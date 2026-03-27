@@ -1,0 +1,25 @@
+/**
+ * Parent / Guardian API Service
+ * GET    /parents        (list)
+ * POST   /parents        (create)
+ * GET    /parents/:id    (single)
+ * PUT    /parents/:id    (update)
+ * DELETE /parents/:id    (delete)
+ */
+
+import api from '@/lib/api';
+import { buildQuery } from '@/lib/utils';
+
+export const parentService = {
+  getAll: (filters = {}) => api.get(`/parents${buildQuery(filters)}`).then((r) => r.data),
+
+  getById: (id) => api.get(`/parents/${id}`).then((r) => r.data),
+
+  findStudents: (payload) => api.post('/parents/find-students', payload).then((r) => r.data),
+
+  create: (body) => api.post('/parents', body).then((r) => r.data),
+
+  update: (id, body) => api.put(`/parents/${id}`, body).then((r) => r.data),
+
+  delete: (id) => api.delete(`/parents/${id}`).then((r) => r.data),
+};
