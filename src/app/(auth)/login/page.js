@@ -48,7 +48,7 @@
 //   const [loading, setLoading] = useState(false);
 //   const [showPass, setShowPass] = useState(false);
 //   const [loginMode, setLoginMode] = useState('single');
-  
+
 //   const [showAccountSelector, setShowAccountSelector] = useState(false);
 //   const [accounts, setAccounts] = useState([]);
 //   const [selectedAccount, setSelectedAccount] = useState(null);
@@ -85,21 +85,21 @@
 //       toast.error('Invalid user data');
 //       return;
 //     }
-    
+
 //     Cookies.remove('access_token');
 //     Cookies.remove('role_code');
 //     Cookies.remove('institute_type');
-    
+
 //     setUser(user, accessToken);
-    
+
 //     Cookies.set('access_token', accessToken, { expires: 7 });
 //     Cookies.set('role_code', user.user_type, { expires: 7 });
-    
+
 //     const instType = user.institute?.institute_type || user.institute_type || 'school';
 //     Cookies.set('institute_type', instType, { expires: 7 });
-    
+
 //     toast.success(`Welcome, ${user.first_name}!`);
-    
+
 //     const role = user.user_type;
 //     if (role === 'MASTER_ADMIN') {
 //       router.replace('/master-admin');
@@ -119,12 +119,12 @@
 //   const onSingleLogin = async (data) => {
 //     try {
 //       setLoading(true);
-      
+
 //       const response = await authService.login({
 //         email: data.email,
 //         password: data.password
 //       });
-      
+
 //       if (response?.user) {
 //         await completeLogin(response.user, response.accessToken);
 //       } else {
@@ -141,18 +141,18 @@
 //     try {
 //       setLoading(true);
 //       setTempEmail(data.email);
-      
+
 //       const response = await authService.login({ email: data.email });
-      
+
 //       console.log('🔍 Raw response:', response);
-      
+
 //       // ✅ FIX: Check both property names
 //       const requiresSelection = response?.requiresSelection || response?.requiresAccountSelection;
 //       const accountsList = response?.accounts || [];
-      
+
 //       console.log('🔍 requiresSelection:', requiresSelection);
 //       console.log('🔍 accountsList length:', accountsList.length);
-      
+
 //       if (requiresSelection && accountsList.length > 0) {
 //         console.log('✅ Showing account selector with', accountsList.length, 'accounts');
 //         setAccounts(accountsList);
@@ -160,7 +160,7 @@
 //         setLoading(false);
 //         return;
 //       }
-      
+
 //       // Handle single account that needs password
 //       if (response?.requiresPassword && response?.account) {
 //         setSelectedAccount(response.account);
@@ -168,12 +168,12 @@
 //         setLoading(false);
 //         return;
 //       }
-      
+
 //       if (response?.user) {
 //         await completeLogin(response.user, response.accessToken);
 //         return;
 //       }
-      
+
 //       toast.error(response?.message || 'No account found');
 //     } catch (err) {
 //       console.error('❌ Dual login error:', err);
@@ -189,21 +189,21 @@
 //     setShowAccountSelector(false);
 //     setShowPasswordDialog(true);
 //   };
-  
+
 //   const handlePasswordSubmit = async () => {
 //     if (!accountPassword) {
 //       toast.error('Please enter password');
 //       return;
 //     }
-    
+
 //     setLoading(true);
-    
+
 //     try {
 //       const response = await authService.loginWithAccount({
 //         accountId: selectedAccount.id,
 //         password: accountPassword
 //       });
-      
+
 //       if (response?.user) {
 //         setShowPasswordDialog(false);
 //         setAccountPassword('');
@@ -217,7 +217,7 @@
 //       setLoading(false);
 //     }
 //   };
-  
+
 //   return (
 //     <>
 //       <div className="flex min-h-[500px] items-center justify-center py-8">
@@ -229,7 +229,7 @@
 //             <h1 className="text-2xl font-bold tracking-tight">The Clouds Academy</h1>
 //             <p className="text-sm text-muted-foreground">Sign in to your account</p>
 //           </div>
-          
+
 //           <div className="rounded-xl border bg-card shadow-sm">
 //             <Tabs defaultValue="single" onValueChange={setLoginMode} className="w-full">
 //               <TabsList className="grid w-full grid-cols-2 rounded-t-xl rounded-b-none border-b">
@@ -242,7 +242,7 @@
 //                   Multiple Accounts
 //                 </TabsTrigger>
 //               </TabsList>
-              
+
 //               <TabsContent value="single" className="p-6">
 //                 <form onSubmit={handleSubmitSingle(onSingleLogin)} className="space-y-4">
 //                   <div>
@@ -258,7 +258,7 @@
 //                     />
 //                     {errorsSingle.email && <p className="text-xs text-destructive mt-1">{errorsSingle.email.message}</p>}
 //                   </div>
-                  
+
 //                   <div>
 //                     <div className="flex items-center justify-between mb-1.5">
 //                       <Label className="text-sm font-medium">
@@ -287,14 +287,14 @@
 //                     </div>
 //                     {errorsSingle.password && <p className="text-xs text-destructive mt-1">{errorsSingle.password.message}</p>}
 //                   </div>
-                  
+
 //                   <Button type="submit" disabled={loading} className="w-full">
 //                     {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
 //                     Sign In
 //                   </Button>
 //                 </form>
 //               </TabsContent>
-              
+
 //               <TabsContent value="dual" className="p-6">
 //                 <form onSubmit={handleSubmitDual(onDualLogin)} className="space-y-4">
 //                   <div>
@@ -310,14 +310,14 @@
 //                     />
 //                     {errorsDual.email && <p className="text-xs text-destructive mt-1">{errorsDual.email.message}</p>}
 //                   </div>
-                  
+
 //                   <div className="bg-muted/30 rounded-lg p-3 text-sm">
 //                     <p className="text-muted-foreground">
 //                       <Users2 className="w-4 h-4 inline mr-1" />
 //                       <strong>For multiple accounts:</strong> Leave password blank. You'll select which account to use.
 //                     </p>
 //                   </div>
-                  
+
 //                   <Button type="submit" disabled={loading} className="w-full">
 //                     {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
 //                     Continue
@@ -326,7 +326,7 @@
 //               </TabsContent>
 //             </Tabs>
 //           </div>
-          
+
 //           <div className="mt-5 rounded-xl border border-dashed bg-muted/40 p-4">
 //             <div className="mb-3 flex items-center gap-1.5">
 //               <Zap size={13} className="text-amber-500" />
@@ -355,7 +355,7 @@
 //           </div>
 //         </div>
 //       </div>
-      
+
 //       <AccountSelectionModal
 //         open={showAccountSelector}
 //         onOpenChange={setShowAccountSelector}
@@ -363,7 +363,7 @@
 //         email={tempEmail}
 //         onSelectAccount={handleSelectAccount}
 //       />
-      
+
 //       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
 //         <DialogContent className="sm:max-w-sm">
 //           <DialogHeader>
@@ -372,7 +372,7 @@
 //               Enter password for {selectedAccount?.display_role} account
 //             </DialogDescription>
 //           </DialogHeader>
-          
+
 //           <div className="space-y-4 py-4">
 //             <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
 //               <div className={`w-10 h-10 rounded-lg ${ROLE_ICONS[selectedAccount?.user_type]?.color || 'bg-slate-100'} flex items-center justify-center`}>
@@ -387,7 +387,7 @@
 //                 <p className="text-xs text-muted-foreground font-mono">{selectedAccount?.email}</p>
 //               </div>
 //             </div>
-            
+
 //             <div className="space-y-2">
 //               <Label>Password</Label>
 //               <div className="relative">
@@ -410,7 +410,7 @@
 //                 </button>
 //               </div>
 //             </div>
-            
+
 //             <Button onClick={handlePasswordSubmit} disabled={!accountPassword} className="w-full">
 //               Sign In
 //             </Button>
@@ -440,8 +440,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import Cookies from 'js-cookie';
 import Link from 'next/link';
-import { 
-  Eye, EyeOff, GraduationCap, Zap, User, Building2, 
+import {
+  Eye, EyeOff, GraduationCap, Zap, User, Building2,
   Users, BookOpen, Briefcase, UserCircle, Loader2, Lock,
   Mail, KeyRound, UserCheck, Users2, School, UserCog, UserPlus
 } from 'lucide-react';
@@ -468,10 +468,10 @@ const ROLE_ICONS = {
 
 // Portal buttons configuration
 const PORTAL_BUTTONS = [
-  { 
-    type: 'STUDENT', 
-    label: 'Student Portal', 
-    icon: BookOpen, 
+  {
+    type: 'STUDENT',
+    label: 'Student Portal',
+    icon: BookOpen,
     color: 'from-emerald-600 to-teal-600',
     bg: 'bg-emerald-50',
     text: 'text-emerald-600',
@@ -479,10 +479,10 @@ const PORTAL_BUTTONS = [
     hover: 'hover:border-emerald-400',
     description: 'View attendance, fees, results & timetable'
   },
-  { 
-    type: 'TEACHER', 
-    label: 'Teacher Portal', 
-    icon: Briefcase, 
+  {
+    type: 'TEACHER',
+    label: 'Teacher Portal',
+    icon: Briefcase,
     color: 'from-blue-600 to-sky-600',
     bg: 'bg-blue-50',
     text: 'text-blue-600',
@@ -490,10 +490,10 @@ const PORTAL_BUTTONS = [
     hover: 'hover:border-blue-400',
     description: 'Manage classes, attendance & assignments'
   },
-  { 
-    type: 'PARENT', 
-    label: 'Parent Portal', 
-    icon: Users, 
+  {
+    type: 'PARENT',
+    label: 'Parent Portal',
+    icon: Users,
     color: 'from-indigo-600 to-violet-600',
     bg: 'bg-indigo-50',
     text: 'text-indigo-600',
@@ -504,9 +504,9 @@ const PORTAL_BUTTONS = [
 ];
 
 const QUICK_LOGINS = [
-  { label: 'Student', email: 'sajood483@gmail.com', password: 'The123456', type: 'STUDENT' },
-  { label: 'Teacher', email: 'shoaibrazamemon160@gmail.com', password: '123456', type: 'TEACHER' },
-  { label: 'Parent', email: 'father.ali@parent.tca', password: 'parent123', type: 'PARENT' },
+  // { label: 'Student', email: 'sajood483@gmail.com', password: 'The123456', type: 'STUDENT' },
+  // { label: 'Teacher', email: 'shoaibrazamemon160@gmail.com', password: '123456', type: 'TEACHER' },
+  // { label: 'Parent', email: 'father.ali@parent.tca', password: 'parent123', type: 'PARENT' },
   { label: 'School Admin', email: 'hafizshoaibraza180@gmail.com', password: 'Shoaib0320', type: 'INSTITUTE_ADMIN' },
   { label: 'Master Admin', email: 'admin@thecloudsacademy.com', password: 'Admin@TCA2026!', type: 'MASTER_ADMIN' },
 ];
@@ -517,7 +517,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [loginMode, setLoginMode] = useState('single');
-  
+
   const [showAccountSelector, setShowAccountSelector] = useState(false);
   const [accounts, setAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState(null);
@@ -549,121 +549,77 @@ export default function LoginPage() {
     toast.info(`Filled ${cred.label} credentials`);
   };
 
-// // Complete login process: set cookies, update auth store, and redirect
-//   const completeLogin = async (user, accessToken) => {
-//     if (!user || !user.id) {
-//       toast.error('Invalid user data');
-//       return;
-//     }
-    
-//     Cookies.remove('access_token');
-//     Cookies.remove('role_code');
-//     Cookies.remove('institute_type');
-//     Cookies.remove('user_type');
-    
-//     setUser(user, accessToken);
-    
-//     Cookies.set('access_token', accessToken, { expires: 7 });
-//     Cookies.set('role_code', user.user_type, { expires: 7 });
-//     Cookies.set('user_type', user.user_type, { expires: 7 });
-    
-//     const instType = user.institute?.institute_type || user.institute_type || 'school';
-//     Cookies.set('institute_type', instType, { expires: 7 });
-    
-//     toast.success(`Welcome, ${user.first_name}!`);
-    
-//     // Redirect based on user type - go directly to portal dashboard
-//     const role = user.user_type;
-//     if (role === 'MASTER_ADMIN') {
-//       router.replace('/master-admin');
-//     } else if (role === 'INSTITUTE_ADMIN') {
-//       router.replace(`/${instType}/dashboard`);
-//     } else if (role === 'TEACHER') {
-//       router.replace('/teacher/dashboard');
-//     } else if (role === 'STUDENT') {
-//       router.replace('/student/dashboard');
-//     } else if (role === 'PARENT') {
-//       router.replace('/parent/dashboard');
-//     } else if (role === 'STAFF') {
-//       router.replace(`/${instType}/dashboard`);
-//     } else {
-//       router.replace('/dashboard');
-//     }
-//   };
+  const completeLogin = async (user, accessToken) => {
+    if (!user || !user.id) {
+      toast.error('Invalid user data');
+      return;
+    }
 
-// frontend/src/app/login/page.jsx - Update completeLogin function
-
-const completeLogin = async (user, accessToken) => {
-  if (!user || !user.id) {
-    toast.error('Invalid user data');
-    return;
-  }
-  
-  // ✅ Clear ALL existing cookies first
-  Cookies.remove('access_token');
-  Cookies.remove('role_code');
-  Cookies.remove('institute_type');
-  Cookies.remove('user_type');
-  Cookies.remove('portal_token');
-  Cookies.remove('portal_type');
-  Cookies.remove('selected_account_id');
-  
-  // ✅ Set auth store
-  setUser(user, accessToken);
-  
-  // ✅ Set correct cookies based on user type
-  Cookies.set('access_token', accessToken, { expires: 7 });
-  Cookies.set('role_code', user.user_type, { expires: 7 });  // ← Use user_type, not role_code
-  Cookies.set('user_type', user.user_type, { expires: 7 });
-  
-  // Set institute type only if user has institute
-  const instType = user.institute?.institute_type || user.institute_type || null;
-  if (instType) {
-    Cookies.set('institute_type', instType, { expires: 7 });
-  } else {
+    // ✅ Clear ALL existing cookies first
+    Cookies.remove('access_token');
+    Cookies.remove('role_code');
     Cookies.remove('institute_type');
-  }
-  
-  // For portal users, also set portal_token and portal_type
-  if (user.user_type === 'STUDENT' || user.user_type === 'PARENT' || user.user_type === 'TEACHER') {
-    Cookies.set('portal_token', accessToken, { expires: 7 });
-    Cookies.set('portal_type', user.user_type, { expires: 7 });
-  } else {
+    Cookies.remove('user_type');
     Cookies.remove('portal_token');
     Cookies.remove('portal_type');
-  }
-  
-  toast.success(`Welcome, ${user.first_name}!`);
-  
-  // Redirect based on user type
-  const role = user.user_type;
-  if (role === 'MASTER_ADMIN') {
-    router.replace('/master-admin');
-  } else if (role === 'INSTITUTE_ADMIN') {
-    router.replace(`/${instType}/dashboard`);
-  } else if (role === 'TEACHER') {
-    router.replace('/teacher/dashboard');
-  } else if (role === 'STUDENT') {
-    router.replace('/student/dashboard');
-  } else if (role === 'PARENT') {
-    router.replace('/parent/dashboard');
-  } else if (role === 'STAFF') {
-    router.replace(`/${instType}/dashboard`);
-  } else {
-    router.replace('/dashboard');
-  }
-};
+    Cookies.remove('selected_account_id');
+
+    // ✅ Set auth store
+    setUser(user, accessToken);
+
+    // ✅ Set correct cookies based on user type
+    Cookies.set('access_token', accessToken, { expires: 7 });
+    Cookies.set('role_code', user.user_type, { expires: 7 });  // ← Use user_type, not role_code
+    Cookies.set('user_type', user.user_type, { expires: 7 });
+
+    // Set institute type only if user has institute
+    const instType = user.institute?.institute_type || user.institute_type || null;
+    if (instType) {
+      Cookies.set('institute_type', instType, { expires: 7 });
+    } else {
+      Cookies.remove('institute_type');
+    }
+
+    // For portal users, also set portal_token and portal_type
+    if (user.user_type === 'STUDENT' || user.user_type === 'PARENT' || user.user_type === 'TEACHER') {
+      Cookies.set('portal_token', accessToken, { expires: 7 });
+      Cookies.set('portal_type', user.user_type, { expires: 7 });
+    } else {
+      Cookies.remove('portal_token');
+      Cookies.remove('portal_type');
+    }
+
+    toast.success(`Welcome, ${user.first_name}!`);
+
+    // Redirect based on user type
+    const role = user.user_type;
+    if (role === 'MASTER_ADMIN') {
+      router.replace('/master-admin');
+    } else if (role === 'INSTITUTE_ADMIN') {
+      router.replace(`/${instType}/dashboard`);
+    } else if (role === 'TEACHER') {
+      router.replace('/teacher/dashboard');
+    } else if (role === 'STUDENT') {
+      router.replace('/student/dashboard');
+    } else if (role === 'PARENT') {
+      router.replace('/parent/dashboard');
+    } else if (role === 'STAFF') {
+      router.replace(`/${instType}/dashboard`);
+    } else {
+      router.replace('/dashboard');
+    }
+  };
 
 
   const onSingleLogin = async (data) => {
     try {
       setLoading(true);
-      
+
       const response = await authService.login({
         email: data.email,
         password: data.password
       });
-      
+
       if (response?.user) {
         await completeLogin(response.user, response.accessToken);
       } else {
@@ -680,31 +636,31 @@ const completeLogin = async (user, accessToken) => {
     try {
       setLoading(true);
       setTempEmail(data.email);
-      
+
       const response = await authService.login({ email: data.email });
-      
+
       const requiresSelection = response?.requiresSelection || response?.requiresAccountSelection;
       const accountsList = response?.accounts || [];
-      
+
       if (requiresSelection && accountsList.length > 0) {
         setAccounts(accountsList);
         setShowAccountSelector(true);
         setLoading(false);
         return;
       }
-      
+
       if (response?.requiresPassword && response?.account) {
         setSelectedAccount(response.account);
         setShowPasswordDialog(true);
         setLoading(false);
         return;
       }
-      
+
       if (response?.user) {
         await completeLogin(response.user, response.accessToken);
         return;
       }
-      
+
       toast.error(response?.message || 'No account found');
     } catch (err) {
       console.error('❌ Dual login error:', err);
@@ -719,21 +675,21 @@ const completeLogin = async (user, accessToken) => {
     setShowAccountSelector(false);
     setShowPasswordDialog(true);
   };
-  
+
   const handlePasswordSubmit = async () => {
     if (!accountPassword) {
       toast.error('Please enter password');
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
       const response = await authService.loginWithAccount({
         accountId: selectedAccount.id,
         password: accountPassword
       });
-      
+
       if (response?.user) {
         setShowPasswordDialog(false);
         setAccountPassword('');
@@ -747,7 +703,7 @@ const completeLogin = async (user, accessToken) => {
       setLoading(false);
     }
   };
-  
+
   return (
     <>
       <div className="flex min-h-screen items-center justify-center py-8 bg-gradient-to-br from-slate-50 to-slate-100">
@@ -760,7 +716,7 @@ const completeLogin = async (user, accessToken) => {
             <h1 className="text-3xl font-bold tracking-tight">The Clouds Academy</h1>
             <p className="text-sm text-muted-foreground">Student Information System</p>
           </div>
-          
+
           {/* 3 Portal Buttons */}
           <div className="grid grid-cols-3 gap-3 mb-6">
             {PORTAL_BUTTONS.map((portal) => {
@@ -780,7 +736,7 @@ const completeLogin = async (user, accessToken) => {
               );
             })}
           </div>
-          
+
           <div className="rounded-xl border bg-card shadow-sm">
             <Tabs defaultValue="single" onValueChange={setLoginMode} className="w-full">
               <TabsList className="grid w-full grid-cols-2 rounded-t-xl rounded-b-none border-b">
@@ -793,7 +749,7 @@ const completeLogin = async (user, accessToken) => {
                   Multiple Accounts
                 </TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="single" className="p-6">
                 <form onSubmit={handleSubmitSingle(onSingleLogin)} className="space-y-4">
                   <div>
@@ -809,7 +765,7 @@ const completeLogin = async (user, accessToken) => {
                     />
                     {errorsSingle.email && <p className="text-xs text-destructive mt-1">{errorsSingle.email.message}</p>}
                   </div>
-                  
+
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <Label className="text-sm font-medium">
@@ -838,14 +794,14 @@ const completeLogin = async (user, accessToken) => {
                     </div>
                     {errorsSingle.password && <p className="text-xs text-destructive mt-1">{errorsSingle.password.message}</p>}
                   </div>
-                  
+
                   <Button type="submit" disabled={loading} className="w-full">
                     {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                     Sign In
                   </Button>
                 </form>
               </TabsContent>
-              
+
               <TabsContent value="dual" className="p-6">
                 <form onSubmit={handleSubmitDual(onDualLogin)} className="space-y-4">
                   <div>
@@ -861,14 +817,14 @@ const completeLogin = async (user, accessToken) => {
                     />
                     {errorsDual.email && <p className="text-xs text-destructive mt-1">{errorsDual.email.message}</p>}
                   </div>
-                  
+
                   <div className="bg-muted/30 rounded-lg p-3 text-sm">
                     <p className="text-muted-foreground">
                       <Users2 className="w-4 h-4 inline mr-1" />
                       <strong>For multiple accounts:</strong> Leave password blank. You'll select which account to use.
                     </p>
                   </div>
-                  
+
                   <Button type="submit" disabled={loading} className="w-full">
                     {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                     Continue
@@ -877,7 +833,7 @@ const completeLogin = async (user, accessToken) => {
               </TabsContent>
             </Tabs>
           </div>
-          
+
           {/* Quick Login */}
           <div className="mt-5 rounded-xl border border-dashed bg-muted/40 p-4">
             <div className="mb-3 flex items-center gap-1.5">
@@ -907,7 +863,7 @@ const completeLogin = async (user, accessToken) => {
           </div>
         </div>
       </div>
-      
+
       <AccountSelectionModal
         open={showAccountSelector}
         onOpenChange={setShowAccountSelector}
@@ -915,7 +871,7 @@ const completeLogin = async (user, accessToken) => {
         email={tempEmail}
         onSelectAccount={handleSelectAccount}
       />
-      
+
       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
@@ -924,7 +880,7 @@ const completeLogin = async (user, accessToken) => {
               Enter password for {selectedAccount?.display_role} account
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
               <div className={`w-10 h-10 rounded-lg ${ROLE_ICONS[selectedAccount?.user_type]?.color || 'bg-slate-100'} flex items-center justify-center`}>
@@ -939,7 +895,7 @@ const completeLogin = async (user, accessToken) => {
                 <p className="text-xs text-muted-foreground font-mono">{selectedAccount?.email}</p>
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label>Password</Label>
               <div className="relative">
@@ -962,7 +918,7 @@ const completeLogin = async (user, accessToken) => {
                 </button>
               </div>
             </div>
-            
+
             <Button onClick={handlePasswordSubmit} disabled={!accountPassword} className="w-full">
               Sign In
             </Button>
