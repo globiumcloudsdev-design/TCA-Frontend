@@ -94,15 +94,22 @@ const ROLE_STYLES = {
   TEACHER: { icon: Briefcase, bg: 'bg-blue-100', ic: 'text-blue-600' },
 };
 
-export default function PortalLoginPage() {
-  // const router = useRouter();
-  const router = useRouter();
-  const searchParams = useSearchParams();
+import { Suspense } from 'react';
 
-  // Get portal type from URL parameter
+export default function PortalLoginPage() {
+  const router = useRouter();
+
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PortalLoginContent />
+    </Suspense>
+  );
+}
+
+function PortalLoginContent() {
+  const searchParams = useSearchParams();
   const urlType = searchParams?.get('type');
 
-  // Set active type based on URL parameter
   useEffect(() => {
     if (urlType && ['STUDENT', 'TEACHER', 'PARENT'].includes(urlType)) {
       setActiveType(urlType);
