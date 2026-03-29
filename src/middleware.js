@@ -153,7 +153,7 @@
 import { NextResponse } from 'next/server';
 
 // Public paths
-const PUBLIC_PATHS = ['/', '/login', '/portal-login', '/forgot-password', '/reset-password'];
+const PUBLIC_PATHS = ['/', '/login', '/portal-login', '/forgot-password', '/reset-password', '/contact', '/about', '/features', '/stats', '/faq', '/pricing'];
 
 // Portal route prefixes
 const PORTAL_PATHS = {
