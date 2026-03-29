@@ -1,15 +1,15 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Menu, X, GraduationCap } from 'lucide-react';
+import { Menu, X, GraduationCap, ArrowRight } from 'lucide-react';
 
 const NAV_LINKS = [
-  { label: 'Features', href: '#features' },
-  { label: 'Modules', href: '#modules' },
+  { label: 'Features', href: '/features' }, // Features page link
+  { label: 'Solutions', href: '#modules' },
   { label: 'Pricing', href: '#pricing' },
-  { label: 'Testimonials', href: '#testimonials' },
-  { label: 'FAQ', href: '#faq' },
+  { label: 'About', href: '#about' },
 ];
 
 export default function Navbar() {
@@ -22,94 +22,114 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const handleNav = (href) => {
-    setMenuOpen(false);
-    const el = document.querySelector(href);
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-  };
-
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? 'bg-white/95 backdrop-blur-md shadow-md border-b border-slate-100' : 'bg-transparent'
+      className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ${
+        scrolled 
+          ? 'py-3 bg-slate-950/80 backdrop-blur-xl border-b border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]' 
+          : 'py-5 bg-transparent'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 shadow-lg group-hover:scale-105 transition-transform">
-              <GraduationCap className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-between">
+          
+          {/* Logo Section */}
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="relative">
+              <div className="absolute inset-0 bg-indigo-500 blur-lg opacity-40 group-hover:opacity-100 transition-opacity" />
+              <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-xl border border-white/20">
+                <GraduationCap className="w-6 h-6 text-white" />
+              </div>
             </div>
-            <div className="flex flex-col leading-none">
-              <span className="text-sm font-bold text-slate-900">The Clouds</span>
-              <span className="text-[10px] font-semibold text-indigo-600 tracking-wider uppercase">Academy</span>
+            <div className="flex flex-col">
+              <span className="text-lg font-black text-white tracking-tight leading-none">THE CLOUDS</span>
+              <span className="text-[10px] font-bold text-indigo-400 tracking-[0.2em] uppercase leading-none mt-1">Academy</span>
             </div>
           </Link>
 
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-1">
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center bg-white/5 border border-white/10 px-2 py-1.5 rounded-full backdrop-blur-md">
             {NAV_LINKS.map((link) => (
-              <button
-                key={link.href}
-                onClick={() => handleNav(link.href)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+              <Link
+                key={link.label}
+                href={link.href}
+                className="px-5 py-2 text-sm font-semibold text-slate-300 hover:text-white transition-all relative group"
               >
                 {link.label}
-              </button>
+                <span className="absolute bottom-1 left-5 right-5 h-px bg-indigo-500 scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
+              </Link>
             ))}
           </nav>
 
-          {/* Desktop CTA */}
-          <div className="hidden md:flex items-center gap-3">
+          {/* Action Buttons */}
+          <div className="hidden md:flex items-center gap-4">
             <Link href="/login">
-              <Button variant="ghost" size="sm" className="text-slate-700 hover:text-indigo-600 font-medium">
-                Sign In
-              </Button>
+              <span className="text-sm font-bold text-slate-300 hover:text-white transition-colors cursor-pointer">
+                Log in
+              </span>
             </Link>
             <Link href="/login">
-              <Button size="sm" className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-md hover:shadow-indigo-200 transition-all font-medium">
-                Start Free Trial
+              <Button size="sm" className="bg-white text-slate-950 hover:bg-indigo-50 font-bold px-6 rounded-full transition-all hover:scale-105 active:scale-95 shadow-lg shadow-white/5">
+                Join Now
+                <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
             </Link>
           </div>
 
-          {/* Mobile menu toggle */}
+          {/* Mobile Menu Button */}
           <button
-            className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100"
+            className="md:hidden p-2.5 rounded-xl bg-white/5 border border-white/10 text-white transition-colors hover:bg-white/10"
             onClick={() => setMenuOpen(!menuOpen)}
           >
-            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      {menuOpen && (
-        <div className="md:hidden bg-white border-t border-slate-100 shadow-xl">
-          <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col gap-1">
+      {/* Mobile Sidebar Overlay */}
+      <div 
+        className={`fixed inset-0 bg-slate-950/60 backdrop-blur-sm md:hidden transition-opacity duration-300 ${
+          menuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setMenuOpen(false)}
+      />
+
+      {/* Mobile Menu Panel */}
+      <div className={`fixed top-0 right-0 h-full w-[280px] bg-slate-900 border-l border-white/10 z-[101] md:hidden transform transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${
+        menuOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}>
+        <div className="p-6 flex flex-col h-full">
+          <div className="flex justify-end mb-8">
+            <button onClick={() => setMenuOpen(false)} className="p-2 text-slate-400"><X /></button>
+          </div>
+          
+          <nav className="flex flex-col gap-4">
             {NAV_LINKS.map((link) => (
-              <button
-                key={link.href}
-                onClick={() => handleNav(link.href)}
-                className="w-full text-left px-4 py-3 text-sm font-medium text-slate-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+              <Link
+                key={link.label}
+                href={link.href}
+                onClick={() => setMenuOpen(false)}
+                className="text-xl font-bold text-white p-2 hover:text-indigo-400 transition-colors"
               >
                 {link.label}
-              </button>
+              </Link>
             ))}
-            <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-slate-100">
-              <Link href="/login" onClick={() => setMenuOpen(false)}>
-                <Button variant="outline" className="w-full font-medium">Sign In</Button>
-              </Link>
-              <Link href="/login" onClick={() => setMenuOpen(false)}>
-                <Button className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-medium">
-                  Start Free Trial
-                </Button>
-              </Link>
-            </div>
+          </nav>
+
+          <div className="mt-auto space-y-4">
+            <Link href="/login" className="block">
+              <Button variant="outline" className="w-full border-white/10 text-white hover:bg-white/5 h-12 rounded-xl">
+                Sign In
+              </Button>
+            </Link>
+            <Link href="/login" className="block">
+              <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-12 rounded-xl shadow-lg shadow-indigo-600/20">
+                Get Started
+              </Button>
+            </Link>
           </div>
         </div>
-      )}
+      </div>
     </header>
   );
 }
