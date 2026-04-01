@@ -205,9 +205,7 @@ export const teacherService = {
       console.error('Error updating teacher:', error);
       throw error;
     }
-  },
-
-  
+  },  
   /**
    * ✅ Toggle teacher status (active/inactive)
    */

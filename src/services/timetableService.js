@@ -164,7 +164,49 @@ export const timetableService = {
       () => api.delete(`/timetable/${id}`).then((r) => r.data),
       () => ({ data: { id } }),
     ),
-
+ /**
+   * Get busy teachers for a specific day and period
+   * @param {Object} params - { day, period, start_time, end_time, exclude_timetable_id, class_id, section_id }
+   */
+  getBusyTeachers: async (params) => {
+    try {
+      const response = await api.get('/timetable/busy-teachers', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching busy teachers:', error);
+      
+      // Fallback: Check in dummy data
+      const { day, period, start_time, end_time, exclude_timetable_id, class_id, section_id } = params;
+      
+      const busyTeacherIds = new Set();
+      
+      DUMMY_TIMETABLE.forEach(slot => {
+        if (slot.day === day && !slot.is_break && slot.id !== exclude_timetable_id) {
+          let isConflict = false;
+          
+          if (period && slot.period === parseInt(period)) {
+            isConflict = true;
+          } else if (start_time && end_time && slot.start_time && slot.end_time) {
+            if ((start_time >= slot.start_time && start_time < slot.end_time) ||
+                (end_time > slot.start_time && end_time <= slot.end_time) ||
+                (start_time <= slot.start_time && end_time >= slot.end_time)) {
+              isConflict = true;
+            }
+          }
+          
+          if (isConflict && slot.teacher_id) {
+            busyTeacherIds.add(slot.teacher_id);
+          }
+        }
+      });
+      
+      return {
+        success: true,
+        data: { busyTeachers: Array.from(busyTeacherIds) }
+      };
+    }
+  },
+    
   /**
    * Check teacher conflict
    * @param {Object} params - { teacher_id, day, period, start_time, end_time, exclude_id }

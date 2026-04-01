@@ -1,170 +1,409 @@
+
+// frontend/src/components/pages/ExamsPage.jsx
+
 'use client';
-/**
- * ExamsPage — Adaptive: School → Exams | Coaching → Tests | Academy → Assessments
- */
+
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, GraduationCap } from 'lucide-react';
-import useInstituteConfig from '@/hooks/useInstituteConfig';
+import { Plus, GraduationCap, Calendar, BookOpen } from 'lucide-react';
+import { format } from 'date-fns';
+
 import useAuthStore from '@/store/authStore';
-import DataTable from '@/components/common/DataTable';
+import useInstituteStore from '@/store/instituteStore';
+import useInstituteConfig from '@/hooks/useInstituteConfig';
+
 import PageHeader from '@/components/common/PageHeader';
+import DataTable from '@/components/common/DataTable';
 import AppModal from '@/components/common/AppModal';
-import SelectField from '@/components/common/SelectField';
-import DatePickerField from '@/components/common/DatePickerField';
 import StatsCard from '@/components/common/StatsCard';
-import { cn } from '@/lib/utils';
-import { DUMMY_EXAMS } from '@/data/dummyData';
+import StatusBadge from '@/components/common/StatusBadge';
+import PageLoader from '@/components/common/PageLoader';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
+import TableRowActions from '@/components/common/TableRowActions';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
-const EXAM_TYPES = [
-  { value:'midterm',  label:'Midterm' }, { value:'final',    label:'Final' },
-  { value:'unit',     label:'Unit Test' }, { value:'quiz',   label:'Quiz' },
-  { value:'monthly',  label:'Monthly' }, { value:'practice', label:'Practice' },
+import { examService } from '@/services/examService';
+import ExamForm from '@/components/forms/ExamForm';
+
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All Status' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'ongoing', label: 'Ongoing' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'results_published', label: 'Results Published' }
 ];
-const STATUS_OPTS = [{ value:'scheduled', label:'Scheduled' }, { value:'ongoing', label:'Ongoing' }, { value:'completed', label:'Completed' }];
-const STATUS_COLORS = { scheduled:'bg-blue-100 text-blue-700', ongoing:'bg-amber-100 text-amber-700', completed:'bg-emerald-100 text-emerald-700' };
 
-const schema = z.object({
-  title:      z.string().min(3, 'Required'),
-  type:       z.string().min(1, 'Required'),
-  subject:    z.string().min(1, 'Required'),
-  class_name: z.string().min(1, 'Required'),
-  total_marks:z.coerce.number().min(1, 'Required'),
-  pass_marks: z.coerce.number().min(1, 'Required'),
-  status:     z.string().min(1, 'Required'),
-  exam_date:  z.string().optional(),
-});
+const EXAM_TYPE_OPTIONS = [
+  { value: 'all', label: 'All Types' },
+  { value: 'mid_term', label: 'Mid Term' },
+  { value: 'final', label: 'Final' },
+  { value: 'unit_test', label: 'Unit Test' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'half_yearly', label: 'Half Yearly' },
+  { value: 'annual', label: 'Annual' }
+];
 
-
+const STATUS_COLORS = {
+  draft: 'bg-gray-100 text-gray-700',
+  scheduled: 'bg-blue-100 text-blue-700',
+  ongoing: 'bg-amber-100 text-amber-700',
+  completed: 'bg-emerald-100 text-emerald-700',
+  cancelled: 'bg-red-100 text-red-700',
+  results_published: 'bg-purple-100 text-purple-700'
+};
 
 export default function ExamsPage({ type }) {
-  const qc    = useQueryClient();
-  const canDo = useAuthStore((s) => s.canDo);
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { canDo } = useAuthStore();
+  const { currentInstitute } = useInstituteStore();
   const { terms } = useInstituteConfig();
-  const label  = type === 'coaching' ? 'Test' : type === 'academy' ? 'Assessment' : 'Exam';
+
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [examType, setExamType] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingExam, setEditingExam] = useState(null);
+  const [deletingExam, setDeletingExam] = useState(null);
+  const [publishingExam, setPublishingExam] = useState(null);
+
+  const label = type === 'coaching' ? 'Test' : type === 'academy' ? 'Assessment' : 'Exam';
   const labelP = type === 'coaching' ? 'Tests' : type === 'academy' ? 'Assessments' : 'Exams';
 
-  const [search, setSearch]   = useState('');
-  const [status, setStatus]   = useState('');
-  const [page,   setPage]     = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [modal,   setModal]   = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [deleting,setDeleting]= useState(null);
-
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm({ resolver: zodResolver(schema), defaultValues: { status:'scheduled', total_marks:100, pass_marks:40 } });
-
-  const { data, isLoading } = useQuery({
-    queryKey: ['exams', type, page, pageSize, search, status],
-    queryFn: async () => {
-      try {
-        const { examService } = await import('@/services');
-        return await examService.getAll({ page, limit: pageSize, search, status });
-      } catch {
-        const d = DUMMY_EXAMS.filter(r => (!search || r.title.toLowerCase().includes(search.toLowerCase())) && (!status || r.status === status));
-        const slice = d.slice((page-1)*pageSize, page*pageSize);
-        return { data: { rows: slice, total: d.length, totalPages: Math.max(1, Math.ceil(d.length / pageSize)) } };
-      }
-    },
-    placeholderData: (p) => p,
+  // Fetch exams
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['exams', currentInstitute?.id, page, pageSize, search, status, examType],
+    queryFn: () => examService.getAll({
+      institute_id: currentInstitute?.id,
+      page,
+      limit: pageSize,
+      search,
+      status: status !== 'all' ? status : undefined,
+      type: examType !== 'all' ? examType : undefined
+    }),
+    enabled: !!currentInstitute?.id
   });
 
-  const rows = data?.data?.rows ?? DUMMY_EXAMS;
-  const total = data?.data?.total ?? rows.length;
-  const totalPages = data?.data?.totalPages ?? 1;
+  const exams = data?.data || [];
+  const total = data?.pagination?.total || 0;
+  const totalPages = data?.pagination?.totalPages || 1;
 
-  const save = useMutation({
-    mutationFn: async (vals) => {
-      try { const { examService } = await import('@/services'); return editing ? await examService.update(editing.id, vals) : await examService.create(vals); }
-      catch { return { data: vals }; }
+  // Calculate stats
+  const stats = useMemo(() => {
+    const scheduled = exams.filter(e => e.status === 'scheduled').length;
+    const ongoing = exams.filter(e => e.status === 'ongoing').length;
+    const completed = exams.filter(e => ['completed', 'results_published'].includes(e.status)).length;
+    return { scheduled, ongoing, completed, total: exams.length };
+  }, [exams]);
+
+  // Mutations
+  const deleteMutation = useMutation({
+    mutationFn: (id) => examService.delete(id),
+    onSuccess: () => {
+      toast.success(`${label} deleted successfully`);
+      queryClient.invalidateQueries({ queryKey: ['exams'] });
+      setDeletingExam(null);
     },
-    onSuccess: () => { toast.success(editing ? 'Updated' : 'Created'); qc.invalidateQueries({ queryKey: ['exams'] }); closeModal(); },
-    onError: () => toast.error('Save failed'),
+    onError: (error) => toast.error(error.message || `Failed to delete ${label.toLowerCase()}`)
   });
 
-  const remove = useMutation({
-    mutationFn: async (id) => {
-      try { const { examService } = await import('@/services'); return await examService.delete(id); }
-      catch { return { success: true }; }
+  const publishMutation = useMutation({
+    mutationFn: (id) => examService.publish(id),
+    onSuccess: (data) => {
+      toast.success(`${label} published successfully`);
+      queryClient.invalidateQueries({ queryKey: ['exams'] });
+      setPublishingExam(null);
     },
-    onSuccess: () => { toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['exams'] }); setDeleting(null); },
-    onError: () => toast.error('Delete failed'),
+    onError: (error) => {
+      toast.error(error.message || `Failed to publish ${label.toLowerCase()}`);
+      setPublishingExam(null);
+    }
   });
 
-  const openAdd  = () => { setEditing(null); reset({ status:'scheduled', total_marks:100, pass_marks:40 }); setModal(true); };
-  const openEdit = (row) => { setEditing(row); reset({ ...row }); setModal(true); };
-  const closeModal = () => { setModal(false); setEditing(null); reset(); };
+  const handleEdit = (exam) => {
+    setEditingExam(exam);
+    setModalOpen(true);
+  };
+
+  const handleDelete = (exam) => {
+    setDeletingExam(exam);
+  };
+
+  const handlePublish = (exam) => {
+    setPublishingExam(exam);
+  };
+
+  const handleEnterResults = (exam) => {
+    router.push(`exams/${exam.id}/results`);
+  };
+
+  const handleViewResults = (exam) => {
+    router.push(`exams/${exam.id}/results-report`);
+  };
+
+  const handleSuccess = () => {
+    setModalOpen(false);
+    setEditingExam(null);
+    queryClient.invalidateQueries({ queryKey: ['exams'] });
+  };
 
   const columns = useMemo(() => [
-    { accessorKey: 'title', header: `${label} Title`, cell: ({ getValue }) => <span className="font-medium">{getValue()}</span> },
-    { accessorKey: 'type',       header: 'Type',       cell: ({ getValue }) => <span className="capitalize">{getValue()}</span> },
-    { accessorKey: 'subject',    header: 'Subject' },
-    { accessorKey: 'class_name', header: terms.primary_unit },
-    { accessorKey: 'total_marks',header: 'Total Marks' },
-    { accessorKey: 'exam_date',  header: 'Date', cell: ({ getValue }) => getValue() ? new Date(getValue()).toLocaleDateString('en-PK') : '—' },
-    { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => { const s = getValue(); return <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', STATUS_COLORS[s])}>{s}</span>; } },
-    { id: 'actions', header: 'Actions', enableHiding: false, cell: ({ row }) => (
-      <div className="flex items-center justify-end gap-1">
-        {canDo('exams.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
-        {canDo('exams.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
-      </div>
-    )},
-  ], [canDo, label, terms.primary_unit]);
+    {
+      accessorKey: 'name',
+      header: `${label} Name`,
+      cell: ({ row }) => (
+        <div>
+          <p className="font-medium">{row.original.name}</p>
+          {row.original.code && (
+            <p className="text-xs text-muted-foreground">{row.original.code}</p>
+          )}
+        </div>
+      )
+    },
+    {
+      accessorKey: 'type',
+      header: 'Type',
+      cell: ({ getValue }) => (
+        <span className="capitalize">{getValue()?.replace('_', ' ')}</span>
+      )
+    },
+    {
+      accessorKey: 'subject_schedules',
+      header: 'Subjects',
+      cell: ({ getValue }) => {
+        const schedules = getValue() || [];
+        return (
+          <div className="flex flex-wrap gap-1 max-w-[200px]">
+            {schedules.slice(0, 3).map(s => (
+              <Badge key={s.subject_id} variant="outline" className="text-xs">
+                {s.subject_name}
+              </Badge>
+            ))}
+            {schedules.length > 3 && (
+              <Badge variant="outline" className="text-xs">
+                +{schedules.length - 3}
+              </Badge>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      accessorKey: 'total_marks',
+      header: 'Total Marks',
+      cell: ({ getValue }) => getValue() || '—'
+    },
+    {
+      accessorKey: 'start_date',
+      header: 'Exam Period',
+      cell: ({ row }) => {
+        const start = row.original.start_date;
+        const end = row.original.end_date;
+        if (!start) return '—';
+        if (start === end) return format(new Date(start), 'dd MMM yyyy');
+        return `${format(new Date(start), 'dd MMM')} - ${format(new Date(end), 'dd MMM yyyy')}`;
+      }
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ getValue }) => (
+        <StatusBadge status={getValue()} customColors={STATUS_COLORS} />
+      )
+    },
+    {
+      accessorKey: 'results_summary',
+      header: 'Results',
+      cell: ({ row }) => {
+        const summary = row.original.results_summary;
+        if (!summary || summary.total_students === 0) return '—';
+        return (
+          <div className="text-xs">
+            <span className="text-green-600">Pass: {summary.passed}</span>
+            {' | '}
+            <span className="text-red-600">Fail: {summary.failed}</span>
+            {summary.absent > 0 && (
+              <span className="text-gray-500"> | Absent: {summary.absent}</span>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      enableHiding: false,
+      cell: ({ row }) => {
+        const exam = row.original;
+        const extraActions = [];
 
-  const counts = useMemo(() => ({ scheduled: rows.filter(r => r.status === 'scheduled').length, ongoing: rows.filter(r => r.status === 'ongoing').length, completed: rows.filter(r => r.status === 'completed').length }), [rows]);
+        // Publish action (draft exams)
+        if (canDo('exam_results.publish') && exam.status === 'draft') {
+          extraActions.push({
+            label: 'Publish',
+            icon: '📢',
+            onClick: () => handlePublish(exam)
+          });
+        }
+
+        // Enter Results (published/ongoing exams)
+        if (canDo('exam_results.enter') && ['scheduled', 'ongoing', 'completed'].includes(exam.status)) {
+          extraActions.push({
+            label: 'Enter Results',
+            icon: '✏️',
+            onClick: () => handleEnterResults(exam)
+          });
+        }
+
+        // View Results (results published or completed)
+        if (canDo('exam_results.view') && ['completed', 'results_published'].includes(exam.status)) {
+          extraActions.push({
+            label: 'View Results',
+            icon: '👁️',
+            onClick: () => handleViewResults(exam)
+          });
+        }
+
+        return (
+          <TableRowActions
+            onEdit={canDo('exams.update') ? () => handleEdit(exam) : undefined}
+            onDelete={canDo('exams.delete') ? () => handleDelete(exam) : undefined}
+            extra={extraActions}
+          />
+        );
+      }
+    }
+  ], [canDo, label]);
+
+  if (isLoading) return <PageLoader message={`Loading ${labelP.toLowerCase()}...`} />;
 
   return (
-    <div className="space-y-5">
-      <PageHeader title={labelP} description={`${total} total`} />
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatsCard label="Scheduled"  value={counts.scheduled}  icon={<GraduationCap size={18} />} />
-        <StatsCard label="Ongoing"    value={counts.ongoing}    icon={<GraduationCap size={18} />} />
-        <StatsCard label="Completed"  value={counts.completed}  icon={<GraduationCap size={18} />} />
+    <div className="space-y-6">
+      <PageHeader
+        title={labelP}
+        description={`Manage ${labelP.toLowerCase()} for your institute`}
+        action={
+          canDo('exams.create') && (
+            <Button onClick={() => { setEditingExam(null); setModalOpen(true); }}>
+              <Plus className="mr-2 h-4 w-4" />
+              New {label}
+            </Button>
+          )
+        }
+      />
+
+      <div className="grid gap-4 sm:grid-cols-4">
+        <StatsCard
+          label="Total"
+          value={stats.total}
+          icon={<GraduationCap size={18} />}
+        />
+        <StatsCard
+          label="Scheduled"
+          value={stats.scheduled}
+          icon={<Calendar size={18} />}
+          variant="info"
+        />
+        <StatsCard
+          label="Ongoing"
+          value={stats.ongoing}
+          icon={<BookOpen size={18} />}
+          variant="warning"
+        />
+        <StatsCard
+          label="Completed"
+          value={stats.completed}
+          icon={<GraduationCap size={18} />}
+          variant="success"
+        />
       </div>
-      <DataTable columns={columns} data={rows} loading={isLoading} emptyMessage={`No ${labelP.toLowerCase()} found`}
-        search={search} onSearch={(v) => { setSearch(v); setPage(1); }} searchPlaceholder={`Search ${labelP.toLowerCase()}…`}
-        filters={[{ name:'status', label:'Status', value:status, onChange:(v) => { setStatus(v); setPage(1); }, options:STATUS_OPTS }]}
-        action={canDo('exams.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> New {label}</button> : null}
+
+      <DataTable
+        columns={columns}
+        data={exams}
+        loading={isLoading}
+        emptyMessage={`No ${labelP.toLowerCase()} found`}
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1); }}
+        searchPlaceholder={`Search ${labelP.toLowerCase()}...`}
+        filters={[
+          {
+            name: 'status',
+            label: 'Status',
+            value: status,
+            onChange: (v) => { setStatus(v); setPage(1); },
+            options: STATUS_OPTIONS
+          },
+          {
+            name: 'type',
+            label: 'Exam Type',
+            value: examType,
+            onChange: (v) => { setExamType(v); setPage(1); },
+            options: EXAM_TYPE_OPTIONS
+          }
+        ]}
         enableColumnVisibility
-        exportConfig={{ fileName: 'exams' }}
-        pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }} />
+        exportConfig={{
+          fileName: `${labelP.toLowerCase()}_export`,
+          data: exams
+        }}
+        pagination={{
+          page,
+          totalPages,
+          onPageChange: setPage,
+          total,
+          pageSize,
+          onPageSizeChange: (s) => { setPageSize(s); setPage(1); }
+        }}
+      />
 
-      <AppModal open={modal} onClose={closeModal} title={editing ? `Edit ${label}` : `New ${label}`} size="lg"
-        footer={<><button type="button" onClick={closeModal} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button><button type="submit" form="exam-form" disabled={save.isPending} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60">{save.isPending ? 'Saving…' : editing ? 'Update' : 'Create'}</button></>}>
-        <form id="exam-form" onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4">
-          <div className="space-y-1.5"><label className="text-sm font-medium">{label} Title *</label><input {...register('title')} className="input-base" />{errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}</div>
-          <div className="grid grid-cols-2 gap-4">
-            <SelectField label="Type" name="type" control={control} error={errors.type} options={EXAM_TYPES} required />
-            <div className="space-y-1.5"><label className="text-sm font-medium">Subject *</label><input {...register('subject')} className="input-base" />{errors.subject && <p className="text-xs text-destructive">{errors.subject.message}</p>}</div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><label className="text-sm font-medium">{terms.primary_unit} *</label><input {...register('class_name')} className="input-base" />{errors.class_name && <p className="text-xs text-destructive">{errors.class_name.message}</p>}</div>
-            <DatePickerField label="Exam Date" name="exam_date" control={control} />
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-1.5"><label className="text-sm font-medium">Total Marks *</label><input type="number" {...register('total_marks')} className="input-base" />{errors.total_marks && <p className="text-xs text-destructive">{errors.total_marks.message}</p>}</div>
-            <div className="space-y-1.5"><label className="text-sm font-medium">Pass Marks *</label><input type="number" {...register('pass_marks')} className="input-base" />{errors.pass_marks && <p className="text-xs text-destructive">{errors.pass_marks.message}</p>}</div>
-            <SelectField label="Status" name="status" control={control} error={errors.status} options={STATUS_OPTS} required />
-          </div>
-        </form>
+      {/* Exam Form Modal */}
+      <AppModal
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setEditingExam(null); }}
+        title={editingExam ? `Edit ${label}` : `Create New ${label}`}
+        size="xl"
+      >
+        <ExamForm
+          initialData={editingExam}
+          onSuccess={handleSuccess}
+          onCancel={() => { setModalOpen(false); setEditingExam(null); }}
+          instituteId={currentInstitute?.id}
+        />
       </AppModal>
 
-      {/* Delete Confirm */}
-      <AppModal open={!!deleting} onClose={() => setDeleting(null)} title={`Delete ${label}`} size="sm"
-        footer={
-          <>
-            <button onClick={() => setDeleting(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button>
-            <button onClick={() => remove.mutate(deleting.id)} disabled={remove.isPending} className="rounded-md bg-destructive px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
-              {remove.isPending ? 'Deleting\u2026' : 'Delete'}
-            </button>
-          </>
-        }>
-        <p className="text-sm text-muted-foreground">Delete <strong>{deleting?.title}</strong>? This cannot be undone.</p>
-      </AppModal>
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        open={!!deletingExam}
+        onClose={() => setDeletingExam(null)}
+        onConfirm={() => deleteMutation.mutate(deletingExam.id)}
+        loading={deleteMutation.isPending}
+        title={`Delete ${label}`}
+        description={`Are you sure you want to delete "${deletingExam?.name}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+      />
+
+      {/* Publish Confirmation */}
+      <ConfirmDialog
+        open={!!publishingExam}
+        onClose={() => setPublishingExam(null)}
+        onConfirm={() => publishMutation.mutate(publishingExam.id)}
+        loading={publishMutation.isPending}
+        title={`Publish ${label}`}
+        description={`Are you sure you want to publish "${publishingExam?.name}"? Once published, students will be able to view this ${label.toLowerCase()}. You can still enter and modify results after publishing.`}
+        confirmLabel="Publish"
+        variant="info"
+      />
     </div>
   );
 }

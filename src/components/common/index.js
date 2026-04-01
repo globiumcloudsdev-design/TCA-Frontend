@@ -32,6 +32,8 @@ export { default as SelectField }       from './SelectField';
 export { default as CheckboxField }     from './CheckboxField';
 export { default as SwitchField }       from './SwitchField';
 export { default as DatePickerField }   from './DatePickerField';
+export { default as TimePickerField }   from './TimePickerField';
+export { default as MultiSelectField }  from './MultiSelectField';
 export { default as FormSubmitButton }  from './FormSubmitButton';
 
 // Inputs

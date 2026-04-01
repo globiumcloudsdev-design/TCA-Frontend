@@ -26,4 +26,8 @@ export const attendanceService = {
   // Class attendance summary (present%, absent count, etc.)
   getSummary: (classId, filters = {}) =>
     api.get(`/attendance/summary/${classId}${buildQuery(filters)}`).then((r) => r.data),
+
+  // QR Scan Attendance
+  // data: { student_id, type: "regular" }
+  scan: (data) => api.post('/attendance/scan', data).then((r) => r.data),
 };

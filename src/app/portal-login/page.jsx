@@ -74,7 +74,7 @@ const PORTAL_TYPES = [
 // Demo accounts
 const DEMO_ACCOUNTS = [
   { role: 'STUDENT', email: 'sajood483@gmail.com', password: 'The123456', name: 'Hassan Raza', institute_type: 'school' },
-  { role: 'PARENT', email: 'father.ali@parent.tca', password: 'parent123', name: 'Mr. Khan', institute_type: 'school' },
+  { role: 'PARENT', email: 'hafizshoaibraza200@gmail.com', password: 'Shoaib@0320', name: 'Mr. Khan', institute_type: 'school' },
   { role: 'TEACHER', email: 'shoaibrazamemon160@gmail.com', password: '123456', name: 'Shoaib Raza', institute_type: 'school' },
   // { role: 'TEACHER', email: 'hafizshoaibraza180@gmail.com', password: 'Shoaib0320', name: 'Shoaib Raza', institute_type: 'school' },
   { role: 'STUDENT', email: 'hafizshoaibraza180@gmail.com', password: '', name: 'Shoaib (Dual)', institute_type: 'school' },
@@ -97,7 +97,6 @@ const ROLE_STYLES = {
 import { Suspense } from 'react';
 
 export default function PortalLoginPage() {
-  const router = useRouter();
 
   return (
     <Suspense fallback={<div>Loading...</div>}>
@@ -107,6 +106,7 @@ export default function PortalLoginPage() {
 }
 
 function PortalLoginContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const urlType = searchParams?.get('type');
 
@@ -399,8 +399,8 @@ function PortalLoginContent() {
                     key={pt.type}
                     onClick={() => setActiveType(pt.type)}
                     className={`flex items-center justify-center gap-2.5 py-4 text-sm font-semibold transition-all duration-200 ${isActive
-                        ? `bg-gradient-to-r ${pt.gradient} text-white`
-                        : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                      ? `bg-gradient-to-r ${pt.gradient} text-white`
+                      : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
                       }`}
                   >
                     <Icon className={`w-4 h-4 ${isActive ? 'text-white' : ''}`} />
@@ -517,8 +517,8 @@ function PortalLoginContent() {
                       type="button"
                       onClick={() => setDemoInstitute(tab.value)}
                       className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${demoInstitute === tab.value
-                          ? 'bg-slate-800 text-white'
-                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        ? 'bg-slate-800 text-white'
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                         }`}
                     >
                       {tab.label}

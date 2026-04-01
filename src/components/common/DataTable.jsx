@@ -12,7 +12,7 @@
  *   enableColumnVisibility boolean  â€” shows "Columns" toggle button
  *   selectionActions      ReactNode â€” rendered above table when rows are selected
  *
- *  â”€â”€ Built-in Toolbar (search + filters) â”€â”€
+ *   Built-in Toolbar (search + filters) - pass these props to enable:
  *   search                string
  *   onSearch              (val: string) => void
  *   searchPlaceholder     string
@@ -574,11 +574,3 @@ export default function DataTable({
     </div>
   );
 }
-
-
-
-
-
-
-
-

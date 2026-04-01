@@ -488,7 +488,7 @@ export default function InstituteDetailPage({ params }) {
     <div className="space-y-6">
       <AppBreadcrumb
         items={[
-          { label: 'Institutes', href: '/master-admin/schools' },
+          { label: 'Institutes', href: '/master-admin/institutes' },
           { label: school.name },
         ]}
       />

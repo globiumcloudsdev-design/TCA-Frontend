@@ -6,9 +6,11 @@ import { attendanceService, classService } from '@/services';
 import useAuthStore from '@/store/authStore';
 import { PERMISSIONS } from '@/constants';
 import { formatDate } from '@/lib/utils';
+import Link from 'next/link';
+import { QrCode } from 'lucide-react';
 
 export default function AttendancePage() {
-  const canMark = useAuthStore((s) => s.canDo(PERMISSIONS.ATTENDANCE_MARK));
+  const canMark = useAuthStore((s) => s.canDo(PERMISSIONS.ATTENDANCE_CREATE) || s.canDo(PERMISSIONS.ATTENDANCE_UPDATE));
 
   const today = new Date().toISOString().split('T')[0];
   const [date,    setDate]    = useState(today);
@@ -32,14 +34,23 @@ export default function AttendancePage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Attendance</h1>
-        {canMark && classId && (
-          <a
-            href={`/attendance/mark?class_id=${classId}&date=${date}`}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+        <div className="flex items-center gap-2">
+          <Link
+            href="/attendance/scan"
+            className="flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
           >
-            Mark Attendance
-          </a>
-        )}
+            <QrCode className="h-4 w-4" />
+            Scan QR Student
+          </Link>
+          {canMark && classId && (
+            <Link
+              href={`/attendance/mark?class_id=${classId}&date=${date}`}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Mark Attendance
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Filters */}

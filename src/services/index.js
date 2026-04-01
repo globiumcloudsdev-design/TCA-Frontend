@@ -18,6 +18,7 @@ export { noticeService }            from './noticeService';
 export { staffAttendanceService }   from './staffAttendanceService';
 export { reportService }            from './reportService';
 export { attendanceService }    from './attendanceService';
+export { studentAttendanceService } from './studentAttendanceService';
 export { examService }          from './examService';
 export { feeService }           from './feeService';
 export { roleService }          from './roleService';

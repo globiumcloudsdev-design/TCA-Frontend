@@ -153,7 +153,7 @@
 import { NextResponse } from 'next/server';
 
 // Public paths
-const PUBLIC_PATHS = ['/', '/login', '/portal-login', '/forgot-password', '/reset-password', '/contact', '/about', '/features', '/stats', '/faq', '/pricing'];
+const PUBLIC_PATHS = ['/', '/login', '/portal-login', '/forgot-password', '/reset-password/', '/contact', '/about', '/features', '/stats', '/faq', '/pricing'];
 
 // Portal route prefixes
 const PORTAL_PATHS = {
@@ -171,6 +171,7 @@ const INSTITUTE_ROUTE_MAP = {
   academy: '/academy/',
   college: '/college/',
   university: '/university/',
+  tution_center: '/tution-center/',
 };
 
 const DASHBOARD_PATHS = {

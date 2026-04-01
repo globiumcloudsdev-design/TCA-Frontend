@@ -148,6 +148,16 @@
   animation: shimmer 3s linear infinite;
 }
 
+@keyframes scan-line {
+  0%   { top: 15%; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 85%; opacity: 0; }
+}
+.animate-scan-line {
+  animation: scan-line 2.5s ease-in-out infinite;
+}
+
 /* ──────────────────────────────────────────────────────────────────
    Shared form input utility
    ────────────────────────────────────────────────────────────────── */

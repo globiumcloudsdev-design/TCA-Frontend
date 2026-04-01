@@ -334,7 +334,7 @@ export default function AcademicYearsPage({ type }) {
         description={`Manage ${pageTitle.toLowerCase()} for your institute`}
         action={
           canCreate && (
-            <Button onClick={openAddModal} size="sm">
+            <Button onClick={openAddModal}>
               <Plus className="mr-2 h-4 w-4" />
               Add {terms?.academic_year || 'Year'}
             </Button>
