@@ -834,7 +834,9 @@ export const useTeacherDashboard = () => {
     try {
       setLoading(true);
       const response = await teacherPortalService.getDashboard();
-      setData(response);
+      // Handle both wrapped and unwrapped responses
+      const dashboardData = response?.data || response;
+      setData(dashboardData);
     } catch (err) {
       setError(err.message);
       toast.error('Failed to load dashboard');
@@ -908,6 +910,9 @@ export const useTeacherClasses = () => {
         name: cls.name || cls.class_name,
         class_name: cls.name || cls.class_name,
         sections: cls.sections || [],
+        subjects: cls.subjects || [],
+        subject_details: cls.subject_details || [],
+        schedule: cls.schedule || [],
         is_active: cls.is_active !== false,
         student_count: cls.student_count || 0
       }));
@@ -1338,4 +1343,293 @@ export const useTeacherNotices = (limit = 10) => {
   };
 
   return { notices, loading, refetch: fetchNotices };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXAM MANAGEMENT HOOKS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const useTeacherExamAssignments = () => {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['teacher-portal', 'exam-assignments'],
+    queryFn: teacherPortalService.getExamAssignments
+  });
+
+  const assignments = useMemo(() => {
+    if (!data) return null;
+    if (data.classes) return data; // Already in correct format
+    if (data.data) return data.data; // Wrapped response
+    return data; // Return as-is
+  }, [data]);
+
+  return { assignments, loading: isLoading, error };
+};
+
+export const useTeacherExams = (filters = {}, page = 1, limit = 10) => {
+  const queryClient = useQueryClient();
+  const [currentPage, setCurrentPage] = useState(page);
+  const [currentLimit, setCurrentLimit] = useState(limit);
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['teacher-portal', 'exams', filters, currentPage, currentLimit],
+    queryFn: () => teacherPortalService.getTeacherExams(filters, currentPage, currentLimit)
+  });
+
+      console.log('Teacher Exams Data', data);
+
+  // Handle different data structures
+  let exams = [];
+  let pagination = { total: 0, page: currentPage, limit: currentLimit, totalPages: 0 };
+
+  if (data) {
+    if (data.data && Array.isArray(data.data.data)) {
+      exams = data.data.data;
+      pagination = data.data.pagination || data.pagination || pagination;
+    } else if (data.data && Array.isArray(data.data)) {
+      exams = data.data;
+      pagination = data.pagination || pagination;
+    } else if (Array.isArray(data)) {
+      exams = data;
+    } else if (data.exams && Array.isArray(data.exams)) {
+      exams = data.exams;
+      pagination = data.pagination || pagination;
+    }
+  }
+
+  const createExamMutation = useMutation({
+    mutationFn: (examData) => teacherPortalService.createExam(examData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacher-portal', 'exams'] });
+      toast.success('Exam created successfully');
+    },
+    onError: (error) => {
+      toast.error(error?.message || 'Failed to create exam');
+    }
+  });
+
+      console.log('Teacher Exams', exams);
+
+  return {
+    exams,
+    pagination,
+    loading: isLoading,
+    error,
+    createExam: createExamMutation.mutate,
+    isCreating: createExamMutation.isPending,
+    refetch,
+    setPage: setCurrentPage,
+    setLimit: setCurrentLimit
+  };
+};
+
+export const useTeacherExamDetails = (examId) => {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['teacher-portal', 'exam-details', examId],
+    queryFn: () => teacherPortalService.getExamDetails(examId),
+    enabled: !!examId
+  });
+
+  const exam = useMemo(() => {
+    if (!data) return null;
+    return data.data || data;
+  }, [data]);
+
+  return {
+    exam,
+    loading: isLoading,
+    error,
+    refetch
+  };
+};
+
+export const useTeacherExamResults = (examId, filters = {}, page = 1, limit = 20) => {
+  const queryClient = useQueryClient();
+  const [currentPage, setCurrentPage] = useState(page);
+  const [currentLimit, setCurrentLimit] = useState(limit);
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['teacher-portal', 'exam-results', examId, filters, currentPage, currentLimit],
+    queryFn: () => teacherPortalService.getExamResults(examId, filters, currentPage, currentLimit),
+    enabled: !!examId,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)
+  });
+
+  // Handle different data structures
+  let results = [];
+  let exam = {};
+  let pagination = { total: 0, page: currentPage, limit: currentLimit, totalPages: 0 };
+
+    console.log('Exam Result', data);
+
+  // if (data) {
+  //   if (Array.isArray(data)) {
+  //     results = data;
+  //   } else if (data.data && Array.isArray(data.data)) {
+  //     results = data.data;
+  //     pagination = data.pagination || pagination;
+  //     exam = data.exam || {};
+  //   } else if (data.results && Array.isArray(data.results)) {
+  //     results = data.results;
+  //     pagination = data.pagination || pagination;
+  //     exam = data.exam || {};
+  //   }
+  // }
+
+   if (data) {
+    // Case 1: { success: true, data: { data: [...], exam: {...}, pagination: {...} } }
+    if (data.data && data.data.data && Array.isArray(data.data.data)) {
+      results = data.data.data;
+      pagination = data.data.pagination || pagination;
+      exam = data.data.exam || {};
+    }
+    // Case 2: { data: [...], exam: {...}, pagination: {...} }
+    else if (data.data && Array.isArray(data.data)) {
+      results = data.data;
+      pagination = data.pagination || pagination;
+      exam = data.exam || {};
+    }
+    // Case 3: { results: [...], exam: {...}, pagination: {...} }
+    else if (data.results && Array.isArray(data.results)) {
+      results = data.results;
+      pagination = data.pagination || pagination;
+      exam = data.exam || {};
+    }
+    // Case 4: Direct array
+    else if (Array.isArray(data)) {
+      results = data;
+    }
+    // Case 5: Wrapped in data property
+    else if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+      if (data.data.results && Array.isArray(data.data.results)) {
+        results = data.data.results;
+      }
+      exam = data.data.exam || {};
+      pagination = data.data.pagination || pagination;
+    }
+  }
+
+  console.log('Extracted Results:', results);
+  console.log('Extracted Exam:', exam);
+  console.log('Extracted Pagination:', pagination);
+
+  const addResultsMutation = useMutation({
+    mutationFn: (resultsData) => teacherPortalService.addExamResults(examId, resultsData),
+    onSuccess: (data, variables, context) => {
+      // Invalidate the results query to ensure fresh data
+      queryClient.invalidateQueries({
+        queryKey: ['teacher-portal', 'exam-results', examId]
+      });
+    },
+    onError: (error) => {
+      // Error is handled by the component itself
+      // Hook only provides the data/error state
+    }
+  });
+
+  // Wrapper function to support both old callback style and component-level handling
+  const addResults = useCallback(
+    (resultsData, callbacks = {}) => {
+      const { onSuccess, onError } = callbacks;
+
+      addResultsMutation.mutate(resultsData, {
+        onSuccess: (data) => {
+          if (onSuccess) {
+            onSuccess(data);
+          }
+        },
+        onError: (error) => {
+          if (onError) {
+            onError(error);
+          }
+        }
+      });
+    },
+    [addResultsMutation]
+  );  
+
+  return {
+    results,
+    exam,
+    pagination,
+    loading: isLoading,
+    error,
+    addResults,
+    isAddingResults: addResultsMutation.isPending,
+    refetch,
+    setPage: setCurrentPage,
+    setLimit: setCurrentLimit,
+    addResultsError: addResultsMutation.error,
+    isError: addResultsMutation.isError
+  };
+};
+
+// Add this new hook after useTeacherExamResults
+export const useTeacherExamEntry = (examId, filters = {}, page = 1, limit = 100) => {
+  const queryClient = useQueryClient();
+  const [currentPage, setCurrentPage] = useState(page);
+  const [currentLimit, setCurrentLimit] = useState(limit);
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['teacher-portal', 'exam-entry', examId, filters, currentPage, currentLimit],
+    queryFn: () => teacherPortalService.getExamEntryStudents(examId, filters, currentPage, currentLimit),
+    enabled: !!examId,
+    retry: 2
+  });
+
+  // Handle different data structures
+  let students = [];
+  let exam = {};
+  let pagination = { total: 0, page: currentPage, limit: currentLimit, totalPages: 0 };
+
+  if (data) {
+    if (data.data && Array.isArray(data.data.data)) {
+      students = data.data.data;
+      pagination = data.data.pagination || pagination;
+      exam = data.data.exam || {};
+    } else if (data.data && Array.isArray(data.data)) {
+      students = data.data;
+      pagination = data.pagination || pagination;
+      exam = data.exam || {};
+    } else if (data.students && Array.isArray(data.students)) {
+      students = data.students;
+      pagination = data.pagination || pagination;
+      exam = data.exam || {};
+    } else if (Array.isArray(data)) {
+      students = data;
+    }
+  }
+
+  const addResultsMutation = useMutation({
+    mutationFn: (resultsData) => teacherPortalService.addExamResults(examId, resultsData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacher-portal', 'exam-entry', examId] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-portal', 'exam-results', examId] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-portal', 'exam-details', examId] });
+      toast.success('Marks saved successfully!');
+    },
+    onError: (error) => {
+      toast.error(error?.message || 'Failed to save marks');
+    }
+  });
+
+  const addResults = useCallback((resultsData, callbacks = {}) => {
+    addResultsMutation.mutate(resultsData, {
+      onSuccess: (data) => callbacks.onSuccess?.(data),
+      onError: (error) => callbacks.onError?.(error)
+    });
+  }, [addResultsMutation]);
+
+  return {
+    students,
+    exam,
+    pagination,
+    loading: isLoading,
+    error,
+    addResults,
+    isAddingResults: addResultsMutation.isPending,
+    refetch,
+    setPage: setCurrentPage,
+    setLimit: setCurrentLimit
+  };
 };

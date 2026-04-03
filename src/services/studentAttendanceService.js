@@ -98,5 +98,20 @@ export const studentAttendanceService = {
       console.error('Error updating attendance:', error);
       throw error;
     }
+  },
+
+  /**
+   * Get attendance report
+   * @param {Object} params - { class_id, section_id, student_id, month, year }
+   */
+  getAttendanceReport: async (params = {}) => {
+    try {
+      const queryString = buildQuery(params);
+      const response = await api.get(`/attendance/reports${queryString}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching attendance report:', error);
+      throw error;
+    }
   }
 };

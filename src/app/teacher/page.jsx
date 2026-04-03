@@ -18,6 +18,7 @@ const QUICK_LINK_DEFS = [
   { key: 'assignments', href: '/teacher/assignments',   icon: ClipboardList, bg: 'bg-violet-50',  ic: 'text-violet-600' },
   { key: 'homework',    href: '/teacher/homework',      icon: NotebookPen,   bg: 'bg-cyan-50',    ic: 'text-cyan-600' },
   { key: 'attendance',  href: '/teacher/attendance',    icon: UserCheck,     bg: 'bg-teal-50',    ic: 'text-teal-600' },
+  { key: 'exams',       href: '/teacher/exams',         icon: BookOpen,      bg: 'bg-amber-50',   ic: 'text-amber-600' },
   { key: 'announcements',href: '/teacher/announcements', icon: Bell,         bg: 'bg-rose-50',    ic: 'text-rose-600' },
 ];
 
@@ -166,8 +167,8 @@ export default function TeacherOverview() {
                   {(cls.sections || []).map((section) => section.name).filter(Boolean).join(', ') || 'No section mapped'}
                 </p>
                 <div className="flex flex-wrap gap-1 mt-1.5">
-                  {(cls.subjects || []).map((sub) => (
-                    <span key={sub} className="text-[10px] bg-white text-blue-700 px-2 py-0.5 rounded-full border border-blue-200 font-medium">{sub}</span>
+                  {(cls.subjects || []).map((sub, idx) => (
+                    <span key={`${cls.id || cls.class_id}-subject-${idx}`} className="text-[10px] bg-white text-blue-700 px-2 py-0.5 rounded-full border border-blue-200 font-medium">{sub}</span>
                   ))}
                 </div>
               </div>

@@ -223,7 +223,25 @@ export const EXAM_TYPES = [
   { value: 'final', label: 'Final' },
   { value: 'unit_test', label: 'Unit Test' },
   { value: 'monthly', label: 'Monthly' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'half_yearly', label: 'Half Yearly' },
+  { value: 'annual', label: 'Annual' },
+  { value: 'entrance', label: 'Entrance' },
+  { value: 'practice', label: 'Practice' },
+  { value: 'quiz', label: 'Quiz' },
+  { value: 'assignment', label: 'Assignment' },
   { value: 'other', label: 'Other' },
+];
+
+// ── Exam categories ───────────────────────────────────────────────────────
+export const EXAM_CATEGORIES = [
+  { value: 'theory', label: 'Theory' },
+  { value: 'practical', label: 'Practical' },
+  { value: 'viva', label: 'Viva' },
+  { value: 'assignment', label: 'Assignment' },
+  { value: 'project', label: 'Project' },
+  { value: 'combined', label: 'Combined' }
 ];
 
 // ── Months ────────────────────────────────────────────────────────────────

@@ -52,9 +52,11 @@ import {
   X,
   SlidersHorizontal,
   Download,
+  Upload,
 } from 'lucide-react';
 import ExportModal from './ExportModal';
-
+import ImportModal from './ImportModal';
+import { toast } from 'sonner';
 import {
   Table,
   TableBody,
@@ -167,11 +169,14 @@ export default function DataTable({
   onRowClick,
   // ── Export ──
   exportConfig = null,   // { fileName: string, dateField?: string }
+  // ── Import  ──
+  importConfig = null,   // { columns, onImport, fileName, sampleData }
 }) {
   const [sorting, setSorting] = useState([]);
   const [rowSelection, setRowSelection] = useState({});
   const [columnVisibility, setColumnVisibility] = useState({});
   const [exportOpen, setExportOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   // Prepend selection column when enabled
   const finalColumns = useMemo(
@@ -203,7 +208,10 @@ export default function DataTable({
   const selectedCount = table.getSelectedRowModel().rows.length;
   const totalRows = pagination?.total ?? data.length;
 
-  const hasToolbar = onSearch || filters.length > 0 || action || enableColumnVisibility || exportConfig;
+  // const hasToolbar = onSearch || filters.length > 0 || action || enableColumnVisibility || exportConfig;
+
+  // Toolbar mein import button add karo
+  const hasToolbar = onSearch || filters.length > 0 || action || enableColumnVisibility || exportConfig || importConfig;
 
   // ── Export rows: nested objects/arrays ko flatten karta hai ──────────────
   const exportRows = useMemo(() => {
@@ -413,6 +421,17 @@ export default function DataTable({
               </DropdownMenu>
             )}
 
+            {importConfig && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5 text-sm"
+                onClick={() => setImportOpen(true)}
+              >
+                <Upload size={14} /> Import
+              </Button>
+            )}
+
             {exportConfig && (
               <Button
                 variant="outline"
@@ -429,13 +448,24 @@ export default function DataTable({
         </div>
       )}
 
+      {/* Import Modal */}
+      {importConfig && (
+        <ImportModal
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          columns={importConfig.columns || columns}
+          onImport={importConfig.onImport}
+          fileName={importConfig.fileName || 'import'}
+          sampleData={importConfig.sampleData}
+        />
+      )}
+
       {/* Export Modal */}
       {exportConfig && (
         <ExportModal
           open={exportOpen}
           onClose={() => setExportOpen(false)}
           columns={columns}
-          // rows={data}
           rows={exportRows}    // ✅ processed, flattened rows
           fileName={exportConfig.fileName ?? 'export'}
           dateField={exportConfig.dateField ?? null}

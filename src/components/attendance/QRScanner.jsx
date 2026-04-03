@@ -12,7 +12,7 @@ import { studentAttendanceService } from '@/services';
  * QRScanner Component 
  * Uses html5-qrcode via CDN to avoid NPM installation issues in restricted environments.
  */
-export default function QRScanner() {
+export default function QRScanner({ onScan, bulkMode = false }) {
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
   const [result, setResult] = useState(null);
@@ -24,6 +24,22 @@ export default function QRScanner() {
     // Prevent multiple simultaneous scans or scans during cooldown
     if (decodedText && !loading && ready && !result) {
       setReady(false);
+      
+      if (onScan) {
+        // Bulk mode or external handler
+        const scanSuccess = await onScan(decodedText);
+        if (scanSuccess) {
+           setResult({ success: true, message: `✅ Scanned: ${decodedText}` });
+        } else {
+           setResult({ success: false, message: `❌ Invalid or Already Scanned: ${decodedText}` });
+        }
+        setTimeout(() => {
+          setResult(null);
+          setReady(true);
+        }, 1500);
+        return;
+      }
+
       setLoading(true);
       setResult(null);
       setError(null);

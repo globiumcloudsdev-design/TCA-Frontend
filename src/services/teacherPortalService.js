@@ -107,7 +107,56 @@ export const teacherPortalService = {
     api.get('/portal/teacher/timetable', { params: { week } }).then(unwrap),
   
   // Notices
-  getNotices: (limit = 10) => api.get('/portal/teacher/notices', { params: { limit } }).then(unwrap)
+  getNotices: (limit = 10) => api.get('/portal/teacher/notices', { params: { limit } }).then(unwrap),
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // EXAM MANAGEMENT
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Get available classes, sections, and subjects for the current teacher
+   */
+  getExamAssignments: () =>
+    api.get('/portal/teacher/exam-assignments').then(unwrap),
+
+  /**
+   * Create a new exam for teacher's assigned class/section
+   */
+  createExam: (examData) =>
+    api.post('/portal/teacher/exams', examData).then(unwrap),
+
+  /**
+   * Get all exams created by the teacher with optional filters
+   */
+  getTeacherExams: (filters = {}, page = 1, limit = 10) =>
+    api.get('/portal/teacher/exams', { params: { ...filters, page, limit } }).then(unwrap),
+
+  /**
+   * Get detailed information about a specific exam
+   */
+  getExamDetails: (examId) =>
+    api.get(`/portal/teacher/exams/${examId}`).then(unwrap),
+
+  /**
+   * Get exam results with student information
+   */
+  getExamResults: (examId, filters = {}, page = 1, limit = 20) =>
+    api.get(`/portal/teacher/exams/${examId}/results`, { params: { ...filters, page, limit } }).then(unwrap),
+
+  /**
+   * Add or update exam results for multiple students
+   */
+  addExamResults: (examId, results) =>
+    api.post(`/portal/teacher/exams/${examId}/results`, { results }).then(unwrap),
+
+  /**
+   * Get ALL students for exam entry (with existing results if any)
+   * This is specifically for the "Enter Marks" page
+   */
+  getExamEntryStudents: (examId, filters = {}, page = 1, limit = 100) =>
+    api.get(`/portal/teacher/exams/${examId}/entry-students`, { 
+      params: { ...filters, page, limit } 
+    }).then(unwrap),
 };
 
 export default teacherPortalService;

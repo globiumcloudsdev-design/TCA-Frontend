@@ -1420,7 +1420,7 @@ export default function TeacherHomeworkPage() {
         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
       </div>
     );
-  }
+  }  
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto p-4 md:p-6">

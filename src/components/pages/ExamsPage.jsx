@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
+import { EXAM_TYPES } from '@/constants';
 
 import PageHeader from '@/components/common/PageHeader';
 import DataTable from '@/components/common/DataTable';
@@ -38,16 +39,10 @@ const STATUS_OPTIONS = [
   { value: 'results_published', label: 'Results Published' }
 ];
 
+// Add "All Types" option to EXAM_TYPES for filtering
 const EXAM_TYPE_OPTIONS = [
   { value: 'all', label: 'All Types' },
-  { value: 'mid_term', label: 'Mid Term' },
-  { value: 'final', label: 'Final' },
-  { value: 'unit_test', label: 'Unit Test' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'quarterly', label: 'Quarterly' },
-  { value: 'half_yearly', label: 'Half Yearly' },
-  { value: 'annual', label: 'Annual' }
+  ...EXAM_TYPES
 ];
 
 const STATUS_COLORS = {
@@ -97,6 +92,8 @@ export default function ExamsPage({ type }) {
   const total = data?.pagination?.total || 0;
   const totalPages = data?.pagination?.totalPages || 1;
 
+  console.log('Exams',exams);
+  
   // Calculate stats
   const stats = useMemo(() => {
     const scheduled = exams.filter(e => e.status === 'scheduled').length;

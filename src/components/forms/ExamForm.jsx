@@ -29,6 +29,7 @@ import { examService } from '@/services/examService';
 import { classService } from '@/services/classService';
 import { academicYearService } from '@/services/academicYearService';
 import { useAuthStore } from '@/store/authStore';
+import { EXAM_TYPES, EXAM_CATEGORIES } from '@/constants';
 
 // ─────────────────────────────────────────────────────────
 // VALIDATION SCHEMAS
@@ -76,26 +77,6 @@ const step3Schema = z.object({
 
 // FULL SCHEMA
 const fullSchema = step1Schema.merge(step2Schema).merge(step3Schema);
-
-const EXAM_TYPES = [
-  { value: 'mid_term', label: 'Mid Term' },
-  { value: 'final', label: 'Final' },
-  { value: 'unit_test', label: 'Unit Test' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'quarterly', label: 'Quarterly' },
-  { value: 'half_yearly', label: 'Half Yearly' },
-  { value: 'annual', label: 'Annual' },
-];
-
-const EXAM_CATEGORIES = [
-  { value: 'theory', label: 'Theory' },
-  { value: 'practical', label: 'Practical' },
-  { value: 'viva', label: 'Viva' },
-  { value: 'assignment', label: 'Assignment' },
-  { value: 'project', label: 'Project' },
-  { value: 'combined', label: 'Combined' }
-];
 
 export default function ExamForm({
   initialData = null,

@@ -100,6 +100,7 @@ const flattenStudent = (s) => {
   return flat;
 };
 
+
 export default function StudentsPage({ type }) {
   const router = useRouter();
   const qc = useQueryClient();
@@ -248,6 +249,149 @@ export default function StudentsPage({ type }) {
     });
   }, [students]);
 
+  // StudentsPage.jsx - Complete function
+
+  const handleBulkImport = async (importedData) => {
+    if (!importedData || importedData.length === 0) {
+      toast.error('No data to import');
+      return;
+    }
+
+    try {
+      // Show loading
+      const toastId = toast.loading(`Importing ${importedData.length} ${terms.students}...`);
+
+      // Call bulk import API
+      const response = await studentService.bulkCreate(importedData, type);
+
+      // Dismiss loading
+      toast.dismiss(toastId);
+
+      // Handle response
+      if (response?.data?.failed?.length > 0) {
+        // Partial success
+        toast.warning(
+          `✅ ${response.data.imported} imported | ❌ ${response.data.failed.length} failed`,
+          {
+            duration: 5000,
+            description: 'Check console for failed rows details'
+          }
+        );
+        console.log('Failed imports:', response.data.failed);
+      } else if (response?.data?.imported === response?.data?.total) {
+        // Full success
+        toast.success(`🎉 Successfully imported ${response.data.imported} ${terms.students}!`);
+      } else {
+        // Failed
+        toast.error(`Import failed: ${response?.data?.errors?.join(', ') || 'Unknown error'}`);
+      }
+
+      // Refresh data
+      qc.invalidateQueries({ queryKey: ['students', type] });
+      qc.invalidateQueries({ queryKey: ['students', type, filters] });
+
+      return response;
+
+    } catch (error) {
+      console.error('Bulk import error:', error);
+      toast.error(error.response?.data?.message || error.message || 'Failed to import students');
+      throw error;
+    }
+  };
+
+  // All possible columns from StudentForm
+  const ALL_STUDENT_COLUMNS = [
+    // Personal Information
+    { key: 'first_name', label: 'First Name', required: true, validation: 'text' },
+    { key: 'last_name', label: 'Last Name', required: true, validation: 'text' },
+    { key: 'email', label: 'Email', required: false, validation: 'email' },
+    { key: 'phone', label: 'Phone', required: false, validation: 'phone' },
+    { key: 'registration_no', label: 'Registration No', required: false, validation: 'text' },
+    { key: 'cnic', label: 'CNIC/B-Form', required: false, validation: 'cnic' },
+    { key: 'dob', label: 'Date of Birth', required: false, validation: 'date' },
+    { key: 'gender', label: 'Gender', required: false, validation: 'select', options: ['male', 'female', 'other'] },
+    { key: 'blood_group', label: 'Blood Group', required: false, validation: 'select' },
+    { key: 'religion', label: 'Religion', required: false, validation: 'text' },
+    { key: 'nationality', label: 'Nationality', required: false, validation: 'text' },
+
+    // Academic Information (Institute Type Specific)
+    { key: 'class_name', label: 'Class/Course/Program', required: false, validation: 'text' },
+    { key: 'section_name', label: 'Section/Batch', required: false, validation: 'text' },
+    { key: 'roll_no', label: 'Roll Number', required: false, validation: 'text' },
+    { key: 'academic_year', label: 'Academic Year', required: false, validation: 'text' },
+    { key: 'admission_date', label: 'Admission Date', required: false, validation: 'date' },
+
+    // Coaching Specific
+    { key: 'course_name', label: 'Course Name', required: false, validation: 'text' },
+    { key: 'batch_name', label: 'Batch Name', required: false, validation: 'text' },
+    { key: 'target_exam', label: 'Target Exam', required: false, validation: 'text' },
+    { key: 'current_module', label: 'Current Module', required: false, validation: 'text' },
+    { key: 'candidate_id', label: 'Candidate ID', required: false, validation: 'text' },
+
+    // College/University Specific
+    { key: 'department_name', label: 'Department', required: false, validation: 'text' },
+    { key: 'program_name', label: 'Program', required: false, validation: 'text' },
+    { key: 'semester_name', label: 'Semester', required: false, validation: 'text' },
+    { key: 'cgpa', label: 'CGPA', required: false, validation: 'number' },
+    { key: 'faculty_name', label: 'Faculty', required: false, validation: 'text' },
+
+    // Academy Specific
+    { key: 'program_name', label: 'Program', required: false, validation: 'text' },
+    { key: 'module_name', label: 'Module', required: false, validation: 'text' },
+    { key: 'trainee_id', label: 'Trainee ID', required: false, validation: 'text' },
+
+    // Guardian Information (Primary Guardian)
+    { key: 'guardian_name', label: 'Guardian Name', required: false, validation: 'text' },
+    { key: 'guardian_phone', label: 'Guardian Phone', required: false, validation: 'phone' },
+    { key: 'guardian_cnic', label: 'Guardian CNIC', required: false, validation: 'cnic' },
+    { key: 'guardian_email', label: 'Guardian Email', required: false, validation: 'email' },
+    { key: 'guardian_relation', label: 'Guardian Relation', required: false, validation: 'text' },
+    { key: 'guardian_type', label: 'Guardian Type', required: false, validation: 'select', options: ['father', 'mother', 'guardian'] },
+
+    // Multiple Guardians (JSON format)
+    { key: 'guardians', label: 'Guardians (JSON)', required: false, validation: 'json' },
+
+    // Contact Information
+    { key: 'present_address', label: 'Present Address', required: false, validation: 'text' },
+    { key: 'permanent_address', label: 'Permanent Address', required: false, validation: 'text' },
+    { key: 'city', label: 'City', required: false, validation: 'text' },
+
+    // Emergency Contact
+    { key: 'emergency_contact_name', label: 'Emergency Contact Person', required: false, validation: 'text' },
+    { key: 'emergency_contact_relation', label: 'Emergency Contact Relation', required: false, validation: 'text' },
+    { key: 'emergency_contact_phone', label: 'Emergency Contact Phone', required: false, validation: 'phone' },
+
+    // Fee Information
+    { key: 'monthly_fee', label: 'Monthly Fee', required: false, validation: 'number' },
+    { key: 'admission_fee', label: 'Admission Fee', required: false, validation: 'number' },
+    { key: 'concession_type', label: 'Concession Type', required: false, validation: 'select', options: ['none', 'merit', 'need', 'staff', 'sibling'] },
+    { key: 'concession_percentage', label: 'Concession Percentage', required: false, validation: 'number' },
+    { key: 'concession_reason', label: 'Concession Reason', required: false, validation: 'text' },
+    { key: 'fee_status', label: 'Fee Status', required: false, validation: 'select', options: ['paid', 'pending', 'overdue', 'partial'] },
+
+    // Medical Information
+    { key: 'medical_conditions', label: 'Medical Conditions', required: false, validation: 'text' },
+    { key: 'allergies', label: 'Allergies', required: false, validation: 'text' },
+
+    // Previous Education
+    { key: 'previous_school', label: 'Previous School/College', required: false, validation: 'text' },
+    { key: 'previous_class', label: 'Previous Class/Grade', required: false, validation: 'text' },
+
+    // Status
+    { key: 'is_active', label: 'Active Status', required: false, validation: 'boolean' },
+    { key: 'status', label: 'Status', required: false, validation: 'select', options: ['active', 'inactive', 'graduated', 'transferred'] },
+
+    // Additional Fields
+    { key: 'father_name', label: 'Father Name', required: false, validation: 'text' },
+    { key: 'father_cnic', label: 'Father CNIC', required: false, validation: 'cnic' },
+    { key: 'father_phone', label: 'Father Phone', required: false, validation: 'phone' },
+    { key: 'father_occupation', label: 'Father Occupation', required: false, validation: 'text' },
+    { key: 'mother_name', label: 'Mother Name', required: false, validation: 'text' },
+    { key: 'mother_cnic', label: 'Mother CNIC', required: false, validation: 'cnic' },
+    { key: 'mother_phone', label: 'Mother Phone', required: false, validation: 'phone' },
+    { key: 'address', label: 'Address', required: false, validation: 'text' },
+  ];
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -275,6 +419,17 @@ export default function StudentsPage({ type }) {
         ]}
         action={addButton}
         enableColumnVisibility
+        importConfig={{
+          columns: ALL_STUDENT_COLUMNS.map(col => ({
+            key: col.key,
+            label: col.label,
+            required: col.required || false,
+            validation: col.validation || null,
+            options: col.options || null
+          })),
+          onImport: handleBulkImport,
+          fileName: `${type}-students-import`,
+        }}
         exportConfig={
           {
             fileName: `${type}-${terms.students.toLowerCase()}`,

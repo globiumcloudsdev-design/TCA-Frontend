@@ -25,9 +25,9 @@ import { DUMMY_STUDENTS, paginate } from '@/data/dummyData';
 // ─────────────────────────────────────────────────────────────────────────────
 function normalizeFilters(filters = {}, type = 'school') {
   const base = {
-    page:      filters.page ?? 1,
-    limit:     filters.limit ?? 20,
-    search:    filters.search,
+    page: filters.page ?? 1,
+    limit: filters.limit ?? 20,
+    search: filters.search,
     is_active: filters.is_active,
     branch_id: filters.branch_id,
   };
@@ -43,31 +43,6 @@ function normalizeFilters(filters = {}, type = 'school') {
     default: // school
       return { ...base, class_id: filters.class_id, section_id: filters.section_id, academic_year_id: filters.academic_year_id };
   }
-}
-
-// Client-side dummy filter (called only when API is unreachable)
-function filterDummies(filters, type) {
-  let list = [...DUMMY_STUDENTS];
-  if (type) list = list.filter((s) => !s.institute_type || s.institute_type === type);
-  if (filters.search) {
-    const q = filters.search.toLowerCase();
-    list = list.filter((s) =>
-      `${s.first_name} ${s.last_name}`.toLowerCase().includes(q) ||
-      (s.roll_number || '').toLowerCase().includes(q),
-    );
-  }
-  if (filters.is_active !== undefined && filters.is_active !== '') {
-    list = list.filter((s) => s.is_active === (filters.is_active === 'true' || filters.is_active === true));
-  }
-  if (filters.class_id || filters.course_id || filters.program_id || filters.department_id) {
-    const id = filters.class_id || filters.course_id || filters.program_id || filters.department_id;
-    list = list.filter((s) => s.class_id === id || s.course_id === id || s.program_id === id || s.department_id === id);
-  }
-  if (filters.section_id || filters.batch_id || filters.semester_id) {
-    const id = filters.section_id || filters.batch_id || filters.semester_id;
-    list = list.filter((s) => s.section_id === id || s.batch_id === id || s.semester_id === id);
-  }
-  return paginate(list, filters.page, filters.limit);
 }
 
 export const studentService = {
@@ -107,4 +82,21 @@ export const studentService = {
     const key = type === 'school' ? 'section_id' : (type === 'coaching' || type === 'academy') ? 'batch_id' : 'semester_id';
     return studentService.getAll({ [key]: id }, type);
   },
+  /**
+   * Bulk import students - Simple version
+   * @param {Array} students - List of student objects to import
+   * @param {string} instituteType - Type of institute
+   */
+  bulkCreate: async (studentsData, instituteType) => {
+    try {
+      const response = await api.post('/students/bulk-import', {
+        students: studentsData,
+        institute_type: instituteType
+      });
+      return response;
+    } catch (error) {
+      console.error('Bulk create API error:', error);
+      throw error;
+    }
+  }
 };

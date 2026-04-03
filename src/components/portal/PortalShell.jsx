@@ -338,7 +338,7 @@ function buildTeacherNav(t, navLabels) {
     { label: navLabels.notes, href: '/teacher/notes', icon: FileText, permission: PERM.NOTES_CREATE },
     // { label: t.notesLabel, href: '/teacher/study-material', icon: BookMarked, permission: PERM.NOTES_CREATE },
     // { label: t.syllabusLabel, href: '/teacher/syllabus', icon: BookOpen, permission: PERM.SYLLABUS_UPDATE },
-    // { label: t.examsLabel, href: '/teacher/exams', icon: FileText, permission: PERM.EXAMS_UPDATE },
+    { label: t.examsLabel, href: '/teacher/exams', icon: FileText, permission: PERM.EXAMS_UPDATE },
     // { label: t.resultsLabel, href: '/teacher/exam-results', icon: TrendingUp, permission: PERM.EXAM_RESULTS_ENTER },
     { label: navLabels.announcements, href: '/teacher/announcements', icon: Bell, permission: PERM.NOTICES_CREATE },
     // { label: navLabels.reports, href: '/teacher/reports', icon: PieChart, permission: PERM.REPORTS_STUDENT },
