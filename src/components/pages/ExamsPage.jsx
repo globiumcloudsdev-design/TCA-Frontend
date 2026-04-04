@@ -30,7 +30,6 @@ import { examService } from '@/services/examService';
 import ExamForm from '@/components/forms/ExamForm';
 
 const STATUS_OPTIONS = [
-  { value: 'all', label: 'All Status' },
   { value: 'draft', label: 'Draft' },
   { value: 'scheduled', label: 'Scheduled' },
   { value: 'ongoing', label: 'Ongoing' },
@@ -91,8 +90,6 @@ export default function ExamsPage({ type }) {
   const exams = data?.data || [];
   const total = data?.pagination?.total || 0;
   const totalPages = data?.pagination?.totalPages || 1;
-
-  console.log('Exams',exams);
   
   // Calculate stats
   const stats = useMemo(() => {

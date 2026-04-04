@@ -1,256 +1,422 @@
+// QRScanner.jsx - A robust QR code scanner component for marking student attendance with real-time feedback, error handling, and support for both instant and queue-based scanning modes.
+//src/components/attendance/QRScanner.jsx
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import Script from 'next/script';
+import React, { useEffect, useRef, useState } from 'react';
+import QrScanner from 'qr-scanner';
+import { Loader2, CheckCircle2, XCircle, User, Hash, GraduationCap, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
-import { attendanceService } from '@/services/attendanceService';
-import { Loader2, CheckCircle2, XCircle, Camera, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { studentAttendanceService } from '@/services';
+import { studentAttendanceService, studentService } from '@/services';
 
-/**
- * QRScanner Component 
- * Uses html5-qrcode via CDN to avoid NPM installation issues in restricted environments.
- */
-export default function QRScanner({ onScan, bulkMode = false }) {
-  const [loading, setLoading] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
+export default function QRScanner({ onScan, bulkMode = false, onScanComplete, instituteId, type = 'school' }) {
+  const videoRef = useRef(null);
   const scannerRef = useRef(null);
-  const [scriptLoaded, setScriptLoaded] = useState(false);
+  const cooldownRef = useRef(false);
+  const isProcessingRef = useRef(false);
 
-  const handleScanSuccess = async (decodedText) => {
-    // Prevent multiple simultaneous scans or scans during cooldown
-    if (decodedText && !loading && ready && !result) {
-      setReady(false);
-      
-      if (onScan) {
-        // Bulk mode or external handler
-        const scanSuccess = await onScan(decodedText);
-        if (scanSuccess) {
-           setResult({ success: true, message: `✅ Scanned: ${decodedText}` });
-        } else {
-           setResult({ success: false, message: `❌ Invalid or Already Scanned: ${decodedText}` });
-        }
-        setTimeout(() => {
-          setResult(null);
-          setReady(true);
-        }, 1500);
-        return;
-      }
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+  const [studentDetails, setStudentDetails] = useState(null);
 
-      setLoading(true);
-      setResult(null);
-      setError(null);
+  // =========================
+  // 🔊 AUDIO + VOICE SYSTEM
+  // =========================
 
-      try {
-        console.log('🔍 QR Scanned:', decodedText);
-        const response = await studentAttendanceService.scanQR({
-          student_id: decodedText,
-          type: "regular"
-        });
+  const playTone = (frequency = 500, duration = 200) => {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
 
-        const studentName = response.data?.student_name || 'Student';
-        setResult({
-          success: true,
-          message: `✅ Attendance marked: ${studentName}`
-        });
-        toast.success(response.message || `Attendance marked for ${studentName}`);
+    oscillator.type = 'sine';
+    oscillator.frequency.value = frequency;
 
-      } catch (err) {
-        console.error('❌ API Error:', err);
-        const errorMessage = err.response?.data?.message || "❌ Already marked present today";
-        setResult({
-          success: false,
-          message: errorMessage
-        });
-        toast.error(errorMessage);
-      } finally {
-        setLoading(false);
-        // Cooldown for 2 seconds before allowing next scan
-        setTimeout(() => {
-          setResult(null);
-          setReady(true);
-        }, 2000);
-      }
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+
+    oscillator.start();
+
+    setTimeout(() => {
+      oscillator.stop();
+      ctx.close();
+    }, duration);
+  };
+
+  const vibrate = (pattern = 200) => {
+    if (navigator.vibrate) navigator.vibrate(pattern);
+  };
+
+  const speak = (text, type = 'normal') => {
+    if (!window.speechSynthesis) return;
+    
+    window.speechSynthesis.cancel();
+    
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 1;
+    utter.pitch = type === 'success' ? 1.2 : 0.9;
+
+    const speakWithVoice = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const voice = voices.find(v => v.name.includes('Google') || v.name.includes('Female'));
+      if (voice) utter.voice = voice;
+      window.speechSynthesis.speak(utter);
+    };
+
+    if (window.speechSynthesis.getVoices().length) {
+      speakWithVoice();
+    } else {
+      window.speechSynthesis.onvoiceschanged = speakWithVoice;
     }
   };
 
-  useEffect(() => {
-    // Only run on client after script is loaded
-    if (scriptLoaded && typeof window !== 'undefined' && window.Html5Qrcode) {
-        let html5QrCode;
+  const successSound = (name) => {
+    playTone(800, 120);
+    setTimeout(() => playTone(1000, 120), 120);
+    speak(`${name} attendance marked`, 'success');
+    vibrate(200);
+  };
+
+  const errorSound = (message = 'Already marked or invalid') => {
+    playTone(300, 300);
+    speak(message, 'error');
+    vibrate([200, 100, 200]);
+  };
+
+  const lateSound = (name) => {
+    playTone(600, 150);
+    setTimeout(() => playTone(400, 150), 150);
+    speak(`${name} marked late`);
+    vibrate([100, 50, 100]);
+  };
+
+  // =========================
+  // 🔍 FETCH STUDENT DETAILS
+  // =========================
+
+  const fetchStudentDetails = async (studentId) => {
+    try {
+      // Try to get student details from API
+      const response = await studentService.getById(studentId, instituteId, type);
+      const student = response?.data || response;
+      
+      if (student) {
+        // Flatten student details
+        const details = student.details?.studentDetails || student.studentDetails || {};
+        const activeSession = details.academicSessions?.find(s => s.status === 'active') || {};
         
-        const startScanner = async () => {
-            try {
-                // Ensure container exists
-                if (!document.getElementById("reader")) return;
-
-                html5QrCode = new window.Html5Qrcode("reader");
-                scannerRef.current = html5QrCode;
-
-                const config = { 
-                    fps: 10, 
-                    qrbox: { width: 250, height: 250 },
-                    aspectRatio: 1.0,
-                    // Fix for small screens
-                    videoConstraints: {
-                        facingMode: "environment"
-                    }
-                };
-
-                await html5QrCode.start(
-                    { facingMode: "environment" },
-                    config,
-                    (decodedText) => handleScanSuccess(decodedText),
-                    (errorMessage) => {
-                        // Ignore frequent scan failures (common in this lib)
-                    }
-                );
-                setReady(true);
-                setError(null);
-            } catch (err) {
-                console.error('📷 Camera error:', err);
-                setError('Camera access failed. Check permissions.');
-            }
+        return {
+          id: student.id,
+          name: `${student.first_name || ''} ${student.last_name || ''}`.trim(),
+          roll_no: activeSession.roll_no || details.roll_no || student.roll_no || 'N/A',
+          class_name: activeSession.class_name || details.class_name || student.class_name || 'N/A',
+          section_name: activeSession.section_name || details.section_name || student.section_name || 'N/A',
+          registration_no: student.registration_no || 'N/A',
+          avatar: student.avatar_url
         };
-
-        startScanner();
-
-        return () => {
-            if (html5QrCode) {
-                if (html5QrCode.isScanning) {
-                    html5QrCode.stop().then(() => html5QrCode.clear()).catch(e => console.warn(e));
-                } else {
-                    try { html5QrCode.clear(); } catch (e) {}
-                }
-            }
-        };
+      }
+      return null;
+    } catch (err) {
+      console.error('Failed to fetch student details:', err);
+      return null;
     }
-  }, [scriptLoaded]);
+  };
+
+  // =========================
+  // 🔥 SCAN HANDLER
+  // =========================
+
+  const handleScan = async (data) => {
+    if (!data || loading || cooldownRef.current || isProcessingRef.current) {
+      console.log('⏸️ Scan blocked');
+      return;
+    }
+
+    isProcessingRef.current = true;
+    cooldownRef.current = true;
+    setLoading(true);
+    setResult(null);
+    setError('');
+    setStudentDetails(null);
+
+    try {
+      const raw = data?.data || data;
+      console.log('📱 Raw QR Data:', raw);
+
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = raw;
+      }
+
+      const studentId = parsed?.id || parsed;
+      console.log('🎯 Student ID:', studentId);
+
+      // Fetch student details first
+      const studentInfo = await fetchStudentDetails(studentId);
+      setStudentDetails(studentInfo);
+
+      // 👉 CASE 1: External handler provided (for queue/bulk mode)
+      if (onScan) {
+        console.log('📞 Calling external onScan handler...');
+        const ok = await onScan(studentId);
+
+        if (ok) {
+          setResult({ 
+            success: true, 
+            message: `Added to queue`,
+            student: studentInfo 
+          });
+          successSound(studentInfo?.name || 'Student');
+          if (onScanComplete) onScanComplete(true, studentId, studentInfo);
+        } else {
+          setResult({ 
+            success: false, 
+            message: 'Already in queue or invalid',
+            student: studentInfo 
+          });
+          errorSound('Already in queue');
+          if (onScanComplete) onScanComplete(false, studentId, studentInfo);
+        }
+        return;
+      }
+
+      // 👉 CASE 2: Direct API call (for instant scan mode)
+      console.log('📡 Calling API directly...');
+      const res = await studentAttendanceService.scanQR({
+        student_id: studentId,
+        type: bulkMode ? 'bulk' : 'regular',
+      });
+
+      console.log('✅ API Response:', res);
+
+      const status = res?.data?.status || 'present';
+
+      setResult({
+        success: true,
+        message: `Attendance marked`,
+        student: studentInfo,
+        status: status
+      });
+
+      toast.success(`Attendance marked for ${studentInfo?.name || 'Student'}`);
+
+      if (status === 'late') {
+        lateSound(studentInfo?.name || 'Student');
+      } else {
+        successSound(studentInfo?.name || 'Student');
+      }
+
+      if (onScanComplete) onScanComplete(true, studentId, studentInfo);
+
+    } catch (err) {
+      console.error('❌ Scan Error:', err);
+      
+      const errorMessage = err?.response?.data?.message || err?.message || 'Scan failed';
+      
+      setResult({
+        success: false,
+        message: errorMessage,
+        student: studentDetails
+      });
+
+      setError(errorMessage);
+      toast.error(errorMessage);
+      errorSound(errorMessage);
+      
+      if (onScanComplete) onScanComplete(false, null, null, errorMessage);
+    } finally {
+      setLoading(false);
+      isProcessingRef.current = false;
+
+      setTimeout(() => {
+        setResult(null);
+        setError('');
+        // Keep student details for a bit longer
+        setTimeout(() => {
+          setStudentDetails(null);
+        }, 500);
+      }, 2000);
+      
+      setTimeout(() => {
+        cooldownRef.current = false;
+      }, 800);
+    }
+  };
+
+  // =========================
+  // 🚀 START SCANNER
+  // =========================
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+
+    let scanner = null;
+    
+    const initScanner = async () => {
+      try {
+        scanner = new QrScanner(videoRef.current, handleScan, {
+          returnDetailedScanResult: true,
+          highlightScanRegion: true,
+          highlightCodeOutline: true,
+          maxScansPerSecond: 5,
+        });
+
+        scannerRef.current = scanner;
+        await scanner.start();
+        console.log('✅ QR Scanner started successfully');
+      } catch (err) {
+        console.error('Camera error:', err);
+        setError('Camera permission denied or not available');
+        toast.error('Unable to access camera. Please check permissions.');
+      }
+    };
+
+    initScanner();
+
+    if (window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+    }
+
+    return () => {
+      if (scanner) {
+        scanner.stop();
+        scanner.destroy();
+        console.log('🛑 QR Scanner stopped');
+      }
+    };
+  }, []);
+
+  // =========================
+  // 🎨 UI
+  // =========================
 
   return (
-    <div className="flex flex-col items-center justify-center space-y-6 w-full max-w-lg mx-auto">
-      {/* Load library via CDN directly to bypass build errors from missing node_modules */}
-      <Script 
-        src="https://unpkg.com/html5-qrcode" 
-        strategy="afterInteractive"
-        onLoad={() => setScriptLoaded(true)}
-      />
-      
-      <div className="relative w-full aspect-square overflow-hidden rounded-[2.5rem] bg-[#020617] border-[12px] border-white/5 shadow-2xl transition-all duration-500 hover:border-white/10">
-        {/* The actual camera feed container */}
-        <div id="reader" className="w-full h-full object-cover"></div>
+    <div className="flex flex-col items-center gap-6 w-full max-w-lg mx-auto">
 
-        {/* Global UI Overlays */}
-        {(loading || !ready || error || result) && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-2xl z-20 transition-all duration-300">
+      <div className="relative w-full aspect-square rounded-3xl overflow-hidden bg-black border border-white/10">
+
+        <video ref={videoRef} className="w-full h-full object-cover" />
+
+        {/* Overlay with Student Details */}
+        {(loading || result || error || studentDetails) && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md z-10">
+            
             {loading ? (
-              <div className="flex flex-col items-center space-y-6">
-                <div className="relative">
-                  <div className="h-20 w-20 rounded-full border-t-4 border-emerald-500 animate-spin" />
-                  <Loader2 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-emerald-500 animate-pulse" />
-                </div>
-                <div className="space-y-1 text-center">
-                  <p className="text-white text-lg font-bold tracking-tight">Processing...</p>
-                  <p className="text-white/40 text-xs uppercase tracking-widest">Marking attendance</p>
-                </div>
+              <div className="text-center">
+                <Loader2 className="h-10 w-10 text-emerald-500 animate-spin mx-auto" />
+                <p className="text-white text-sm mt-3">Fetching student details...</p>
               </div>
             ) : error ? (
-              <div className="flex flex-col items-center space-y-6 p-10 text-center animate-in zoom-in duration-300">
-                <div className="h-20 w-20 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20">
-                  <XCircle className="h-10 w-10 text-red-500" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-white text-xl font-bold">Hardware Error</h3>
-                  <p className="text-white/50 text-sm">{error}</p>
-                </div>
-                <Button variant="outline" onClick={() => window.location.reload()} className="rounded-full bg-white/5 text-white border-white/10 hover:bg-white/10">
-                  <RefreshCw className="mr-2 h-4 w-4" /> Try Again
-                </Button>
+              <div className="text-center max-w-[90%]">
+                <XCircle className="h-10 w-10 text-red-500 mx-auto" />
+                <p className="text-red-400 mt-2 text-sm font-medium">{error}</p>
               </div>
-            ) : result?.success ? (
-              <div className="flex flex-col items-center space-y-6 p-10 text-center animate-in zoom-in duration-300">
-                <div className="relative">
-                  <div className="h-24 w-24 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
-                    <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+            ) : (result?.success || studentDetails) ? (
+              <div className="text-center w-full max-w-sm px-4 animate-in zoom-in-95 duration-200">
+                <CheckCircle2 className={`h-12 w-12 ${result?.status === 'late' ? 'text-amber-500' : 'text-emerald-500'} mx-auto animate-bounce`} />
+                
+                {/* Student Details Card */}
+                {(studentDetails || result?.student) && (
+                  <div className="mt-4 bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
+                    <div className="flex items-center gap-3 mb-3 pb-3 border-b border-white/20">
+                      <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                        <User className="w-6 h-6 text-emerald-400" />
+                      </div>
+                      <div className="text-left flex-1">
+                        <p className="text-white font-bold text-lg">
+                          {studentDetails?.name || result?.student?.name || 'Student'}
+                        </p>
+                        <p className="text-emerald-400 text-xs font-mono">
+                          ID: {(studentDetails?.id || result?.student?.id)?.slice(0, 8)}...
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-left">
+                      <div className="flex items-center gap-2">
+                        <Hash className="w-4 h-4 text-emerald-400" />
+                        <div>
+                          <p className="text-[10px] text-white/50 uppercase font-bold">Roll No</p>
+                          <p className="text-white text-sm font-semibold">
+                            {studentDetails?.roll_no || result?.student?.roll_no || 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="w-4 h-4 text-emerald-400" />
+                        <div>
+                          <p className="text-[10px] text-white/50 uppercase font-bold">Registration</p>
+                          <p className="text-white text-sm font-semibold truncate">
+                            {studentDetails?.registration_no || result?.student?.registration_no || 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="w-4 h-4 text-emerald-400" />
+                        <div>
+                          <p className="text-[10px] text-white/50 uppercase font-bold">Class</p>
+                          <p className="text-white text-sm font-semibold">
+                            {studentDetails?.class_name || result?.student?.class_name || 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="w-4 h-4 text-emerald-400" />
+                        <div>
+                          <p className="text-[10px] text-white/50 uppercase font-bold">Section</p>
+                          <p className="text-white text-sm font-semibold">
+                            {studentDetails?.section_name || result?.student?.section_name || 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {result?.message && (
+                      <div className="mt-3 pt-3 border-t border-white/20">
+                        <p className={`text-sm font-bold ${result.success ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {result.message}
+                        </p>
+                        {result?.status === 'late' && (
+                          <p className="text-amber-400 text-xs mt-1">⚠️ Marked as Late</p>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="absolute -inset-2 bg-emerald-500/20 rounded-full animate-ping" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-white text-2xl font-bold tracking-tight">Success!</h3>
-                  <p className="text-emerald-400 font-medium px-4 py-2 bg-emerald-500/5 rounded-xl border border-emerald-500/10 whitespace-pre-wrap">
-                    {result.message}
-                  </p>
-                </div>
-                <p className="text-white/30 text-[10px] font-bold uppercase tracking-[0.3em] animate-pulse">AUTO-READY IN 2S</p>
-              </div>
-            ) : result ? (
-              <div className="flex flex-col items-center space-y-6 p-10 text-center animate-in zoom-in duration-300">
-                <div className="h-24 w-24 rounded-full bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
-                  <XCircle className="h-12 w-12 text-amber-500" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-white text-2xl font-bold tracking-tight">Notice</h3>
-                  <p className="text-amber-400 font-medium px-4 py-2 bg-amber-500/5 rounded-xl border border-amber-500/10">
-                    {result.message}
-                  </p>
-                </div>
-                <p className="text-white/30 text-[10px] font-bold uppercase tracking-[0.3em] animate-pulse">AUTO-READY IN 2S</p>
+                )}
+
+                {!studentDetails && !result?.student && result?.success && (
+                  <p className="text-emerald-400 mt-4 font-bold">{result.message}</p>
+                )}
               </div>
             ) : (
-              <div className="flex flex-col items-center space-y-6">
-                <Loader2 className="h-10 w-10 text-white/20 animate-spin" />
-                <p className="text-white/40 text-xs font-bold uppercase tracking-widest">Waiting for camera...</p>
+              <div className="text-center">
+                <XCircle className="h-12 w-12 text-yellow-500 mx-auto" />
+                <p className="text-yellow-400 mt-2">{result?.message}</p>
               </div>
             )}
+
           </div>
         )}
 
-        {/* Viewfinder (Active when scanning) */}
-        {ready && !loading && !error && !result && (
-          <div className="absolute inset-0 pointer-events-none z-10 transition-opacity duration-500">
-            {/* Viewport Frame */}
-            <div className="absolute inset-[15%] border-2 border-white/5 rounded-[2rem] overflow-hidden">
-                <div className="absolute inset-0 bg-blue-500/5" />
-                
-                {/* Corner Markers */}
-                <div className="absolute -top-1 -left-1 w-14 h-14 border-t-[6px] border-l-[6px] border-emerald-500 rounded-tl-3xl shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
-                <div className="absolute -top-1 -right-1 w-14 h-14 border-t-[6px] border-r-[6px] border-emerald-500 rounded-tr-3xl shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
-                <div className="absolute -bottom-1 -left-1 w-14 h-14 border-b-[6px] border-l-[6px] border-emerald-500 rounded-bl-3xl shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
-                <div className="absolute -bottom-1 -right-1 w-14 h-14 border-b-[6px] border-r-[6px] border-emerald-500 rounded-br-3xl shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
-            </div>
-            
-            {/* Moving Scan Line */}
-            <div className="absolute top-[15%] left-[15%] right-[15%] h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent shadow-[0_0_15px_rgba(16,185,129,1)] animate-scan-line opacity-80" />
-            
-            {/* UI Hints */}
-            <div className="absolute bottom-12 left-0 right-0 text-center animate-bounce">
-              <span className="text-[10px] font-black tracking-[0.2em] text-white bg-emerald-600 px-4 py-2 rounded-full shadow-lg">
-                SCANNING ACTIVE
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-col items-center gap-6 w-full text-center">
-        <div className="flex flex-wrap items-center justify-center gap-4">
-          <div className="flex items-center gap-3 px-6 py-2.5 bg-slate-100 dark:bg-white/5 rounded-full border border-slate-200 dark:border-white/10">
-            <Camera className="h-4 w-4 text-emerald-500" />
-            <span className="text-[11px] font-black text-slate-700 dark:text-white/50 uppercase tracking-widest">Smart Vision</span>
-          </div>
-          <div className="flex items-center gap-3 px-6 py-2.5 bg-slate-100 dark:bg-white/5 rounded-full border border-slate-200 dark:border-white/10">
-            <RefreshCw className="h-4 w-4 text-sky-500" />
-            <span className="text-[11px] font-black text-slate-700 dark:text-white/50 uppercase tracking-widest">Continuous</span>
-          </div>
-        </div>
+        {/* Scan Frame */}
+        <div className="absolute inset-[20%] border-4 border-emerald-500 rounded-2xl pointer-events-none animate-pulse" />
         
-        <p className="text-xs text-muted-foreground leading-relaxed max-w-[280px]">
-          Point the student's ID card QR directly into the viewfinder. Ensure good lighting for best results.
-        </p>
+        {/* Corner indicators */}
+        <div className="absolute top-[18%] left-[18%] w-8 h-8 border-t-4 border-l-4 border-emerald-500 rounded-tl-2xl" />
+        <div className="absolute top-[18%] right-[18%] w-8 h-8 border-t-4 border-r-4 border-emerald-500 rounded-tr-2xl" />
+        <div className="absolute bottom-[18%] left-[18%] w-8 h-8 border-b-4 border-l-4 border-emerald-500 rounded-bl-2xl" />
+        <div className="absolute bottom-[18%] right-[18%] w-8 h-8 border-b-4 border-r-4 border-emerald-500 rounded-br-2xl" />
+
       </div>
+
+      <p className="text-xs text-muted-foreground text-center">
+        📸 QR ko frame ke andar rakho — Student details automatically show honge ⚡
+      </p>
+
     </div>
   );
 }

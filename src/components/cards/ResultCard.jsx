@@ -8,6 +8,7 @@
 import { useRef } from 'react';
 import { Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuthStore } from '@/store/authStore';
 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -294,6 +295,7 @@ function getInitials(name) {
 
 export default function ResultCard({ student, exam, result, institute }) {
   const printRef = useRef();
+  const { getInstitute } = useAuthStore();
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
@@ -343,9 +345,10 @@ export default function ResultCard({ student, exam, result, institute }) {
     );
   }
 
-  const inst = institute || { name: 'Institute Name', code: 'INST-CODE', logo_url: null, institute_type: 'institution' };
+  const inst = institute || getInstitute?.() || { name: 'Institute Name', code: 'INST-CODE', logo_url: null, institute_type: 'institution' };
 
-  const subjectMarks       = result.subject_marks || [];
+  const subjectMarks       = Array.isArray(result.subject_marks) ? result.subject_marks : [];
+  const examSubjects       = Array.isArray(exam.subject_schedules) ? exam.subject_schedules : [];
   const totalMarksObtained = result.total_marks_obtained || 0;
   const percentage         = parseFloat(result.percentage || 0);
   const grade              = result.grade || 'N/A';
@@ -421,7 +424,7 @@ export default function ResultCard({ student, exam, result, institute }) {
             </div>
             <div className="rc-info-cell">
               <div className="rc-info-label">Roll Number</div>
-              <div className="rc-info-value">{student.roll_number || 'N/A'}</div>
+              <div className="rc-info-value">{student.roll_number || student.roll_no || 'N/A'}</div>
             </div>
             <div className="rc-info-cell">
               <div className="rc-info-label">Registration No.</div>
@@ -440,7 +443,7 @@ export default function ResultCard({ student, exam, result, institute }) {
           <div className="rc-stats-row">
             <div className="rc-stat-card">
               <div className="rc-stat-label">Total Marks</div>
-              <div className="rc-stat-value blue">{exam.total_marks}</div>
+              <div className="rc-stat-value blue">{exam.total_marks || result.total_marks || 0}</div>
             </div>
             <div className="rc-stat-card">
               <div className="rc-stat-label">Marks Obtained</div>
@@ -464,17 +467,28 @@ export default function ResultCard({ student, exam, result, institute }) {
               </tr>
             </thead>
             <tbody>
-              {(exam.subject_schedules || []).map((subject, idx) => {
-                const subjectMark  = subjectMarks.find(s => s.subject_id === subject.subject_id);
-                const obtained     = subjectMark?.marks_obtained || 0;
-                const subjectPct   = subject.total_marks > 0
-                  ? parseFloat(((obtained / subject.total_marks) * 100).toFixed(1))
+              {examSubjects.map((subject, idx) => {
+                const markById = subject.subject_id
+                  ? subjectMarks.find((s) => s.subject_id === subject.subject_id)
+                  : null;
+                const markByName = !markById
+                  ? subjectMarks.find((s) => {
+                      const left = String(s.subject_name || s.subject || '').trim().toLowerCase();
+                      const right = String(subject.subject_name || '').trim().toLowerCase();
+                      return left && right && left === right;
+                    })
+                  : null;
+                const subjectMark = markById || markByName || subjectMarks[idx] || null;
+                const totalMarks = Number(subject.total_marks || subject.total || subjectMark?.total_marks || 0);
+                const obtained = Number(subjectMark?.marks_obtained ?? subjectMark?.marks ?? 0);
+                const subjectPct = totalMarks > 0
+                  ? parseFloat(((obtained / totalMarks) * 100).toFixed(1))
                   : 0;
 
                 return (
                   <tr key={subject.subject_id || idx}>
                     <td>{subject.subject_name}</td>
-                    <td>{subject.total_marks}</td>
+                    <td>{totalMarks}</td>
                     <td>{obtained}</td>
                     <td>
                       <span className={`rc-pct-pill ${getPctClass(subjectPct)}`}>

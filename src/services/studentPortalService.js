@@ -41,6 +41,9 @@ export const studentPortalService = {
       headers: { 'Content-Type': 'multipart/form-data' }
     }).then(unwrap),
 
+  getExamSchedule: () =>
+    api.get('/portal/student/exams/schedule').then(unwrap),
+
   getResults: (filters = {}) =>
     api.get('/portal/student/results', { params: filters }).then(unwrap),
 

@@ -29,6 +29,7 @@ export { default as ExportModal }       from './ExportModal';
 export { default as InputField }        from './InputField';
 export { default as TextareaField }     from './TextareaField';
 export { default as SelectField }       from './SelectField';
+export { default as CreatableSelectField } from './CreatableSelectField';
 export { default as CheckboxField }     from './CheckboxField';
 export { default as SwitchField }       from './SwitchField';
 export { default as DatePickerField }   from './DatePickerField';

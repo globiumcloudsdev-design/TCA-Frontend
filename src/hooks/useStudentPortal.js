@@ -31,6 +31,12 @@ export const useStudentAssignments = (filters = {}, page = 1, limit = 10) =>
     queryFn: () => studentPortalService.getAssignments(filters, page, limit)
   });
 
+export const useStudentExamSchedule = () =>
+  useQuery({
+    queryKey: ['student-portal', 'exams', 'schedule'],
+    queryFn: studentPortalService.getExamSchedule
+  });
+
 export const useStudentResults = (filters = {}) =>
   useQuery({
     queryKey: ['student-portal', 'results', filters],

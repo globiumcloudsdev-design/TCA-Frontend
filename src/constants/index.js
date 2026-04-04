@@ -213,7 +213,7 @@ export const PAYMENT_METHODS = [
   { value: 'bank_transfer', label: 'Bank Transfer' },
   { value: 'jazzcash', label: 'JazzCash' },
   { value: 'easypaisa', label: 'EasyPaisa' },
-  { value: 'stripe', label: 'Card (Stripe)' },
+  // { value: 'stripe', label: 'Card (Stripe)' },
   { value: 'other', label: 'Other' },
 ];
 
