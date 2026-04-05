@@ -392,9 +392,9 @@ export function middleware(request) {
   // =============================
   // 1️⃣ PUBLIC ROUTES (skip middleware)
   // =============================
+  const PUBLIC_PATHS = ['/', '/login', '/portal-login', '/forgot-password', '/reset-password', '/contact', '/about', '/features', '/stats', '/faq', '/pricing'];
   if (
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/portal-login') ||
+    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/')) ||
     pathname.startsWith('/student') ||
     pathname.startsWith('/parent') ||
     pathname.startsWith('/teacher') ||
