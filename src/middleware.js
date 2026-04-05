@@ -395,6 +395,9 @@ export function middleware(request) {
   if (
     pathname.startsWith('/login') ||
     pathname.startsWith('/portal-login') ||
+    pathname.startsWith('/student') ||
+    pathname.startsWith('/parent') ||
+    pathname.startsWith('/teacher') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
     pathname.includes('.')
@@ -422,37 +425,7 @@ export function middleware(request) {
   }
 
   // =============================
-  // 4️⃣ PORTAL USERS: STUDENT / PARENT / TEACHER
-  // =============================
-  if (userType === 'STUDENT') {
-    if (!pathname.startsWith('/student')) {
-      return NextResponse.redirect(
-        new URL('/student', request.url)
-      );
-    }
-    return NextResponse.next();
-  }
-
-  if (userType === 'PARENT') {
-    if (!pathname.startsWith('/parent')) {
-      return NextResponse.redirect(
-        new URL('/parent', request.url)
-      );
-    }
-    return NextResponse.next();
-  }
-
-  if (userType === 'TEACHER') {
-    if (!pathname.startsWith('/teacher')) {
-      return NextResponse.redirect(
-        new URL('/teacher', request.url)
-      );
-    }
-    return NextResponse.next();
-  }
-
-  // =============================
-  // 5️⃣ STAFF / INSTITUTE USERS
+  // 4️⃣ STAFF / INSTITUTE USERS
   // =============================
   if (userType === 'STAFF' || userType === 'INSTITUTE_ADMIN' || userType === 'BRANCH_ADMIN') {
     // fallback instituteType
@@ -468,7 +441,7 @@ export function middleware(request) {
   }
 
   // =============================
-  // 6️⃣ DEFAULT: anything else
+  // 5️⃣ DEFAULT: anything else
   // =============================
   return NextResponse.next();
 }
