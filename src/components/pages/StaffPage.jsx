@@ -196,7 +196,7 @@ export default function StaffManagementPage({ instituteType }) {
     const staffMembers = data?.data ?? [];
     const total = data?.pagination.total ?? 0;
     const totalPages = data?.pagination?.totalPages ?? 1;
-    const availableRoles = user.permissions ?? [];
+    const availableRoles = user?.permissions ?? [];
 
     // Get default permissions - ALL permissions from institute role
     const getDefaultPermissions = (staffType) => {
