@@ -122,11 +122,11 @@ export default function AccountSelectionModal({
     } else if (role === 'INSTITUTE_ADMIN') {
       router.replace(`/${instType}/dashboard`);
     } else if (role === 'TEACHER') {
-      router.replace('/teacher/dashboard');
+      router.replace('/teacher');
     } else if (role === 'STUDENT') {
-      router.replace('/student/dashboard');
+      router.replace('/student');
     } else if (role === 'PARENT') {
-      router.replace('/parent/dashboard');
+      router.replace('/parent');
     } else {
       router.replace('/dashboard');
     }

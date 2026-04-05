@@ -40,7 +40,8 @@ const PORTAL_BUTTONS = [
 
 const QUICK_LOGINS = [
   { label: 'School Admin', email: 'hafizshoaibraza190@gmail.com', password: '123456', type: 'INSTITUTE_ADMIN' },
-  { label: 'Master Admin', email: 'admin@thecloudsacademy.com', password: 'Admin@TCA2026!', type: 'MASTER_ADMIN' },
+  // { label: 'Master Admin', email: 'admin@thecloudsacademy.com', password: 'Admin@TCA2026!', type: 'MASTER_ADMIN' },
+    { label: 'Accountant', email: 'hafizshoaibraza140@gmail.com', password: '123456', type: 'STAFF' },
 ];
 
 export default function LoginPage() {
@@ -110,9 +111,9 @@ export default function LoginPage() {
     const role = user.user_type;
     if (role === 'MASTER_ADMIN') router.replace('/master-admin');
     else if (role === 'INSTITUTE_ADMIN' || role === 'STAFF') router.replace(`/${instType}/dashboard`);
-    else if (role === 'TEACHER') router.replace('/teacher/dashboard');
-    else if (role === 'STUDENT') router.replace('/student/dashboard');
-    else if (role === 'PARENT') router.replace('/parent/dashboard');
+    else if (role === 'TEACHER') router.replace('/teacher');
+    else if (role === 'STUDENT') router.replace('/student');
+    else if (role === 'PARENT') router.replace('/parent');
     else router.replace('/dashboard');
   };
 

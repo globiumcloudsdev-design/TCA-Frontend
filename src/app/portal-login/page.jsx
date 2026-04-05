@@ -198,9 +198,9 @@ function PortalLoginContent() {
 
     // Redirect based on user type
     const redirectPaths = {
-      STUDENT: '/student/dashboard',
-      PARENT: '/parent/dashboard',
-      TEACHER: '/teacher/dashboard'
+      STUDENT: '/student',
+      PARENT: '/parent',
+      TEACHER: '/teacher'
     };
 
     const redirectPath = redirectPaths[user.user_type] || '/portal';
