@@ -5,16 +5,19 @@
  */
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Pencil, User, Phone, Mail, MapPin, Calendar,
   GraduationCap, BookOpen, TrendingUp, DollarSign, CheckSquare,
-  ChevronRight, Hash, Users, ShieldCheck, Clock, AlertCircle,
+  ChevronRight, Hash, Users, ShieldCheck, Clock, AlertCircle, Receipt,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import { DUMMY_FLAT_STUDENTS } from '@/data/dummyData';
 import useAuthStore from '@/store/authStore';
+import { toast } from 'sonner';
+import AppModal from '@/components/common/AppModal';
+import FeeVoucherForm from '@/components/forms/FeeVoucherForm';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 function initials(s) {
@@ -362,9 +365,11 @@ function ExamsTab({ student }) {
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function StudentDetailPage({ type, id }) {
   const router = useRouter();
+  const qc = useQueryClient();
   const canDo  = useAuthStore((s) => s.canDo);
   const { terms } = useInstituteConfig();
   const [activeTab, setActiveTab] = useState('Overview');
+  const [voucherOpen, setVoucherOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['student', type, id],
@@ -382,8 +387,36 @@ export default function StudentDetailPage({ type, id }) {
 
   const student = data?.data ?? DUMMY_FLAT_STUDENTS[0];
 
+  const createVoucher = useMutation({
+    mutationFn: async (body) => {
+      const { feeService } = await import('@/services');
+      return feeService.create(body);
+    },
+    onSuccess: () => {
+      toast.success('Fee voucher generated successfully');
+      setVoucherOpen(false);
+      qc.invalidateQueries({ queryKey: ['fees'] });
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to generate fee voucher');
+    },
+  });
+
   const studentLabel = terms?.student ?? (type === 'coaching' ? 'Candidate' : type === 'academy' ? 'Trainee' : 'Student');
   const rollNo = student.roll_number || student.candidate_id || student.trainee_id || student.reg_number;
+
+  const voucherDefaultValues = {
+    student_id: student?.id,
+    month: String(new Date().getMonth() + 1),
+    year: new Date().getFullYear(),
+    due_date: new Date().toISOString().slice(0, 10),
+    discount: 0,
+  };
+
+  const voucherStudentOptions = [{
+    value: student?.id,
+    label: `${student?.first_name || ''} ${student?.last_name || ''}`.trim(),
+  }];
 
   if (isLoading) {
     return (
@@ -466,6 +499,14 @@ export default function StudentDetailPage({ type, id }) {
           >
             <ArrowLeft size={14} /> Back
           </button>
+          {canDo('fees.create') && (
+            <button
+              onClick={() => setVoucherOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm hover:bg-accent transition-colors"
+            >
+              <Receipt size={14} /> Generate Voucher
+            </button>
+          )}
           {canDo('student.update') && (
             <button
               onClick={() => router.push(`/${type}/students/${id}/edit`)}
@@ -500,6 +541,22 @@ export default function StudentDetailPage({ type, id }) {
       {activeTab === 'Attendance'  && <AttendanceTab  student={student} />}
       {activeTab === 'Fees'        && <FeesTab        student={student} />}
       {activeTab === 'Exams'       && <ExamsTab       student={student} />}
+
+      <AppModal
+        open={voucherOpen}
+        onClose={() => setVoucherOpen(false)}
+        title="Generate Fee Voucher"
+        description={`Create voucher for ${(student?.first_name || '')} ${(student?.last_name || '')}`}
+        size="lg"
+      >
+        <FeeVoucherForm
+          defaultValues={voucherDefaultValues}
+          onSubmit={(body) => createVoucher.mutate(body)}
+          onCancel={() => setVoucherOpen(false)}
+          loading={createVoucher.isPending}
+          studentOptions={voucherStudentOptions}
+        />
+      </AppModal>
     </div>
   );
 }

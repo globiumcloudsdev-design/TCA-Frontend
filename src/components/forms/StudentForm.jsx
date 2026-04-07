@@ -16,13 +16,15 @@
 import { useForm, Controller, useFieldArray } from 'react-hook-form'; // Added useFieldArray
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
+import { 
   InputField,
   SelectField,
   TextareaField,
   DatePickerField,
   FormSubmitButton,
 } from '@/components/common';
+import PhoneInputField from '@/components/common/PhoneInput';
+import CnicInput from '@/components/common/CnicInput';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -599,12 +601,20 @@ export default function StudentForm({
                     placeholder="e.g. Pakistani" 
                     defaultValue="Pakistani"
                   />
-                  <InputField 
-                    label="CNIC/B-Form" 
-                    name="cnic" 
-                    register={register} 
-                    error={errors.cnic} 
-                    placeholder="00000-0000000-0" 
+                  <Controller
+                    name="cnic"
+                    control={control}
+                    render={({ field }) => (
+                      <CnicInput
+                        label="CNIC / B-Form"
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        country="pk"
+                        placeholder="00000-0000000-0"
+                        error={errors.cnic}
+                        {...field}
+                      />
+                    )}
                   />
                 </div>
               </div>
@@ -760,20 +770,34 @@ export default function StudentForm({
                         error={errors.guardians?.[index]?.relation} 
                         disabled
                       />
-                      <InputField 
-                        label="CNIC" 
-                        name={`guardians.${index}.cnic`} 
-                        register={register} 
-                        error={errors.guardians?.[index]?.cnic} 
-                        placeholder="00000-0000000-0"
+                      <Controller
+                        name={`guardians.${index}.cnic`}
+                        control={control}
+                        render={({ field }) => (
+                          <CnicInput
+                            label="Guardian CNIC / B-Form"
+                            value={field.value || ''}
+                            onChange={field.onChange}
+                            country="pk"
+                            placeholder="00000-0000000-0"
+                            error={errors.guardians?.[index]?.cnic}
+                            {...field}
+                          />
+                        )}
                       />
-                      <InputField 
-                        label="Phone *" 
-                        name={`guardians.${index}.phone`} 
-                        register={register} 
-                        error={errors.guardians?.[index]?.phone} 
-                        required 
-                        type="tel" 
+                      <Controller
+                        name={`guardians.${index}.phone`}
+                        control={control}
+                        render={({ field }) => (
+                          <PhoneInputField
+                            label="Guardian Phone"
+                            value={field.value || ''}
+                            onChange={field.onChange}
+                            country="pk"
+                            error={errors.guardians?.[index]?.phone}
+                            inputProps={{ required: true, name: field.name }}
+                          />
+                        )}
                       />
                       <InputField
                         label="Email"
@@ -814,7 +838,20 @@ export default function StudentForm({
                 </div>
                 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <InputField label="Phone" name="phone" register={register} error={errors.phone} required type="tel" />
+                  <Controller
+                    name="phone"
+                    control={control}
+                    render={({ field }) => (
+                      <PhoneInputField
+                        label="Phone Number"
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        country="pk"
+                        error={errors.phone}
+                        inputProps={{ required: true, name: field.name }}
+                      />
+                    )}
+                  />
                   <InputField label="Email" name="email" register={register} error={errors.email} type="email" />
                   <InputField label="City" name="city" register={register} error={errors.city} required />
                 </div>
@@ -851,7 +888,20 @@ export default function StudentForm({
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <InputField label="Contact Person" name="emergency_contact_name" register={register} error={errors.emergency_contact_name} />
                   <InputField label="Relation" name="emergency_contact_relation" register={register} error={errors.emergency_contact_relation} />
-                  <InputField label="Emergency Phone" name="emergency_contact_phone" register={register} error={errors.emergency_contact_phone} type="tel" />
+                  <Controller
+                    name="emergency_contact_phone"
+                    control={control}
+                    render={({ field }) => (
+                      <PhoneInputField
+                        label="Emergency Contact Phone"
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        country="pk"
+                        error={errors.emergency_contact_phone}
+                        inputProps={{ name: field.name }}
+                      />
+                    )}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -1000,9 +1050,15 @@ export default function StudentForm({
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={loading}>
-          {loading ? 'Saving...' : (isEdit ? 'Update' : 'Create')}
-        </Button>
+        {activeTab !== 'documents' ? (
+          <Button type="button" onClick={nextTab}>
+            Next
+          </Button>
+        ) : (
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Saving...' : (isEdit ? 'Update' : 'Add')}
+          </Button>
+        )}
       </div>
     </form>
   );

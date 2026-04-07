@@ -32,6 +32,8 @@ import {
   DOCUMENT_TYPES,
   RELATIONSHIP_OPTIONS
 } from '@/constants/index';
+import CnicInput from '../common/CnicInput';
+import PhoneInputField from '../common/PhoneInput';
 
 // Constants
 const MAX_FILE_MB = 10;
@@ -412,12 +414,11 @@ export default function TeacherForm({
                     placeholder="Select"
                   />
                   
-                  <InputField
-                    label="CNIC"
-                    name="cnic"
-                    register={register}
+                  <CnicInput
+                    label="CNIC / B-Form"
+                    value={watch('cnic') || ''}
+                    onChange={val => setValue('cnic', val)}
                     error={errors.cnic}
-                    placeholder="00000-0000000-0"
                   />
                 </div>
 
@@ -436,23 +437,18 @@ export default function TeacherForm({
                     placeholder="teacher@school.com"
                   />
                   
-                  <InputField
-                    label="Phone *"
-                    name="phone"
-                    register={register}
+                  <PhoneInputField
+                    label="Phone Number"
+                    value={watch('phone') || ''}
+                    onChange={val => setValue('phone', val)}
                     error={errors.phone}
-                    required
-                    type="tel"
-                    placeholder="03001234567"
                   />
                   
-                  <InputField
+                  <PhoneInputField
                     label="Alternate Phone"
-                    name="alternate_phone"
-                    register={register}
+                    value={watch('alternate_phone') || ''}
+                    onChange={val => setValue('alternate_phone', val)}
                     error={errors.alternate_phone}
-                    type="tel"
-                    placeholder="03123456789"
                   />
                   
                   <InputField
@@ -504,13 +500,11 @@ export default function TeacherForm({
                     placeholder="Select"
                   />
                   
-                  <InputField
-                    label="Emergency Phone"
-                    name="emergency_contact_phone"
-                    register={register}
+                  <PhoneInputField
+                    label="Emergency Contact Phone"
+                    value={watch('emergency_contact_phone') || ''}
+                    onChange={val => setValue('emergency_contact_phone', val)}
                     error={errors.emergency_contact_phone}
-                    type="tel"
-                    placeholder="03001234567"
                   />
                 </div>
               </div>
@@ -842,17 +836,37 @@ export default function TeacherForm({
         </TabsContent>
       </Tabs>
 
-      {/* Form Actions */}
+      {/* Tab Navigation & Actions */}
       <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t">
         <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">
           Cancel
         </Button>
-        <FormSubmitButton
-          loading={loading}
-          label={isEdit ? 'Save Changes' : 'Add Teacher'}
-          loadingLabel={isEdit ? 'Saving…' : 'Adding…'}
-          className="w-full sm:w-auto"
-        />
+        {activeTab !== 'personal' && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={prevTab}
+            className="w-full sm:w-auto"
+          >
+            Previous
+          </Button>
+        )}
+        {activeTab !== 'documents' ? (
+          <Button
+            type="button"
+            onClick={nextTab}
+            className="w-full sm:w-auto"
+          >
+            Next
+          </Button>
+        ) : (
+          <FormSubmitButton
+            loading={loading}
+            label={isEdit ? 'Save Changes' : 'Add Teacher'}
+            loadingLabel={isEdit ? 'Saving…' : 'Adding…'}
+            className="w-full sm:w-auto"
+          />
+        )}
       </div>
     </form>
   );

@@ -40,7 +40,7 @@ const PORTAL_BUTTONS = [
 
 const QUICK_LOGINS = [
   { label: 'School Admin', email: 'hafizshoaibraza190@gmail.com', password: '123456', type: 'INSTITUTE_ADMIN' },
-  // { label: 'Master Admin', email: 'admin@thecloudsacademy.com', password: 'Admin@TCA2026!', type: 'MASTER_ADMIN' },
+  { label: 'Master Admin', email: 'admin@thecloudsacademy.com', password: 'Admin@TCA2026!', type: 'MASTER_ADMIN' },
     { label: 'Accountant', email: 'hafizshoaibraza140@gmail.com', password: '123456', type: 'STAFF' },
 ];
 

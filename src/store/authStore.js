@@ -75,14 +75,42 @@ export const useAuthStore = create(
       canDo: (permissionCode) => {
         const u = get().user;
 
-        if (!u) return false;
-        if (u.role_code === "MASTER_ADMIN" || u.user_type === "MASTER_ADMIN") return true;
+        if (!u) {
+          console.log('❌ canDo - No user found');
+          return false;
+        }
+        
+        // MASTER_ADMIN bypass
+        if (u.role_code === "MASTER_ADMIN" || u.user_type === "MASTER_ADMIN") {
+          console.log('✅ canDo - User is MASTER_ADMIN');
+          return true;
+        }
 
         const perms = u.permissions || [];
+        
+        // Debug
+        console.log('🔍 canDo check:', {
+          permissionCode,
+          permisionsType: typeof perms,
+          permissionsArray: Array.isArray(perms),
+          permissionsCount: perms?.length,
+          permissionsIncludesCode: perms?.includes(permissionCode),
+          allPermissions: perms
+        });
 
-        if (perms.includes("ALL")) return true;
+        if (!Array.isArray(perms)) {
+          console.warn('⚠️ canDo - permissions is not an array:', perms);
+          return false;
+        }
 
-        return perms.includes(permissionCode);
+        if (perms.includes("ALL")) {
+          console.log('✅ canDo - User has ALL permissions');
+          return true;
+        }
+
+        const result = perms.includes(permissionCode);
+        console.log(`${result ? '✅' : '❌'} canDo("${permissionCode}"):`, result);
+        return result;
       },
 
       canDoAny: (codes = []) => {

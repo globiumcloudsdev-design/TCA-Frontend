@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import {
     Plus, Pencil, Trash2, Users, UserCog, Mail, Phone,
     Loader2, RefreshCw, Upload, X, Calendar, Briefcase,
-    GraduationCap, Banknote, MapPin, FileText, Shield
+    GraduationCap, Banknote, MapPin, FileText, Shield, IdCard
 } from 'lucide-react';
 import useAuthStore from '@/store/authStore';
 import { staffService } from '@/services/staffService';
@@ -26,6 +26,8 @@ import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
 import SelectField from '@/components/common/SelectField';
 import InputField from '@/components/common/InputField';
+import PhoneInputField from '@/components/common/PhoneInput';
+import CnicInput from '@/components/common/CnicInput';
 import SwitchField from '@/components/common/SwitchField';
 import StatsCard from '@/components/common/StatsCard';
 import { FileUpload } from '@/components/forms/FileUpload';
@@ -38,6 +40,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { DatePickerField, TextareaField } from '../common';
 import { GENDER_OPTIONS, RELATIONSHIP_OPTIONS, BLOOD_GROUP_OPTIONS, RELIGION_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DOCUMENT_TYPES, STAFF_TYPES, STATUS_OPTS } from '@/constants';
+import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
 
 const MAX_FILE_MB = 10;
 const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
@@ -180,6 +183,12 @@ export default function StaffManagementPage({ instituteType }) {
     const canCreate = canDo('staff.create') || canDo('users.create') || user?.user_type === 'MASTER_ADMIN';
     const canUpdate = canDo('staff.update') || canDo('users.update') || user?.user_type === 'MASTER_ADMIN';
     const canDelete = canDo('staff.delete') || canDo('users.delete') || user?.user_type === 'MASTER_ADMIN';
+
+    const resolveCardRole = (staffMember) => {
+        const typeValue = String(staffMember?.staff_type || '').toLowerCase();
+        if (typeValue.includes('admin')) return 'admin';
+        return 'staff';
+    };
 
     // Fetch staff members
     const { data, isLoading, refetch, isFetching } = useQuery({
@@ -717,11 +726,24 @@ export default function StaffManagementPage({ instituteType }) {
                                 <Trash2 size={13} />
                             </button>
                         )}
+                        {(canDo('staff.read') || canDo('users.read')) && (
+                            <button
+                                onClick={() => generateAndDownloadIdCard({
+                                    role: resolveCardRole(s),
+                                    person: s,
+                                    institute: user?.institute || user?.school || {}
+                                })}
+                                className="rounded p-1.5 hover:bg-accent"
+                                title="Generate ID Card"
+                            >
+                                <IdCard size={13} />
+                            </button>
+                        )}
                     </div>
                 );
             },
         },
-    ], [canUpdate, canDelete]);
+    ], [canUpdate, canDelete, canDo, user]);
 
     // Stats
     const activeCount = staffMembers.filter(s => s.is_active).length;
@@ -811,16 +833,34 @@ export default function StaffManagementPage({ instituteType }) {
                         <Button variant="outline" onClick={() => setModalOpen(false)}>
                             Cancel
                         </Button>
-                        <Button
-                            type="submit"
-                            form="staff-form"
-                            disabled={createMutation.isPending || updateMutation.isPending}
-                        >
-                            {createMutation.isPending || updateMutation.isPending ? (
-                                <Loader2 size={14} className="animate-spin mr-1" />
-                            ) : null}
-                            {editingStaff ? 'Update' : 'Create'}
-                        </Button>
+                        {activeTab !== 'personal' && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={prevTab}
+                            >
+                                Previous
+                            </Button>
+                        )}
+                        {activeTab !== 'documents' ? (
+                            <Button
+                                type="button"
+                                onClick={nextTab}
+                            >
+                                Next
+                            </Button>
+                        ) : (
+                            <Button
+                                type="submit"
+                                form="staff-form"
+                                disabled={createMutation.isPending || updateMutation.isPending}
+                            >
+                                {createMutation.isPending || updateMutation.isPending ? (
+                                    <Loader2 size={14} className="animate-spin mr-1" />
+                                ) : null}
+                                {editingStaff ? 'Update' : 'Add Staff'}
+                            </Button>
+                        )}
                     </div>
                 }
             >
@@ -940,12 +980,11 @@ export default function StaffManagementPage({ instituteType }) {
                                                 placeholder="Select"
                                             />
 
-                                            <InputField
-                                                label="CNIC"
-                                                name="cnic"
-                                                register={register}
+                                            <CnicInput
+                                                label="CNIC / B-Form"
+                                                value={watch('cnic') || ''}
+                                                onChange={val => setValue('cnic', val)}
                                                 error={errors.cnic}
-                                                placeholder="00000-0000000-0"
                                             />
                                         </div>
 
@@ -963,22 +1002,18 @@ export default function StaffManagementPage({ instituteType }) {
                                                 placeholder="john@institute.com"
                                             />
 
-                                            <InputField
-                                                label="Phone"
-                                                name="phone"
-                                                register={register}
+                                            <PhoneInputField
+                                                label="Phone Number"
+                                                value={watch('phone') || ''}
+                                                onChange={val => setValue('phone', val)}
                                                 error={errors.phone}
-                                                type="tel"
-                                                placeholder="03001234567"
                                             />
 
-                                            <InputField
+                                            <PhoneInputField
                                                 label="Alternate Phone"
-                                                name="alternate_phone"
-                                                register={register}
+                                                value={watch('alternate_phone') || ''}
+                                                onChange={val => setValue('alternate_phone', val)}
                                                 error={errors.alternate_phone}
-                                                type="tel"
-                                                placeholder="03123456789"
                                             />
 
                                             <InputField
@@ -1030,13 +1065,11 @@ export default function StaffManagementPage({ instituteType }) {
                                                 placeholder="Select"
                                             />
 
-                                            <InputField
-                                                label="Emergency Phone"
-                                                name="emergency_contact_phone"
-                                                register={register}
+                                            <PhoneInputField
+                                                label="Emergency Contact Phone"
+                                                value={watch('emergency_contact_phone') || ''}
+                                                onChange={val => setValue('emergency_contact_phone', val)}
                                                 error={errors.emergency_contact_phone}
-                                                type="tel"
-                                                placeholder="03001234567"
                                             />
                                         </div>
                                     </div>

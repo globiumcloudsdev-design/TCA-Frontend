@@ -21,7 +21,8 @@ import {
   Filter,
   Mail,
   Phone,
-  Power // ✅ For active/deactivate
+  Power,
+  IdCard
 } from 'lucide-react';
 
 import useAuthStore from '@/store/authStore';
@@ -49,6 +50,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 
 import { teacherService } from '@/services/teacherService';
+import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
 
 // ✅ Zod schema for filters
 const filterSchema = z.object({
@@ -330,6 +332,18 @@ export default function TeachersPage({ type }) {
 
         const extraActions = [];
 
+        if (canDo('teachers.read')) {
+          extraActions.push({
+            label: 'Generate ID Card',
+            icon: <IdCard className="h-4 w-4" />,
+            onClick: () => generateAndDownloadIdCard({
+              role: 'teacher',
+              person: teacher,
+              institute: currentInstitute || user?.institute || user?.school || {}
+            })
+          });
+        }
+
         if (canUpdate) {
           extraActions.push({
             label: 'Regenerate QR Code',
@@ -356,7 +370,7 @@ export default function TeachersPage({ type }) {
         );
       },
     },
-  ], [canDo]);
+  ], [canDo, currentInstitute, user]);
 
   // Stats
   const teachers = data?.data || [];

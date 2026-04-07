@@ -14,7 +14,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Plus, Eye, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Eye, Pencil, Trash2, Loader2, IdCard } from 'lucide-react';
 import { toast } from 'sonner';
 
 import useInstituteConfig from '@/hooks/useInstituteConfig';
@@ -27,6 +27,7 @@ import AppModal from '@/components/common/AppModal';
 import StudentForm from '@/components/forms/StudentForm';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import { cn } from '@/lib/utils';
+import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
 
 // Status badge color map
 const STATUS_COLORS = {
@@ -37,7 +38,7 @@ const STATUS_COLORS = {
 };
 
 // Build react-table ColumnDef[] dynamically from studentColumns config
-function buildColumns(studentColumns, type, terms, canDo, router, onDelete, onEdit) {
+function buildColumns(studentColumns, type, terms, canDo, router, onDelete, onEdit, onGenerateIdCard) {
   const cols = studentColumns.map((col) => ({
     accessorKey: col.key,
     header: col.label,
@@ -78,6 +79,15 @@ function buildColumns(studentColumns, type, terms, canDo, router, onDelete, onEd
               <Trash2 size={13} />
             </button>
           )}
+          {canDo('students.read') && (
+            <button
+              onClick={() => onGenerateIdCard(stu)}
+              className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent"
+              title="Generate ID Card"
+            >
+              <IdCard size={13} />
+            </button>
+          )}
         </div>
       );
     },
@@ -105,6 +115,7 @@ export default function StudentsPage({ type }) {
   const router = useRouter();
   const qc = useQueryClient();
   const canDo = useAuthStore((s) => s.canDo);
+  const user = useAuthStore((s) => s.user);
   const { currentInstitute } = useInstituteStore();
   const { terms, studentColumns } = useInstituteConfig();
 
@@ -192,9 +203,14 @@ export default function StudentsPage({ type }) {
   const total = data?.pagination?.total ?? 0;
   const totalPages = data?.pagination?.totalPages ?? 1;
 
+  const handleGenerateIdCard = (student) => {
+    const institute = currentInstitute || user?.institute || user?.school || {};
+    generateAndDownloadIdCard({ role: 'student', person: student, institute });
+  };
+
   const columns = useMemo(
-    () => buildColumns(studentColumns, type, terms, canDo, router, setDeleting, (stu) => setEditingId(stu.id)),
-    [studentColumns, type, terms, canDo, router],
+    () => buildColumns(studentColumns, type, terms, canDo, router, setDeleting, (stu) => setEditingId(stu.id), handleGenerateIdCard),
+    [studentColumns, type, terms, canDo, router, currentInstitute, user],
   );
 
   const statusOptions = [
@@ -367,7 +383,7 @@ export default function StudentsPage({ type }) {
     { key: 'concession_type', label: 'Concession Type', required: false, validation: 'select', options: ['none', 'merit', 'need', 'staff', 'sibling'] },
     { key: 'concession_percentage', label: 'Concession Percentage', required: false, validation: 'number' },
     { key: 'concession_reason', label: 'Concession Reason', required: false, validation: 'text' },
-    { key: 'fee_status', label: 'Fee Status', required: false, validation: 'select', options: ['paid', 'pending', 'overdue', 'partial'] },
+    { key: 'fee_status', label: 'Fee Status', required: false, validation: 'select', options: [ 'pending', 'overdue', 'partial'] },
 
     // Medical Information
     { key: 'medical_conditions', label: 'Medical Conditions', required: false, validation: 'text' },
