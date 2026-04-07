@@ -40,7 +40,7 @@ export const useAuthStore = create(
       // Loading State
       // ─────────────────────────────────────────
       setLoading: (val) => {
-        console.log("⏳ Auth Loading:", val);
+        // console.log("⏳ Auth Loading:", val);
         set({ isLoading: val });
       },
 
@@ -76,7 +76,7 @@ export const useAuthStore = create(
         const u = get().user;
 
         if (!u) {
-          console.log('❌ canDo - No user found');
+          // console.log('❌ canDo - No user found');
           return false;
         }
         
@@ -89,14 +89,14 @@ export const useAuthStore = create(
         const perms = u.permissions || [];
         
         // Debug
-        console.log('🔍 canDo check:', {
-          permissionCode,
-          permisionsType: typeof perms,
-          permissionsArray: Array.isArray(perms),
-          permissionsCount: perms?.length,
-          permissionsIncludesCode: perms?.includes(permissionCode),
-          allPermissions: perms
-        });
+        // console.log('🔍 canDo check:', {
+        //   permissionCode,
+        //   permisionsType: typeof perms,
+        //   permissionsArray: Array.isArray(perms),
+        //   permissionsCount: perms?.length,
+        //   permissionsIncludesCode: perms?.includes(permissionCode),
+        //   allPermissions: perms
+        // });
 
         if (!Array.isArray(perms)) {
           console.warn('⚠️ canDo - permissions is not an array:', perms);
@@ -104,12 +104,12 @@ export const useAuthStore = create(
         }
 
         if (perms.includes("ALL")) {
-          console.log('✅ canDo - User has ALL permissions');
+          // console.log('✅ canDo - User has ALL permissions');
           return true;
         }
 
         const result = perms.includes(permissionCode);
-        console.log(`${result ? '✅' : '❌'} canDo("${permissionCode}"):`, result);
+        // console.log(`${result ? '✅' : '❌'} canDo("${permissionCode}"):`, result);
         return result;
       },
 
@@ -130,8 +130,8 @@ export const useAuthStore = create(
       schoolHasBranches: () => {
         const u = get().user;
 
-        console.log("🔍 Debug - Full user object:", u);
-        console.log("🔍 Debug - Institute object:", u?.institute);
+        // console.log("🔍 Debug - Full user object:", u);
+        // console.log("🔍 Debug - Institute object:", u?.institute);
         // console.log("🔍 Debug - Institute settings:", u?.institute?.settings);
         
         // Check institute settings
@@ -140,8 +140,8 @@ export const useAuthStore = create(
         // Check branch data exists
         const hasBranchData = !!u?.branch;
 
-        console.log("🔍 Debug - hasBranchesFromInstitute:", hasBranchesFromInstitute);
-        console.log("🔍 Debug - hasBranchData:", hasBranchData);
+        // console.log("🔍 Debug - hasBranchesFromInstitute:", hasBranchesFromInstitute);
+        // console.log("🔍 Debug - hasBranchData:", hasBranchData);
 
         return hasBranchesFromInstitute;
       },

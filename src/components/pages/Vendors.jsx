@@ -65,7 +65,7 @@ function generateRandomPassword() {
 export default function Vendors() {
   const canDo = useAuthStore((s) => s.canDo);
   const user = useAuthStore((s) => s.user);
-  const type = user.institute.institute_type;
+  const type = user?.institute?.institute_type || null;
 
   const queryClient = useQueryClient();
 
@@ -112,13 +112,11 @@ export default function Vendors() {
       };
       try {
         const res = await vendorService.getAll(params);
-        console.log('Vendors fetched:', res);
         return {
           rows: res?.data || [],
           pagination: res?.pagination || { total: 0, page: 1, limit: pageSize, totalPages: 0 }
         };
       } catch (error) {
-        console.error('Failed to fetch vendors:', error);
         return { rows: [], pagination: { total: 0, page: 1, limit: pageSize, totalPages: 0 } };
       }
     },
@@ -136,16 +134,15 @@ export default function Vendors() {
   } = useQuery({
     queryKey: ['students-for-vendors', type],
     queryFn: async () => {
+      if (!type) return [];
       try {
         const res = await studentService.getAll({ page: 1, limit: 1000, is_active: true }, type);
-        console.log('Students fetched:', res);
         if (Array.isArray(res?.data?.rows)) return res.data.rows;
         if (Array.isArray(res?.data)) return res.data;
         if (Array.isArray(res?.rows)) return res.rows;
         if (Array.isArray(res)) return res;
         return [];
       } catch (error) {
-        console.error('Failed to fetch students:', error);
         return [];
       }
     },
