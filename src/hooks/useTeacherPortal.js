@@ -1,5 +1,4 @@
-// // // frontend/src/hooks/useTeacherPortal.js
-
+// src/hooks/useTeacherPortal.js
 // // /**
 // //  * Custom hooks for Teacher Portal
 // //  * Makes it easy to use teacher portal service in components
@@ -968,8 +967,8 @@ export const useTeacherStudents = () => {
   const [attendanceSummary, setAttendanceSummary] = useState(null);
 
   const fetchStudents = useCallback(async (customFilters = {}, page = 1, limit = 10) => {
-    // Merge filters
-    const mergedFilters = { ...filters, ...customFilters };
+    // Use the provided filter set directly
+    const mergedFilters = { ...customFilters };
     
     // Validate - class_id is required
     if (!mergedFilters.class_id) {
@@ -1037,14 +1036,17 @@ export const useTeacherStudents = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []);
 
   // Update filters and refetch
   const updateFilters = useCallback((newFilters) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
-    // Reset to page 1 when filters change
-    fetchStudents({ ...filters, ...newFilters }, 1, pagination.limit);
-  }, [filters, pagination.limit, fetchStudents]);
+    setFilters((prev) => {
+      const nextFilters = { ...prev, ...newFilters };
+      // Reset to page 1 when filters change
+      fetchStudents(nextFilters, 1, pagination.limit);
+      return nextFilters;
+    });
+  }, [fetchStudents, pagination.limit]);
 
   // Change page
   const changePage = useCallback((newPage) => {
@@ -1632,4 +1634,72 @@ export const useTeacherExamEntry = (examId, filters = {}, page = 1, limit = 100)
     setPage: setCurrentPage,
     setLimit: setCurrentLimit
   };
+};
+
+
+
+
+// ─────────────────────────────────────────────────────────────────────────
+// LEAVE REQUESTS
+// ─────────────────────────────────────────────────────────────────────────
+
+export const useTeacherLeaveRequests = (filters = {}, page = 1, limit = 10) =>
+  useQuery({
+    queryKey: ['teacher-portal', 'leave-requests', filters, page, limit],
+    queryFn: () => teacherPortalService.getLeaveRequests(filters, page, limit)
+  });
+
+export const useTeacherLeaveStatistics = () =>
+  useQuery({
+    queryKey: ['teacher-portal', 'leave-statistics'],
+    queryFn: teacherPortalService.getLeaveStatistics
+  });
+
+export const useTeacherLeaveBalance = () =>
+  useQuery({
+    queryKey: ['teacher-portal', 'leave-balance'],
+    queryFn: teacherPortalService.getLeaveBalance
+  });
+
+export const usePendingLeaveApprovals = (filters = {}, page = 1, limit = 10) =>
+  useQuery({
+    queryKey: ['teacher-portal', 'leave-approvals', filters, page, limit],
+    queryFn: () => teacherPortalService.getPendingLeaveApprovals(filters, page, limit)
+  });
+
+export const useCreateLeaveRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data) => teacherPortalService.createLeaveRequest(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacher-portal', 'leave-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-portal', 'leave-statistics'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-portal', 'leave-balance'] });
+    }
+  });
+};
+
+export const useCancelLeaveRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }) => teacherPortalService.cancelLeaveRequest(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacher-portal', 'leave-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-portal', 'leave-statistics'] });
+    }
+  });
+};
+
+export const useApproveRejectLeaveRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }) => teacherPortalService.approveRejectLeaveRequest?.(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacher-portal', 'leave-approvals'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-portal', 'leave-requests'] });
+    }
+  });
 };

@@ -157,6 +157,28 @@ export const teacherPortalService = {
     api.get(`/portal/teacher/exams/${examId}/entry-students`, { 
       params: { ...filters, page, limit } 
     }).then(unwrap),
+
+  // Leave Requests
+  getLeaveRequests: (filters = {}, page = 1, limit = 10) =>
+    api.get('/portal/teacher/leave-requests', { params: { ...filters, page, limit } }).then(unwrap),
+
+  createLeaveRequest: (data) =>
+    api.post('/portal/teacher/leave-requests', data).then(unwrap),
+
+  getLeaveRequestById: (id) =>
+    api.get(`/portal/teacher/leave-requests/${id}`).then(unwrap),
+
+  cancelLeaveRequest: (id, data = {}) =>
+    api.patch(`/portal/teacher/leave-requests/${id}/cancel`, data).then(unwrap),
+
+  getLeaveStatistics: () =>
+    api.get('/portal/teacher/leave-requests/statistics').then(unwrap),
+
+  getLeaveBalance: () =>
+    api.get('/portal/teacher/leave-balance').then(unwrap),
+
+  getPendingLeaveApprovals: (filters = {}, page = 1, limit = 10) =>
+    api.get('/portal/teacher/leave-requests/pending', { params: { ...filters, page, limit } }).then(unwrap)
 };
 
 export default teacherPortalService;

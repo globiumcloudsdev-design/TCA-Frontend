@@ -15,6 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import AttendanceReport from '@/components/attendance/AttendanceReport';
 
 const REPORT_TABS = [
   { id: 'student',    label: 'Students',    icon: Users,         permission: 'REPORT_STUDENT'    },
@@ -139,7 +140,7 @@ export default function ReportsPage() {
 
           {/* ── Attendance Report ── */}
           {activeTab === 'attendance' && (
-            <AttendanceReportView data={report} />
+            <AttendanceReport />
           )}
 
           {/* ── Salary Report ── */}
@@ -235,53 +236,6 @@ function FeeReportView({ data }) {
   );
 }
 
-/* ─── Attendance Report View ──────────────────────────────────── */
-function AttendanceReportView({ data }) {
-  const stats = [
-    { title: 'Total Days',    value: data.total_days    ?? 0 },
-    { title: 'Avg Present %', value: `${data.avg_present_pct ?? 0}%` },
-    { title: 'Total Absent',  value: data.total_absent  ?? 0 },
-    { title: 'Total Late',    value: data.total_late    ?? 0 },
-  ];
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((s) => (
-          <div key={s.title} className="rounded-xl border bg-card p-4 shadow-sm">
-            <p className="text-xs text-muted-foreground">{s.title}</p>
-            <p className="text-xl font-bold mt-1">{s.value}</p>
-          </div>
-        ))}
-      </div>
-      {data.by_class && data.by_class.length > 0 && (
-        <div className="rounded-lg border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 border-b">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium">Class</th>
-                <th className="px-4 py-3 text-center font-medium text-green-600">Present</th>
-                <th className="px-4 py-3 text-center font-medium text-red-600">Absent</th>
-                <th className="px-4 py-3 text-center font-medium text-yellow-600">Late</th>
-                <th className="px-4 py-3 text-center font-medium">%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.by_class.map((row) => (
-                <tr key={row.class_id ?? row.class} className="border-b last:border-0 hover:bg-muted/20">
-                  <td className="px-4 py-3 font-medium">{row.class ?? '—'}</td>
-                  <td className="px-4 py-3 text-center text-green-600">{row.present ?? 0}</td>
-                  <td className="px-4 py-3 text-center text-red-600">{row.absent ?? 0}</td>
-                  <td className="px-4 py-3 text-center text-yellow-600">{row.late ?? 0}</td>
-                  <td className="px-4 py-3 text-center font-semibold">{row.pct ?? 0}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ─── Salary Report View ──────────────────────────────────────── */
 function SalaryReportView({ data }) {

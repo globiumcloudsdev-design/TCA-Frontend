@@ -16,7 +16,71 @@ import SelectField from '@/components/common/SelectField';
 import { CreatableSelectField } from '@/components/common';
 import { cn } from '@/lib/utils';
 
-// Only show ID Card and Payroll policies for now
+// ID Card Preview Component
+const IDCardPreview = ({ config }) => {
+  const {
+    layout = 'vertical',
+    size = 'CR80',
+    design = { background_color: '#0f172a', text_color: '#ffffff', logo_position: 'top' },
+    qr_enabled = false,
+    barcode_enabled = false,
+  } = config || {};
+
+  const cardStyles = {
+    CR80: { width: '320px', height: '200px' },
+    A4: { width: '100%', height: 'auto', minHeight: '200px' },
+  };
+  const cardSize = cardStyles[size] || cardStyles.CR80;
+
+  return (
+    <div className="rounded-lg border bg-white p-4 shadow-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <h4 className="text-sm font-semibold">Live Preview</h4>
+        <span className="text-xs text-muted-foreground">{size} • {layout}</span>
+      </div>
+      <div
+        className="relative overflow-hidden rounded-lg"
+        style={{
+          ...cardSize,
+          backgroundColor: design.background_color,
+          color: design.text_color,
+          padding: '12px',
+          display: 'flex',
+          flexDirection: layout === 'vertical' ? 'column' : 'row',
+          gap: '12px',
+        }}
+      >
+        {design.logo_position === 'top' && (
+          <div className="flex justify-center">
+            <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center text-2xl">🏫</div>
+          </div>
+        )}
+        <div className="flex-1 space-y-2 text-center">
+          <div className="text-lg font-bold">Student ID Card</div>
+          <div className="text-sm">John Doe</div>
+          <div className="text-xs">ID: STD-12345</div>
+          <div className="text-xs">Class: 10th Grade</div>
+        </div>
+        {design.logo_position === 'right' && (
+          <div className="flex justify-center">
+            <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center text-2xl">🏫</div>
+          </div>
+        )}
+        {(qr_enabled || barcode_enabled) && (
+          <div className="absolute bottom-2 right-2 flex gap-1">
+            {qr_enabled && <div className="h-8 w-8 bg-black/20 rounded">QR</div>}
+            {barcode_enabled && <div className="h-6 w-16 bg-black/20 rounded">|| || ||</div>}
+          </div>
+        )}
+      </div>
+      <p className="mt-2 text-center text-[10px] text-muted-foreground">
+        *Preview only – actual card may vary based on data
+      </p>
+    </div>
+  );
+};
+
+// Policy Type Options
 const POLICY_TYPE_OPTIONS = [
   { value: POLICY_TYPES.ID_CARD, label: POLICY_TYPE_LABELS[POLICY_TYPES.ID_CARD] },
   { value: POLICY_TYPES.PAYROLL, label: POLICY_TYPE_LABELS[POLICY_TYPES.PAYROLL] }
@@ -34,8 +98,6 @@ const EMPTY_FORM = {
 export default function PolicyManagement() {
   const canDo = useAuthStore((s) => s.canDo);
   const institute = useAuthStore((s) => s.getInstitute());
-  const user = useAuthStore((s) => s.user);
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const queryClient = useQueryClient();
 
   // State
@@ -49,7 +111,7 @@ export default function PolicyManagement() {
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [formStep, setFormStep] = useState(1); // Step 1: Basic Info, Step 2: Configure
+  const [formStep, setFormStep] = useState(1);
 
   // Selected items
   const [editingPolicy, setEditingPolicy] = useState(null);
@@ -77,6 +139,7 @@ export default function PolicyManagement() {
   const total = policiesData?.pagination?.total || 0;
   const totalPages = policiesData?.pagination?.totalPages || 1;
 
+  // Mutations
   const createMutation = useMutation({
     mutationFn: policyService.create,
     onSuccess: () => {
@@ -85,7 +148,6 @@ export default function PolicyManagement() {
       closeFormModal();
     },
     onError: (error) => {
-      console.error('Create error:', error);
       toast.error(error?.response?.data?.message || 'Failed to create policy');
     }
   });
@@ -98,7 +160,6 @@ export default function PolicyManagement() {
       closeFormModal();
     },
     onError: (error) => {
-      console.error('Update error:', error);
       toast.error(error?.response?.data?.message || 'Failed to update policy');
     }
   });
@@ -164,8 +225,13 @@ export default function PolicyManagement() {
   };
 
   const handleNextStep = () => {
-    if (!form.policy_type || !form.policy_name) {
-      toast.error('Please fill in Policy Type and Policy Name');
+    // Validation for step 1
+    if (!form.policy_type) {
+      toast.error('Please select a Policy Type');
+      return;
+    }
+    if (!form.policy_name || form.policy_name.trim() === '') {
+      toast.error('Please enter a Policy Name');
       return;
     }
     setFormStep(2);
@@ -176,23 +242,29 @@ export default function PolicyManagement() {
   };
 
   const onSave = (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevent any accidental submit
 
     if (!form.policy_type || !form.policy_name) {
       toast.error('Please fill all required fields');
       return;
     }
 
-    const payload = {
-      ...form,
-      institute_id: institute?.id,
-      config: form.config || POLICY_CONFIG_TEMPLATES[form.policy_type] || {}
-    };
-
     if (editingPolicy) {
-      updateMutation.mutate({ id: editingPolicy.id, data: payload });
+      const updatePayload = {
+        policy_name: form.policy_name,
+        description: form.description,
+        config: form.config,
+        branch_id: form.branch_id,
+        is_active: form.is_active
+      };
+      updateMutation.mutate({ id: editingPolicy.id, data: updatePayload });
     } else {
-      createMutation.mutate(payload);
+      const createPayload = {
+        ...form,
+        institute_id: institute?.id,
+        config: form.config || POLICY_CONFIG_TEMPLATES[form.policy_type] || {}
+      };
+      createMutation.mutate(createPayload);
     }
   };
 
@@ -209,7 +281,298 @@ export default function PolicyManagement() {
     });
   };
 
-  // Columns for DataTable
+  // Config form renderers
+  const renderConfigForm = () => {
+    const policyType = form.policy_type;
+    const config = form.config || {};
+
+    switch (policyType) {
+      case POLICY_TYPES.ID_CARD:
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Card Settings</h3>
+                <SelectField
+                  label="Layout"
+                  value={config.layout || 'vertical'}
+                  onChange={(v) => setForm({ ...form, config: { ...config, layout: v } })}
+                  options={[
+                    { value: 'horizontal', label: 'Horizontal' },
+                    { value: 'vertical', label: 'Vertical' }
+                  ]}
+                />
+                <SelectField
+                  label="Card Size"
+                  value={config.size || 'CR80'}
+                  onChange={(v) => setForm({ ...form, config: { ...config, size: v } })}
+                  options={[
+                    { value: 'CR80', label: 'CR80 (Standard)' },
+                    { value: 'A4', label: 'A4' }
+                  ]}
+                />
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Background Color</label>
+                  <input
+                    type="color"
+                    value={config.design?.background_color || '#0f172a'}
+                    onChange={(e) => setForm({
+                      ...form,
+                      config: { ...config, design: { ...config.design, background_color: e.target.value } }
+                    })}
+                    className="input-base h-10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Text Color</label>
+                  <input
+                    type="color"
+                    value={config.design?.text_color || '#ffffff'}
+                    onChange={(e) => setForm({
+                      ...form,
+                      config: { ...config, design: { ...config.design, text_color: e.target.value } }
+                    })}
+                    className="input-base h-10"
+                  />
+                </div>
+                <SelectField
+                  label="Logo Position"
+                  value={config.design?.logo_position || 'top'}
+                  onChange={(v) => setForm({
+                    ...form,
+                    config: { ...config, design: { ...config.design, logo_position: v } }
+                  })}
+                  options={[
+                    { value: 'top', label: 'Top' },
+                    { value: 'left', label: 'Left' },
+                    { value: 'right', label: 'Right' }
+                  ]}
+                />
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={config.qr_enabled || false}
+                      onChange={(e) => setForm({ ...form, config: { ...config, qr_enabled: e.target.checked } })}
+                    />
+                    <span>Enable QR Code</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={config.barcode_enabled || false}
+                      onChange={(e) => setForm({ ...form, config: { ...config, barcode_enabled: e.target.checked } })}
+                    />
+                    <span>Enable Barcode</span>
+                  </label>
+                </div>
+              </div>
+              <div>
+                <IDCardPreview config={config} />
+              </div>
+            </div>
+          </div>
+        );
+
+      case POLICY_TYPES.PAYROLL:
+        return (
+          <div className="space-y-6">
+            <div className="border-b pb-4">
+              <h3 className="font-semibold mb-3">Salary Structure</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium">Basic Salary Percentage (%)</label>
+                  <input
+                    type="number"
+                    value={config.salary_structure?.basic_percentage || 50}
+                    onChange={(e) => setForm({
+                      ...form,
+                      config: {
+                        ...config,
+                        salary_structure: {
+                          ...config.salary_structure,
+                          basic_percentage: parseInt(e.target.value) || 0
+                        }
+                      }
+                    })}
+                    className="input-base mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Allowances</label>
+                  <div className="space-y-2 pl-2 border-l-2 border-muted">
+                    {(config.salary_structure?.allowances || []).map((allowance, idx) => (
+                      <div key={idx} className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          value={allowance.name}
+                          onChange={(e) => {
+                            const newAllowances = [...(config.salary_structure?.allowances || [])];
+                            newAllowances[idx] = { ...newAllowances[idx], name: e.target.value };
+                            setForm({
+                              ...form,
+                              config: {
+                                ...config,
+                                salary_structure: { ...config.salary_structure, allowances: newAllowances }
+                              }
+                            });
+                          }}
+                          placeholder="Allowance name"
+                          className="input-base text-sm flex-1"
+                        />
+                        <input
+                          type="number"
+                          value={allowance.percentage}
+                          onChange={(e) => {
+                            const newAllowances = [...(config.salary_structure?.allowances || [])];
+                            newAllowances[idx] = { ...newAllowances[idx], percentage: parseInt(e.target.value) || 0 };
+                            setForm({
+                              ...form,
+                              config: {
+                                ...config,
+                                salary_structure: { ...config.salary_structure, allowances: newAllowances }
+                              }
+                            });
+                          }}
+                          placeholder="%"
+                          className="input-base text-sm w-24"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newAllowances = (config.salary_structure?.allowances || []).filter((_, i) => i !== idx);
+                            setForm({
+                              ...form,
+                              config: {
+                                ...config,
+                                salary_structure: { ...config.salary_structure, allowances: newAllowances }
+                              }
+                            });
+                          }}
+                          className="text-destructive hover:bg-destructive/10 rounded p-1"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newAllowances = [...(config.salary_structure?.allowances || []), { name: '', percentage: 0 }];
+                        setForm({
+                          ...form,
+                          config: {
+                            ...config,
+                            salary_structure: { ...config.salary_structure, allowances: newAllowances }
+                          }
+                        });
+                      }}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      + Add Allowance
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-b pb-4">
+              <h3 className="font-semibold mb-3">Deductions</h3>
+              <div className="space-y-2 pl-2 border-l-2 border-muted">
+                {(config.deductions || []).map((deduction, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={deduction.name}
+                      onChange={(e) => {
+                        const newDeductions = [...(config.deductions || [])];
+                        newDeductions[idx] = { ...newDeductions[idx], name: e.target.value };
+                        setForm({ ...form, config: { ...config, deductions: newDeductions } });
+                      }}
+                      placeholder="Deduction name"
+                      className="input-base text-sm flex-1"
+                    />
+                    <input
+                      type="number"
+                      value={deduction.amount}
+                      onChange={(e) => {
+                        const newDeductions = [...(config.deductions || [])];
+                        newDeductions[idx] = { ...newDeductions[idx], amount: parseInt(e.target.value) || 0 };
+                        setForm({ ...form, config: { ...config, deductions: newDeductions } });
+                      }}
+                      placeholder="Amount"
+                      className="input-base text-sm w-24"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newDeductions = (config.deductions || []).filter((_, i) => i !== idx);
+                        setForm({ ...form, config: { ...config, deductions: newDeductions } });
+                      }}
+                      className="text-destructive hover:bg-destructive/10 rounded p-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newDeductions = [...(config.deductions || []), { name: '', amount: 0 }];
+                    setForm({ ...form, config: { ...config, deductions: newDeductions } });
+                  }}
+                  className="text-xs text-primary hover:underline"
+                >
+                  + Add Deduction
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-3">Overtime Settings</h3>
+              <div className="space-y-3">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={config.overtime?.enabled || false}
+                    onChange={(e) => setForm({
+                      ...form,
+                      config: {
+                        ...config,
+                        overtime: { ...config.overtime, enabled: e.target.checked }
+                      }
+                    })}
+                  />
+                  <span>Enable Overtime</span>
+                </label>
+                {config.overtime?.enabled && (
+                  <div>
+                    <label className="text-sm font-medium">Rate per Hour (₨)</label>
+                    <input
+                      type="number"
+                      value={config.overtime?.rate_per_hour || 200}
+                      onChange={(e) => setForm({
+                        ...form,
+                        config: {
+                          ...config,
+                          overtime: { ...config.overtime, rate_per_hour: parseInt(e.target.value) || 0 }
+                        }
+                      })}
+                      className="input-base mt-1"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+
+      default:
+        return <p className="text-muted-foreground">Select a policy type to configure</p>;
+    }
+  };
+
+  // DataTable columns (unchanged, keep as is)
   const columns = useMemo(() => [
     {
       accessorKey: 'policy_name',
@@ -296,284 +659,6 @@ export default function PolicyManagement() {
     }
   ], [canDo]);
 
-  // Render config form based on policy type
-  const renderConfigForm = () => {
-    const policyType = form.policy_type;
-    const config = form.config;
-
-    switch (policyType) {
-      case POLICY_TYPES.ID_CARD:
-        return (
-          <div className="space-y-6">
-            {/* Layout & Size */}
-            <div className="border-b pb-4">
-              <h3 className="font-semibold mb-3">Card Settings</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <SelectField
-                  label="Layout"
-                  value={config?.layout || 'vertical'}
-                  onChange={(v) => setForm({ ...form, config: { ...config, layout: v } })}
-                  options={[
-                    { value: 'horizontal', label: 'Horizontal' },
-                    { value: 'vertical', label: 'Vertical' }
-                  ]}
-                />
-                <SelectField
-                  label="Card Size"
-                  value={config?.size || 'CR80'}
-                  onChange={(v) => setForm({ ...form, config: { ...config, size: v } })}
-                  options={[
-                    { value: 'CR80', label: 'CR80 (Standard)' },
-                    { value: 'A4', label: 'A4' }
-                  ]}
-                />
-              </div>
-            </div>
-
-            {/* Design */}
-            <div className="border-b pb-4">
-              <h3 className="font-semibold mb-3">Design Settings</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Background Color</label>
-                  <input
-                    type="color"
-                    value={config?.design?.background_color || '#0f172a'}
-                    onChange={(e) => setForm({
-                      ...form,
-                      config: { ...config, design: { ...config?.design, background_color: e.target.value } }
-                    })}
-                    className="input-base mt-1 h-10"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Text Color</label>
-                  <input
-                    type="color"
-                    value={config?.design?.text_color || '#ffffff'}
-                    onChange={(e) => setForm({
-                      ...form,
-                      config: { ...config, design: { ...config?.design, text_color: e.target.value } }
-                    })}
-                    className="input-base mt-1 h-10"
-                  />
-                </div>
-                <SelectField
-                  label="Logo Position"
-                  value={config?.design?.logo_position || 'top'}
-                  onChange={(v) => setForm({
-                    ...form,
-                    config: { ...config, design: { ...config?.design, logo_position: v } }
-                  })}
-                  options={[
-                    { value: 'top', label: 'Top' },
-                    { value: 'left', label: 'Left' },
-                    { value: 'right', label: 'Right' }
-                  ]}
-                />
-              </div>
-            </div>
-
-            {/* Features */}
-            <div>
-              <h3 className="font-semibold mb-3">Card Features</h3>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={config?.qr_enabled || false}
-                    onChange={(e) => setForm({ ...form, config: { ...config, qr_enabled: e.target.checked } })}
-                  />
-                  <span className="text-sm">Enable QR Code</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={config?.barcode_enabled || false}
-                    onChange={(e) => setForm({ ...form, config: { ...config, barcode_enabled: e.target.checked } })}
-                  />
-                  <span className="text-sm">Enable Barcode</span>
-                </label>
-              </div>
-            </div>
-          </div>
-        );
-
-      case POLICY_TYPES.PAYROLL:
-        return (
-          <div className="space-y-6">
-            {/* Salary Structure */}
-            <div className="border-b pb-4">
-              <h3 className="font-semibold mb-3">Salary Structure</h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-sm font-medium">Basic Salary Percentage (%)</label>
-                  <input
-                    type="number"
-                    value={config?.salary_structure?.basic_percentage || 50}
-                    onChange={(e) => setForm({
-                      ...form,
-                      config: {
-                        ...config,
-                        salary_structure: {
-                          ...config?.salary_structure,
-                          basic_percentage: parseInt(e.target.value)
-                        }
-                      }
-                    })}
-                    className="input-base mt-1"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Allowances</label>
-                  <div className="space-y-2 pl-2 border-l-2 border-muted">
-                    {config?.salary_structure?.allowances?.map((allowance, idx) => (
-                      <div key={idx} className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          value={allowance.name}
-                          onChange={(e) => {
-                            const newAllowances = [...config.salary_structure.allowances];
-                            newAllowances[idx].name = e.target.value;
-                            setForm({
-                              ...form,
-                              config: {
-                                ...config,
-                                salary_structure: { ...config.salary_structure, allowances: newAllowances }
-                              }
-                            });
-                          }}
-                          placeholder="Allowance name"
-                          className="input-base text-xs"
-                        />
-                        <div className="flex gap-1">
-                          <input
-                            type="number"
-                            value={allowance.percentage}
-                            onChange={(e) => {
-                              const newAllowances = [...config.salary_structure.allowances];
-                              newAllowances[idx].percentage = parseInt(e.target.value);
-                              setForm({
-                                ...form,
-                                config: {
-                                  ...config,
-                                  salary_structure: { ...config.salary_structure, allowances: newAllowances }
-                                }
-                              });
-                            }}
-                            placeholder="%"
-                            className="input-base text-xs w-20"
-                          />
-                          <button
-                            onClick={() => {
-                              const newAllowances = config.salary_structure.allowances.filter((_, i) => i !== idx);
-                              setForm({
-                                ...form,
-                                config: {
-                                  ...config,
-                                  salary_structure: { ...config.salary_structure, allowances: newAllowances }
-                                }
-                              });
-                            }}
-                            className="text-xs px-2 py-1 text-destructive hover:bg-destructive/10 rounded"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Deductions */}
-            <div className="border-b pb-4">
-              <h3 className="font-semibold mb-3">Deductions</h3>
-              <div className="space-y-2 pl-2 border-l-2 border-muted">
-                {config?.deductions?.map((deduction, idx) => (
-                  <div key={idx} className="grid grid-cols-3 gap-2">
-                    <input
-                      type="text"
-                      value={deduction.name}
-                      onChange={(e) => {
-                        const newDeductions = [...config.deductions];
-                        newDeductions[idx].name = e.target.value;
-                        setForm({ ...form, config: { ...config, deductions: newDeductions } });
-                      }}
-                      placeholder="Deduction name"
-                      className="input-base text-xs"
-                    />
-                    <input
-                      type="number"
-                      value={deduction.amount}
-                      onChange={(e) => {
-                        const newDeductions = [...config.deductions];
-                        newDeductions[idx].amount = parseInt(e.target.value);
-                        setForm({ ...form, config: { ...config, deductions: newDeductions } });
-                      }}
-                      placeholder="Amount"
-                      className="input-base text-xs"
-                    />
-                    <button
-                      onClick={() => {
-                        const newDeductions = config.deductions.filter((_, i) => i !== idx);
-                        setForm({ ...form, config: { ...config, deductions: newDeductions } });
-                      }}
-                      className="text-xs px-2 py-1 text-destructive hover:bg-destructive/10 rounded"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Overtime */}
-            <div>
-              <h3 className="font-semibold mb-3">Overtime Settings</h3>
-              <div className="space-y-3">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={config?.overtime?.enabled || false}
-                    onChange={(e) => setForm({
-                      ...form,
-                      config: {
-                        ...config,
-                        overtime: { ...config?.overtime, enabled: e.target.checked }
-                      }
-                    })}
-                  />
-                  <span className="text-sm">Enable Overtime</span>
-                </label>
-                {config?.overtime?.enabled && (
-                  <div>
-                    <label className="text-sm font-medium">Rate per Hour (₨)</label>
-                    <input
-                      type="number"
-                      value={config.overtime?.rate_per_hour || 200}
-                      onChange={(e) => setForm({
-                        ...form,
-                        config: {
-                          ...config,
-                          overtime: { ...config?.overtime, rate_per_hour: parseInt(e.target.value) }
-                        }
-                      })}
-                      className="input-base mt-1"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
-
   const canReadPolicies = canDo('policies.read');
   const canCreatePolicies = canDo('policies.create');
 
@@ -656,45 +741,43 @@ export default function PolicyManagement() {
         }}
       />
 
-      {/* Add/Edit Modal - Professional Step-Based Form */}
+      {/* Add/Edit Modal */}
       <AppModal
         open={formModalOpen}
         onClose={closeFormModal}
         title={`${editingPolicy ? 'Edit' : 'Create'} ${form.policy_type ? POLICY_TYPE_LABELS[form.policy_type] : 'Policy'}`}
         size="lg"
         footer={
-          <>
-            <div className="flex items-center justify-between">
-              {formStep === 2 && (
-                <button type="button" onClick={handlePrevStep} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">
-                  ← Previous
+          <div className="flex items-center justify-between w-full">
+            {formStep === 2 && (
+              <button type="button" onClick={handlePrevStep} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">
+                ← Previous
+              </button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <button type="button" onClick={closeFormModal} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">
+                Cancel
+              </button>
+              {formStep === 1 ? (
+                <button
+                  type="button"
+                  onClick={handleNextStep}
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                >
+                  Next →
+                </button>
+              ) : (
+                <button
+                  type="button"  // IMPORTANT: type="button" to avoid any automatic submission
+                  onClick={onSave}
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                >
+                  {(createMutation.isPending || updateMutation.isPending) ? 'Saving...' : (editingPolicy ? 'Update Policy' : 'Create Policy')}
                 </button>
               )}
-              <div className="flex gap-2 ml-auto">
-                <button type="button" onClick={closeFormModal} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">
-                  Cancel
-                </button>
-                {formStep === 1 ? (
-                  <button
-                    type="button"
-                    onClick={handleNextStep}
-                    className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-                  >
-                    Next →
-                  </button>
-                ) : (
-                  <button
-                    type="submit"
-                    form="policy-form"
-                    className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-                    disabled={createMutation.isPending || updateMutation.isPending}
-                  >
-                    {(createMutation.isPending || updateMutation.isPending) ? 'Saving...' : (editingPolicy ? 'Update Policy' : 'Create Policy')}
-                  </button>
-                )}
-              </div>
             </div>
-          </>
+          </div>
         }
       >
         {/* Step Indicator */}
@@ -705,10 +788,7 @@ export default function PolicyManagement() {
           )}>
             1
           </div>
-          <div className={cn(
-            'h-1 w-12',
-            formStep >= 2 ? 'bg-primary' : 'bg-muted'
-          )} />
+          <div className={cn('h-1 w-12', formStep >= 2 ? 'bg-primary' : 'bg-muted')} />
           <div className={cn(
             'flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold',
             formStep >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
@@ -717,14 +797,11 @@ export default function PolicyManagement() {
           </div>
         </div>
 
-        <form id="policy-form" onSubmit={onSave} className="space-y-4">
-          {/* STEP 1: Basic Info */}
+        {/* No <form> tag to prevent accidental submit on Enter */}
+        <div className="space-y-4">
           {formStep === 1 && (
             <div className="space-y-5 animate-in fade-in duration-300">
-              <div>
-                <h3 className="font-semibold text-base mb-4">Step 1: Basic Information</h3>
-              </div>
-
+              <h3 className="font-semibold text-base">Step 1: Basic Information</h3>
               <SelectField
                 label="Policy Type *"
                 value={form.policy_type}
@@ -738,7 +815,6 @@ export default function PolicyManagement() {
                 options={POLICY_TYPE_OPTIONS}
                 required
               />
-
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">Policy Name *</label>
                 <input
@@ -746,10 +822,14 @@ export default function PolicyManagement() {
                   onChange={(e) => setForm({ ...form, policy_name: e.target.value })}
                   className="input-base"
                   placeholder={form.policy_type === POLICY_TYPES.ID_CARD ? "e.g., Student ID Card Policy" : "e.g., Staff Payroll Policy"}
-                  required
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault(); // Prevent accidental submit when pressing Enter
+                      handleNextStep();
+                    }
+                  }}
                 />
               </div>
-
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">Description</label>
                 <textarea
@@ -760,7 +840,6 @@ export default function PolicyManagement() {
                   rows={3}
                 />
               </div>
-
               <SelectField
                 label="Status"
                 value={form.is_active ? 'active' : 'inactive'}
@@ -770,32 +849,29 @@ export default function PolicyManagement() {
                   { value: 'inactive', label: '⏸️ Inactive' }
                 ]}
               />
-
               {form.policy_type && (
                 <div className="rounded-lg border-l-4 border-primary bg-primary/5 p-4">
                   <p className="text-sm text-foreground">
-                    <strong>📋 Next Step:</strong> Configure {POLICY_TYPE_LABELS[form.policy_type]} settings in the next step
+                    <strong>📋 Next Step:</strong> Configure {POLICY_TYPE_LABELS[form.policy_type]} settings
                   </p>
                 </div>
               )}
             </div>
           )}
 
-          {/* STEP 2: Configuration */}
           {formStep === 2 && (
             <div className="space-y-5 animate-in fade-in duration-300">
               <div>
-                <h3 className="font-semibold text-base mb-2">Step 2: Configure {POLICY_TYPE_LABELS[form.policy_type]}</h3>
+                <h3 className="font-semibold text-base">Step 2: Configure {POLICY_TYPE_LABELS[form.policy_type]}</h3>
                 <p className="text-xs text-muted-foreground">Set up the specific settings for this policy</p>
               </div>
-
               {renderConfigForm()}
             </div>
           )}
-        </form>
+        </div>
       </AppModal>
 
-      {/* View Modal */}
+      {/* View Modal with Preview for ID Card */}
       <AppModal
         open={viewModalOpen}
         onClose={() => {
@@ -836,14 +912,20 @@ export default function PolicyManagement() {
               </div>
               <div className="sm:col-span-2">
                 <p className="text-muted-foreground">Description</p>
-                <p className="font-medium whitespace-pre-wrap">{viewingPolicy.description || '—'}</p>
+                <p className="whitespace-pre-wrap">{viewingPolicy.description || '—'}</p>
               </div>
-              <div className="sm:col-span-2">
-                <p className="text-muted-foreground">Configuration</p>
-                <pre className="mt-2 rounded-lg bg-muted p-3 text-xs overflow-auto max-h-96">
-                  {JSON.stringify(viewingPolicy.config, null, 2)}
-                </pre>
+            </div>
+            {viewingPolicy.policy_type === POLICY_TYPES.ID_CARD && (
+              <div className="mt-4">
+                <p className="text-muted-foreground mb-2">ID Card Preview</p>
+                <IDCardPreview config={viewingPolicy.config} />
               </div>
+            )}
+            <div className="sm:col-span-2">
+              <p className="text-muted-foreground">Full Configuration (JSON)</p>
+              <pre className="mt-2 rounded-lg bg-muted p-3 text-xs overflow-auto max-h-96">
+                {JSON.stringify(viewingPolicy.config, null, 2)}
+              </pre>
             </div>
           </div>
         )}

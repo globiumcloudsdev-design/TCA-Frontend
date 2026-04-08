@@ -717,7 +717,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
-import Papa from 'papaparse';
 
 // File upload area component
 function FileUploadArea({ onFileSelect, accept, isProcessing }) {
@@ -923,15 +922,11 @@ export default function ImportModal({
     let rows = [];
 
     try {
-      if (extension === 'csv') {
-        const text = await uploadedFile.text();
-        const result = Papa.parse(text, { header: true, skipEmptyLines: true });
-        headers = result.meta.fields || [];
-        rows = result.data;
-      } else if (['xlsx', 'xls'].includes(extension)) {
+      if (['csv', 'xlsx', 'xls'].includes(extension)) {
         const buffer = await uploadedFile.arrayBuffer();
         const workbook = XLSX.read(buffer);
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
         const data = XLSX.utils.sheet_to_json(sheet);
         headers = Object.keys(data[0] || {});
         rows = data;

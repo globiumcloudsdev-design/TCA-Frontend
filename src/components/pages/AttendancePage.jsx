@@ -14,6 +14,7 @@ import StatsCard from '@/components/common/StatsCard';
 import AppModal from '@/components/common/AppModal';
 import { cn } from '@/lib/utils';
 import MarkAttendanceModal from '@/components/attendance/MarkAttendanceModal';
+import AttendanceReport from '@/components/attendance/AttendanceReport';
 import {
   studentAttendanceService,
   classService,
@@ -49,7 +50,13 @@ export default function AttendancePage({ type }) {
   const canDo = useAuthStore((s) => s.canDo);
   const { terms, attendanceConfig } = useInstituteConfig();
 
+  const [view, setView] = useState('list'); // 'list' or 'report'
   const [isMarkOpen, setIsMarkOpen] = useState({ open: false, mode: 'class' });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Filters State
   const [filters, setFilters] = useState({
@@ -57,7 +64,7 @@ export default function AttendancePage({ type }) {
     class_id: '',
     section_id: '',
     status: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: '', // Initialized in useEffect to avoid hydration mismatch
     search: ''
   });
 
@@ -85,7 +92,12 @@ export default function AttendancePage({ type }) {
         setFilters(prev => ({ ...prev, academic_year_id: currentYear.id }));
       }
     }
-  }, [yearsData?.data, filters.academic_year_id]);
+    
+    // Set default today's date if not set
+    if (!filters.date) {
+      setFilters(prev => ({ ...prev, date: new Date().toISOString().slice(0, 10) }));
+    }
+  }, [yearsData?.data, filters.academic_year_id, filters.date]);
 
   // Fetch Classes
   const { data: classesData } = useQuery({
@@ -220,15 +232,29 @@ export default function AttendancePage({ type }) {
         description="Track and manage student daily attendance"
         action={
           <div className="flex gap-2">
-            <Button variant="outline" className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-900/50 dark:text-indigo-400 dark:hover:bg-indigo-900/20" onClick={() => setIsReportModalOpen(true)}>
-              <FileText className="mr-2 h-4 w-4" />
-              Reports
-            </Button>
+            <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl mr-2">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setView('list')}
+                className={cn("px-4 py-1.5 h-auto text-xs font-bold transition-all", view === 'list' ? 'bg-white dark:bg-slate-800 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700')}
+              >
+                Daily Log
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setView('report')}
+                className={cn("px-4 py-1.5 h-auto text-xs font-bold transition-all", view === 'report' ? 'bg-white dark:bg-slate-800 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700')}
+              >
+                Report Mode
+              </Button>
+            </div>
             <Button variant="emerald" onClick={() => setIsMarkOpen({ open: true, mode: 'scan' })}>
               <QrCode className="mr-2 h-4 w-4" />
               Scan QR
             </Button>
-            {canDo('attendance.mark') && (
+            {mounted && canDo('attendance.mark') && (
               <Button onClick={() => setIsMarkOpen({ open: true, mode: 'class' })}>
                 <CheckSquare className="mr-2 h-4 w-4" />
                 Bulk Mark
@@ -238,88 +264,94 @@ export default function AttendancePage({ type }) {
         }
       />
 
-      {/* Filters Section */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-card p-5 rounded-2xl border border-border/50 shadow-sm">
-        <DatePickerField
-          label="Attendance Date"
-          value={filters.date}
-          onChange={(val) => handleFilterChange('date', val)}
-        />
+      {view === 'list' ? (
+        <>
+          {/* Filters Section */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-card p-5 rounded-2xl border border-border/50 shadow-sm">
+            <DatePickerField
+              label="Attendance Date"
+              value={filters.date}
+              onChange={(val) => handleFilterChange('date', val)}
+            />
 
-        <SelectField
-          label="Academic Year"
-          options={yearsData?.data?.map(y => ({ value: y.id, label: y.name })) || []}
-          value={filters.academic_year_id}
-          onChange={(val) => handleFilterChange('academic_year_id', val)}
-          placeholder="Select Year"
-        />
+            <SelectField
+              label="Academic Year"
+              options={yearsData?.data?.map(y => ({ value: y.id, label: y.name })) || []}
+              value={filters.academic_year_id}
+              onChange={(val) => handleFilterChange('academic_year_id', val)}
+              placeholder="Select Year"
+            />
 
-        <SelectField
-          label="Class"
-          options={[
-            { value: 'all', label: `All ${terms.class || 'Classes'}s` },
-            ...(classesData?.data?.map(c => ({ value: String(c.id), label: c.name })) || [])
-          ]}
-          value={String(filters.class_id)}
-          onChange={(val) => handleFilterChange('class_id', val)}
-          placeholder={`Select ${terms.class || 'Class'}`}
-        />
+            <SelectField
+              label="Class"
+              options={[
+                { value: 'all', label: `All ${terms.class || 'Classes'}s` },
+                ...(classesData?.data?.map(c => ({ value: String(c.id), label: c.name })) || [])
+              ]}
+              value={String(filters.class_id)}
+              onChange={(val) => handleFilterChange('class_id', val)}
+              placeholder={`Select ${terms.class || 'Class'}`}
+            />
 
-        <SelectField
-          label="Section"
-          options={sections.map(s => ({ value: String(s.id), label: s.name })) || []}
-          value={String(filters.section_id)}
-          onChange={(val) => handleFilterChange('section_id', val)}
-          placeholder="All Sections"
-          disabled={!filters.class_id || filters.class_id === 'all'}
-        />
+            <SelectField
+              label="Section"
+              options={sections.map(s => ({ value: String(s.id), label: s.name })) || []}
+              value={String(filters.section_id)}
+              onChange={(val) => handleFilterChange('section_id', val)}
+              placeholder="All Sections"
+              disabled={!filters.class_id || filters.class_id === 'all'}
+            />
 
-        <SelectField
-          label="Status"
-          options={STATUS_OPTIONS}
-          value={filters.status}
-          onChange={(val) => handleFilterChange('status', val)}
-          placeholder="All Status"
-        />
-      </div>
-
-      {!filters.class_id ? (
-        <div className="py-24 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50/50 dark:bg-slate-900/50 mt-10 animate-in fade-in duration-500">
-          <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-center mx-auto mb-4">
-            <Filter className="w-8 h-8 text-slate-400" />
+            <SelectField
+              label="Status"
+              options={STATUS_OPTIONS}
+              value={filters.status}
+              onChange={(val) => handleFilterChange('status', val)}
+              placeholder="All Status"
+            />
           </div>
-          <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300">Select a Class</h3>
-          <p className="text-slate-500 mt-1 max-w-sm mx-auto">Please select a specific Class or "All Classes" from the filters above to view attendance records.</p>
-        </div>
+
+          {!filters.class_id ? (
+            <div className="py-24 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50/50 dark:bg-slate-900/50 mt-10 animate-in fade-in duration-500">
+              <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-center mx-auto mb-4">
+                <Filter className="w-8 h-8 text-slate-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300">Select a Class</h3>
+              <p className="text-slate-500 mt-1 max-w-sm mx-auto">Please select a specific Class or "All Classes" from the filters above to view attendance records.</p>
+            </div>
+          ) : (
+            <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 fade-in">
+              <div className="grid gap-4 sm:grid-cols-4">
+                <StatsCard label="Attendance Rate" value={`${stats.rate}%`} icon={<CheckSquare size={18} />} trend={stats.rate >= 75 ? 1 : -1} description="Based on current list" />
+                <StatsCard label="Present" value={stats.present} icon={<CheckSquare size={18} />} color="emerald" />
+                <StatsCard label="Absent" value={stats.absent} icon={<X size={18} />} color="red" />
+                <StatsCard label="Late" value={stats.late} icon={<Minus size={18} />} color="amber" />
+              </div>
+
+              <DataTable
+                columns={columns}
+                data={rows}
+                loading={isLoading}
+                emptyMessage="No attendance records found for selected filters"
+                search={filters.search}
+                onSearch={(v) => handleFilterChange('search', v)}
+                searchPlaceholder="Search student name or reg no..."
+                enableColumnVisibility
+                exportConfig={{ fileName: `attendance_${filters.date}` }}
+                pagination={{
+                  page,
+                  totalPages: pagination.totalPages,
+                  onPageChange: setPage,
+                  total: pagination.total,
+                  pageSize,
+                  onPageSizeChange: (s) => { setPageSize(s); setPage(1); }
+                }}
+              />
+            </div>
+          )}
+        </>
       ) : (
-        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 fade-in">
-          <div className="grid gap-4 sm:grid-cols-4">
-            <StatsCard label="Attendance Rate" value={`${stats.rate}%`} icon={<CheckSquare size={18} />} trend={stats.rate >= 75 ? 1 : -1} description="Based on current list" />
-            <StatsCard label="Present" value={stats.present} icon={<CheckSquare size={18} />} color="emerald" />
-            <StatsCard label="Absent" value={stats.absent} icon={<X size={18} />} color="red" />
-            <StatsCard label="Late" value={stats.late} icon={<Minus size={18} />} color="amber" />
-          </div>
-
-          <DataTable
-            columns={columns}
-            data={rows}
-            loading={isLoading}
-            emptyMessage="No attendance records found for selected filters"
-            search={filters.search}
-            onSearch={(v) => handleFilterChange('search', v)}
-            searchPlaceholder="Search student name or reg no..."
-            enableColumnVisibility
-            exportConfig={{ fileName: `attendance_${filters.date}` }}
-            pagination={{
-              page,
-              totalPages: pagination.totalPages,
-              onPageChange: setPage,
-              total: pagination.total,
-              pageSize,
-              onPageSizeChange: (s) => { setPageSize(s); setPage(1); }
-            }}
-          />
-        </div>
+        <AttendanceReport terms={terms} />
       )}
 
       <AppModal 

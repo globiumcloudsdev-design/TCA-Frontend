@@ -73,3 +73,50 @@ export const useSubmitStudentAssignment = () => {
     }
   });
 };
+
+// ─────────────────────────────────────────────────────────────────────────
+// LEAVE REQUESTS
+// ─────────────────────────────────────────────────────────────────────────
+
+export const useStudentLeaveRequests = (filters = {}, page = 1, limit = 10) =>
+  useQuery({
+    queryKey: ['student-portal', 'leave-requests', filters, page, limit],
+    queryFn: () => studentPortalService.getLeaveRequests(filters, page, limit)
+  });
+
+export const useStudentLeaveStatistics = () =>
+  useQuery({
+    queryKey: ['student-portal', 'leave-statistics'],
+    queryFn: studentPortalService.getLeaveStatistics
+  });
+
+export const useStudentLeaveBalance = () =>
+  useQuery({
+    queryKey: ['student-portal', 'leave-balance'],
+    queryFn: studentPortalService.getLeaveBalance
+  });
+
+export const useCreateLeaveRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data) => studentPortalService.createLeaveRequest(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['student-portal', 'leave-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['student-portal', 'leave-statistics'] });
+      queryClient.invalidateQueries({ queryKey: ['student-portal', 'leave-balance'] });
+    }
+  });
+};
+
+export const useCancelLeaveRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }) => studentPortalService.cancelLeaveRequest(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['student-portal', 'leave-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['student-portal', 'leave-statistics'] });
+    }
+  });
+};

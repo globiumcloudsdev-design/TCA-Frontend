@@ -1,8 +1,7 @@
 import React from "react";
 import PropTypes from "prop-types";
-import PhoneInput from "react-phone-input-2";
-import "react-phone-input-2/lib/style.css";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 export default function PhoneInputField({
   value,
@@ -26,39 +25,23 @@ export default function PhoneInputField({
       {/* WRAPPER */}
       <div
         className={cn(
-          "rounded-xl border bg-muted/30 px-2 py-1.5",
+          "relative flex items-center",
           "transition-all duration-200",
-          "focus-within:ring-2 focus-within:ring-primary/30",
-          error ? "border-red-500" : "border-border"
+          error ? "text-red-500" : ""
         )}
       >
-        <PhoneInput
-          country={country}
+        <div className="absolute left-3 text-xs font-bold text-slate-400 pointer-events-none uppercase">
+          {country}
+        </div>
+        <Input
+          type="tel"
           value={value}
-          onChange={onChange}
-          enableSearch
-          disableSearchIcon={false}
-          
-          containerClass="!w-full !bg-transparent"
-          
-          inputClass={cn(
-            "!w-full !h-10 !pl-12 !pr-3",
-            "!bg-transparent !border-0",
-            "!text-sm !shadow-none",
-            "!outline-none !ring-0",
-            "!focus:ring-0",
+          onChange={(e) => onChange(e.target.value)}
+          className={cn(
+            "pl-10 h-10 rounded-xl",
+            error && "border-red-500 focus-visible:ring-red-500"
           )}
-
-          buttonClass={cn(
-            "!border-0 !bg-transparent",
-            "!rounded-lg !mr-1",
-            "hover:!bg-muted/50"
-          )}
-
-          dropdownClass="!z-50 !rounded-lg !border !shadow-md"
-          
-          searchClass="!p-2 !outline-none"
-
+          placeholder="Enter phone number..."
           {...props}
         />
       </div>

@@ -376,5 +376,28 @@ export const parentPortalService = {
     withFallback(
       () => api.get('/portal/parent/notices', { params: { limit } }).then(r => r.data),
       () => ({ data: DUMMY_PARENT_DASHBOARD.notices })
-    )
+    ),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // LEAVE REQUESTS
+  // ─────────────────────────────────────────────────────────────────────────
+  getLeaveRequests: (filters = {}, page = 1, limit = 10) =>
+    api.get('/portal/parent/leave-requests', { 
+      params: { ...filters, page, limit } 
+    }).then(r => r.data),
+
+  createLeaveRequest: (data) =>
+    api.post('/portal/parent/leave-requests', data).then(r => r.data),
+
+  getLeaveRequestById: (id) =>
+    api.get(`/portal/parent/leave-requests/${id}`).then(r => r.data),
+
+  cancelLeaveRequest: (id, data = {}) =>
+    api.patch(`/portal/parent/leave-requests/${id}/cancel`, data).then(r => r.data),
+
+  getLeaveStatistics: () =>
+    api.get('/portal/parent/leave-requests/statistics').then(r => r.data),
+
+  getLeaveBalance: () =>
+    api.get('/portal/parent/leave-balance').then(r => r.data)
 };

@@ -61,7 +61,26 @@ export const studentPortalService = {
   getRecentNotices: (limit = 5) =>
     api.get('/portal/student/notices/recent', { params: { limit } }).then(unwrap),
 
-  getLibraryData: () => api.get('/portal/student/library').then(unwrap)
+  getLibraryData: () => api.get('/portal/student/library').then(unwrap),
+
+  // Leave Requests
+  getLeaveRequests: (filters = {}, page = 1, limit = 10) =>
+    api.get('/portal/student/leave-requests', { params: { ...filters, page, limit } }).then(unwrap),
+
+  createLeaveRequest: (data) =>
+    api.post('/portal/student/leave-requests', data).then(unwrap),
+
+  getLeaveRequestById: (id) =>
+    api.get(`/portal/student/leave-requests/${id}`).then(unwrap),
+
+  cancelLeaveRequest: (id, data = {}) =>
+    api.patch(`/portal/student/leave-requests/${id}/cancel`, data).then(unwrap),
+
+  getLeaveStatistics: () =>
+    api.get('/portal/student/leave-requests/statistics').then(unwrap),
+
+  getLeaveBalance: () =>
+    api.get('/portal/student/leave-balance').then(unwrap)
 };
 
 export default studentPortalService;
