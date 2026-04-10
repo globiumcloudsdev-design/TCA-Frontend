@@ -2,24 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Download, CheckCircle } from 'lucide-react';
+import { CheckCircle, FileText, DownloadCloud } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import { createRoot } from 'react-dom/client';
 import { toast } from 'sonner';
 
 import { payrollService } from '@/services';
 import useAuthStore from '@/store/authStore';
-import { PERMISSIONS, PAYROLL_STATUS, LEAVE_TYPES, LEAVE_STATUS, MONTHS } from '@/constants';
+import { PERMISSIONS, MONTHS } from '@/constants';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import {
-  PageHeader, DataTable, StatusBadge, TableRowActions,
-  ConfirmDialog, AppModal, StatsCard,
+  PageHeader, DataTable, TableRowActions, AppModal,
 } from '@/components/common';
 import { Button } from '@/components/ui/button';
 import { Badge }  from '@/components/ui/badge';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import PayslipTemplate from '@/components/payroll/PayslipTemplate';
 
 const extractRows  = (d) => d?.data?.rows ?? d?.data ?? [];
 const extractPages = (d) => d?.data?.totalPages ?? 1;
@@ -42,7 +40,7 @@ const MONTH_LABELS = Object.fromEntries(
 );
 
 /* ─── Payslip columns ─────────────────────────────────────────── */
-const payslipColumns = (onMarkPaid, canMark) => [
+const payslipColumns = (onMarkPaid, onViewPayslip, onDownloadPayslip, canMark) => [
   {
     id: 'employee',
     header: 'Employee',
@@ -94,6 +92,8 @@ const payslipColumns = (onMarkPaid, canMark) => [
     cell: ({ row }) => {
       const p = row.original;
       const extraActions = [];
+      extraActions.push({ label: 'View Payslip', onClick: () => onViewPayslip(p), icon: FileText });
+      extraActions.push({ label: 'Download Payslip', onClick: () => onDownloadPayslip(p), icon: DownloadCloud });
       if (canMark && p.status === 'generated') {
         extraActions.push({ label: 'Mark as Paid', onClick: () => onMarkPaid(p.id), icon: CheckCircle });
       }
@@ -176,8 +176,20 @@ const gradeColumns = () => [
 export default function PayrollPage() {
   const qc = useQueryClient();
 
-  const canGenerate = useAuthStore((s) => s.canDo(PERMISSIONS.PAYROLL_GENERATE));
-  const canMark     = useAuthStore((s) => s.canDo(PERMISSIONS.PAYROLL_MARK_PAID));
+  const canDownload = useAuthStore((s) =>
+    s.canDoAny([
+      PERMISSIONS.PAYROLL_GENERATE,
+      'payroll.process',
+      PERMISSIONS.PAYROLL_CREATE,
+      PERMISSIONS.PAYROLL_READ,
+    ])
+  );
+  const canMark     = useAuthStore((s) =>
+    s.canDoAny([
+      PERMISSIONS.PAYROLL_UPDATE,
+      'payroll.process',
+    ])
+  );
   const canApprove  = useAuthStore((s) => s.canDo(PERMISSIONS.LEAVE_APPROVE));
   const canCreate   = useAuthStore((s) => s.canDo(PERMISSIONS.PAYROLL_READ));
 
@@ -187,10 +199,7 @@ export default function PayrollPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [page,       setPage]     = useState(1);
   const [pageSize,   setPageSize] = useState(10);
-
-  /* generate payroll */
-  const [genOpen, setGenOpen] = useState(false);
-  const [genForm, setGenForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear() });
+  const [selectedPayslip, setSelectedPayslip] = useState(null);
 
   /* ── Payslips query ── */
   const { data: payslipsData, isLoading: psLoading } = useQuery({
@@ -241,13 +250,70 @@ export default function PayrollPage() {
     onError:   (e) => toast.error(e?.response?.data?.message ?? 'Failed'),
   });
 
-  const generateMutation = useMutation({
-    mutationFn: (body) => payrollService.generatePayroll(body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['payslips'] }); toast.success('Payroll generated'); setGenOpen(false); setActiveTab(0); },
-    onError:   (e) => toast.error(e?.response?.data?.message ?? 'Failed'),
-  });
+  const downloadPayslipAsPdf = async (record) => {
+    if (!record) {
+      toast.error('No payslip selected');
+      return;
+    }
 
-  const psColumns    = payslipColumns((id) => markPaidMutation.mutate(id), canMark);
+    const host = document.createElement('div');
+    host.style.position = 'fixed';
+    host.style.left = '-99999px';
+    host.style.top = '0';
+    host.style.width = '980px';
+    host.style.zIndex = '-1';
+    document.body.appendChild(host);
+
+    const root = createRoot(host);
+    root.render(<PayslipTemplate record={record} className="rounded-none shadow-none" />);
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      const payslipElement = host.querySelector('.payslip-print') ?? host.firstElementChild;
+      if (!payslipElement) throw new Error('Payslip template not found');
+
+      const canvas = await html2canvas(payslipElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const employeeName = (record.teacher_name || record.employee_name || 'staff').replace(/\s+/g, '_');
+      const monthLabel = MONTH_LABELS[String(record.month)] || record.month || 'period';
+      pdf.save(`payslip-${employeeName}-${monthLabel}-${record.year || new Date().getFullYear()}.pdf`);
+      toast.success('Payslip downloaded');
+    } catch {
+      toast.error('Failed to download payslip');
+    } finally {
+      root.unmount();
+      host.remove();
+    }
+  };
+
+  const psColumns    = payslipColumns(
+    (id) => markPaidMutation.mutate(id),
+    (row) => setSelectedPayslip(row),
+    (row) => downloadPayslipAsPdf(row),
+    canMark,
+  );
   const lvColumns    = leaveColumns((id) => approveLeaveMutation.mutate(id), (id) => rejectLeaveMutation.mutate(id), canApprove);
   const grColumns    = gradeColumns();
 
@@ -259,9 +325,19 @@ export default function PayrollPage() {
         title="Payroll"
         description="Salary management, payslips, and leave requests"
         action={
-          canGenerate && activeTab === 0 && (
-            <Button onClick={() => setGenOpen(true)} size="sm">
-              <Plus className="w-4 h-4 mr-1.5" /> Generate Payroll
+          canDownload && activeTab === 0 && (
+            <Button
+              onClick={() => {
+                const target = selectedPayslip ?? payslips?.[0] ?? null;
+                if (!target) {
+                  toast.error('No payslip available to download');
+                  return;
+                }
+                downloadPayslipAsPdf(target);
+              }}
+              size="sm"
+            >
+              <DownloadCloud className="w-4 h-4 mr-1.5" /> Download Payslip
             </Button>
           )
         }
@@ -315,46 +391,23 @@ export default function PayrollPage() {
         />
       )}
 
-      {/* Generate payroll modal */}
-      <AppModal open={genOpen} onClose={() => setGenOpen(false)} title="Generate Payroll">
-        <div className="space-y-4 py-1">
-          <p className="text-sm text-muted-foreground">
-            This will generate payslips for all active staff for the selected month.
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Month</Label>
-              <Select
-                value={String(genForm.month)}
-                onValueChange={(v) => setGenForm((p) => ({ ...p, month: Number(v) }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(MONTHS ?? []).map(({ value, label }) => (
-                    <SelectItem key={value} value={String(value)}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Year</Label>
-              <Input
-                type="number"
-                value={genForm.year}
-                onChange={(e) => setGenForm((p) => ({ ...p, year: Number(e.target.value) }))}
-                min="2020" max="2099"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" size="sm" onClick={() => setGenOpen(false)} disabled={generateMutation.isPending}>Cancel</Button>
-            <Button size="sm" disabled={generateMutation.isPending} onClick={() => generateMutation.mutate(genForm)}>
-              {generateMutation.isPending ? 'Generating…' : 'Generate'}
+      <AppModal
+        open={!!selectedPayslip}
+        onClose={() => setSelectedPayslip(null)}
+        title="Payslip Preview"
+        size="xl"
+        footer={
+          <div className="flex items-center gap-2 payslip-no-print">
+            <Button variant="outline" size="sm" onClick={() => setSelectedPayslip(null)}>
+              Close
+            </Button>
+            <Button size="sm" onClick={() => downloadPayslipAsPdf(selectedPayslip)}>
+              <DownloadCloud className="h-4 w-4 mr-1" /> Download PDF
             </Button>
           </div>
-        </div>
+        }
+      >
+        <PayslipTemplate record={selectedPayslip} />
       </AppModal>
     </div>
   );

@@ -23,7 +23,7 @@ export default function TeacherAttendancePage() {
 const user = useAuthStore((state) => state.user);
   const t = getPortalTerms(user?.institute_type || 'school');
     const { classes, loading: classesLoading } = useTeacherClasses();
-  const { students, filterByClass, filterBySection } = useTeacherStudents();
+  const { students, fetchStudents, clearStudents, loading: studentsLoading } = useTeacherStudents();
   const { markAttendance, getClassAttendance } = useTeacherAttendance();
   const today      = new Date().toISOString().split('T')[0];
 
@@ -47,45 +47,58 @@ const user = useAuthStore((state) => state.user);
       }
       return next;
     });
-
-    if (name === 'class_id') {
-      filterByClass(value);
-    }
-
-    if (name === 'section_id') {
-      filterBySection(value);
-    }
   };
 
+
   useEffect(() => {
-    if (!filters.class_id && classes.length > 0) {
-      const firstClass = classes[0].class_id;
-      setFilters((prev) => ({ ...prev, class_id: firstClass, section_id: '' }));
+    if (!filters.class_id || !filters.section_id) {
+      clearStudents();
+      setAttendance({});
+      return;
     }
-  }, [classes, filters.class_id]);
 
-  useEffect(() => {
-    if (!filters.class_id) return;
-    filterByClass(filters.class_id);
-    setSaved(false);
-  }, [filters.class_id, filterByClass]);
+    const loadAll = async () => {
+      setSaved(false);
 
-  useEffect(() => {
-    const hydrateAttendance = async () => {
-      if (!filters.class_id) return;
+      // 1. Fetch students
+      fetchStudents({
+        class_id: filters.class_id,
+        section_id: filters.section_id,
+        page: 1
+      });
+
+      // 2. Fetch existing attendance records for this class+section+date
       try {
-        const records = await getClassAttendance(filters.class_id, filters.date);
+        const res = await getClassAttendance(filters.class_id, filters.date, filters.section_id);
+
+        // Handle both array and { data: [] } response shapes
+        const recordList = Array.isArray(res)
+          ? res
+          : Array.isArray(res?.data)
+            ? res.data
+            : Array.isArray(res?.message?.data)
+              ? res.message.data
+              : [];
+
+        console.log('[Attendance] Existing records:', recordList);
+
         const next = {};
-        (records || []).forEach((row) => {
-          next[row.student_id] = row.status;
+        recordList.forEach((row) => {
+          // Backend returns student_id directly or nested in Student object
+          const sid = row.student_id || row.Student?.id;
+          if (sid && row.status) {
+            next[sid] = row.status;
+          }
         });
         setAttendance(next);
       } catch {
+        // If attendance fetch fails (e.g. no records yet), just clear
         setAttendance({});
       }
     };
-    hydrateAttendance();
-  }, [filters.class_id, filters.date, getClassAttendance]);
+
+    loadAll();
+  }, [filters.class_id, filters.section_id, filters.date, fetchStudents, clearStudents, getClassAttendance]);
 
   const setStatus = (studentId, status) => {
     if (saved) return;
@@ -95,8 +108,28 @@ const user = useAuthStore((state) => state.user);
     }));
   };
 
+  const selectedClass = classes.find((c) => c.class_id === filters.class_id);
+  const sections = selectedClass?.sections || [];
+  const selectedSection = sections.find((s) => (s.id || s.section_id) === filters.section_id);
+  const selectedSectionName = selectedSection?.name || selectedSection?.section_name || '';
+
+  // Frontend-side section filter (safety net in case backend doesn't filter by section_id)
+  const displayStudents = filters.section_id
+    ? students.filter((s) => {
+        const studentSectionId = s.section_id || s.details?.section_id || s.section?.id;
+        const studentSectionName = s.section || s.section_name || s.details?.section_name || '';
+        if (studentSectionId) return studentSectionId === filters.section_id;
+        if (selectedSectionName && studentSectionName) {
+          return studentSectionName.trim().toLowerCase() === selectedSectionName.trim().toLowerCase();
+        }
+        return true;
+      })
+    : students;
+
   const handleSave = async () => {
-    const unmarked = students.filter((s, i) => !attendance[s.id || `s-${i}`]);
+    // Use displayStudents (filtered by section) for save
+    const toSave = displayStudents;
+    const unmarked = toSave.filter((s, i) => !attendance[s.id || `s-${i}`]);
     if (unmarked.length > 0) {
       toast.warning(`${unmarked.length} student(s) still not marked. Please mark all students.`);
       return;
@@ -104,8 +137,9 @@ const user = useAuthStore((state) => state.user);
     try {
       await markAttendance({
         class_id: filters.class_id,
+        section_id: filters.section_id,
         date: filters.date,
-        attendance: students.map((s, i) => ({
+        attendance: toSave.map((s, i) => ({
           student_id: s.id || `s-${i}`,
           status: attendance[s.id || `s-${i}`]
         }))
@@ -119,10 +153,9 @@ const user = useAuthStore((state) => state.user);
   const presentCount = Object.values(attendance).filter((v) => v === 'present').length;
   const absentCount  = Object.values(attendance).filter((v) => v === 'absent').length;
   const lateCount    = Object.values(attendance).filter((v) => v === 'late').length;
-  const unmarked     = students.length - Object.values(attendance).filter(Boolean).length;
+  const unmarked     = displayStudents.length - Object.values(attendance).filter(Boolean).length;
 
-  const selectedClass = classes.find((c) => c.class_id === filters.class_id);
-  const sections = selectedClass?.sections || [];
+  // sections and selectedSectionName already computed above
 
   if (classesLoading) {
     return <div className="max-w-3xl mx-auto text-sm text-slate-500">Loading attendance...</div>;
@@ -193,6 +226,7 @@ const user = useAuthStore((state) => state.user);
                 label="Date"
                 value={filters.date}
                 onChange={(value) => handleFilterChange('date', value)}
+                disableFutureDates
               />
 
               <SelectField
@@ -240,7 +274,15 @@ const user = useAuthStore((state) => state.user);
           </div>
 
           {/* Student list */}
-          {!filters.class_id ? (
+          {studentsLoading ? (
+            <div className="py-24 text-center border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
+              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-4">
+                <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+              <h3 className="text-lg font-semibold text-slate-700">Loading Students...</h3>
+              <p className="text-slate-500 mt-1 max-w-sm mx-auto">Please wait while we fetch the students for this section.</p>
+            </div>
+          ) : !filters.class_id ? (
             <div className="py-24 text-center border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
               <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-4">
                 <Users className="w-8 h-8 text-slate-400" />
@@ -248,20 +290,31 @@ const user = useAuthStore((state) => state.user);
               <h3 className="text-lg font-semibold text-slate-700">No {t.class || 'Class'} Selected</h3>
               <p className="text-slate-500 mt-1 max-w-sm mx-auto">Please select a {t.class || 'class'} from the filters above to view student attendance.</p>
             </div>
+          ) : !filters.section_id ? (
+            <div className="py-24 text-center border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
+              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-4">
+                <Users className="w-8 h-8 text-slate-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-700">No {t.section || 'Section'} Selected</h3>
+              <p className="text-slate-500 mt-1 max-w-sm mx-auto">Please select a {t.section || 'section'} from the filters above to view student attendance.</p>
+            </div>
           ) : students.length === 0 ? (
             <div className="py-24 text-center border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
               <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-4">
                 <Users className="w-8 h-8 text-slate-400" />
               </div>
               <h3 className="text-lg font-semibold text-slate-700">No Students Found</h3>
-              <p className="text-slate-500 mt-1 max-w-sm mx-auto">No students in the selected {t.class || 'class'} or section.</p>
+              <p className="text-slate-500 mt-1 max-w-sm mx-auto">No students found in the selected {t.class || 'class'} and {t.section || 'section'}.</p>
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-cyan-50 flex items-center justify-between sticky top-0 z-10">
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900">{t.studentsLabel} — {selectedClass?.class_name}</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">{students.length} total students</p>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    {t.studentsLabel} — {selectedClass?.class_name}
+                    {selectedSectionName && <span className="ml-1 text-blue-600">· Section {selectedSectionName}</span>}
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">{displayStudents.length} student{displayStudents.length !== 1 ? 's' : ''} in this section</p>
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -271,17 +324,17 @@ const user = useAuthStore((state) => state.user);
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">#</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">{t.studentsLabel}</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">Roll No</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Email</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Section</th>
                       <th className="px-4 py-3 text-center font-semibold text-slate-700">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {students.map((s, i) => {
+                    {displayStudents.map((s, i) => {
                       const sid = s.id || `s-${i}`;
                       const status = attendance[sid] || '';
                       const studentName = s.name || `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Unknown';
                       const rollNo = s.roll_no || s.roll_number || s.registration_no || 'N/A';
-                      const email = s.email || s.contact_email || '—';
+                      const sectionLabel = s.section || s.section_name || s.details?.section_name || selectedSectionName || '—';
                       
                       return (
                         <tr key={sid} className="hover:bg-blue-50/40 transition-colors">
@@ -297,7 +350,11 @@ const user = useAuthStore((state) => state.user);
                             </div>
                           </td>
                           <td className="px-4 py-3 text-slate-600 font-mono text-xs">{rollNo}</td>
-                          <td className="px-4 py-3 text-slate-600 text-xs truncate">{email}</td>
+                          <td className="px-4 py-3">
+                            <span className="text-xs font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-100">
+                              {sectionLabel}
+                            </span>
+                          </td>
                           <td className="px-4 py-3">
                             <div className="flex gap-1.5 justify-center flex-wrap">
                               {STATUS_OPTIONS.map((opt) => {
@@ -326,7 +383,7 @@ const user = useAuthStore((state) => state.user);
           )}
 
           {/* Save button */}
-          {filters.class_id && students.length > 0 && !saved && (
+          {filters.class_id && filters.section_id && displayStudents.length > 0 && !saved && (
             <Button
               onClick={handleSave}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 font-bold gap-2 sticky bottom-0"

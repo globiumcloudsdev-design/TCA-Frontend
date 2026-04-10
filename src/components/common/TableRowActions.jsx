@@ -17,6 +17,7 @@
  */
 'use client';
 
+import { isValidElement } from 'react';
 import { MoreHorizontal, Eye, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,6 +31,16 @@ import {
 export default function TableRowActions({ onView, onEdit, onDelete, extra = [], disabled }) {
   const hasDestructive = !!onDelete;
   const hasAny = onView || onEdit || onDelete || extra.length;
+
+  const renderIcon = (icon) => {
+    if (!icon) return null;
+    if (isValidElement(icon)) return icon;
+    if (typeof icon === 'function') {
+      const Icon = icon;
+      return <Icon size={14} className="h-3.5 w-3.5 shrink-0" />;
+    }
+    return icon;
+  };
 
   if (!hasAny) return null;
 
@@ -60,7 +71,7 @@ export default function TableRowActions({ onView, onEdit, onDelete, extra = [], 
             onClick={item.onClick}
             className={item.variant === 'destructive' ? 'text-destructive focus:text-destructive' : ''}
           >
-            {item.icon && <span className="mr-2">{item.icon}</span>}
+            {item.icon && <span className="mr-2 inline-flex items-center">{renderIcon(item.icon)}</span>}
             {item.label}
           </DropdownMenuItem>
         ))}

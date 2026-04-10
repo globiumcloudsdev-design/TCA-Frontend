@@ -2,25 +2,26 @@
  * DatePickerField — Calendar-based date picker with react-hook-form
  * ─────────────────────────────────────────────────────────────────
  * Props:
- *   label       string
- *   name        string
- *   control     UseFormControl
- *   error       FieldError
- *   placeholder string
- *   required    boolean
- *   disabled    boolean
- *   className   string
- *   fromYear    number    default 1990
- *   toYear      number    default current year + 10
- *   disablePastDates  boolean  default false  (disable dates before today)
+ *   label             string
+ *   name              string
+ *   control           UseFormControl
+ *   error             FieldError
+ *   placeholder       string
+ *   required          boolean
+ *   disabled          boolean
+ *   className         string
+ *   fromYear          number    default 1990
+ *   toYear            number    default current year + 10
+ *   disablePastDates  boolean   default false  (disable dates before today)
+ *   disableFutureDates boolean  default false  (disable dates after today)
  *
  * Usage:
- *   <DatePickerField label="Exam Date" name="exam_date" control={control} error={errors.exam_date} disablePastDates required />
+ *   <DatePickerField label="Attendance Date" name="date" control={control} disableFutureDates />
  */
 'use client';
 
 import { Controller } from 'react-hook-form';
-import { format, parseISO, isValid, isBefore, startOfDay } from 'date-fns';
+import { format, parseISO, isValid, isBefore, isAfter, startOfDay, endOfDay } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,8 @@ export default function DatePickerField({
   fromYear = 1990,
   toYear = new Date().getFullYear() + 10,
   disablePastDates = false,
+  disableFutureDates = false,
+  rules,
 }) {
   const content = (fieldValue, fieldChange) => {
     let dateValue = null;
@@ -51,10 +54,12 @@ export default function DatePickerField({
       if (!isValid(dateValue)) dateValue = null;
     }
 
-    // Disable past dates if requested
-    const disabledMatcher = disablePastDates 
-      ? (date) => isBefore(date, startOfDay(new Date()))
-      : undefined;
+    // Build disabled matcher based on props
+    const disabledMatcher = (date) => {
+      if (disablePastDates && isBefore(date, startOfDay(new Date()))) return true;
+      if (disableFutureDates && isAfter(date, endOfDay(new Date()))) return true;
+      return false;
+    };
 
     return (
       <Popover>
@@ -100,6 +105,7 @@ export default function DatePickerField({
         <Controller
           name={name}
           control={control}
+          rules={rules}
           render={({ field }) => content(field.value, field.onChange)}
         />
       ) : (

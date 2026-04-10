@@ -917,6 +917,7 @@ export const useTeacherClasses = () => {
       }));
       
       setClasses(normalizedClasses);
+      console.log('[TeacherClasses] Loaded classes:', normalizedClasses.map(c => ({ id: c.id, class_id: c.class_id, name: c.class_name, sections: c.sections })));
     } catch (err) {
       setError(err.message);
       toast.error('Failed to load classes');
@@ -976,6 +977,10 @@ export const useTeacherStudents = () => {
       setPagination(prev => ({ ...prev, total: 0, totalPages: 0 }));
       return;
     }
+
+    // Optional: if your logic requires section_id, you can clear here too
+    // But we'll leave it to the caller for now OR add a parameter.
+    // For now, let's just expose a clear function.
 
     setLoading(true);
     setError(null);
@@ -1085,6 +1090,11 @@ export const useTeacherStudents = () => {
     }
   }, []);
 
+  const clearStudents = useCallback(() => {
+    setStudents([]);
+    setPagination(prev => ({ ...prev, total: 0, totalPages: 0 }));
+  }, []);
+
   // Initial fetch when class_id is set
   useEffect(() => {
     if (filters.class_id) {
@@ -1107,6 +1117,7 @@ export const useTeacherStudents = () => {
     changePage,
     changePageSize,
     getStudentDetails,
+    clearStudents,
     refetch: () => fetchStudents(filters, pagination.page, pagination.limit)
   };
 };
@@ -1241,16 +1252,16 @@ export const useTeacherAttendance = () => {
     }
   }, []);
 
-  const getClassAttendance = useCallback(async (classId, date) => {
+  const getClassAttendance = useCallback(async (classId, date, sectionId) => {
     try {
-      setLoading(true);
-      const response = await teacherPortalService.getClassAttendance(classId, date);
+      const response = await teacherPortalService.getClassAttendance(classId, date, sectionId);
       return response;
     } catch (error) {
-      toast.error('Failed to load attendance');
+      // Don't show toast for 404 (no records yet) — just return empty
+      if (error?.response?.status !== 404) {
+        toast.error(error?.response?.data?.message || error.message || 'Failed to load attendance');
+      }
       throw error;
-    } finally {
-      setLoading(false);
     }
   }, []);
 

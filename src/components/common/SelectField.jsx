@@ -49,6 +49,7 @@ export default function SelectField({
   required,
   disabled,
   className,
+  rules,
 }) {
   const normalizedOptions = (options || []).filter((opt) => {
     const value = String(opt?.value ?? '').trim();
@@ -68,6 +69,7 @@ export default function SelectField({
         <Controller
           name={name}
           control={control}
+          rules={rules}
           render={({ field }) => (
             <Select
               value={field.value ?? ''}

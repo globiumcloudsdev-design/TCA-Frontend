@@ -8,13 +8,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Wallet } from 'lucide-react';
+import { Plus, Pencil, Trash2, Wallet, FileText, Printer } from 'lucide-react';
 import useAuthStore from '@/store/authStore';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
 import SelectField from '@/components/common/SelectField';
 import StatsCard from '@/components/common/StatsCard';
+import PayslipTemplate from '@/components/payroll/PayslipTemplate';
 import { cn } from '@/lib/utils';
 import { DUMMY_PAYROLL } from '@/data/dummyData';
 
@@ -45,6 +46,7 @@ export default function PayrollPage({ type }) {
   const [modal,   setModal]   = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleting,setDeleting]= useState(null);
+  const [selectedPayslip, setSelectedPayslip] = useState(null);
 
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm({ resolver: zodResolver(schema), defaultValues: { status:'pending' } });
 
@@ -101,6 +103,7 @@ export default function PayrollPage({ type }) {
     { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => { const s = getValue(); return <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', STATUS_COLORS[s])}>{s?.replace('_', ' ')}</span>; } },
     { id: 'actions', header: 'Actions', enableHiding: false, cell: ({ row }) => (
       <div className="flex items-center justify-end gap-1">
+        <button onClick={() => setSelectedPayslip(row.original)} className="rounded p-1.5 hover:bg-accent" title="View Payslip"><FileText size={13} /></button>
         {canDo('payroll.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
         {canDo('payroll.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
       </div>
@@ -156,6 +159,29 @@ export default function PayrollPage({ type }) {
           </>
         }>
         <p className="text-sm text-muted-foreground">Delete payroll record for <strong>{deleting?.staff_name}</strong>? This cannot be undone.</p>
+      </AppModal>
+
+      <AppModal
+        open={!!selectedPayslip}
+        onClose={() => setSelectedPayslip(null)}
+        title="Payslip Preview"
+        size="xl"
+        footer={
+          <div className="flex items-center gap-2 payslip-no-print">
+            <button type="button" onClick={() => setSelectedPayslip(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+            >
+              <Printer size={14} /> Print
+            </button>
+          </div>
+        }
+      >
+        <PayslipTemplate record={selectedPayslip} />
       </AppModal>
     </div>
   );

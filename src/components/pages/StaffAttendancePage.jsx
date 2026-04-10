@@ -2,7 +2,7 @@
 /**
  * StaffAttendancePage — Staff daily attendance for all types
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckSquare, X, Minus } from 'lucide-react';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
@@ -17,7 +17,6 @@ import SelectField from '@/components/common/SelectField';
 import DatePickerField from '@/components/common/DatePickerField';
 import TimePickerField from '@/components/common/TimePickerField';
 import { cn } from '@/lib/utils';
-import { DUMMY_STAFF_ATTENDANCE } from '@/data/dummyData';
 import { toast } from 'sonner';
 
 const STATUS_COLORS = { present: 'bg-emerald-100 text-emerald-700', absent: 'bg-red-100 text-red-700', late: 'bg-amber-100 text-amber-700', leave: 'bg-blue-100 text-blue-700' };
@@ -75,7 +74,7 @@ export default function StaffAttendancePage({ type }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [staffTypeFilter, setStaffTypeFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState(new Date().toISOString().slice(0, 10));
+  const [dateFilter, setDateFilter] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isMarkModalOpen, setIsMarkModalOpen] = useState(false);
@@ -83,12 +82,20 @@ export default function StaffAttendancePage({ type }) {
   const [deletingRecord, setDeletingRecord] = useState(null);
   const [manualForm, setManualForm] = useState({
     staff_id: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: '',
     status: 'present',
     check_in: '',
     check_out: '',
     remarks: '',
   });
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    const today = new Date().toISOString().slice(0, 10);
+    setDateFilter(today);
+    setManualForm(prev => ({ ...prev, date: today }));
+  }, []);
 
   const { data, isLoading } = useQuery({
     queryKey: ['staff-attendance', type, page, pageSize, search, statusFilter, staffTypeFilter, dateFilter],
@@ -103,13 +110,9 @@ export default function StaffAttendancePage({ type }) {
           staff_type: staffTypeFilter,
           date: dateFilter,
         });
-      } catch {
-        const d = DUMMY_STAFF_ATTENDANCE.filter(r =>
-          (!search || (r.employee_name || r.name || '').toLowerCase().includes(search.toLowerCase())) &&
-          (!statusFilter || r.status === statusFilter)
-        );
-        const slice = d.slice((page - 1) * pageSize, page * pageSize);
-        return { data: { rows: slice, total: d.length, totalPages: Math.max(1, Math.ceil(d.length / pageSize)) } };
+      } catch (err) {
+        console.error('Error loading staff attendance:', err);
+        return { data: { rows: [], total: 0, totalPages: 1 } };
       }
     },
     placeholderData: (p) => p,
@@ -223,8 +226,8 @@ export default function StaffAttendancePage({ type }) {
     },
   });
 
-  const rows = data?.data?.rows ?? DUMMY_STAFF_ATTENDANCE;
-  const total = data?.data?.total ?? rows.length;
+  const rows = data?.data?.rows ?? [];
+  const total = data?.data?.total ?? 0;
   const totalPages = data?.data?.totalPages ?? 1;
 
   const openMarkModal = () => {
@@ -319,12 +322,12 @@ export default function StaffAttendancePage({ type }) {
       header: 'Actions',
       cell: ({ row }) => (
         <TableRowActions
-          onEdit={canDo('staff_attendance.mark') ? () => openEditModal(row.original) : undefined}
-          onDelete={canDo('staff_attendance.mark') ? () => setDeletingRecord(row.original) : undefined}
+          onEdit={(isMounted && canDo('staff_attendance.mark')) ? () => openEditModal(row.original) : undefined}
+          onDelete={(isMounted && canDo('staff_attendance.mark')) ? () => setDeletingRecord(row.original) : undefined}
         />
       ),
     },
-  ], [canDo]);
+  ], [canDo, isMounted]);
 
   return (
     <div className="space-y-5">
@@ -332,8 +335,12 @@ export default function StaffAttendancePage({ type }) {
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-3">
         <label className="text-sm font-medium">Date:</label>
-        <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
-          className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring" />
+        <DatePickerField
+          value={dateFilter}
+          onChange={(v) => setDateFilter(v || '')}
+          disableFutureDates
+          className="w-48"
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4">
@@ -354,7 +361,7 @@ export default function StaffAttendancePage({ type }) {
           { name: 'staff_type', label: 'Staff Type', value: staffTypeFilter, onChange: (v) => { setStaffTypeFilter(v); setPage(1); }, options: STAFF_TYPE_OPTS },
         ]}
         action={
-          (canDo('staff_attendance.create') || canDo('staff_attendance.mark')) ? (
+          (isMounted && (canDo('staff_attendance.create') || canDo('staff_attendance.mark'))) ? (
             <button
               type="button"
               onClick={openMarkModal}
@@ -432,6 +439,7 @@ export default function StaffAttendancePage({ type }) {
               value={manualForm.date}
               onChange={(value) => setManualForm((p) => ({ ...p, date: value }))}
               disabled={!!editingAttendanceId}
+              disableFutureDates
               required
             />
 

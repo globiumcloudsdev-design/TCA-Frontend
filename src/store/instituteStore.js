@@ -27,7 +27,6 @@ export const useInstituteStore = create(
       // Set Current Institute
       // ─────────────────────────────────────────
       setCurrentInstitute: (institute) => {
-        // console.log("🏢 Setting Current Institute:", institute);
         set({ 
           currentInstitute: institute,
           error: null 
@@ -245,3 +244,6 @@ if (typeof window !== 'undefined') {
 }
 
 export default useInstituteStore;
+
+
+

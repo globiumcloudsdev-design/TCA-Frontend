@@ -1,33 +1,290 @@
+// // frontend/src/stores/authStore.js
+
+// /**
+//  * The Clouds Academy — Auth Store (Zustand)
+//  */
+
+// import { create } from "zustand";
+// import { persist } from "zustand/middleware";
+// import { setAccessToken, setSchoolCode, clearAuthData } from "@/lib/auth";
+
+// export const useAuthStore = create(
+//   persist(
+//     (set, get) => ({
+//       user: null,
+//       isAuthenticated: false,
+//       isLoading: false,
+
+//       // ─────────────────────────────────────────
+//       // Set User (Login)
+//       // ─────────────────────────────────────────
+//       setUser: (user, accessToken) => {
+//         console.log("🔐 Setting User:", user);
+//         console.log("🏫 Institute with Logo:", user?.institute);
+//         console.log("🌿 Branch Info:", user?.branch);
+
+//         if (accessToken) setAccessToken(accessToken);
+        
+//         // Set school code from institute
+//         if (user?.institute?.code) setSchoolCode(user.institute.code);
+//         // Fallback to old school object
+//         if (user?.school?.code) setSchoolCode(user.school.code);
+
+//         set({
+//           user,
+//           isAuthenticated: true,
+//         });
+//       },
+
+//       // ─────────────────────────────────────────
+//       // Loading State
+//       // ─────────────────────────────────────────
+//       setLoading: (val) => {
+//         set({ isLoading: val });
+//       },
+
+//       // ─────────────────────────────────────────
+//       // Logout
+//       // ─────────────────────────────────────────
+//       logout: () => {
+//         console.log("🚪 User Logged Out:", get().user);
+
+//         clearAuthData();
+
+//         set({
+//           user: null,
+//           isAuthenticated: false,
+//         });
+//       },
+
+//       // ─────────────────────────────────────────
+//       // Getters
+//       // ─────────────────────────────────────────
+
+//       isMasterAdmin: () => {
+//         const user = get().user;
+//         return user?.role_code === "MASTER_ADMIN" || user?.user_type === "MASTER_ADMIN";
+//       },
+
+//       permissions: () => {
+//         const user = get().user;
+//         return user?.permissions || [];
+//       },
+
+//       canDo: (permissionCode) => {
+//         const u = get().user;
+
+//         if (!u) {
+//           return false;
+//         }
+        
+//         // MASTER_ADMIN bypass
+//         if (u.role_code === "MASTER_ADMIN" || u.user_type === "MASTER_ADMIN") {
+//           console.log('✅ canDo - User is MASTER_ADMIN');
+//           return true;
+//         }
+
+//         const perms = u.permissions || [];
+        
+//         if (!Array.isArray(perms)) {
+//           console.warn('⚠️ canDo - permissions is not an array:', perms);
+//           return false;
+//         }
+
+//         if (perms.includes("ALL")) {
+//           return true;
+//         }
+
+//         const result = perms.includes(permissionCode);
+//         return result;
+//       },
+
+//       canDoAny: (codes = []) => {
+//         const u = get().user;
+
+//         if (!u) return false;
+//         if (u.role_code === "MASTER_ADMIN" || u.user_type === "MASTER_ADMIN") return true;
+
+//         const perms = u.permissions || [];
+
+//         if (perms.includes("ALL")) return true;
+
+//         return codes.some((code) => perms.includes(code));
+//       },
+
+//       // ✅ Updated schoolHasBranches to use institute settings
+//       schoolHasBranches: () => {
+//         const u = get().user;
+
+//         // console.log("🔍 Debug - Full user object:", u);
+//         // console.log("🔍 Debug - Institute object:", u?.institute);
+//         // console.log("🔍 Debug - Institute settings:", u?.institute?.settings);
+        
+//         // Check institute settings
+//         const hasBranchesFromInstitute = u?.institute?.settings?.has_branches === true;
+        
+//         // Check branch data exists
+//         const hasBranchData = !!u?.branch;
+
+//         return hasBranchesFromInstitute;
+//       },
+
+//       // ✅ New: Get branch info
+//       getBranch: () => {
+//         const u = get().user;
+//         return u?.branch || null;
+//       },
+
+//       // ✅ New: Check if user is in a branch
+//       hasBranch: () => {
+//         const u = get().user;
+//         return !!u?.branch_id || !!u?.branch;
+//       },
+
+//       // ✅ New: Get institute logo URL
+//       instituteLogo: () => {
+//         const u = get().user;
+//         return u?.institute?.logo_url || u?.school?.logo_url || null;
+//       },
+
+//       // ✅ New: Get full institute info
+//       getInstitute: () => {
+//         const u = get().user;
+//         return u?.institute || u?.school || null;
+//       },
+
+//       // institute type
+//       instituteType: () => {
+//         const u = get().user;
+
+//         return (
+//           u?.institute_type ||
+//           u?.institute?.institute_type ||
+//           u?.school?.institute_type ||
+//           null
+//         );
+//       },
+
+//       // dashboard redirect path (updated for branch users)
+//       dashboardPath: () => {
+//         const u = get().user;
+
+//         if (!u) return "/login";
+
+//         if (u.role_code === "MASTER_ADMIN" || u.user_type === "MASTER_ADMIN") {
+//           return "/master-admin";
+//         }
+
+//         // Branch users might have different dashboard
+//         if (u.branch_id || u.branch) {
+//           const branchPath = `/branch/${u.branch_id || u.branch?.id}/dashboard`;
+//           return branchPath;
+//         }
+
+//         const type =
+//           u.institute_type ||
+//           u.institute?.institute_type ||
+//           u.school?.institute_type ||
+//           "school";
+
+//         const PATHS = {
+//           school: "/school/dashboard",
+//           coaching: "/coaching/dashboard",
+//           academy: "/academy/dashboard",
+//           college: "/college/dashboard",
+//           university: "/university/dashboard",
+//         };
+
+//         return PATHS[type] ?? "/dashboard";
+//       },
+
+//       // Helper: get settings object
+//       settings: () => {
+//         const u = get().user;
+//         return u?.institute?.settings || u?.school?.settings || {};
+//       },
+
+//       // Helper: get user type display name
+//       userTypeName: () => {
+//         const u = get().user;
+//         const typeMap = {
+//           MASTER_ADMIN: 'Master Admin',
+//           INSTITUTE_ADMIN: 'Institute Admin',
+//           BRANCH_ADMIN: 'Branch Admin',
+//           TEACHER: 'Teacher',
+//           STUDENT: 'Student',
+//           PARENT: 'Parent',
+//           STAFF: 'Staff'
+//         };
+//         return typeMap[u?.user_type] || u?.user_type || 'User';
+//       }
+//     }),
+//     {
+//       name: "clouds-auth",
+
+//       // Persist only safe fields
+//       partialize: (state) => ({
+//         user: state.user,
+//         isAuthenticated: state.isAuthenticated,
+//       }),
+
+//       // 🔥 Runs when store loads from localStorage
+//       onRehydrateStorage: () => (state) => {
+//         console.log("♻️ Auth Store Rehydrated");
+//         console.log("👤 Persisted User:", state?.user);
+//         console.log("🏫 Persisted Institute:", state?.user?.institute);
+//         console.log("🌿 Persisted Branch:", state?.user?.branch);
+//       },
+//     }
+//   )
+// );
+
+// export default useAuthStore;
+
+
+
+
+
+
+
+
 // frontend/src/stores/authStore.js
 
 /**
  * The Clouds Academy — Auth Store (Zustand)
+ * Complete with all settings and policy methods
  */
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { setAccessToken, setSchoolCode, clearAuthData } from "@/lib/auth";
+import { settingService } from "@/services/settingService";
 
 export const useAuthStore = create(
   persist(
     (set, get) => ({
+      // =========================================================
+      // STATE
+      // =========================================================
       user: null,
       isAuthenticated: false,
       isLoading: false,
 
-      // ─────────────────────────────────────────
-      // Set User (Login)
-      // ─────────────────────────────────────────
+      // =========================================================
+      // CORE METHODS
+      // =========================================================
+      
+      /**
+       * Set user after login
+       */
       setUser: (user, accessToken) => {
         console.log("🔐 Setting User:", user);
-        console.log("🏫 Institute with Logo:", user?.institute);
-        console.log("🌿 Branch Info:", user?.branch);
+        console.log("🏫 Institute:", user?.institute);
+        console.log("🌿 Branch:", user?.branch);
 
         if (accessToken) setAccessToken(accessToken);
         
-        // Set school code from institute
         if (user?.institute?.code) setSchoolCode(user.institute.code);
-        // Fallback to old school object
         if (user?.school?.code) setSchoolCode(user.school.code);
 
         set({
@@ -36,32 +293,175 @@ export const useAuthStore = create(
         });
       },
 
-      // ─────────────────────────────────────────
-      // Loading State
-      // ─────────────────────────────────────────
+      /**
+       * Set loading state
+       */
       setLoading: (val) => {
-        // console.log("⏳ Auth Loading:", val);
         set({ isLoading: val });
       },
 
-      // ─────────────────────────────────────────
-      // Logout
-      // ─────────────────────────────────────────
+      /**
+       * Logout user
+       */
       logout: () => {
         console.log("🚪 User Logged Out:", get().user);
-
         clearAuthData();
-
         set({
           user: null,
           isAuthenticated: false,
         });
       },
 
-      // ─────────────────────────────────────────
-      // Getters
-      // ─────────────────────────────────────────
+      /**
+       * Refresh user data from server (after updates)
+       */
+      refreshUserData: async () => {
+        try {
+          const response = await settingService.refreshUserData();
+          if (response.success && response.data) {
+            const currentUser = get().user;
+            const updatedUser = {
+              ...currentUser,
+              ...response.data,
+              institute: response.data.institute || currentUser?.institute,
+              branch: response.data.branch || currentUser?.branch
+            };
+            
+            set({ user: updatedUser });
+            console.log("🔄 User data refreshed successfully");
+            return true;
+          }
+        } catch (error) {
+          console.error("Failed to refresh user data:", error);
+          return false;
+        }
+      },
 
+      // =========================================================
+      // SETTINGS UPDATE METHODS (Realtime Store Updates)
+      // =========================================================
+      
+      /**
+       * Update entire institute settings object
+       */
+      setInstituteSettings: (updatedSettings) => {
+        const currentUser = get().user;
+        if (!currentUser) return;
+
+        const updatedUser = {
+          ...currentUser,
+          institute: {
+            ...currentUser.institute,
+            settings: {
+              ...currentUser.institute?.settings,
+              ...updatedSettings
+            }
+          }
+        };
+
+        console.log("🔄 Updating Institute Settings:", updatedSettings);
+        set({ user: updatedUser });
+      },
+
+      /**
+       * Update specific settings section (academic, timings, finance, etc.)
+       */
+      updateSettingSection: (sectionName, sectionData) => {
+        const currentUser = get().user;
+        if (!currentUser) return;
+
+        const currentSettings = currentUser.institute?.settings || {};
+        
+        const updatedUser = {
+          ...currentUser,
+          institute: {
+            ...currentUser.institute,
+            settings: {
+              ...currentSettings,
+              [sectionName]: {
+                ...currentSettings[sectionName],
+                ...sectionData
+              }
+            }
+          }
+        };
+
+        console.log(`🔄 Updating ${sectionName} section:`, sectionData);
+        set({ user: updatedUser });
+      },
+
+      /**
+       * Update institute logo URL
+       */
+      setInstituteLogo: (logoUrl) => {
+        const currentUser = get().user;
+        if (!currentUser) return;
+
+        const updatedUser = {
+          ...currentUser,
+          institute: {
+            ...currentUser.institute,
+            logo_url: logoUrl
+          }
+        };
+
+        console.log("🔄 Updating Institute Logo:", logoUrl);
+        set({ user: updatedUser });
+      },
+
+      /**
+       * Update institute name
+       */
+      setInstituteName: (name) => {
+        const currentUser = get().user;
+        if (!currentUser) return;
+
+        const updatedUser = {
+          ...currentUser,
+          institute: {
+            ...currentUser.institute,
+            name: name
+          }
+        };
+
+        console.log("🔄 Updating Institute Name:", name);
+        set({ user: updatedUser });
+      },
+
+      /**
+       * Enable/disable a module
+       */
+      setModuleEnabled: (moduleName, enabled) => {
+        const currentUser = get().user;
+        if (!currentUser) return;
+
+        const currentModules = currentUser.institute?.settings?.modules || {};
+        
+        const updatedUser = {
+          ...currentUser,
+          institute: {
+            ...currentUser.institute,
+            settings: {
+              ...currentUser.institute?.settings,
+              modules: {
+                ...currentModules,
+                [moduleName]: {
+                  ...currentModules[moduleName],
+                  enabled: enabled
+                }
+              }
+            }
+          }
+        };
+
+        console.log(`🔄 Module ${moduleName} set to:`, enabled);
+        set({ user: updatedUser });
+      },
+
+      // =========================================================
+      // GETTERS - Institute Info
+      // =========================================================
+      
       isMasterAdmin: () => {
         const user = get().user;
         return user?.role_code === "MASTER_ADMIN" || user?.user_type === "MASTER_ADMIN";
@@ -74,136 +474,63 @@ export const useAuthStore = create(
 
       canDo: (permissionCode) => {
         const u = get().user;
-
-        if (!u) {
-          // console.log('❌ canDo - No user found');
-          return false;
-        }
-        
-        // MASTER_ADMIN bypass
-        if (u.role_code === "MASTER_ADMIN" || u.user_type === "MASTER_ADMIN") {
-          console.log('✅ canDo - User is MASTER_ADMIN');
-          return true;
-        }
-
+        if (!u) return false;
+        if (u.role_code === "MASTER_ADMIN" || u.user_type === "MASTER_ADMIN") return true;
         const perms = u.permissions || [];
-        
-        // Debug
-        // console.log('🔍 canDo check:', {
-        //   permissionCode,
-        //   permisionsType: typeof perms,
-        //   permissionsArray: Array.isArray(perms),
-        //   permissionsCount: perms?.length,
-        //   permissionsIncludesCode: perms?.includes(permissionCode),
-        //   allPermissions: perms
-        // });
-
-        if (!Array.isArray(perms)) {
-          console.warn('⚠️ canDo - permissions is not an array:', perms);
-          return false;
-        }
-
-        if (perms.includes("ALL")) {
-          // console.log('✅ canDo - User has ALL permissions');
-          return true;
-        }
-
-        const result = perms.includes(permissionCode);
-        // console.log(`${result ? '✅' : '❌'} canDo("${permissionCode}"):`, result);
-        return result;
+        if (!Array.isArray(perms)) return false;
+        if (perms.includes("ALL")) return true;
+        return perms.includes(permissionCode);
       },
 
       canDoAny: (codes = []) => {
         const u = get().user;
-
         if (!u) return false;
         if (u.role_code === "MASTER_ADMIN" || u.user_type === "MASTER_ADMIN") return true;
-
         const perms = u.permissions || [];
-
         if (perms.includes("ALL")) return true;
-
         return codes.some((code) => perms.includes(code));
       },
 
-      // ✅ Updated schoolHasBranches to use institute settings
       schoolHasBranches: () => {
         const u = get().user;
-
-        // console.log("🔍 Debug - Full user object:", u);
-        // console.log("🔍 Debug - Institute object:", u?.institute);
-        // console.log("🔍 Debug - Institute settings:", u?.institute?.settings);
-        
-        // Check institute settings
-        const hasBranchesFromInstitute = u?.institute?.settings?.has_branches === true;
-        
-        // Check branch data exists
-        const hasBranchData = !!u?.branch;
-
-        // console.log("🔍 Debug - hasBranchesFromInstitute:", hasBranchesFromInstitute);
-        // console.log("🔍 Debug - hasBranchData:", hasBranchData);
-
-        return hasBranchesFromInstitute;
+        return u?.institute?.settings?.has_branches === true;
       },
 
-      // ✅ New: Get branch info
       getBranch: () => {
         const u = get().user;
         return u?.branch || null;
       },
 
-      // ✅ New: Check if user is in a branch
       hasBranch: () => {
         const u = get().user;
         return !!u?.branch_id || !!u?.branch;
       },
 
-      // ✅ New: Get institute logo URL
       instituteLogo: () => {
         const u = get().user;
         return u?.institute?.logo_url || u?.school?.logo_url || null;
       },
 
-      // ✅ New: Get full institute info
       getInstitute: () => {
         const u = get().user;
         return u?.institute || u?.school || null;
       },
 
-      // institute type
       instituteType: () => {
         const u = get().user;
-
-        return (
-          u?.institute_type ||
-          u?.institute?.institute_type ||
-          u?.school?.institute_type ||
-          null
-        );
+        return u?.institute_type || u?.institute?.institute_type || u?.school?.institute_type || "school";
       },
 
-      // dashboard redirect path (updated for branch users)
       dashboardPath: () => {
         const u = get().user;
-
         if (!u) return "/login";
-
         if (u.role_code === "MASTER_ADMIN" || u.user_type === "MASTER_ADMIN") {
           return "/master-admin";
         }
-
-        // Branch users might have different dashboard
         if (u.branch_id || u.branch) {
-          const branchPath = `/branch/${u.branch_id || u.branch?.id}/dashboard`;
-          return branchPath;
+          return `/branch/${u.branch_id || u.branch?.id}/dashboard`;
         }
-
-        const type =
-          u.institute_type ||
-          u.institute?.institute_type ||
-          u.school?.institute_type ||
-          "school";
-
+        const type = get().instituteType();
         const PATHS = {
           school: "/school/dashboard",
           coaching: "/coaching/dashboard",
@@ -211,17 +538,14 @@ export const useAuthStore = create(
           college: "/college/dashboard",
           university: "/university/dashboard",
         };
-
         return PATHS[type] ?? "/dashboard";
       },
 
-      // Helper: get settings object
       settings: () => {
         const u = get().user;
         return u?.institute?.settings || u?.school?.settings || {};
       },
 
-      // Helper: get user type display name
       userTypeName: () => {
         const u = get().user;
         const typeMap = {
@@ -234,23 +558,110 @@ export const useAuthStore = create(
           STAFF: 'Staff'
         };
         return typeMap[u?.user_type] || u?.user_type || 'User';
-      }
+      },
+
+      // =========================================================
+      // GETTERS - Settings Sections
+      // =========================================================
+      
+      instituteSettings: () => {
+        const u = get().user;
+        return u?.institute?.settings || u?.school?.settings || {};
+      },
+
+      getSettingSection: (sectionName) => {
+        const u = get().user;
+        const settings = u?.institute?.settings || u?.school?.settings || {};
+        return settings[sectionName] || {};
+      },
+
+      academicSettings: () => {
+        const u = get().user;
+        const settings = u?.institute?.settings || u?.school?.settings || {};
+        return settings.academic || {};
+      },
+
+      timingsSettings: () => {
+        const u = get().user;
+        const settings = u?.institute?.settings || u?.school?.settings || {};
+        return settings.timings || {};
+      },
+
+      financeSettings: () => {
+        const u = get().user;
+        const settings = u?.institute?.settings || u?.school?.settings || {};
+        return settings.finance || {};
+      },
+
+      communicationSettings: () => {
+        const u = get().user;
+        const settings = u?.institute?.settings || u?.school?.settings || {};
+        return settings.communication || {};
+      },
+
+      moduleSettings: () => {
+        const u = get().user;
+        const settings = u?.institute?.settings || u?.school?.settings || {};
+        return settings.modules || {};
+      },
+
+      isModuleEnabled: (moduleName) => {
+        const u = get().user;
+        const settings = u?.institute?.settings || u?.school?.settings || {};
+        const modules = settings.modules || {};
+        return modules[moduleName]?.enabled === true;
+      },
+
+      // =========================================================
+      // GETTERS - Policies
+      // =========================================================
+      
+      getAllPolicies: () => {
+        const u = get().user;
+        return u?.institute?.policies?.all || [];
+      },
+
+      getPoliciesByType: (policyType) => {
+        const u = get().user;
+        return u?.institute?.policies?.by_type?.[policyType] || [];
+      },
+
+      getLatestPolicy: (policyType) => {
+        const u = get().user;
+        return u?.institute?.policies?.latest?.[policyType] || null;
+      },
+
+      getPolicyConfig: (policyType, key = null) => {
+        const policy = get().getLatestPolicy(policyType);
+        if (!policy || !policy.config) return key ? null : {};
+        return key ? policy.config[key] : policy.config;
+      },
+
+      // =========================================================
+      // GETTERS - Branches
+      // =========================================================
+      
+      getBranches: () => {
+        const u = get().user;
+        return u?.institute?.branches || [];
+      },
+
+      getMainBranch: () => {
+        const u = get().user;
+        const branches = u?.institute?.branches || [];
+        return branches.find(b => b.is_main === true) || null;
+      },
     }),
     {
       name: "clouds-auth",
-
-      // Persist only safe fields
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),
-
-      // 🔥 Runs when store loads from localStorage
       onRehydrateStorage: () => (state) => {
         console.log("♻️ Auth Store Rehydrated");
-        console.log("👤 Persisted User:", state?.user);
-        console.log("🏫 Persisted Institute:", state?.user?.institute);
-        console.log("🌿 Persisted Branch:", state?.user?.branch);
+        console.log("👤 User:", state?.user?.first_name);
+        console.log("🏫 Institute:", state?.user?.institute?.name);
       },
     }
   )

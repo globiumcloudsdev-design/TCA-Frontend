@@ -170,3 +170,35 @@
            transition-colors;
   }
 }
+
+/* ──────────────────────────────────────────────────────────────────
+   Payroll / payslip print view
+   ────────────────────────────────────────────────────────────────── */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .payslip-print,
+  .payslip-print * {
+    visibility: visible;
+  }
+
+  .payslip-print {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  .payslip-no-print {
+    display: none !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+}

@@ -29,3 +29,4 @@ export { dashboardService }     from './dashboardService';
 export { notificationService }  from './notificationService';
 export { masterAdminService }   from './masterAdminService';
 export { branchService }        from './branchService';
+export { eventService }         from './eventService';

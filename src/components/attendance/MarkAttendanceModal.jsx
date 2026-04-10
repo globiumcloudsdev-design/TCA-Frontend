@@ -186,6 +186,7 @@ function InstantScanTab({ instituteId, type }) {
               value={scanDate} 
               onChange={setScanDate}
               className="w-full"
+              disableFutureDates
             />
           </div>
           
@@ -472,9 +473,9 @@ function BulkScanTab({ terms, instituteId, type }) {
   const submitMutation = useMutation({
     mutationFn: async () => {
       const payload = {
-        academic_year_id: filters.academic_year_id,
-        class_id: filters.class_id,
-        section_id: filters.section_id,
+        ...(filters.academic_year_id ? { academic_year_id: filters.academic_year_id } : {}),
+        ...(filters.class_id ? { class_id: filters.class_id } : {}),
+        ...(filters.section_id ? { section_id: filters.section_id } : {}),
         date: filters.date,
         type: scanType,
         skip_existing: true,
@@ -521,6 +522,7 @@ function BulkScanTab({ terms, instituteId, type }) {
               value={filters.date} 
               onChange={(date) => setFilters({ ...filters, date })}
               className="w-full"
+              disableFutureDates
             />
           </div>
           
@@ -755,16 +757,17 @@ function ClassAttendanceTab({ terms, type, instituteId }) {
 
   const students = studentsData || [];
 
+  // Hydrate attendance state when students or existing records change
   useEffect(() => {
-    if (students.length > 0 && existingAttendanceData) {
-      const newState = {};
-      existingAttendanceData.forEach(rec => {
-        if (students.find(s => s.id === rec.student_id)) {
-          newState[rec.student_id] = rec.status;
-        }
-      });
-      setAttendanceState(newState);
-    }
+    if (!existingAttendanceData || !studentsData?.length) return;
+    const newState = {};
+    existingAttendanceData.forEach(rec => {
+      // String comparison to avoid number/string ID mismatch
+      if (studentsData.find(s => String(s.id) === String(rec.student_id))) {
+        newState[rec.student_id] = rec.status;
+      }
+    });
+    setAttendanceState(newState);
   }, [studentsData, existingAttendanceData]);
 
   const markAll = (status) => {
@@ -785,9 +788,9 @@ function ClassAttendanceTab({ terms, type, instituteId }) {
         }));
 
       const payload = {
-        academic_year_id: filters.academic_year_id,
-        class_id: filters.class_id,
-        section_id: filters.section_id,
+        ...(filters.academic_year_id ? { academic_year_id: filters.academic_year_id } : {}),
+        ...(filters.class_id ? { class_id: filters.class_id } : {}),
+        ...(filters.section_id ? { section_id: filters.section_id } : {}),
         date: filters.date,
         type: scanType,
         skip_existing: true,
@@ -823,7 +826,7 @@ function ClassAttendanceTab({ terms, type, instituteId }) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
           <div className="space-y-1.5">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Date</label>
-            <DatePickerField value={filters.date} onChange={(date) => setFilters({ ...filters, date })} />
+            <DatePickerField value={filters.date} onChange={(date) => setFilters({ ...filters, date })} disableFutureDates />
           </div>
           <SelectField
             label="Class"
@@ -1145,7 +1148,7 @@ function StudentSearchTab({ terms, type, instituteId }) {
           </div>
 
           <div className="space-y-6">
-            <DatePickerField label="Select Date" value={date} onChange={setDate} />
+            <DatePickerField label="Select Date" value={date} onChange={setDate} disableFutureDates />
             
             <CreatableSelectField
               label="📋 Attendance Type"
