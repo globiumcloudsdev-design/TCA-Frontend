@@ -1,27 +1,29 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import {
-  Calendar,
-  Clock,
-  LogIn,
-  LogOut,
-  CheckCircle2,
-  MapPin,
-  AlertCircle,
-  History,
-  TrendingUp,
-  Info,
+import { 
+  Calendar, Clock, LogIn, LogOut, CheckCircle2, 
+  AlertCircle, History, TrendingUp, Info, Search, Filter, X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import DataTable from "@/components/common/DataTable";
+import { MonthPicker } from "@/components/common/MonthPicker";
+import { AttendanceHistoryTable } from "@/components/portal/teacher/AttendanceHistoryTable";
 import useAuthStore from "@/store/authStore";
 import teacherPortalService from "@/services/teacherPortalService";
+import { generateSelfAttendanceReportPDF } from "@/lib/pdf/attendanceReport";
 
 export default function TeacherSelfAttendancePage() {
   const user = useAuthStore((state) => state.user);
@@ -29,113 +31,27 @@ export default function TeacherSelfAttendancePage() {
   const [attendanceData, setAttendanceData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
+  
   const [reportStats, setReportStats] = useState(null);
+  const [reportMonth, setReportMonth] = useState(() => format(new Date(), "yyyy-MM"));
+  const [reportLoading, setReportLoading] = useState(false);
+  
+
   const [historyData, setHistoryData] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
-  const [historyPagination, setHistoryPagination] = useState({
-    page: 1,
-    limit: 20,
-    totalPages: 1,
+  const [historyPagination, setHistoryPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
+  const [historyFilters, setHistoryFilters] = useState({
+    month: format(new Date(), "yyyy-MM"),
+    status: ""
   });
-  const [selectedMonth, setSelectedMonth] = useState(() =>
-    format(new Date(), "yyyy-MM"),
-  );
-  const [reportLoading, setReportLoading] = useState(false);
+  
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+  const [leaveBalance, setLeaveBalance] = useState(null);
+  const [leaveSubmitting, setLeaveSubmitting] = useState(false);
+
   const [isMounted, setIsMounted] = useState(false);
 
-  const columns = useMemo(
-    () => [
-      {
-        accessorKey: "date",
-        header: "Date & Day",
-        cell: ({ row }) => {
-          if (!row.original.date) return null;
-          const d = new Date(row.original.date);
-          return (
-            <div className="font-semibold text-xs py-1">
-              <span className="text-slate-900">
-                {format(d, "MMM dd, yyyy")}
-              </span>
-              <span className="text-slate-400 ml-2 font-medium">
-                {format(d, "EEE")}
-              </span>
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: "status",
-        header: () => <div className="text-center">Status</div>,
-        cell: ({ row }) => {
-          const status = (row.original.status || "UNKNOWN").toLowerCase();
-          return (
-            <div className="text-center">
-              <span
-                className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tight ${
-                  status === "present"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : status === "late"
-                      ? "bg-amber-100 text-amber-700"
-                      : status === "leave"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-rose-100 text-rose-700"
-                }`}
-              >
-                {status}
-              </span>
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: "check_in",
-        header: () => <div className="text-center">Check IN</div>,
-        cell: ({ row }) => (
-          <div className="text-center font-mono opacity-80 text-xs">
-            {row.original.check_in
-              ? format(new Date(row.original.check_in), "hh:mm a")
-              : "—"}
-          </div>
-        ),
-      },
-      {
-        accessorKey: "check_out",
-        header: () => <div className="text-center">Check OUT</div>,
-        cell: ({ row }) => (
-          <div className="text-center font-mono opacity-80 text-xs">
-            {row.original.check_out
-              ? format(new Date(row.original.check_out), "hh:mm a")
-              : "—"}
-          </div>
-        ),
-      },
-      {
-        accessorKey: "duration",
-        header: () => <div className="text-center">Hours</div>,
-        cell: ({ row }) => (
-          <div className="text-center font-bold text-slate-600 tracking-tight text-xs">
-            {row.original.duration_display || "—"}
-          </div>
-        ),
-      },
-      {
-        id: "action",
-        header: () => <div className="text-right">Action</div>,
-        cell: () => (
-          <div className="text-right">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 rounded-full text-slate-400 hover:text-blue-600"
-            >
-              <Info className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-        ),
-      },
-    ],
-    [],
-  );
+
 
   const fetchTodayAttendance = async () => {
     try {
@@ -149,25 +65,21 @@ export default function TeacherSelfAttendancePage() {
     }
   };
 
-  const fetchHistory = async (page = 1, fetchMonth = null) => {
+  const fetchHistory = async (page = 1) => {
     try {
       setHistoryLoading(true);
-      const today = new Date();
-      const month = fetchMonth || selectedMonth;
-
-      // We parse the exact year and month from 'yyyy-MM' to construct correct boundary dates
-      const [year, monthNum] = month.split("-");
+      const targetMonth = historyFilters.month || format(new Date(), "yyyy-MM");
+      const [year, monthNum] = targetMonth.split('-');
       const targetDate = new Date(year, monthNum - 1, 1);
-
+      
       const from_date = format(startOfMonth(targetDate), "yyyy-MM-dd");
       const to_date = format(endOfMonth(targetDate), "yyyy-MM-dd");
-      const res = await teacherPortalService.getSelfAttendanceHistory({
-        page,
-        limit: 20,
-        month,
-        from_date,
-        to_date,
-      });
+      const params = { page, limit: 20, month: targetMonth, from_date, to_date };
+      if (historyFilters.status) {
+        params.status = historyFilters.status;
+      }
+      
+      const res = await teacherPortalService.getSelfAttendanceHistory(params);
       setHistoryData(res.data || []);
       if (res.pagination) setHistoryPagination(res.pagination);
     } catch (error) {
@@ -177,44 +89,79 @@ export default function TeacherSelfAttendancePage() {
     }
   };
 
-  const fetchReport = async (fetchMonth = null) => {
+  const fetchReport = async () => {
     try {
       setReportLoading(true);
-      const month = fetchMonth || selectedMonth;
-      const [year, monthNum] = month.split("-");
+      const month = reportMonth;
+      const [year, monthNum] = month.split('-');
       const targetDate = new Date(year, monthNum - 1, 1);
       const from_date = format(startOfMonth(targetDate), "yyyy-MM-dd");
       const to_date = format(endOfMonth(targetDate), "yyyy-MM-dd");
+      
+      const res = await teacherPortalService.getSelfAttendanceReport({ month, from_date, to_date });
+      
+      // Handle potential { success: true, data: { ... } } wrapper from backend
+      const actualData = res?.data || res;
 
-      const res = await teacherPortalService.getSelfAttendanceReport({
-        month,
-        from_date,
-        to_date,
-      });
-      if (res.stats) {
-        setReportStats(res.stats);
+      if (actualData?.stats) {
+        setReportStats(actualData.stats);
+      }
+      if (actualData?.daily) {
+         setHistoryData(actualData.daily);
       }
     } catch (error) {
       console.error("Failed to fetch report:", error);
-      toast.error("Failed to generate report");
+      toast.error("Failed to fetch report stats");
     } finally {
       setReportLoading(false);
     }
   };
 
-  const handleGenerateReport = () => {
-    fetchReport(selectedMonth);
-    fetchHistory(1, selectedMonth);
+  const fetchLeaveBalance = async () => {
+    try {
+      const res = await teacherPortalService.getLeaveBalance();
+      setLeaveBalance(res.data || res);
+    } catch (error) {
+      console.error("Failed to fetch leave balance:", error);
+    }
   };
+
+  const handleDownloadPDF = () => {
+    toast.success("Preparing ultra-premium PDF Report...");
+    
+    generateSelfAttendanceReportPDF({
+      user,
+      schoolName: user?.school?.name || localStorage.getItem("school_code") || "The Cloud Academy",
+      reportMonth,
+      reportStats,
+      historyData
+    });
+  };
+
+  // 1. Auto-fetch report when reportMonth changes (handles both initial current month & any newly selected month)
+  useEffect(() => {
+    fetchReport();
+  }, [reportMonth]);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [historyFilters.month, historyFilters.status]);
 
   useEffect(() => {
     setIsMounted(true);
     fetchTodayAttendance();
-    fetchHistory();
-    fetchReport();
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const getStatusColor = (status) => {
+    const s = (status || "").toUpperCase();
+    if (s === "PRESENT") return "bg-emerald-100 text-emerald-700 border-emerald-200";
+    if (s === "LATE") return "bg-amber-100 text-amber-700 border-amber-200";
+    if (s === "ABSENT") return "bg-rose-100 text-rose-700 border-rose-200";
+    if (s === "LEAVE") return "bg-blue-100 text-blue-700 border-blue-200";
+    return "bg-slate-100 text-slate-500 border-slate-200";
+  };
 
   const handleCheckIn = async () => {
     setLoading(true);
@@ -224,8 +171,13 @@ export default function TeacherSelfAttendancePage() {
       fetchTodayAttendance();
     } catch (error) {
       console.error(error);
-      const msg = error?.response?.data?.message || "Check-in failed";
-      toast.error(msg);
+      if (error?.response?.status === 409) {
+        toast.error("Already checked in today");
+      } else if (error?.response?.status === 403) {
+        toast.error("You have an approved leave today");
+      } else {
+        toast.error(error?.response?.data?.message || "Check-in failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -239,8 +191,13 @@ export default function TeacherSelfAttendancePage() {
       fetchTodayAttendance();
     } catch (error) {
       console.error(error);
-      const msg = error?.response?.data?.message || "Check-out failed";
-      toast.error(msg);
+      if (error?.response?.status === 409) {
+        toast.error("Already checked out today");
+      } else if (error?.response?.status === 400) {
+        toast.error("Check-in not found for today. Cannot check out.");
+      } else {
+        toast.error(error?.response?.data?.message || "Check-out failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -250,356 +207,335 @@ export default function TeacherSelfAttendancePage() {
   const isCheckedOut = attendanceData?.is_checked_out;
   const canCheckIn = attendanceData?.can_check_in;
   const canCheckOut = attendanceData?.can_check_out;
-  const onDuty = isCheckedIn && !isCheckedOut;
+  const dailyStatus = attendanceData?.status || "NOT_MARKED";
+
+  // Compute countdown block for early check-in (40 min threshold) and strict End Time restriction
+  const shiftStartTime = user?.institute?.settings?.start_time || user?.school?.settings?.start_time || "08:00";
+  const shiftEndTime = user?.institute?.settings?.end_time || user?.school?.settings?.end_time || "15:00";
+  
+  const getCountdownInfo = () => {
+    if (isCheckedIn || dailyStatus === "LEAVE" || !canCheckIn) return { isEarly: false, isClosed: false };
+    
+    try {
+      const [sHrs, sMins] = shiftStartTime.split(":");
+      const startShiftDate = new Date();
+      startShiftDate.setHours(parseInt(sHrs, 10), parseInt(sMins || "0", 10), 0, 0);
+
+      const [eHrs, eMins] = shiftEndTime.split(":");
+      const endShiftDate = new Date();
+      endShiftDate.setHours(parseInt(eHrs, 10), parseInt(eMins || "0", 10), 0, 0);
+      
+      const diffStartMs = startShiftDate - time;
+      const thresholdMs = 40 * 60 * 1000; // 40 minutes before shift
+      
+      // Too early restraint
+      if (diffStartMs > thresholdMs && diffStartMs > 0) {
+        const remainingMs = diffStartMs - thresholdMs;
+        const totalSecs = Math.floor(remainingMs / 1000);
+        const h = Math.floor(totalSecs / 3600);
+        const m = Math.floor((totalSecs % 3600) / 60);
+        const s = totalSecs % 60;
+        
+        const timeStr = [
+          h > 0 ? `${h}h` : null,
+          m > 0 || h > 0 ? `${m}m` : null,
+          `${s}s`
+        ].filter(Boolean).join(" ");
+
+        return { isEarly: true, isClosed: false, timeStr, shiftTime: shiftStartTime };
+      }
+
+      // School closing restraint
+      if (time > endShiftDate) {
+        return { isEarly: false, isClosed: true };
+      }
+
+    } catch (e) {
+      console.error(e);
+    }
+    return { isEarly: false, isClosed: false };
+  };
+
+  const countdown = getCountdownInfo();
+
+  const getDurationDisplay = () => {
+    if (attendanceData?.duration_display) return attendanceData.duration_display;
+    if (attendanceData?.check_in && attendanceData?.check_out) {
+       const diff = new Date(attendanceData.check_out) - new Date(attendanceData.check_in);
+       const m = Math.floor(diff / 60000);
+       return `${Math.floor(m / 60)}h ${m % 60}m`;
+    }
+    // LIVE TIMER if currently checked in
+    if (attendanceData?.check_in && !attendanceData?.check_out) {
+       const diff = time - new Date(attendanceData.check_in);
+       if (diff < 0) return '0h 0m';
+       const m = Math.floor(diff / 60000);
+       return `${Math.floor(m / 60)}h ${m % 60}m`;
+    }
+    return '--';
+  };
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-12">
-      {/* Welcome & Time Banner - Project Style */}
-      <div className="bg-gradient-to-r from-blue-600 to-sky-700 rounded-2xl p-6 text-white relative overflow-hidden shadow-lg shadow-blue-100">
-        <div className="absolute right-4 top-4 opacity-10">
-          <Clock className="w-32 h-32" />
-        </div>
-        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center text-3xl font-extrabold text-white flex-shrink-0 backdrop-blur-sm">
-              <Calendar className="w-8 h-8" />
-            </div>
+      {/* SECTION 1 - Today's Card */}
+      <Card className="border border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
+        <CardHeader className="pb-4 border-b border-slate-50 bg-slate-50/30">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-white/70 text-xs mb-0.5 tracking-wider uppercase font-bold">
-                My Attendance
-              </p>
-              <h1 className="text-2xl font-extrabold tracking-tight">
-                Daily Presence & Duty
-              </h1>
-              <div className="flex flex-wrap gap-2 mt-2">
-                <Badge className="bg-white/20 text-white border-0 text-xs font-bold">
-                  {isMounted
-                    ? format(time, "EEEE, dd MMMM")
-                    : "Loading date..."}
-                </Badge>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/30 rounded-full text-[10px] font-bold">
-                  <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />{" "}
-                  Live Tracking Active
-                </div>
+              <CardTitle className="text-lg font-bold text-slate-800">Today&apos;s Attendance</CardTitle>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs text-slate-500 font-medium tracking-tight">
+                  {isMounted ? format(time, "EEEE, MMMM do, yyyy") : "Loading date..."}
+                </span>
+                <span className="text-xs font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                  {isMounted ? format(time, "hh:mm:ss a") : "--:--:--"}
+                </span>
               </div>
             </div>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex flex-col items-center min-w-[180px]">
-            <p className="text-[10px] text-white/60 font-black uppercase tracking-widest mb-1">
-              Current Server Time
-            </p>
-            <p className="text-3xl font-black text-white font-mono tracking-tighter">
-              {isMounted ? format(time, "hh:mm:ss a") : "--:--:--"}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          {
-            label: "Punctuality",
-            value: reportStats
-              ? `${reportStats.attendance_percentage}%`
-              : "--%",
-            icon: TrendingUp,
-            color: "text-blue-600",
-            bg: "bg-blue-50",
-          },
-          {
-            label: "Monthly Presence",
-            value: reportStats
-              ? `${reportStats.present}/${reportStats.total_days}`
-              : "--/--",
-            icon: CheckCircle2,
-            color: "text-emerald-600",
-            bg: "bg-emerald-50",
-          },
-          {
-            label: "Late Comings",
-            value: reportStats
-              ? String(reportStats.late).padStart(2, "0")
-              : "--",
-            icon: Clock,
-            color: "text-amber-600",
-            bg: "bg-amber-50",
-          },
-          {
-            label: "Absences",
-            value: reportStats
-              ? String(reportStats.absent).padStart(2, "0")
-              : "--",
-            icon: AlertCircle,
-            color: "text-rose-600",
-            bg: "bg-rose-50",
-          },
-        ].map((s) => {
-          const Icon = s.icon;
-          return (
-            <div
-              key={s.label}
-              className={`${s.bg} rounded-xl p-4 border border-white shadow-sm`}
-            >
-              <Icon className={`w-5 h-5 ${s.color} mb-2`} />
-              <p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p>
-              <p className="text-xs text-slate-500 mt-0.5 font-bold">
-                {s.label}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Attendance Action */}
-        <Card className="lg:col-span-2 border border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
-          <CardHeader className="pb-4 border-b border-slate-50">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg font-bold text-slate-800">
-                  Attendance Log
-                </CardTitle>
-                <div className="flex items-center gap-2 mt-1">
-                  <MapPin className="w-3 h-3 text-slate-400" />
-                  <span className="text-xs text-slate-500 font-medium tracking-tight">
-                    Main Campus Gate · Designated Area
-                  </span>
-                </div>
-              </div>
-              <Badge
-                className={`uppercase text-[10px] font-black px-2.5 py-1 tracking-wider ${onDuty ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200"}`}
-              >
-                {onDuty ? "On Duty" : "Off Duty"}
+            <div className="flex flex-col items-end gap-2">
+              <Badge className={`uppercase text-[10px] font-black px-2.5 py-1 tracking-wider ${getStatusColor(dailyStatus)}`}>
+                {dailyStatus}
               </Badge>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  fetchLeaveBalance();
+                  setLeaveModalOpen(true);
+                }}
+                className="h-7 text-[10px] border-blue-200 text-blue-600 hover:bg-blue-50"
+              >
+                Apply Leave
+              </Button>
             </div>
-          </CardHeader>
-          <CardContent className="py-10 text-center">
-            <AnimatePresence mode="wait">
-              {loadingInitial ? (
-                <div className="py-10 flex justify-center">
-                  <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
-                </div>
-              ) : (
-                <motion.div
-                  key={onDuty ? "in" : "out"}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="flex flex-col items-center gap-6"
-                >
-                  <div
-                    className={`w-28 h-28 rounded-3xl flex items-center justify-center transition-all shadow-inner ${onDuty ? "bg-emerald-50 text-emerald-500" : "bg-blue-50 text-blue-500"}`}
-                  >
-                    {onDuty ? (
-                      <CheckCircle2 className="w-14 h-14" />
-                    ) : (
-                      <Clock className="w-14 h-14" />
-                    )}
-                  </div>
+          </div>
+        </CardHeader>
+        <CardContent className="py-6">
+          {attendanceData?.leave && (
+            <div className="mb-6 bg-blue-50 border border-blue-200 p-4 rounded-xl flex gap-3">
+              <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-blue-800 mb-1">Leave Applied</p>
+                <p className="text-[11px] font-medium text-blue-700 leading-relaxed">
+                  You are marked on leave for today. Remarks: {attendanceData.leave.remarks || 'N/A'}
+                </p>
+              </div>
+            </div>
+          )}
 
-                  <div>
-                    <h3 className="text-xl font-extrabold text-slate-900 mb-1 tracking-tight">
-                      {onDuty
-                        ? "You are currently Checked In"
-                        : isCheckedOut
-                          ? "You have Checked Out for today"
-                          : "Mark your Check-In"}
-                    </h3>
-                    {onDuty && attendanceData?.check_in ? (
-                      <p className="text-sm text-slate-500 font-medium">
-                        Session started at{" "}
-                        <span className="text-emerald-600 font-bold">
-                          {format(new Date(attendanceData.check_in), "hh:mm a")}
-                        </span>
-                      </p>
-                    ) : (
-                      <p className="text-sm text-slate-500 font-medium tracking-tight">
-                        {isCheckedOut
-                          ? "Have a great rest of your day!"
-                          : "Capture your presence for the morning shift"}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex gap-4">
-                    {(!isCheckedIn || canCheckIn) && (
-                      <Button
-                        onClick={handleCheckIn}
-                        disabled={loading || !canCheckIn}
-                        className={`h-14 px-10 rounded-xl text-sm font-bold tracking-tight transition-all active:scale-95 shadow-md bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50`}
-                      >
-                        <LogIn className="w-4 h-4 mr-2" /> MARK CHECK IN
-                      </Button>
-                    )}
-                    {(onDuty || canCheckOut) && (
-                      <Button
-                        onClick={handleCheckOut}
-                        disabled={loading || !canCheckOut}
-                        className={`h-14 px-10 rounded-xl text-sm font-bold tracking-tight transition-all active:scale-95 shadow-md bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-50`}
-                      >
-                        <LogOut className="w-4 h-4 mr-2" /> MARK CHECK OUT
-                      </Button>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </CardContent>
-        </Card>
-
-        {/* Schedule Sidebar */}
-        <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-blue-600" /> Today&apos;s Schedule
-            </h3>
-            <div className="space-y-3">
-              {[
-                {
-                  time: "08:30 AM",
-                  task: "Class 9 Math (A)",
-                  room: "L-01",
-                  active: true,
-                },
-                {
-                  time: "11:15 AM",
-                  task: "Physics Lab (B)",
-                  room: "Lab-3",
-                  active: false,
-                },
-                {
-                  time: "01:45 PM",
-                  task: "Staff Meeting",
-                  room: "Conf. Hall",
-                  active: false,
-                },
-              ].map((item, idx) => (
-                <div
-                  key={idx}
-                  className={`p-3 rounded-xl border border-transparent transition-all ${item.active ? "bg-blue-50 border-blue-100" : "bg-slate-50"}`}
-                >
-                  <div className="flex justify-between items-start">
-                    <p
-                      className={`text-[10px] font-bold ${item.active ? "text-blue-600" : "text-slate-400"}`}
-                    >
-                      {item.time} · {item.room}
-                    </p>
-                    {item.active && (
-                      <Badge className="bg-blue-600 text-[8px] h-4">NOW</Badge>
-                    )}
-                  </div>
-                  <p
-                    className={`text-sm font-bold tracking-tight mt-0.5 ${item.active ? "text-blue-900" : "text-slate-700"}`}
-                  >
-                    {item.task}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+            {/* Metric Displays */}
+            <div className="col-span-1 md:col-span-2 grid grid-cols-3 gap-4 border-r border-slate-100 pr-4">
+              <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Check In</p>
+                <p className="font-mono font-black text-slate-700">
+                   {attendanceData?.check_in ? format(new Date(attendanceData.check_in), "hh:mm a") : '--:--'}
+                </p>
+              </div>
+              <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Check Out</p>
+                <p className="font-mono font-black text-slate-700">
+                   {attendanceData?.check_out ? format(new Date(attendanceData.check_out), "hh:mm a") : '--:--'}
+                </p>
+              </div>
+              <div className="text-center p-3 bg-blue-50 rounded-xl border border-blue-100">
+                <p className="text-[10px] uppercase font-bold text-blue-500 mb-1">Duration</p>
+                <div className="flex flex-col items-center">
+                  <p className="font-mono font-black text-blue-700">
+                     {getDurationDisplay()}
                   </p>
+                  {attendanceData?.check_in && !attendanceData?.check_out && (
+                    <span className="text-[9px] font-bold text-blue-500 animate-pulse mt-0.5 w-max">🔴 LIVE TIMER</span>
+                  )}
                 </div>
-              ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="col-span-1 flex flex-col gap-3 justify-center items-center">
+              <AnimatePresence mode="wait">
+                {loadingInitial ? (
+                  <div className="py-4 flex justify-center">
+                    <div className="w-6 h-6 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+                  </div>
+                ) : (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex flex-col gap-3 w-full max-w-[200px]"
+                  >
+                    <div className="relative w-full">
+                      {countdown.isEarly && (
+                         <div className="absolute -top-7 left-1/2 transform -translate-x-1/2 flex justify-center z-10 w-max">
+                           <div className="bg-slate-800 text-white text-[10px] font-mono px-3 py-1 rounded-full shadow-lg border border-slate-700 animate-pulse">
+                             ⏱️ Opens in {countdown.timeStr}
+                           </div>
+                         </div>
+                      )}
+                      {countdown.isClosed && (
+                         <div className="absolute -top-7 left-1/2 transform -translate-x-1/2 flex justify-center z-10 w-max">
+                           <div className="bg-rose-100 text-rose-700 font-bold text-[10px] uppercase tracking-wider px-3 py-1 rounded-full shadow-sm border border-rose-200">
+                             School Closed
+                           </div>
+                         </div>
+                      )}
+                      <Button 
+                        onClick={handleCheckIn}
+                        disabled={loading || !canCheckIn || countdown.isEarly || countdown.isClosed}
+                        className="w-full h-10 rounded-lg text-xs font-bold tracking-tight shadow-sm bg-emerald-600 hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-200 text-white disabled:opacity-50"
+                      >
+                        {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><LogIn className="w-4 h-4 mr-2" /> MARK CHECK IN</>}
+                      </Button>
+                    </div>
+                    <Button 
+                      onClick={handleCheckOut}
+                      disabled={loading || !canCheckOut}
+                      className="w-full h-10 rounded-lg text-xs font-bold tracking-tight shadow-sm bg-rose-600 hover:bg-rose-700 focus:ring-2 focus:ring-rose-200 text-white disabled:opacity-50"
+                    >
+                      {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><LogOut className="w-4 h-4 mr-2" /> MARK CHECK OUT</>}
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex gap-3">
-            <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-            <p className="text-[11px] font-medium text-amber-800 leading-relaxed italic">
-              Remember to Check Out before leaving the premises. Late comings
-              will be tracked automatically.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Detailed Monthly Report Stats */}
+      {/* SECTION 2 - Monthly Stats */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 border-b border-slate-50 pb-4">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-blue-600" />
-            <h2 className="text-sm font-bold text-slate-800">
-              Monthly Performance Report
-            </h2>
-          </div>
-          <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="text-xs px-3 py-2 rounded-lg border border-slate-200 text-slate-700 bg-white font-bold outline-none focus:ring-2 focus:ring-blue-100"
-            />
-            <Button
-              onClick={handleGenerateReport}
-              disabled={reportLoading}
-              className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 shadow-sm font-bold transition-all"
-            >
-              {reportLoading ? "Generating..." : "Generate Report"}
-            </Button>
-          </div>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-50">
+           <div className="flex items-center gap-2">
+             <TrendingUp className="w-5 h-5 text-blue-600" />
+             <h2 className="text-sm font-bold text-slate-800">Monthly Stats Overview</h2>
+           </div>
+           <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200 shadow-sm">
+             <MonthPicker 
+               value={reportMonth} 
+               onChange={(val) => setReportMonth(val)} 
+             />
+             <Button 
+                onClick={handleDownloadPDF} 
+                disabled={reportLoading}
+                className="h-8 text-xs bg-rose-600 hover:bg-rose-700 text-white rounded-lg px-4 shadow-sm font-bold transition-all flex items-center gap-1.5"
+             >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                Download PDF
+             </Button>
+           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 divide-y md:divide-y-0 md:divide-x divide-slate-100">
-          <div className="px-2 text-center">
-            <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">
-              Avg Check-In
-            </p>
-            <p className="text-xl font-black text-slate-700 font-mono">
-              {reportStats?.avg_check_in || "--:--"}
-            </p>
-          </div>
-          <div className="px-2 text-center">
-            <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">
-              Avg Check-Out
-            </p>
-            <p className="text-xl font-black text-slate-700 font-mono">
-              {reportStats?.avg_check_out || "--:--"}
-            </p>
-          </div>
-          <div className="px-2 text-center">
-            <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">
-              Avg Work Hours
-            </p>
-            <p className="text-xl font-black text-blue-600 font-mono">
-              {reportStats?.avg_working_hours || "--"}
-            </p>
-          </div>
-          <div className="px-2 text-center">
-            <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">
-              Total Late (Mins)
-            </p>
-            <p className="text-xl font-black text-amber-600 font-mono">
-              {reportStats?.total_late_minutes || "0"}
-            </p>
-          </div>
-          <div className="px-2 text-center">
-            <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">
-              Total Overtime
-            </p>
-            <p className="text-xl font-black text-emerald-600 font-mono">
-              {reportStats?.total_overtime_minutes || "0"}
-              <span className="text-xs ml-1 text-slate-400">m</span>
-            </p>
-          </div>
-        </div>
-      </div>
 
-      {/* History - Professional Table Style */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
-          <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-            <History className="w-4 h-4 text-blue-600" /> Recent Logbook
-          </h2>
-          <button className="text-[11px] font-bold text-blue-600 hover:underline">
-            Download Report
-          </button>
-        </div>
-        {historyLoading ? (
+        {reportLoading ? (
           <div className="py-10 flex justify-center">
             <div className="w-6 h-6 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
           </div>
         ) : (
-          <DataTable
-            columns={columns}
-            data={historyData}
-            emptyMessage="No recent check-ins found."
-          />
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-100/50">
+                <p className="text-xs font-bold text-slate-500 mb-1">Attendance %</p>
+                <p className="text-2xl font-black text-blue-600">{reportStats?.attendance_percentage ?? '--'}%</p>
+              </div>
+              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100/50">
+                <p className="text-xs font-bold text-slate-500 mb-1">Present Days</p>
+                <p className="text-2xl font-black text-emerald-600">
+                  {reportStats?.present ?? '--'} <span className="text-xs text-slate-400 font-medium">/ {reportStats?.total_days ?? '--'}</span>
+                </p>
+              </div>
+              <div className="bg-amber-50 rounded-xl p-4 border border-amber-100/50">
+                <p className="text-xs font-bold text-slate-500 mb-1">Late Comings</p>
+                <p className="text-2xl font-black text-amber-600">{reportStats?.late ?? '--'}</p>
+              </div>
+              <div className="bg-rose-50 rounded-xl p-4 border border-rose-100/50">
+                <p className="text-xs font-bold text-slate-500 mb-1">Absent Days</p>
+                <p className="text-2xl font-black text-rose-600">{reportStats?.absent ?? '--'}</p>
+              </div>
+              <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100/50">
+                <p className="text-xs font-bold text-slate-500 mb-1">On Leave</p>
+                <p className="text-2xl font-black text-indigo-600">{reportStats?.on_leave ?? '--'}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 divide-y md:divide-y-0 md:divide-x divide-slate-100 pt-2 border-t border-slate-50">
+              <div className="px-2 text-center md:text-left">
+                 <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">Avg Check-In</p>
+                 <p className="text-lg font-black text-slate-700 font-mono">{reportStats?.avg_check_in || '--:--'}</p>
+              </div>
+              <div className="px-2 text-center md:text-left">
+                 <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">Avg Check-Out</p>
+                 <p className="text-lg font-black text-slate-700 font-mono">{reportStats?.avg_check_out || '--:--'}</p>
+              </div>
+              <div className="px-2 text-center md:text-left">
+                 <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">Avg Work Hours</p>
+                 <p className="text-lg font-black text-blue-600 font-mono">{reportStats?.avg_working_hours || '--'}</p>
+              </div>
+              <div className="px-2 text-center md:text-left">
+                 <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">Total Late (Mins)</p>
+                 <p className="text-lg font-black text-amber-600 font-mono">{reportStats?.total_late_minutes || '0'}</p>
+              </div>
+              <div className="px-2 text-center md:text-left">
+                 <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">Total Overtime</p>
+                 <p className="text-lg font-black text-emerald-600 font-mono">{reportStats?.total_overtime_minutes || '0'}<span className="text-xs ml-1 text-slate-400">m</span></p>
+              </div>
+            </div>
+          </div>
         )}
       </div>
+
+      {/* SECTION 3 - History Logbook Table (Extracted Component) */}
+      <AttendanceHistoryTable 
+        historyData={historyData}
+        loading={historyLoading}
+        filters={historyFilters}
+        setFilters={setHistoryFilters}
+      />
+
+      {/* Basic Leave Application Dialog Placeholder */}
+      <Dialog open={leaveModalOpen} onOpenChange={setLeaveModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Apply for Leave</DialogTitle>
+            <DialogDescription>
+              Submit your day-off requests here across the organization.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+             {leaveBalance ? (
+               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2 mb-4">
+                 <p className="text-xs font-bold text-slate-600">Available Balance:</p>
+                 {Array.isArray(leaveBalance) ? (
+                   leaveBalance.map((b, i) => (
+                     <div key={i} className="flex justify-between items-center text-xs">
+                       <span className="text-slate-500 font-medium">{b.leave_type || b.type || 'Leave'}</span>
+                       <span className="font-bold">{b.remaining ?? b.balance ?? b.available ?? b} days left</span>
+                     </div>
+                   ))
+                 ) : (
+                   Object.entries(leaveBalance).map(([key, val], i) => {
+                     // Ignore metadata keys if any
+                     if (key === 'success' || key === 'message' || key === 'data') return null;
+                     const name = typeof val === 'object' && val !== null ? (val.leave_type || key) : key;
+                     const amount = typeof val === 'object' && val !== null ? (val.remaining ?? val.balance ?? val.available ?? 0) : val;
+                     return (
+                       <div key={i} className="flex justify-between items-center text-xs">
+                         <span className="text-slate-500 font-medium capitalize">{name.replace(/_/g, ' ')}</span>
+                         <span className="font-bold flex items-center justify-end">{amount} days left</span>
+                       </div>
+                     );
+                   })
+                 )}
+               </div>
+             ) : (
+               <div className="text-xs text-slate-500 p-4 text-center">Loading balances...</div>
+             )}
+             <p className="text-xs text-slate-400 italic">Form integration goes here based on your actual Leave Application component payload requirements.</p>
+          </div>
+          <div className="flex justify-end pt-4">
+            <Button variant="outline" size="sm" onClick={() => setLeaveModalOpen(false)}>Cancel</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+

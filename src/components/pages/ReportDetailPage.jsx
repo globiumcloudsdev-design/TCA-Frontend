@@ -24,6 +24,8 @@ import InputField from '@/components/common/InputField';
 import SelectField from '@/components/common/SelectField';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import FeeCollectionDummyApp from './FeeCollectionDummyApp';
+import PayrollDummyApp from './PayrollDummyApp';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REPORT TYPE CONFIGS
@@ -87,6 +89,12 @@ const REPORT_CONFIGS = {
       { key: 'status', label: 'Status' },
     ],
     permission: 'reports.exam',
+  },
+  payroll: {
+    title: 'Payroll Report',
+    filters: [],
+    columns: [],
+    permission: 'reports.payroll',
   },
 };
 
@@ -396,7 +404,7 @@ export default function ReportDetailPage({ reportType: propReportType }) {
       
       return null;
     },
-    enabled: !!currentInstitute?.id,
+    enabled: !!currentInstitute?.id && reportType !== 'fee' && reportType !== 'payroll',
   });
 
   // Debug logging (AFTER all hooks are declared)
@@ -474,95 +482,98 @@ export default function ReportDetailPage({ reportType: propReportType }) {
   const totalRecords = reportData?.data?.total_records || 0;
 
   return (
-    <div className="space-y-6">
-      {/* Debug Info */}
-      <div className="text-xs text-muted-foreground border rounded p-2 bg-slate-50 space-y-1">
-        <div>📊 Classes: {classesData?.data?.length || 0} loaded</div>
-        <div>📚 Sections: {sections?.length || 0} loaded</div>
-        <div>📝 Exams: {examsData?.data?.length || 0} loaded</div>
-        <div>🔧 Report: {reportLoading ? '⏳ Loading...' : 'Ready'}</div>
-      </div>
+    <div className="space-y-6 animate-in fade-in duration-500">
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="rounded p-1 hover:bg-accent">
-            <ChevronLeft size={20} />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold">{config.title}</h1>
-            <p className="text-sm text-muted-foreground">{totalRecords} total records</p>
-          </div>
-        </div>
-        <Button
-          onClick={handleExport}
-          disabled={exporting || !reportData}
-          variant="outline"
-          className="gap-2"
-        >
-          {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-          Export as Excel
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <ReportFilters
-        reportType={reportType}
-        filters={filters}
-        onFilterChange={handleFilterChange}
-        options={{
-          classes: Array.isArray(classesData?.data) ? classesData.data : [],
-        }}
-        loading={reportLoading}
-        sections={sections || []}
-        exams={Array.isArray(examsData?.data) ? examsData.data : examsData || []}
-        onClassChange={(classId) => {
-          console.log('📍 Class changed to:', classId);
-        }}
-      />
-
-      {/* Summary Stats */}
-      {reportData?.data?.summary && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {Object.entries(reportData.data.summary).map(([key, value]) => (
-            <div key={key} className="rounded-lg border bg-card p-3">
-              <p className="text-xs text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</p>
-              <p className="text-lg font-semibold">{value}</p>
+      {/* Header - Only show if not fee or payroll report (they have their own premium headers) */}
+      {reportType !== 'fee' && reportType !== 'payroll' && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={() => router.back()} className="rounded p-1 hover:bg-accent transition-colors">
+              <ChevronLeft size={20} />
+            </button>
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">{config.title}</h1>
+              <p className="text-sm text-muted-foreground font-medium">{totalRecords} total records found</p>
             </div>
-          ))}
+          </div>
+          <Button
+            onClick={handleExport}
+            disabled={exporting || !reportData}
+            variant="outline"
+            className="gap-2 border-slate-200 shadow-sm hover:shadow-md transition-all active:scale-95"
+          >
+            {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Export as Excel
+          </Button>
         </div>
       )}
 
-      {/* DataTable */}
-      <div className="rounded-lg border bg-card">
-        {reportLoading ? (
-          <div className="flex items-center justify-center py-10">
-            <Loader2 size={20} className="animate-spin" />
-          </div>
-        ) : recordCount === 0 ? (
-          <div className="py-10 text-center text-muted-foreground">
-            <p>No data found</p>
-            <p className="text-xs">Try adjusting your filters</p>
-          </div>
-        ) : (
-          <DataTable
-            columns={columns}
-            data={reportData?.data?.records || []}
-            pagination={{
-              skip: filters.skip,
-              limit: filters.limit,
-              total: totalRecords,
-              onSkipChange: (skip) => setFilters((prev) => ({ ...prev, skip })),
-              onLimitChange: (limit) => setFilters((prev) => ({ ...prev, limit })),
+      {reportType === 'fee' ? (
+        <FeeCollectionDummyApp />
+      ) : reportType === 'payroll' ? (
+        <PayrollDummyApp />
+      ) : (
+        <>
+          {/* Filters */}
+          <ReportFilters
+            reportType={reportType}
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            options={{
+              classes: Array.isArray(classesData?.data) ? classesData.data : [],
+            }}
+            loading={reportLoading}
+            sections={sections || []}
+            exams={Array.isArray(examsData?.data) ? examsData.data : examsData || []}
+            onClassChange={(classId) => {
+              console.log('📍 Class changed to:', classId);
             }}
           />
-        )}
-      </div>
 
-      {/* Footer Info */}
-      <div className="text-xs text-muted-foreground">
-        Showing {filters.skip + 1} to {Math.min(filters.skip + filters.limit, totalRecords)} of {totalRecords} records
-      </div>
+          {/* Summary Stats */}
+          {reportData?.data?.summary && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {Object.entries(reportData.data.summary).map(([key, value]) => (
+                <div key={key} className="rounded-lg border bg-card p-3">
+                  <p className="text-xs text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</p>
+                  <p className="text-lg font-semibold">{value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* DataTable */}
+          <div className="rounded-lg border bg-card">
+            {reportLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 size={20} className="animate-spin" />
+              </div>
+            ) : recordCount === 0 ? (
+              <div className="py-10 text-center text-muted-foreground">
+                <p>No data found</p>
+                <p className="text-xs">Try adjusting your filters</p>
+              </div>
+            ) : (
+              <DataTable
+                columns={columns}
+                data={reportData?.data?.records || []}
+                pagination={{
+                  skip: filters.skip,
+                  limit: filters.limit,
+                  total: totalRecords,
+                  onSkipChange: (skip) => setFilters((prev) => ({ ...prev, skip })),
+                  onLimitChange: (limit) => setFilters((prev) => ({ ...prev, limit })),
+                }}
+              />
+            )}
+          </div>
+
+          {/* Footer Info */}
+          <div className="text-xs text-muted-foreground">
+            Showing {filters.skip + 1} to {Math.min(filters.skip + filters.limit, totalRecords)} of {totalRecords} records
+          </div>
+        </>
+      )}
     </div>
   );
 }

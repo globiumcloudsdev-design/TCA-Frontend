@@ -150,5 +150,58 @@ export const leaveRequestService = {
       console.error('Error marking leave:', error);
       throw error;
     }
+  },
+
+  /**
+   * Get all leave types for institute
+   */
+  getLeaveTypes: async (filters = {}) => {
+    try {
+      const queryString = buildQuery(filters);
+      const response = await api.get(`/leave-types${queryString}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching leave types:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Create new leave type
+   */
+  createLeaveType: async (leaveTypeData) => {
+    try {
+      const response = await api.post('/leave-types', leaveTypeData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating leave type:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update leave type
+   */
+  updateLeaveType: async (id, leaveTypeData) => {
+    try {
+      const response = await api.put(`/leave-types/${id}`, leaveTypeData);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating leave type ${id}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Delete leave type
+   */
+  deleteLeaveType: async (id) => {
+    try {
+      const response = await api.delete(`/leave-types/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting leave type ${id}:`, error);
+      throw error;
+    }
   }
 };

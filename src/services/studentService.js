@@ -27,22 +27,44 @@ function normalizeFilters(filters = {}, type = 'school') {
   const base = {
     page: filters.page ?? 1,
     limit: filters.limit ?? 20,
-    search: filters.search,
-    is_active: filters.is_active,
-    branch_id: filters.branch_id,
   };
+
+  // Only add search and is_active if they're explicitly set (not undefined)
+  if (filters.search !== undefined && filters.search !== null && filters.search !== '') {
+    base.search = filters.search;
+  }
+  if (filters.is_active !== undefined && filters.is_active !== null) {
+    base.is_active = filters.is_active;
+  }
+
+  // Add type-specific filters
   switch (type) {
     case 'coaching':
-      return { ...base, course_id: filters.course_id || filters.class_id, batch_id: filters.batch_id || filters.section_id };
+      if (filters.course_id) base.course_id = filters.course_id;
+      if (filters.batch_id) base.batch_id = filters.batch_id;
+      break;
     case 'academy':
-      return { ...base, program_id: filters.program_id || filters.class_id, batch_id: filters.batch_id || filters.section_id };
+      if (filters.program_id) base.program_id = filters.program_id;
+      if (filters.batch_id) base.batch_id = filters.batch_id;
+      break;
     case 'college':
-      return { ...base, department_id: filters.department_id || filters.class_id, program_id: filters.program_id, semester_id: filters.semester_id || filters.section_id };
+      if (filters.department_id) base.department_id = filters.department_id;
+      if (filters.program_id) base.program_id = filters.program_id;
+      if (filters.semester_id) base.semester_id = filters.semester_id;
+      break;
     case 'university':
-      return { ...base, faculty_id: filters.faculty_id, department_id: filters.department_id || filters.class_id, program_id: filters.program_id, semester_id: filters.semester_id };
+      if (filters.faculty_id) base.faculty_id = filters.faculty_id;
+      if (filters.department_id) base.department_id = filters.department_id;
+      if (filters.program_id) base.program_id = filters.program_id;
+      if (filters.semester_id) base.semester_id = filters.semester_id;
+      break;
     default: // school
-      return { ...base, class_id: filters.class_id, section_id: filters.section_id, academic_year_id: filters.academic_year_id };
+      if (filters.academic_year_id) base.academic_year_id = filters.academic_year_id;
+      if (filters.class_id) base.class_id = filters.class_id;
+      if (filters.section_id) base.section_id = filters.section_id;
   }
+
+  return base;
 }
 
 export const studentService = {

@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
-import { studentService } from '@/services';
+import { studentService, academicYearService, classService } from '@/services';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
@@ -110,7 +110,6 @@ const flattenStudent = (s) => {
   return flat;
 };
 
-
 export default function StudentsPage({ type }) {
   const router = useRouter();
   const qc = useQueryClient();
@@ -159,15 +158,22 @@ export default function StudentsPage({ type }) {
 
   const remove = useMutation({
     mutationFn: async (id) => {
+      console.log('🚀 Deleting student:', { id, type });
       return await studentService.delete(id, type);
     },
     onSuccess: () => {
-      toast.success('Deleted');
-      qc.invalidateQueries({ queryKey: ['students', type] });
+      toast.success('Student deleted successfully');
+      console.log('✅ Student deleted, invalidating cache...');
+      // Invalidate with exact query key including filters
+      qc.invalidateQueries({ queryKey: ['students', type, filters] });
+      // Also clear all students queries for this type as fallback
+      qc.invalidateQueries({ queryKey: ['students'] });
       setDeleting(null);
     },
     onError: (error) => {
-      toast.error(error.message || 'Failed to delete');
+      console.error('❌ Delete error:', error);
+      const errorMsg = error?.response?.data?.message || error?.message || 'Failed to delete student';
+      toast.error(errorMsg);
     }
   });
 
@@ -590,7 +596,6 @@ function displayFeeStatus(status) {
     </span>
   );
 }
-
 
 
 

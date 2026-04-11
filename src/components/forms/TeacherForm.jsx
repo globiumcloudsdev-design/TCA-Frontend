@@ -1,4 +1,4 @@
-// src/components/forms/TeacherForm.jsx (COMPLETE FIXED VERSION)
+// src/components/forms/TeacherForm.jsx (UPDATED WITH ALL FEATURES)
 
 'use client';
 
@@ -19,18 +19,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { X, Plus, Upload } from 'lucide-react';
+import { X, Plus, Upload, Eye, EyeOff } from 'lucide-react';
 import { 
   GENDER_OPTIONS, 
   RELIGION_OPTIONS, 
   BLOOD_GROUP_OPTIONS,
   TEACHER_QUALIFICATION_OPTIONS,
   TEACHER_DESIGNATION_OPTIONS,
-  TEACHER_DEPARTMENT_OPTIONS,
-  TEACHER_STATUS_OPTIONS,
   EMPLOYMENT_TYPE_OPTIONS,
   DOCUMENT_TYPES,
-  RELATIONSHIP_OPTIONS
+  RELATIONSHIP_OPTIONS,
+  TEACHER_STATUS_OPTIONS
 } from '@/constants/index';
 import CnicInput from '../common/CnicInput';
 import PhoneInputField from '../common/PhoneInput';
@@ -38,6 +37,15 @@ import PhoneInputField from '../common/PhoneInput';
 // Constants
 const MAX_FILE_MB = 10;
 const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
+
+// Contract Type Options
+const CONTRACT_TYPE_OPTIONS = [
+  { value: 'permanent', label: 'Permanent' },
+  { value: 'contract', label: 'Contract Based' },
+  { value: 'probation', label: 'Probation Period' },
+  { value: 'part_time', label: 'Part Time' },
+  { value: 'visiting', label: 'Visiting Faculty' },
+];
 
 // Validation Schemas
 const documentSchema = z.object({
@@ -73,16 +81,16 @@ const teacherSchema = z.object({
   permanent_address: z.string().optional(),
   city: z.string().optional(),
   
-  // Professional - REMOVED SUBJECTS
+  // Professional
   qualification: z.string().optional(),
   specialization: z.string().optional(),
   experience_years: z.string().optional(),
   previous_institution: z.string().optional(),
   
-  // Employment
+  // Employment - REMOVED DEPARTMENT
   designation: z.string().optional(),
-  department: z.string().optional(),
   employment_type: z.string().optional(),
+  contract_type: z.string().optional(),
   joining_date: z.string().optional(),
   contract_start_date: z.string().optional(),
   contract_end_date: z.string().optional(),
@@ -109,6 +117,38 @@ const teacherSchema = z.object({
   documents: z.array(documentSchema).default([]),
 });
 
+// Password Input Component with Eye Icon
+const PasswordInputField = ({ label, name, register, error, placeholder, required }) => {
+  const [showPassword, setShowPassword] = useState(false);
+  
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={name} className="text-sm font-medium">
+        {label} {required && <span className="text-red-500">*</span>}
+      </Label>
+      <div className="relative">
+        <input
+          id={name}
+          type={showPassword ? 'text' : 'password'}
+          {...register(name)}
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${
+            error ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
+          } dark:bg-gray-800 dark:text-white pr-10`}
+          placeholder={placeholder}
+        />
+        <button
+          type="button"
+          onClick={() => setShowPassword(!showPassword)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+        >
+          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </div>
+      {error && <p className="text-sm text-red-500">{error.message}</p>}
+    </div>
+  );
+};
+
 export default function TeacherForm({
   defaultValues = {},
   onSubmit,
@@ -129,6 +169,7 @@ export default function TeacherForm({
         status: 'active',
         send_email: true,
         documents: [],
+        contract_type: 'permanent',
       };
     }
 
@@ -163,10 +204,10 @@ export default function TeacherForm({
       experience_years: teacherDetails.experience_years || '',
       previous_institution: teacherDetails.previous_institution || '',
       
-      // Employment
+      // Employment - REMOVED DEPARTMENT
       designation: teacherDetails.designation || '',
-      department: teacherDetails.department || '',
       employment_type: teacherDetails.employment_type || '',
+      contract_type: teacherDetails.contract_type || 'permanent',
       joining_date: teacherDetails.joining_date || '',
       contract_start_date: teacherDetails.contract_start_date || '',
       contract_end_date: teacherDetails.contract_end_date || '',
@@ -209,8 +250,13 @@ export default function TeacherForm({
     defaultValues: transformedDefaultValues,
   });
 
-  // Watch documents for dynamic UI
+  // Watch values for conditional rendering
   const watchDocuments = watch('documents');
+  const watchContractType = watch('contract_type');
+  const watchEmploymentType = watch('employment_type');
+
+  // Check if contract end date should be shown
+  const showContractEndDate = watchContractType === 'contract' || watchContractType === 'probation';
 
   // Handle document upload
   const handleDocumentUpload = (e, index) => {
@@ -287,7 +333,6 @@ export default function TeacherForm({
       ...doc,
       type: doc.type === 'other' ? doc.customType : doc.type,
       customType: undefined,
-      // Don't send file object to API
       file: undefined,
     }));
     
@@ -295,7 +340,6 @@ export default function TeacherForm({
     const formattedData = {
       ...data,
       documents: formattedDocuments,
-      // Ensure numbers are numbers
       salary: data.salary ? Number(data.salary) : null,
       experience_years: data.experience_years ? Number(data.experience_years) : null,
     };
@@ -512,7 +556,7 @@ export default function TeacherForm({
           </Card>
         </TabsContent>
 
-        {/* Tab 2: Professional Information - REMOVED SUBJECTS */}
+        {/* Tab 2: Professional Information */}
         <TabsContent value="professional">
           <Card>
             <CardContent className="p-4 sm:p-6">
@@ -560,7 +604,7 @@ export default function TeacherForm({
           </Card>
         </TabsContent>
 
-        {/* Tab 3: Employment Information */}
+        {/* Tab 3: Employment Information - REMOVED DEPARTMENT, ADDED CONTRACT TYPE */}
         <TabsContent value="employment">
           <Card>
             <CardContent className="p-4 sm:p-6">
@@ -578,21 +622,21 @@ export default function TeacherForm({
                   />
                   
                   <SelectField
-                    label="Department"
-                    name="department"
-                    control={control}
-                    error={errors.department}
-                    options={TEACHER_DEPARTMENT_OPTIONS}
-                    placeholder="Select"
-                  />
-                  
-                  <SelectField
                     label="Employment Type"
                     name="employment_type"
                     control={control}
                     error={errors.employment_type}
                     options={EMPLOYMENT_TYPE_OPTIONS}
                     placeholder="Select"
+                  />
+                  
+                  <SelectField
+                    label="Contract Type"
+                    name="contract_type"
+                    control={control}
+                    error={errors.contract_type}
+                    options={CONTRACT_TYPE_OPTIONS}
+                    placeholder="Select contract type"
                   />
                   
                   <DatePickerField
@@ -603,18 +647,22 @@ export default function TeacherForm({
                   />
                   
                   <DatePickerField
-                    label="Contract Start"
+                    label="Contract Start Date"
                     name="contract_start_date"
                     control={control}
                     error={errors.contract_start_date}
                   />
                   
-                  <DatePickerField
-                    label="Contract End"
-                    name="contract_end_date"
-                    control={control}
-                    error={errors.contract_end_date}
-                  />
+                  {/* Conditional Contract End Date */}
+                  {showContractEndDate && (
+                    <DatePickerField
+                      label="Contract End Date"
+                      name="contract_end_date"
+                      control={control}
+                      error={errors.contract_end_date}
+                      description={watchContractType === 'contract' ? 'End date of contract' : 'End of probation period'}
+                    />
+                  )}
                   
                   <InputField
                     label="Monthly Salary (PKR)"
@@ -671,12 +719,11 @@ export default function TeacherForm({
                     <h3 className="text-lg font-semibold">Account Access</h3>
                     
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <InputField
+                      <PasswordInputField
                         label="Password (Leave empty to auto-generate)"
                         name="password"
                         register={register}
                         error={errors.password}
-                        type="password"
                         placeholder="Enter password or leave blank"
                       />
                       
