@@ -45,6 +45,8 @@ export default function DatePickerField({
   toYear = new Date().getFullYear() + 10,
   disablePastDates = false,
   disableFutureDates = false,
+  minDate,
+  maxDate,
   rules,
 }) {
   const content = (fieldValue, fieldChange) => {
@@ -56,8 +58,19 @@ export default function DatePickerField({
 
     // Build disabled matcher based on props
     const disabledMatcher = (date) => {
-      if (disablePastDates && isBefore(date, startOfDay(new Date()))) return true;
-      if (disableFutureDates && isAfter(date, endOfDay(new Date()))) return true;
+      const d = startOfDay(date);
+      if (disablePastDates && isBefore(d, startOfDay(new Date()))) return true;
+      if (disableFutureDates && isAfter(d, endOfDay(new Date()))) return true;
+      
+      if (minDate) {
+        const min = typeof minDate === 'string' ? startOfDay(parseISO(minDate)) : startOfDay(minDate);
+        if (isValid(min) && isBefore(d, min)) return true;
+      }
+      if (maxDate) {
+        const max = typeof maxDate === 'string' ? endOfDay(parseISO(maxDate)) : endOfDay(maxDate);
+        if (isValid(max) && isAfter(d, max)) return true;
+      }
+      
       return false;
     };
 

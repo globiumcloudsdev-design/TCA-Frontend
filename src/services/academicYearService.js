@@ -10,8 +10,6 @@
 
 import api from '@/lib/api';
 import { buildQuery } from '@/lib/utils';
-import { withFallback } from '@/lib/withFallback';
-import { DUMMY_ACADEMIC_YEARS, paginate } from '@/data/dummyData';
 
 export const academicYearService = {
   /**
@@ -33,26 +31,7 @@ export const academicYearService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching academic years:', error);
-      // Fallback to dummy data
-      const filtered = DUMMY_ACADEMIC_YEARS.filter(item => {
-        if (params.institute_id && item.institute_id !== params.institute_id) return false;
-        if (params.is_current !== undefined && item.is_current !== params.is_current) return false;
-        if (params.is_active !== undefined && item.is_active !== params.is_active) return false;
-        if (params.search && !item.name.toLowerCase().includes(params.search.toLowerCase())) return false;
-        return true;
-      });
-      
-      const paginated = paginate(filtered, params.page || 1, params.limit || 10);
-      
-      return {
-        data: paginated.items,
-        pagination: {
-          total: paginated.total,
-          page: params.page || 1,
-          limit: params.limit || 10,
-          totalPages: paginated.totalPages
-        }
-      };
+      throw error;
     }
   },
 
@@ -69,9 +48,7 @@ export const academicYearService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching academic year:', error);
-      const item = DUMMY_ACADEMIC_YEARS.find(y => y.id === id);
-      if (!item) throw new Error('Academic year not found');
-      return { data: item };
+      throw error;
     }
   },
 
@@ -87,8 +64,7 @@ export const academicYearService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching current academic year:', error);
-      const current = DUMMY_ACADEMIC_YEARS.find(y => y.is_current === true);
-      return { data: current || null };
+      return { data: null };
     }
   },
 
@@ -205,14 +181,7 @@ export const academicYearService = {
       return { data: years };
     } catch (error) {
       console.error('Error fetching academic year options:', error);
-      const years = DUMMY_ACADEMIC_YEARS.filter(y =>
-        onlyActive ? y.is_active : true
-      ).map(y => ({
-        value: y.id,
-        label: y.name,
-        is_current: y.is_current
-      }));
-      return { data: years };
+      return { data: [] };
     }
   },
 

@@ -1,4 +1,3 @@
-
 /**
  * Root layout — wraps every page with:
  *  - ThemeProvider  (next-themes)
@@ -25,10 +24,11 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning className={inter.variable}>
-      <body suppressHydrationWarning className="min-h-screen bg-background antialiased">
-        <Providers>
-          {children}
-        </Providers>
+      <body
+        suppressHydrationWarning
+        className="min-h-screen bg-background antialiased"
+      >
+        <Providers>{children}</Providers>
 
         {/* Sonner Toast */}
         <Toaster richColors position="top-right" />

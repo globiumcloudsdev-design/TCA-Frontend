@@ -11,10 +11,10 @@
  */
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Plus, Eye, Pencil, Trash2, Loader2, IdCard } from 'lucide-react';
+import { Plus, Eye, Pencil, Trash2, Loader2, IdCard, Power } from 'lucide-react';
 import { toast } from 'sonner';
 
 import useInstituteConfig from '@/hooks/useInstituteConfig';
@@ -28,6 +28,7 @@ import StudentForm from '@/components/forms/StudentForm';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import { cn } from '@/lib/utils';
 import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
+import { Badge } from '@/components/ui/badge';
 
 // Status badge color map
 const STATUS_COLORS = {
@@ -38,7 +39,7 @@ const STATUS_COLORS = {
 };
 
 // Build react-table ColumnDef[] dynamically from studentColumns config
-function buildColumns(studentColumns, type, terms, canDo, router, onDelete, onEdit, onGenerateIdCard) {
+function buildColumns(studentColumns, type, terms, canDo, router, onDelete, onEdit, onGenerateIdCard, onToggleStatus) {
   const cols = studentColumns.map((col) => ({
     accessorKey: col.key,
     header: col.label,
@@ -48,6 +49,15 @@ function buildColumns(studentColumns, type, terms, canDo, router, onDelete, onEd
 
   // Actions column
   cols.push({
+      accessorKey: 'is_active',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge variant={row.original.is_active ? 'success' : 'secondary'} className="capitalize">
+          {row.original.is_active ? 'Active' : 'Inactive'}
+        </Badge>
+      ),
+    },
+    {
     id: 'actions',
     header: '',
     cell: ({ row }) => {
@@ -88,6 +98,18 @@ function buildColumns(studentColumns, type, terms, canDo, router, onDelete, onEd
               <IdCard size={13} />
             </button>
           )}
+          {canDo('students.update') && (
+            <button
+              onClick={() => onToggleStatus(stu.id, !stu.is_active)}
+              className={cn(
+                "flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent",
+                stu.is_active ? "text-amber-600" : "text-emerald-600"
+              )}
+              title={stu.is_active ? "Deactivate" : "Activate"}
+            >
+              <Power size={13} />
+            </button>
+          )}
         </div>
       );
     },
@@ -119,12 +141,17 @@ export default function StudentsPage({ type }) {
   const { terms, studentColumns } = useInstituteConfig();
 
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState('active');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [deleting, setDeleting] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const addStudent = useMutation({
     mutationFn: async (data) => {
@@ -154,6 +181,15 @@ export default function StudentsPage({ type }) {
     onError: (error) => {
       toast.error(error.message || `Failed to update ${terms.student}`);
     },
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, is_active }) => studentService.toggleStatus(id, is_active),
+    onSuccess: (_, variables) => {
+      toast.success(variables.is_active ? 'Student activated' : 'Student deactivated');
+      qc.invalidateQueries({ queryKey: ['students', type] });
+    },
+    onError: (err) => toast.error(err.message),
   });
 
   const remove = useMutation({
@@ -215,13 +251,13 @@ export default function StudentsPage({ type }) {
   };
 
   const columns = useMemo(
-    () => buildColumns(studentColumns, type, terms, canDo, router, setDeleting, (stu) => setEditingId(stu.id), handleGenerateIdCard),
+    () => buildColumns(studentColumns, type, terms, canDo, router, setDeleting, (stu) => setEditingId(stu.id), handleGenerateIdCard, (id, is_active) => toggleStatusMutation.mutate({ id, is_active })),
     [studentColumns, type, terms, canDo, router, currentInstitute, user],
   );
 
   const statusOptions = [
-    { value: 'true', label: 'Active' },
-    { value: 'false', label: 'Inactive' },
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
   ];
 
   const handleAddStudent = (formData) => {
@@ -283,8 +319,33 @@ export default function StudentsPage({ type }) {
       // Show loading
       const toastId = toast.loading(`Importing ${importedData.length} ${terms.students}...`);
 
+      // Normalize data: map frontend field names to backend field names
+      const normalizedData = importedData.map(row => {
+        const normalized = { ...row };
+        
+        // Map academy_program_name back to program_name for backend
+        if (normalized.academy_program_name !== undefined) {
+          normalized.program_name = normalized.academy_program_name;
+          delete normalized.academy_program_name;
+        }
+        
+        // Ensure academic_year_name is used (some fields might still have old names)
+        if (normalized.academic_year && !normalized.academic_year_name) {
+          normalized.academic_year_name = normalized.academic_year;
+        }
+        
+        // Clean up empty values
+        Object.keys(normalized).forEach(key => {
+          if (normalized[key] === '' || normalized[key] === null || normalized[key] === undefined) {
+            delete normalized[key];
+          }
+        });
+        
+        return normalized;
+      });
+
       // Call bulk import API
-      const response = await studentService.bulkCreate(importedData, type);
+      const response = await studentService.bulkCreate(normalizedData, type);
 
       // Dismiss loading
       toast.dismiss(toastId);
@@ -337,10 +398,10 @@ export default function StudentsPage({ type }) {
     { key: 'nationality', label: 'Nationality', required: false, validation: 'text' },
 
     // Academic Information (Institute Type Specific)
-    { key: 'class_name', label: 'Class/Course/Program', required: false, validation: 'text' },
+    { key: 'class_name', label: 'Class/Course/Program', required: true, validation: 'text' },
     { key: 'section_name', label: 'Section/Batch', required: false, validation: 'text' },
     { key: 'roll_no', label: 'Roll Number', required: false, validation: 'text' },
-    { key: 'academic_year', label: 'Academic Year', required: false, validation: 'text' },
+    { key: 'academic_year_name', label: 'Academic Year', required: true, validation: 'text' },
     { key: 'admission_date', label: 'Admission Date', required: false, validation: 'date' },
 
     // Coaching Specific
@@ -358,7 +419,7 @@ export default function StudentsPage({ type }) {
     { key: 'faculty_name', label: 'Faculty', required: false, validation: 'text' },
 
     // Academy Specific
-    { key: 'program_name', label: 'Program', required: false, validation: 'text' },
+    { key: 'academy_program_name', label: 'Program', required: false, validation: 'text' },
     { key: 'module_name', label: 'Module', required: false, validation: 'text' },
     { key: 'trainee_id', label: 'Trainee ID', required: false, validation: 'text' },
 
@@ -413,6 +474,8 @@ export default function StudentsPage({ type }) {
     { key: 'mother_phone', label: 'Mother Phone', required: false, validation: 'phone' },
     { key: 'address', label: 'Address', required: false, validation: 'text' },
   ];
+
+  if (!mounted) return null;
 
   return (
     <div className="space-y-4">
@@ -551,6 +614,7 @@ function StudentCell({ student: s, columnKey }) {
     case 'class_name': return <span>{val('class_name') || s.class?.name || '—'}</span>;
     case 'course_name': return <span>{val('course_name') || s.course?.name || '—'}</span>;
     case 'program_name': return <span>{val('program_name') || s.program?.name || '—'}</span>;
+    case 'academy_program_name': return <span>{val('academy_program_name') || val('program_name') || s.program?.name || '—'}</span>;
     case 'section_name': return <span>{val('section_name') || s.section?.name || '—'}</span>;
     case 'batch_name': return <span>{val('batch_name') || s.batch?.name || '—'}</span>;
     case 'semester': return <span>{val('semester_name') || s.semester?.name || (val('semester_number') ? `Semester ${val('semester_number')}` : '—')}</span>;

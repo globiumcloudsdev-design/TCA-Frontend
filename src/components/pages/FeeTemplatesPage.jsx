@@ -438,8 +438,10 @@ export default function FeeTemplatesPage({ type }) {
       },
       {
         accessorKey: 'components',
-        accessorFn: (row) =>            // ← yeh add karo
-          (row.components || []).map(c => c.name).join(', '),
+        accessorFn: (row) => {
+          const arr = Array.isArray(row.components) ? row.components : [];
+          return arr.map(c => c.name).join(', ');
+        },
         header: 'Components',
         cell: ({ row }) => {
           const components = row.original.components || [];

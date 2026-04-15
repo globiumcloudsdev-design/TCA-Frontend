@@ -14,63 +14,25 @@ import {
   Search,
   Filter,
   DollarSign,
-  Briefcase,
   AlertCircle,
-  TrendingUp,
-  Users,
-  CreditCard,
-  FileText,
-  Sparkles,
   MoreHorizontal,
+  ChevronLeft,
   Wallet,
-  CheckCircle2
+  CheckCircle2,
+  Briefcase
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import DataTable from "@/components/common/DataTable";
+import SelectField from "@/components/common/SelectField";
+import { useRouter } from "next/navigation";
 
 // --- Elegant Payroll Theme ---
 const MOCK_STATS = [
-  {
-    label: "Total Payroll",
-    value: "$42.5k",
-    icon: Wallet,
-    trend: "+3.2%",
-    trendUp: true,
-    color: "text-indigo-600",
-    bg: "bg-gradient-to-br from-indigo-50/80 to-indigo-100/20",
-    border: "border-indigo-100/50",
-  },
-  {
-    label: "Paid Salaries",
-    value: "$38.2k",
-    icon: CheckCircle2,
-    trend: "90% Disbursed",
-    trendUp: true,
-    color: "text-emerald-600",
-    bg: "bg-gradient-to-br from-emerald-50/80 to-emerald-100/20",
-    border: "border-emerald-100/50",
-  },
-  {
-    label: "Pending Dues",
-    value: "$4.3k",
-    icon: AlertCircle,
-    trend: "12 Staff Left",
-    trendUp: false,
-    color: "text-amber-600",
-    bg: "bg-gradient-to-br from-amber-50/80 to-amber-100/20",
-    border: "border-amber-100/50",
-  },
-  {
-    label: "Avg. Net Pay",
-    value: "$2,850",
-    icon: DollarSign,
-    trend: "+1.5%",
-    trendUp: true,
-    color: "text-violet-600",
-    bg: "bg-gradient-to-br from-violet-50/80 to-violet-100/20",
-    border: "border-violet-100/50",
-  },
+  { label: "Total Payroll", value: "$42.5k", icon: Wallet, trend: "+3.2%", trendUp: true, color: "text-indigo-600", bg: "bg-indigo-500", grad: "from-indigo-500/10 to-transparent" },
+  { label: "Paid Salaries", value: "$38.2k", icon: CheckCircle2, trend: "90% Disbursed", trendUp: true, color: "text-emerald-600", bg: "bg-emerald-500", grad: "from-emerald-500/10 to-transparent" },
+  { label: "Pending Dues", value: "$4.3k", icon: AlertCircle, trend: "12 Staff Left", trendUp: false, color: "text-amber-600", bg: "bg-amber-500", grad: "from-amber-500/10 to-transparent" },
+  { label: "Avg. Net Pay", value: "$2,850", icon: DollarSign, trend: "+1.5%", trendUp: true, color: "text-rose-600", bg: "bg-rose-500", grad: "from-rose-500/10 to-transparent" },
 ];
 
 const MOCK_CHART_DATA = [
@@ -101,21 +63,21 @@ const generateMockData = () => {
 const MOCK_TABLE_DATA = generateMockData();
 
 export default function PayrollDummyApp() {
+  const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+  React.useEffect(() => { setMounted(true); }, []);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [roleFilter, setRoleFilter] = useState("");
 
   const filteredData = useMemo(() => {
     return MOCK_TABLE_DATA.filter((item) =>
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.staffId.toLowerCase().includes(searchTerm.toLowerCase())
+      (item.name.toLowerCase().includes(searchTerm.toLowerCase()) || item.staffId.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      (roleFilter === "" || item.role === roleFilter)
     );
-  }, [searchTerm]);
+  }, [searchTerm, roleFilter]);
 
   const totalPages = Math.ceil(filteredData.length / pageSize);
   const paginatedData = useMemo(() => {
@@ -149,12 +111,12 @@ export default function PayrollDummyApp() {
       cell: ({ getValue }) => {
         const val = getValue();
         const config = {
-          Paid: "bg-emerald-50 text-emerald-600 border-emerald-100/50",
-          Pending: "bg-rose-50 text-rose-600 border-rose-100/50",
-          Partial: "bg-amber-50 text-amber-600 border-amber-100/50",
+          Paid: "bg-emerald-50 text-emerald-600 border-emerald-100",
+          Pending: "bg-rose-50 text-rose-600 border-rose-100",
+          Partial: "bg-amber-50 text-amber-600 border-amber-100",
         };
         return (
-          <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-semibold border uppercase tracking-wider shadow-sm", config[val] || "bg-slate-50")}>
+          <span className={cn("px-2.5 py-1 rounded-md text-[10px] font-semibold border uppercase tracking-wider shadow-sm", config[val] || "bg-slate-50")}>
             {val}
           </span>
         );
@@ -176,66 +138,55 @@ export default function PayrollDummyApp() {
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-700 max-w-[1600px] mx-auto pb-10">
+    <div className="space-y-6">
       
-      {/* --- ELEGANT SOFT COLORFUL HEADER --- */}
-      <div className="relative rounded-2xl p-8 overflow-hidden bg-white border border-slate-200 shadow-xl shadow-slate-100/50">
-        <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-emerald-50 opacity-40 pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-indigo-50 rounded-full blur-3xl opacity-60 pointer-events-none" />
-        
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="text-center md:text-left space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-semibold uppercase tracking-wider border border-emerald-100 shadow-sm">
-              <Sparkles size={12} /> Payroll Management System
+      {/* HEADER OVERHAUL */}
+      <div className="relative rounded-2xl p-7 flex flex-col sm:flex-row items-center justify-between gap-6 bg-white border border-slate-200 shadow-xl shadow-slate-200/40">
+         <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-rose-50/50 pointer-events-none" />
+         <div className="flex items-center gap-5 relative z-10 w-full sm:w-auto">
+            <button onClick={() => router.back()} className="h-11 w-11 flex items-center justify-center rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition-all shadow-sm active:scale-95">
+              <ChevronLeft size={22} className="text-slate-600" />
+            </button>
+            <div className="space-y-1">
+               <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-full border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest shadow-sm">
+                 <Wallet size={12} /> Payroll Management System
+               </div>
+               <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Staff Payroll Report</h1>
             </div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-              Staff Payroll Report
-            </h1>
-            <p className="text-slate-500 text-base font-medium max-w-xl">
-              Track staff compensation, allowances, and payment status with automated reporting.
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Button variant="outline" className="h-10 border-slate-200 rounded-xl px-4 text-xs font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">
-              <Download size={14} className="mr-2" /> Export PDF
-            </Button>
-            <Button className="h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-6 text-xs font-semibold shadow-lg shadow-emerald-100 transition-all active:scale-95">
-              <CheckCircle2 size={14} className="mr-2" /> Disburse Salaries
-            </Button>
-          </div>
-        </div>
+         </div>
+
+         <div className="flex items-center gap-3 relative z-10 w-full sm:w-auto">
+           <Button variant="outline" className="flex-1 sm:flex-none h-11 border-slate-200 rounded-2xl px-5 text-[13px] font-bold text-slate-600 hover:bg-slate-50 shadow-sm transition-all active:scale-95">
+             <Download size={16} className="mr-2" /> Export Excel
+           </Button>
+           <Button className="flex-1 sm:flex-none h-11 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl px-6 text-[13px] font-bold shadow-lg shadow-slate-200 transition-all active:scale-95">
+             Print PDF
+           </Button>
+         </div>
       </div>
 
-      {/* --- SOFT GRADIENT STATS --- */}
+      {/* STATS OVERHAUL */}
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {MOCK_STATS.map((stat, i) => {
           const Icon = stat.icon;
           return (
-            <div key={i} className={cn("group rounded-2xl border p-5 transition-all hover:shadow-xl hover:-translate-y-1 relative overflow-hidden", stat.bg, stat.border)}>
-              <div className="flex justify-between items-start mb-4 relative z-10">
-                <div className={cn("p-2.5 rounded-xl bg-white shadow-sm transition-all group-hover:scale-110", stat.color)}>
-                  <Icon size={18} strokeWidth={2.5} />
-                </div>
-              </div>
-              <div className="space-y-0.5 relative z-10">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                <h3 className="text-2xl font-bold text-slate-900 tabular-nums">{stat.value}</h3>
-                <p className={cn("text-[10px] font-bold mt-1", stat.trendUp ? "text-emerald-500" : "text-amber-500")}>
-                  {stat.trend}
-                </p>
-              </div>
+            <div key={i} className={cn("group rounded-2xl border bg-white p-5 transition-all hover:shadow-xl relative overflow-hidden group border-slate-200")}>
+              <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", stat.grad)} />
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">{stat.label}</p>
+              <h3 className="text-2xl font-bold text-slate-900 tabular-nums relative z-10 mt-1">{stat.value}</h3>
+              <div className={cn("absolute bottom-4 right-4 h-1 w-8 rounded-full opacity-50 transition-all group-hover:w-12", stat.bg)} />
             </div>
           );
         })}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-12">
-        {/* --- DEPARTMENT BREAKDOWN CHART --- */}
+        {/* CHART AREA */}
         <div className="lg:col-span-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex justify-between items-center mb-10">
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">Department-wise Expenditure</h3>
-              <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-widest mt-0.5">Salary allocation by role group</p>
+              <h3 className="text-lg font-semibold text-slate-900">Payroll Expenditure</h3>
+              <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-widest mt-0.5">Salary allocation by role</p>
             </div>
           </div>
 
@@ -247,80 +198,65 @@ export default function PayrollDummyApp() {
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 700 }} tickFormatter={(v) => `$${v/1000}k`} />
                 <RechartsTooltip 
                   cursor={{ fill: "#f8fafc" }}
-                  contentStyle={{ borderRadius: "12px", border: "none", padding: "10px", fontSize: "11px", fontWeight: 800, boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)", backgroundColor: "rgba(255, 255, 255, 0.9)" }}
+                  contentStyle={{ borderRadius: "12px", border: "none", padding: "10px", fontSize: "11px", fontWeight: 700, boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)", backgroundColor: "rgba(255, 255, 255, 0.9)" }}
                 />
                 <Bar dataKey="salary" radius={[8, 8, 0, 0]} barSize={40}>
-                  {MOCK_CHART_DATA.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.8} />
-                  ))}
+                  {MOCK_CHART_DATA.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.8} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* --- QUICK ACTIONS --- */}
-        <div className="lg:col-span-4 rounded-2xl border border-slate-200 bg-slate-50/30 p-6 flex flex-col">
-          <h3 className="text-sm font-semibold text-slate-900 tracking-tight uppercase mb-6 flex items-center gap-2">
-            <Briefcase size={16} className="text-indigo-600" /> Recent Activities
-          </h3>
-          
-          <div className="space-y-6 flex-1">
-            {[
-              { t: "Salaries Disbursed", d: "10 April 2026", s: "Success" },
-              { t: "Tax Report Generated", d: "08 April 2026", s: "Pending" },
-              { t: "New Staff Added", d: "05 April 2026", s: "Notice" },
-            ].map((act, i) => (
-              <div key={i} className="flex gap-4 group cursor-pointer hover:translate-x-1 transition-transform">
-                <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 shadow-sm shadow-indigo-200" />
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">{act.t}</p>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{act.d}</p>
-                </div>
+        {/* SIDE ACTIONS */}
+        <div className="lg:col-span-4 rounded-2xl border border-slate-200 bg-slate-50/10 p-6 flex flex-col justify-between">
+           <div className="space-y-6">
+              <div className="space-y-1">
+                 <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-tight flex items-center gap-2">
+                   <Filter size={14} className="text-slate-400" /> Salary Filters
+                 </h3>
+                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pl-6">Filter by staff details</p>
               </div>
-            ))}
-          </div>
-          
-          <div className="mt-8 p-4 rounded-xl bg-indigo-600 text-white shadow-xl shadow-indigo-100">
-             <p className="text-[11px] font-bold uppercase tracking-widest opacity-80 mb-1">Upcoming Milestone</p>
-             <p className="text-sm font-semibold">Advance Salary Window opens in 2 days.</p>
-          </div>
+              
+              <div className="space-y-4">
+                 <div className="relative">
+                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                   <input
+                     type="text"
+                     placeholder="Search staff..."
+                     value={searchTerm}
+                     onChange={(e) => setSearchTerm(e.target.value)}
+                     className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-xs focus:ring-4 focus:ring-slate-100 transition-all outline-none"
+                   />
+                 </div>
+                 
+                 <SelectField
+                   label="Role Filter"
+                   placeholder="All Roles"
+                   value={roleFilter}
+                   onChange={setRoleFilter}
+                   options={[
+                     { value: "Senior Teacher", label: "Senior Teacher" },
+                     { value: "Admin Officer", label: "Admin Officer" },
+                     { value: "Coordinator", label: "Coordinator" },
+                   ]}
+                 />
+              </div>
+           </div>
+           
+           <div className="mt-8 p-4 rounded-xl bg-white border border-slate-100 shadow-sm relative overflow-hidden group">
+              <div className="flex items-center gap-2 text-rose-500 mb-2 font-bold text-xs uppercase tracking-tight">
+                <Briefcase size={14} /> Upcoming
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Advance salary window opens in <span className="text-rose-600 font-bold">2 days</span>. Notifications sent.
+              </p>
+           </div>
         </div>
       </div>
 
-      {/* --- STAFF LEDGER TABLE --- */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden border-b-2">
-        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white/50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm">
-              <Users size={18} />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-slate-900 tracking-tight">Staff Salary Ledger</h3>
-              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">Showing all active staff members</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-80 group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors" size={16} />
-              <input
-                type="text"
-                placeholder="Search staff name or ID..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full pl-11 pr-5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-4 focus:ring-emerald-100 focus:bg-white focus:border-emerald-400 transition-all duration-300"
-              />
-            </div>
-            <Button variant="outline" size="sm" className="h-[40px] border-slate-200 text-slate-400 hover:text-emerald-600 rounded-xl px-3 transition-all">
-              <Filter size={16} />
-            </Button>
-          </div>
-        </div>
-
+      {/* REUSABLE DATA TABLE */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/40 overflow-hidden">
         <div className="p-0 compact-table border-none">
           <DataTable
             columns={columns}

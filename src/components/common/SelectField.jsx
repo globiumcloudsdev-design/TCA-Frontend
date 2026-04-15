@@ -80,16 +80,22 @@ export default function SelectField({
                 <SelectValue placeholder={placeholder} />
               </SelectTrigger>
               <SelectContent>
-                {normalizedOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={String(opt.value)}>
-                    <span className="flex items-center justify-between gap-2 w-full">
-                      <span>{opt.label}</span>
-                      {opt.badgeStatus ? (
-                        <StatusBadge status={opt.badgeStatus} label={opt.badgeLabel || 'Current'} />
-                      ) : null}
-                    </span>
-                  </SelectItem>
-                ))}
+                {normalizedOptions.length > 0 ? (
+                  normalizedOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={String(opt.value)}>
+                      <span className="flex items-center justify-between gap-2 w-full">
+                        <span>{opt.label}</span>
+                        {opt.badgeStatus ? (
+                          <StatusBadge status={opt.badgeStatus} label={opt.badgeLabel || 'Current'} />
+                        ) : null}
+                      </span>
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="p-4 text-[11px] text-slate-400 text-center italic">
+                    No options found
+                  </div>
+                )}
               </SelectContent>
             </Select>
           )}
@@ -104,16 +110,22 @@ export default function SelectField({
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
-            {normalizedOptions.map((opt) => (
-              <SelectItem key={opt.value} value={String(opt.value)}>
-                <span className="flex items-center justify-between gap-2 w-full">
-                  <span>{opt.label}</span>
-                  {opt.badgeStatus ? (
-                    <StatusBadge status={opt.badgeStatus} label={opt.badgeLabel || 'Current'} />
-                  ) : null}
-                </span>
-              </SelectItem>
-            ))}
+            {normalizedOptions.length > 0 ? (
+              normalizedOptions.map((opt) => (
+                <SelectItem key={opt.value} value={String(opt.value)}>
+                  <span className="flex items-center justify-between gap-2 w-full">
+                    <span>{opt.label}</span>
+                    {opt.badgeStatus ? (
+                      <StatusBadge status={opt.badgeStatus} label={opt.badgeLabel || 'Current'} />
+                    ) : null}
+                  </span>
+                </SelectItem>
+              ))
+            ) : (
+              <div className="p-4 text-[11px] text-slate-400 text-center italic">
+                No options found
+              </div>
+            )}
           </SelectContent>
         </Select>
       )}

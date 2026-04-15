@@ -163,7 +163,7 @@ export const NAV = {
     // { group: 'People', label: 'Admissions', href: '/school/admissions', icon: 'ClipboardList', permission: 'admissions.read' },
     { group: 'Operations', label: 'Attendance', href: '/school/attendance', icon: 'CheckSquare', permission: 'attendance.view' },
     { group: 'Operations', label: 'Staff Attendance', href: '/school/staff-attendance', icon: 'UserCheck', permission: 'staff_attendance.view' },
-          { group: 'Operations',label: 'Leave Requests', href: '/school/leave-requests', icon: 'Calendar', permission: 'staff_attendance.view', group: 'Staff' },
+    { group: 'Operations', label: 'Leave Requests', href: '/school/leave-requests', icon: 'Calendar', permission: 'staff_attendance.view', },
     { group: 'Operations', label: 'Exams', href: '/school/exams', icon: 'ClipboardCheck', permission: 'exams.read' },
     { group: 'Finance', label: 'Expense', href: '/school/expense', icon: 'Wallet', permission: 'expenses.read' },
     { group: 'Finance', label: 'Vendors', href: '/school/vendors', icon: 'Store', permission: 'fees.read' },

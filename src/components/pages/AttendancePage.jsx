@@ -245,13 +245,18 @@ export default function AttendancePage({ type }) {
     () => [
       {
         accessorKey: "student.registration_no",
-        header: "Reg No.",
+        header: "Roll / Reg No",
         cell: ({ row }) => {
-          const student = row.original.Student;
+          const student = row.original.Student || row.original.student;
           return (
-            <span className="font-medium">
-              {student?.registration_no || ""}
-            </span>
+            <div className="flex flex-col">
+              <span className="font-bold text-xs text-slate-700 dark:text-slate-300">
+                {student?.roll_no || student?.roll_number || student?.details?.studentDetails?.roll_no || "—"}
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium">
+                {student?.registration_no || "—"}
+              </span>
+            </div>
           );
         },
       },

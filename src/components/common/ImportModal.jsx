@@ -33,7 +33,7 @@
 //   TableRow,
 // } from '@/components/ui/table';
 // import {
-//   Upload, FileSpreadsheet, FileJson, Loader2, CheckCircle2, 
+//   Upload, FileSpreadsheet, FileJson, Loader2, CheckCircle2,
 //   AlertCircle, X, ArrowRight, MapPin, Edit2, Save, RefreshCw
 // } from 'lucide-react';
 // import { cn } from '@/lib/utils';
@@ -59,7 +59,7 @@
 //     e.preventDefault();
 //     e.stopPropagation();
 //     setDragActive(false);
-    
+
 //     const files = e.dataTransfer.files;
 //     if (files && files[0]) {
 //       setFileName(files[0].name);
@@ -260,11 +260,11 @@
 
 //       setFileHeaders(headers);
 //       setParsedData(rows);
-      
+
 //       // Auto-map columns based on similarity
 //       const autoMapping = {};
 //       headers.forEach(fileCol => {
-//         const matchedCol = availableColumns.find(dbCol => 
+//         const matchedCol = availableColumns.find(dbCol =>
 //           dbCol.label.toLowerCase() === fileCol.toLowerCase() ||
 //           dbCol.key.toLowerCase() === fileCol.toLowerCase() ||
 //           dbCol.label.toLowerCase().includes(fileCol.toLowerCase()) ||
@@ -277,10 +277,10 @@
 //         }
 //       });
 //       setMapping(autoMapping);
-      
+
 //       // Generate preview data
 //       generatePreview(rows, autoMapping);
-      
+
 //       setStep(2);
 //     } catch (err) {
 //       console.error('Parse error:', err);
@@ -307,7 +307,7 @@
 //     const newMapping = { ...mapping, [fileCol]: dbCol };
 //     setMapping(newMapping);
 //     generatePreview(parsedData, newMapping);
-    
+
 //     // Validate required columns
 //     const mappedRequired = Object.values(newMapping).filter(v => v !== 'skip');
 //     const missingRequired = requiredColumns.filter(req => !mappedRequired.includes(req));
@@ -367,13 +367,13 @@
 //       // Simulate progress for better UX
 //       const total = importData.length;
 //       const batchSize = 10;
-      
+
 //       for (let i = 0; i < total; i += batchSize) {
 //         const batch = importData.slice(i, i + batchSize);
 //         await onImport(batch);
 //         setImportProgress(Math.min(((i + batchSize) / total) * 100, 100));
 //       }
-      
+
 //       setImportStatus('success');
 //       setTimeout(() => {
 //         onClose();
@@ -409,7 +409,7 @@
 
 //   const totalRecords = parsedData.length;
 //   const mappedCount = Object.values(mapping).filter(v => v !== 'skip').length;
-//   const missingRequired = requiredColumns.filter(req => 
+//   const missingRequired = requiredColumns.filter(req =>
 //     !Object.values(mapping).includes(req)
 //   );
 
@@ -460,7 +460,7 @@
 //                 accept={accept}
 //                 isProcessing={false}
 //               />
-              
+
 //               {sampleData && (
 //                 <div className="rounded-lg border p-3 bg-muted/20">
 //                   <p className="text-xs font-medium mb-2">Sample Format</p>
@@ -624,31 +624,31 @@
 //               Back
 //             </Button>
 //           )}
-          
+
 //           <Button variant="outline" onClick={handleClose} disabled={importing}>
 //             Cancel
 //           </Button>
-          
+
 //           {step === 1 && file && (
 //             <Button onClick={() => setStep(2)}>
 //               Continue
 //               <ArrowRight className="ml-2 h-4 w-4" />
 //             </Button>
 //           )}
-          
+
 //           {step === 2 && (
-//             <Button 
-//               onClick={() => setStep(3)} 
+//             <Button
+//               onClick={() => setStep(3)}
 //               disabled={missingRequired.length > 0}
 //             >
 //               Preview & Edit
 //               <ArrowRight className="ml-2 h-4 w-4" />
 //             </Button>
 //           )}
-          
+
 //           {step === 3 && (
-//             <Button 
-//               onClick={handleImport} 
+//             <Button
+//               onClick={handleImport}
 //               disabled={importing || missingRequired.length > 0}
 //               className="min-w-[100px]"
 //             >
@@ -671,13 +671,7 @@
 //   );
 // }
 
-
-
-
-
-
-
-'use client';
+"use client";
 
 /**
  * ImportModal — Advanced Import with Column Mapping & Preview
@@ -689,20 +683,29 @@
  * - Progress indicator for large files
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from "react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
-import { ScrollArea } from '@/components/ui/scroll-area';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -710,13 +713,24 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
-  Upload, FileSpreadsheet, FileJson, Loader2, CheckCircle2, 
-  AlertCircle, X, ArrowRight, MapPin, Edit2, Save, RefreshCw
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import * as XLSX from 'xlsx';
+  Upload,
+  FileSpreadsheet,
+  FileJson,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  ArrowRight,
+  MapPin,
+  Edit2,
+  Save,
+  RefreshCw,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import * as XLSX from "xlsx";
+import { format } from "date-fns";
 
 // File upload area component
 function FileUploadArea({ onFileSelect, accept, isProcessing }) {
@@ -726,9 +740,9 @@ function FileUploadArea({ onFileSelect, accept, isProcessing }) {
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
+    if (e.type === "dragenter" || e.type === "dragover") {
       setDragActive(true);
-    } else if (e.type === 'dragleave') {
+    } else if (e.type === "dragleave") {
       setDragActive(false);
     }
   };
@@ -737,7 +751,7 @@ function FileUploadArea({ onFileSelect, accept, isProcessing }) {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     const files = e.dataTransfer.files;
     if (files && files[0]) {
       setFileName(files[0].name);
@@ -757,14 +771,16 @@ function FileUploadArea({ onFileSelect, accept, isProcessing }) {
     <div
       className={cn(
         "border-2 border-dashed rounded-lg p-8 text-center transition-all cursor-pointer",
-        dragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-muted/30",
-        isProcessing && "opacity-50 pointer-events-none"
+        dragActive
+          ? "border-primary bg-primary/5"
+          : "border-border hover:border-primary/50 hover:bg-muted/30",
+        isProcessing && "opacity-50 pointer-events-none",
       )}
       onDragEnter={handleDrag}
       onDragLeave={handleDrag}
       onDragOver={handleDrag}
       onDrop={handleDrop}
-      onClick={() => document.getElementById('file-input')?.click()}
+      onClick={() => document.getElementById("file-input")?.click()}
     >
       <input
         id="file-input"
@@ -801,20 +817,24 @@ function ColumnMappingRow({ fileCol, dbCol, availableColumns, onMap, onSkip }) {
       </div>
       <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
       <div className="flex-1">
-        <Select value={dbCol || 'skip'} onValueChange={onMap}>
+        <Select value={dbCol || "skip"} onValueChange={onMap}>
           <SelectTrigger className="h-8 text-sm">
             <SelectValue placeholder="Map to column..." />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="skip">
-              <span className="text-muted-foreground">— Skip this column —</span>
+              <span className="text-muted-foreground">
+                — Skip this column —
+              </span>
             </SelectItem>
             {availableColumns.map((col) => (
               <SelectItem key={col.key} value={col.key}>
                 <div className="flex items-center gap-2">
                   <span>{col.label}</span>
                   {col.required && (
-                    <Badge variant="destructive" className="text-[8px] px-1">required</Badge>
+                    <Badge variant="destructive" className="text-[8px] px-1">
+                      required
+                    </Badge>
                   )}
                 </div>
               </SelectItem>
@@ -829,7 +849,7 @@ function ColumnMappingRow({ fileCol, dbCol, availableColumns, onMap, onSkip }) {
 // Editable cell component for preview
 function EditableCell({ value, onChange, isInvalid }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(String(value ?? ''));
+  const [editValue, setEditValue] = useState(String(value ?? ""));
 
   const handleSave = () => {
     onChange(editValue);
@@ -837,9 +857,9 @@ function EditableCell({ value, onChange, isInvalid }) {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') handleSave();
-    if (e.key === 'Escape') {
-      setEditValue(String(value ?? ''));
+    if (e.key === "Enter") handleSave();
+    if (e.key === "Escape") {
+      setEditValue(String(value ?? ""));
       setIsEditing(false);
     }
   };
@@ -854,7 +874,9 @@ function EditableCell({ value, onChange, isInvalid }) {
           onKeyDown={handleKeyDown}
           className={cn(
             "w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1",
-            isInvalid ? "border-red-500 focus:ring-red-500" : "border-input focus:ring-primary"
+            isInvalid
+              ? "border-red-500 focus:ring-red-500"
+              : "border-input focus:ring-primary",
           )}
           autoFocus
         />
@@ -872,7 +894,7 @@ function EditableCell({ value, onChange, isInvalid }) {
   return (
     <div className="flex items-center justify-between group">
       <span className={cn("text-sm", isInvalid && "text-red-500")}>
-        {value !== null && value !== undefined ? String(value) : '—'}
+        {value !== null && value !== undefined ? String(value) : "—"}
       </span>
       <button
         onClick={() => setIsEditing(true)}
@@ -888,11 +910,11 @@ function EditableCell({ value, onChange, isInvalid }) {
 export default function ImportModal({
   open,
   onClose,
-  columns = [],           // Available columns for mapping: [{ key, label, required, validation }]
-  onImport,               // (data: any[]) => Promise<void>
-  fileName = 'import',
-  accept = '.csv,.xlsx,.xls',
-  sampleData = null,      // Optional sample data for preview
+  columns = [], // Available columns for mapping: [{ key, label, required, validation }]
+  onImport, // (data: any[]) => Promise<void>
+  fileName = "import",
+  accept = ".csv,.xlsx,.xls",
+  sampleData = null, // Optional sample data for preview
 }) {
   const [step, setStep] = useState(1); // 1: upload, 2: mapping, 3: preview
   const [file, setFile] = useState(null);
@@ -903,72 +925,88 @@ export default function ImportModal({
   const [errors, setErrors] = useState([]);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
-  const [importStatus, setImportStatus] = useState('idle');
+  const [importStatus, setImportStatus] = useState("idle");
 
   // Prepare available columns for mapping
   const availableColumns = useMemo(() => {
-    return columns.filter(col => col.key !== 'select' && col.key !== 'actions');
+    return columns.filter(
+      (col) => col.key !== "select" && col.key !== "actions",
+    );
   }, [columns]);
 
   // Required columns
   const requiredColumns = useMemo(() => {
-    return availableColumns.filter(col => col.required).map(col => col.key);
+    return availableColumns.filter((col) => col.required).map((col) => col.key);
   }, [availableColumns]);
 
   // Parse file based on extension
-  const parseFile = useCallback(async (uploadedFile) => {
-    const extension = uploadedFile.name.split('.').pop().toLowerCase();
-    let headers = [];
-    let rows = [];
+  const parseFile = useCallback(
+    async (uploadedFile) => {
+      const extension = uploadedFile.name.split(".").pop().toLowerCase();
+      let headers = [];
+      let rows = [];
 
-    try {
-      if (['csv', 'xlsx', 'xls'].includes(extension)) {
-        const buffer = await uploadedFile.arrayBuffer();
-        const workbook = XLSX.read(buffer);
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(sheet);
-        headers = Object.keys(data[0] || {});
-        rows = data;
-      }
-
-      setFileHeaders(headers);
-      setParsedData(rows);
-      
-      // Auto-map columns based on similarity
-      const autoMapping = {};
-      headers.forEach(fileCol => {
-        const matchedCol = availableColumns.find(dbCol => 
-          dbCol.label.toLowerCase() === fileCol.toLowerCase() ||
-          dbCol.key.toLowerCase() === fileCol.toLowerCase() ||
-          dbCol.label.toLowerCase().includes(fileCol.toLowerCase()) ||
-          fileCol.toLowerCase().includes(dbCol.label.toLowerCase())
-        );
-        if (matchedCol) {
-          autoMapping[fileCol] = matchedCol.key;
-        } else {
-          autoMapping[fileCol] = 'skip';
+      try {
+        if (["csv", "xlsx", "xls"].includes(extension)) {
+          const buffer = await uploadedFile.arrayBuffer();
+          const workbook = XLSX.read(buffer, { cellDates: true });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const data = XLSX.utils.sheet_to_json(sheet);
+          headers = Object.keys(data[0] || {});
+          rows = data;
         }
-      });
-      setMapping(autoMapping);
-      
-      // Generate preview data
-      generatePreview(rows, autoMapping);
-      
-      setStep(2);
-    } catch (err) {
-      console.error('Parse error:', err);
-      setErrors([{ type: 'parse', message: 'Failed to parse file. Please check the format.' }]);
-    }
-  }, [availableColumns]);
+
+        setFileHeaders(headers);
+        setParsedData(rows);
+
+        // Auto-map columns based on similarity
+        const autoMapping = {};
+        headers.forEach((fileCol) => {
+          const matchedCol = availableColumns.find(
+            (dbCol) =>
+              dbCol.label.toLowerCase() === fileCol.toLowerCase() ||
+              dbCol.key.toLowerCase() === fileCol.toLowerCase() ||
+              dbCol.label.toLowerCase().includes(fileCol.toLowerCase()) ||
+              fileCol.toLowerCase().includes(dbCol.label.toLowerCase()),
+          );
+          if (matchedCol) {
+            autoMapping[fileCol] = matchedCol.key;
+          } else {
+            autoMapping[fileCol] = "skip";
+          }
+        });
+        setMapping(autoMapping);
+
+        // Generate preview data
+        generatePreview(rows, autoMapping);
+
+        setStep(2);
+      } catch (err) {
+        console.error("Parse error:", err);
+        setErrors([
+          {
+            type: "parse",
+            message: "Failed to parse file. Please check the format.",
+          },
+        ]);
+      }
+    },
+    [availableColumns],
+  );
 
   // Generate preview data based on mapping
   const generatePreview = (data, currentMapping) => {
-    const preview = data.slice(0, 10).map(row => {
+    const preview = data.slice(0, 10).map((row) => {
       const mappedRow = {};
       Object.entries(currentMapping).forEach(([fileCol, dbCol]) => {
-        if (dbCol !== 'skip') {
-          mappedRow[dbCol] = row[fileCol] ?? '';
+        if (dbCol !== "skip") {
+          const val = row[fileCol];
+          if (val instanceof Date) {
+            mappedRow[dbCol] = format(val, "yyyy-MM-dd");
+          } else {
+            mappedRow[dbCol] = val ?? "";
+          }
         }
       });
       return mappedRow;
@@ -981,12 +1019,21 @@ export default function ImportModal({
     const newMapping = { ...mapping, [fileCol]: dbCol };
     setMapping(newMapping);
     generatePreview(parsedData, newMapping);
-    
+
     // Validate required columns
-    const mappedRequired = Object.values(newMapping).filter(v => v !== 'skip');
-    const missingRequired = requiredColumns.filter(req => !mappedRequired.includes(req));
+    const mappedRequired = Object.values(newMapping).filter(
+      (v) => v !== "skip",
+    );
+    const missingRequired = requiredColumns.filter(
+      (req) => !mappedRequired.includes(req),
+    );
     if (missingRequired.length > 0) {
-      setErrors([{ type: 'required', message: `Missing required columns: ${missingRequired.join(', ')}` }]);
+      setErrors([
+        {
+          type: "required",
+          message: `Missing required columns: ${missingRequired.join(", ")}`,
+        },
+      ]);
     } else {
       setErrors([]);
     }
@@ -1001,10 +1048,17 @@ export default function ImportModal({
 
   // Prepare all data for import (with edits)
   const prepareImportData = () => {
-    const mappedRequired = Object.values(mapping).filter(v => v !== 'skip');
-    const missingRequired = requiredColumns.filter(req => !mappedRequired.includes(req));
+    const mappedRequired = Object.values(mapping).filter((v) => v !== "skip");
+    const missingRequired = requiredColumns.filter(
+      (req) => !mappedRequired.includes(req),
+    );
     if (missingRequired.length > 0) {
-      setErrors([{ type: 'required', message: `Missing required columns: ${missingRequired.join(', ')}` }]);
+      setErrors([
+        {
+          type: "required",
+          message: `Missing required columns: ${missingRequired.join(", ")}`,
+        },
+      ]);
       return null;
     }
 
@@ -1012,13 +1066,18 @@ export default function ImportModal({
     const fullData = parsedData.map((row, idx) => {
       const mappedRow = {};
       Object.entries(mapping).forEach(([fileCol, dbCol]) => {
-        if (dbCol !== 'skip') {
+        if (dbCol !== "skip") {
           // Check if this row was edited in preview
           const previewRow = previewData[idx];
           if (previewRow && previewRow[dbCol] !== undefined) {
             mappedRow[dbCol] = previewRow[dbCol];
           } else {
-            mappedRow[dbCol] = row[fileCol] ?? '';
+            const val = row[fileCol];
+            if (val instanceof Date) {
+              mappedRow[dbCol] = format(val, "yyyy-MM-dd");
+            } else {
+              mappedRow[dbCol] = val ?? "";
+            }
           }
         }
       });
@@ -1035,29 +1094,34 @@ export default function ImportModal({
 
     setImporting(true);
     setImportProgress(0);
-    setImportStatus('processing');
+    setImportStatus("processing");
 
     try {
       // Simulate progress for better UX
       const total = importData.length;
       const batchSize = 10;
-      
+
       for (let i = 0; i < total; i += batchSize) {
         const batch = importData.slice(i, i + batchSize);
         await onImport(batch);
         setImportProgress(Math.min(((i + batchSize) / total) * 100, 100));
       }
-      
-      setImportStatus('success');
+
+      setImportStatus("success");
       setTimeout(() => {
         onClose();
         resetState();
       }, 1500);
     } catch (err) {
-      console.error('Import error:', err);
-      setImportStatus('error');
-      setErrors([{ type: 'import', message: err.message || 'Import failed. Please try again.' }]);
-      setTimeout(() => setImportStatus('idle'), 3000);
+      console.error("Import error:", err);
+      setImportStatus("error");
+      setErrors([
+        {
+          type: "import",
+          message: err.message || "Import failed. Please try again.",
+        },
+      ]);
+      setTimeout(() => setImportStatus("idle"), 3000);
     } finally {
       setTimeout(() => setImporting(false), 500);
     }
@@ -1073,7 +1137,7 @@ export default function ImportModal({
     setPreviewData([]);
     setErrors([]);
     setImportProgress(0);
-    setImportStatus('idle');
+    setImportStatus("idle");
   };
 
   const handleClose = () => {
@@ -1082,9 +1146,9 @@ export default function ImportModal({
   };
 
   const totalRecords = parsedData.length;
-  const mappedCount = Object.values(mapping).filter(v => v !== 'skip').length;
-  const missingRequired = requiredColumns.filter(req => 
-    !Object.values(mapping).includes(req)
+  const mappedCount = Object.values(mapping).filter((v) => v !== "skip").length;
+  const missingRequired = requiredColumns.filter(
+    (req) => !Object.values(mapping).includes(req),
   );
 
   return (
@@ -1100,23 +1164,32 @@ export default function ImportModal({
               </Badge>
             )}
           </DialogTitle>
+          <DialogDescription>
+            Upload a CSV or Excel file and map columns to import records in bulk
+          </DialogDescription>
         </DialogHeader>
 
         {/* Step indicator */}
         <div className="flex items-center justify-between px-8 py-4 shrink-0">
           {[1, 2, 3].map((s) => (
             <div key={s} className="flex items-center">
-              <div className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all",
-                step >= s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-              )}>
+              <div
+                className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all",
+                  step >= s
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground",
+                )}
+              >
                 {s}
               </div>
               {s < 3 && (
-                <div className={cn(
-                  "w-16 h-0.5 mx-2",
-                  step > s ? "bg-primary" : "bg-muted"
-                )} />
+                <div
+                  className={cn(
+                    "w-16 h-0.5 mx-2",
+                    step > s ? "bg-primary" : "bg-muted",
+                  )}
+                />
               )}
             </div>
           ))}
@@ -1124,7 +1197,6 @@ export default function ImportModal({
 
         {/* Content area with both scrolls */}
         <div className="flex-1 min-h-0 overflow-hidden px-6">
-          
           {/* Step 1: File Upload */}
           {step === 1 && (
             <div className="h-full overflow-y-auto py-4">
@@ -1136,7 +1208,7 @@ export default function ImportModal({
                 accept={accept}
                 isProcessing={false}
               />
-              
+
               {sampleData && (
                 <div className="rounded-lg border p-3 bg-muted/20 mt-4">
                   <p className="text-xs font-medium mb-2">Sample Format</p>
@@ -1158,12 +1230,16 @@ export default function ImportModal({
                     Map file columns to database fields
                   </p>
                 </div>
-                <Badge variant={missingRequired.length === 0 ? "default" : "destructive"}>
+                <Badge
+                  variant={
+                    missingRequired.length === 0 ? "default" : "destructive"
+                  }
+                >
                   {mappedCount} columns mapped
                 </Badge>
               </div>
 
-              {errors.length > 0 && errors[0].type === 'required' && (
+              {errors.length > 0 && errors[0].type === "required" && (
                 <div className="flex items-center gap-2 p-2 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-yellow-700 dark:text-yellow-300">
                   <AlertCircle className="h-4 w-4" />
                   <span className="text-sm">{errors[0].message}</span>
@@ -1186,7 +1262,7 @@ export default function ImportModal({
                       dbCol={mapping[header]}
                       availableColumns={availableColumns}
                       onMap={(value) => updateMapping(header, value)}
-                      onSkip={() => updateMapping(header, 'skip')}
+                      onSkip={() => updateMapping(header, "skip")}
                     />
                   ))}
                 </div>
@@ -1196,11 +1272,15 @@ export default function ImportModal({
                 <div className="rounded-lg border p-3 bg-blue-50 dark:bg-blue-950/20">
                   <p className="text-xs font-medium mb-2">Required Fields</p>
                   <div className="flex flex-wrap gap-2">
-                    {requiredColumns.map(col => {
+                    {requiredColumns.map((col) => {
                       const isMapped = Object.values(mapping).includes(col);
                       return (
-                        <Badge key={col} variant={isMapped ? "default" : "outline"}>
-                          {availableColumns.find(c => c.key === col)?.label || col}
+                        <Badge
+                          key={col}
+                          variant={isMapped ? "default" : "outline"}
+                        >
+                          {availableColumns.find((c) => c.key === col)?.label ||
+                            col}
                           {!isMapped && " (missing)"}
                         </Badge>
                       );
@@ -1233,9 +1313,14 @@ export default function ImportModal({
                     <TableHeader>
                       <TableRow className="bg-muted/40 sticky top-0">
                         {Object.keys(previewData[0] || {}).map((colKey) => {
-                          const col = availableColumns.find(c => c.key === colKey);
+                          const col = availableColumns.find(
+                            (c) => c.key === colKey,
+                          );
                           return (
-                            <TableHead key={colKey} className="whitespace-nowrap text-xs">
+                            <TableHead
+                              key={colKey}
+                              className="whitespace-nowrap text-xs"
+                            >
                               {col?.label || colKey}
                               {col?.required && (
                                 <span className="ml-1 text-red-500">*</span>
@@ -1248,14 +1333,21 @@ export default function ImportModal({
                     <TableBody>
                       {previewData.map((row, rowIdx) => (
                         <TableRow key={rowIdx}>
-                          {Object.entries(row).map(([colKey, value], colIdx) => (
-                            <TableCell key={colIdx} className="p-2 whitespace-nowrap">
-                              <EditableCell
-                                value={value}
-                                onChange={(newValue) => updatePreviewCell(rowIdx, colKey, newValue)}
-                              />
-                            </TableCell>
-                          ))}
+                          {Object.entries(row).map(
+                            ([colKey, value], colIdx) => (
+                              <TableCell
+                                key={colIdx}
+                                className="p-2 whitespace-nowrap"
+                              >
+                                <EditableCell
+                                  value={value}
+                                  onChange={(newValue) =>
+                                    updatePreviewCell(rowIdx, colKey, newValue)
+                                  }
+                                />
+                              </TableCell>
+                            ),
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -1270,7 +1362,7 @@ export default function ImportModal({
               )}
 
               {/* Progress during import */}
-              {importing && importStatus === 'processing' && (
+              {importing && importStatus === "processing" && (
                 <div className="space-y-2 shrink-0">
                   <Progress value={importProgress} className="h-2" />
                   <p className="text-xs text-muted-foreground text-center">
@@ -1280,17 +1372,21 @@ export default function ImportModal({
               )}
 
               {/* Success/Error messages */}
-              {importStatus === 'success' && (
+              {importStatus === "success" && (
                 <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-950 rounded-lg text-green-700 dark:text-green-300 shrink-0">
                   <CheckCircle2 className="h-4 w-4" />
-                  <span className="text-sm">Import completed successfully!</span>
+                  <span className="text-sm">
+                    Import completed successfully!
+                  </span>
                 </div>
               )}
 
-              {importStatus === 'error' && errors.length > 0 && (
+              {importStatus === "error" && errors.length > 0 && (
                 <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-950 rounded-lg text-red-700 dark:text-red-300 shrink-0">
                   <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm">{errors[errors.length - 1]?.message || 'Import failed'}</span>
+                  <span className="text-sm">
+                    {errors[errors.length - 1]?.message || "Import failed"}
+                  </span>
                 </div>
               )}
             </div>
@@ -1299,35 +1395,39 @@ export default function ImportModal({
 
         <DialogFooter className="gap-2 px-6 py-4 border-t mt-auto shrink-0">
           {step > 1 && step < 3 && (
-            <Button variant="outline" onClick={() => setStep(step - 1)} disabled={importing}>
+            <Button
+              variant="outline"
+              onClick={() => setStep(step - 1)}
+              disabled={importing}
+            >
               Back
             </Button>
           )}
-          
+
           <Button variant="outline" onClick={handleClose} disabled={importing}>
             Cancel
           </Button>
-          
+
           {step === 1 && file && (
             <Button onClick={() => setStep(2)}>
               Continue
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           )}
-          
+
           {step === 2 && (
-            <Button 
-              onClick={() => setStep(3)} 
+            <Button
+              onClick={() => setStep(3)}
               disabled={missingRequired.length > 0}
             >
               Preview & Edit
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           )}
-          
+
           {step === 3 && (
-            <Button 
-              onClick={handleImport} 
+            <Button
+              onClick={handleImport}
               disabled={importing || missingRequired.length > 0}
               className="min-w-[100px]"
             >

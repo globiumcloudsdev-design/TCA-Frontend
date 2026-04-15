@@ -16,12 +16,13 @@
 import { useForm, Controller, useFieldArray } from 'react-hook-form'; // Added useFieldArray
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { 
+import {
   InputField,
   SelectField,
   TextareaField,
   DatePickerField,
   FormSubmitButton,
+  SwitchField
 } from '@/components/common';
 import PhoneInputField from '@/components/common/PhoneInput';
 import CnicInput from '@/components/common/CnicInput';
@@ -29,18 +30,17 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { 
+import {
   PlusCircle, X, Upload, ChevronLeft, ChevronRight, Plus, Trash2, // Added Plus, Trash2
-  User, GraduationCap, Users, Phone, MapPin, Heart, DollarSign, BookOpen 
+  User, GraduationCap, Users, Phone, MapPin, Heart, DollarSign, BookOpen
 } from 'lucide-react';
-import { 
-  GENDER_OPTIONS, RELIGION_OPTIONS, BLOOD_GROUP_OPTIONS, DOCUMENT_TYPES ,CONCESSION_OPTIONS,GUARDIAN_TYPES
+import {
+  GENDER_OPTIONS, RELIGION_OPTIONS, BLOOD_GROUP_OPTIONS, DOCUMENT_TYPES, CONCESSION_OPTIONS, GUARDIAN_TYPES
 } from '@/constants';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { useRef, useMemo } from 'react'; 
-import { classService, academicYearService } from '@/services'; 
+import { useRef, useMemo } from 'react';
+import { classService, academicYearService } from '@/services';
 
 const generateUniqueId = (prefix = 'doc') => `${prefix}-${new Date().getTime()}-${Math.floor(Math.random() * 1000)}`;
 const VALID_DOCUMENT_TYPES = new Set(DOCUMENT_TYPES.map((d) => d.value));
@@ -59,7 +59,7 @@ export default function StudentForm({
   const [selectedAcademicYear, setSelectedAcademicYear] = useState(
     defaultValues.details?.studentDetails?.academic_year_id || ''
   );
-  
+
   // Use refs to track previous values for reset logic without triggering re-renders
   const prevClassRef = useRef(defaultValues.details?.studentDetails?.class_id || '');
 
@@ -75,7 +75,7 @@ export default function StudentForm({
     getValues,
     reset,
     formState: { errors },
-  } = useForm({ 
+  } = useForm({
     defaultValues: {
       documents: [],
       guardians: [{ name: '', relation: 'guardian', phone: '', cnic: '', email: '', type: 'guardian' }],
@@ -85,9 +85,9 @@ export default function StudentForm({
           ...defaultValues.details?.studentDetails,
         }
       }
-    } 
+    }
   });
-  
+
   // Guardians Array
   const { fields: guardianFields, append: appendGuardian, remove: removeGuardian } = useFieldArray({
     control,
@@ -99,7 +99,7 @@ export default function StudentForm({
     control,
     name: 'documents'
   });
-  
+
   // Watch documents for preview
   const watchDocuments = watch('documents');
   const watchGuardians = watch('guardians');
@@ -109,7 +109,7 @@ export default function StudentForm({
     if (defaultValues && Object.keys(defaultValues).length > 0) {
       console.log('🔄 Resetting form with:', defaultValues);
       reset(defaultValues);
-      
+
       // Set selected values
       if (defaultValues.details?.studentDetails?.academic_year_id) {
         setSelectedAcademicYear(defaultValues.details.studentDetails.academic_year_id);
@@ -128,12 +128,14 @@ export default function StudentForm({
     queryKey: ['academic-years', instituteId],
     queryFn: async () => {
       try {
-        const response = await academicYearService.getAll({ 
-          institute_id: instituteId, 
-          is_active: true 
+        const response = await academicYearService.getAll({
+          institute_id: instituteId,
+          is_active: true
         });
-        const years = response.data || [];
-        return years.map(y => ({
+        const data = response.data || response || [];
+        const finalYears = Array.isArray(data.rows) ? data.rows : (Array.isArray(data) ? data : []);
+        
+        return finalYears.map(y => ({
           value: y.id,
           label: y.name
         }));
@@ -152,17 +154,17 @@ export default function StudentForm({
     queryKey: ['classes', instituteId, selectedAcademicYear],
     queryFn: async () => {
       if (!selectedAcademicYear) return [];
-      
+
       try {
-        // Yeh wahi ClassForm wala endpoint hai jo sections bhi return karta hai
-        const response = await classService.getAll({ 
+        const response = await classService.getAll({
           academic_year_id: selectedAcademicYear,
-          include_sections: true 
+          include_sections: true
         });
-        
-        // Response structure: { data: rows }
-        const classList = response.data?.rows || response.data || [];
-        
+
+        // Ensure we always return an array
+        const data = response.data || response || [];
+        const classList = Array.isArray(data.rows) ? data.rows : (Array.isArray(data) ? data : []);
+
         console.log('📚 Classes with sections:', classList);
         return classList;
       } catch (error) {
@@ -178,12 +180,16 @@ export default function StudentForm({
   const watchClass = watch('class_id');
   const watchSection = watch('section_id');
 
+  const selectedClassData = useMemo(() => {
+    if (!Array.isArray(classes)) return null;
+    return classes.find((c) => String(c?.id) === String(watchClass)) || null;
+  }, [classes, watchClass]);
+
   // Sections are embedded inside selected class payload.
   const sections = useMemo(() => {
-    if (!watchClass || !classes.length) return [];
+    if (!watchClass || !selectedClassData) return [];
 
-    const selectedClass = classes.find((c) => String(c?.id) === String(watchClass));
-    const rawSections = Array.isArray(selectedClass?.sections) ? selectedClass.sections : [];
+    const rawSections = Array.isArray(selectedClassData?.sections) ? selectedClassData.sections : [];
 
     return rawSections
       .map((section) => ({
@@ -193,13 +199,10 @@ export default function StudentForm({
       }))
       .filter((section) => section.id)
       .filter((section) => section.is_active);
-  }, [watchClass, classes]);
-
-  const selectedClassData = useMemo(() => {
-    return classes.find((c) => String(c?.id) === String(watchClass)) || null;
-  }, [classes, watchClass]);
+  }, [watchClass, selectedClassData]);
 
   const selectedSectionData = useMemo(() => {
+    if (!Array.isArray(sections)) return null;
     return sections.find((s) => String(s?.id) === String(watchSection)) || null;
   }, [sections, watchSection]);
 
@@ -337,7 +340,7 @@ export default function StudentForm({
   // ─────────────────────────────────────────────────────────────────
   const onSubmitForm = (data) => {
     console.log('📤 Submitting form data:', data);
-    
+
     // Create FormData for multipart/form-data submission (required for files)
     const formData = new FormData();
 
@@ -373,6 +376,9 @@ export default function StudentForm({
       'fee_plan_id',
       'monthly_fee',
       'admission_fee',
+      'discount_type',
+      'lab_charges',
+      'annual_charges',
       'concession_type',
       'concession_percentage',
       'concession_reason',
@@ -383,7 +389,7 @@ export default function StudentForm({
       'status',
       'is_active'
     ]);
-    
+
     // 1. Basic Fields
     Object.keys(data).forEach((key) => {
       if (!editableKeys.has(key)) return;
@@ -401,7 +407,7 @@ export default function StudentForm({
     if (sectionId) formData.set('section_id', sectionId);
     if (className) formData.set('class_name', className);
     if (sectionName) formData.set('section_name', sectionName);
-    
+
     // 2. Guardians (normalize: guardian type == relation + include email)
     const normalizedGuardians = (Array.isArray(data.guardians) ? data.guardians : [])
       .map((g) => {
@@ -420,7 +426,7 @@ export default function StudentForm({
     if (normalizedGuardians.length > 0) {
       formData.append('guardians', JSON.stringify(normalizedGuardians));
     }
-    
+
     // 3. Details (Send as JSON string or flat fields? Backend expects flat for some, JSON for others?)
     // The previous implementation sent `details` object. If strict multipart, we might need to stringify it.
     // However, `student.controller.js` parses body... let's see.
@@ -446,9 +452,9 @@ export default function StudentForm({
     // 4. Documents & Files
     // The `documents` array contains metadata. The actual files are in `doc.file`.
     // We need to separate metadata and files.
-    
+
     const documentMetadata = [];
-    
+
     if (data.documents && Array.isArray(data.documents)) {
       data.documents.forEach((doc, index) => {
         // Add file to FormData if it exists and is a File object
@@ -459,7 +465,7 @@ export default function StudentForm({
           // Multer will populate req.files with these files.
           formData.append('documents', doc.file);
         }
-        
+
         // Add metadata (excluding the File object itself to avoid circular json issues or huge payload)
         const { file, ...meta } = doc;
         const normalizedType = VALID_DOCUMENT_TYPES.has(meta.type)
@@ -472,14 +478,14 @@ export default function StudentForm({
         });
       });
     }
-    
+
     // Append document metadata as JSON string
     const documentsJson = JSON.stringify(documentMetadata);
     formData.append('documents_meta', documentsJson);
     formData.append('documents', documentsJson);
     formData.append('institute_id', instituteId);
     formData.append('institute_type', instituteType);
-    
+
     // Submit FormData
     onSubmit(formData);
   };
@@ -536,69 +542,69 @@ export default function StudentForm({
                   <User className="h-5 w-5 text-muted-foreground" />
                   <h3 className="text-sm font-semibold">Basic Information</h3>
                 </div>
-                
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InputField 
-                    label="First Name" 
-                    name="first_name" 
-                    register={register} 
-                    error={errors.first_name} 
-                    required 
-                    placeholder="e.g. Ahmed" 
+                  <InputField
+                    label="First Name"
+                    name="first_name"
+                    register={register}
+                    error={errors.first_name}
+                    required
+                    placeholder="e.g. Ahmed"
                   />
-                  <InputField 
-                    label="Last Name"  
-                    name="last_name"  
-                    register={register} 
-                    error={errors.last_name}  
-                    required 
-                    placeholder="e.g. Ali" 
+                  <InputField
+                    label="Last Name"
+                    name="last_name"
+                    register={register}
+                    error={errors.last_name}
+                    required
+                    placeholder="e.g. Ali"
                   />
-                  <InputField 
-                    label="GR/Reg No"  
-                    name="registration_no"  
-                    register={register} 
-                    error={errors.registration_no}  
-                    placeholder="e.g. 2024-001" 
+                  <InputField
+                    label="GR/Reg No"
+                    name="registration_no"
+                    register={register}
+                    error={errors.registration_no}
+                    placeholder="e.g. 2024-001"
                   />
-                  <DatePickerField 
-                    label="Date of Birth" 
-                    name="dob" 
-                    control={control} 
-                    error={errors.dob} 
+                  <DatePickerField
+                    label="Date of Birth"
+                    name="dob"
+                    control={control}
+                    error={errors.dob}
                     required
                   />
-                  <SelectField 
-                    label="Gender"    
-                    name="gender"     
-                    control={control}   
-                    error={errors.gender}     
-                    options={GENDER_OPTIONS} 
-                    placeholder="Select gender" 
+                  <SelectField
+                    label="Gender"
+                    name="gender"
+                    control={control}
+                    error={errors.gender}
+                    options={GENDER_OPTIONS}
+                    placeholder="Select gender"
                     required
                   />
-                  <SelectField 
-                    label="Blood Group" 
-                    name="blood_group" 
-                    control={control} 
-                    error={errors.blood_group} 
-                    options={BLOOD_GROUP_OPTIONS} 
-                    placeholder="Select blood group" 
+                  <SelectField
+                    label="Blood Group"
+                    name="blood_group"
+                    control={control}
+                    error={errors.blood_group}
+                    options={BLOOD_GROUP_OPTIONS}
+                    placeholder="Select blood group"
                   />
-                  <SelectField 
-                    label="Religion" 
-                    name="religion" 
-                    control={control} 
-                    error={errors.religion} 
-                    options={RELIGION_OPTIONS} 
-                    placeholder="Select religion" 
+                  <SelectField
+                    label="Religion"
+                    name="religion"
+                    control={control}
+                    error={errors.religion}
+                    options={RELIGION_OPTIONS}
+                    placeholder="Select religion"
                   />
-                  <InputField 
-                    label="Nationality" 
-                    name="nationality" 
-                    register={register} 
-                    error={errors.nationality} 
-                    placeholder="e.g. Pakistani" 
+                  <InputField
+                    label="Nationality"
+                    name="nationality"
+                    register={register}
+                    error={errors.nationality}
+                    placeholder="e.g. Pakistani"
                     defaultValue="Pakistani"
                   />
                   <Controller
@@ -634,73 +640,73 @@ export default function StudentForm({
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {/* Academic Year */}
-                  <SelectField 
-                    label="Academic Year" 
-                    name="academic_year_id" 
-                    control={control} 
-                    error={errors.academic_year_id} 
-                    options={academicYears} 
-                    placeholder={yearsLoading ? "Loading..." : "Select"}    
+                  <SelectField
+                    label="Academic Year"
+                    name="academic_year_id"
+                    control={control}
+                    error={errors.academic_year_id}
+                    options={academicYears}
+                    placeholder={yearsLoading ? "Loading..." : "Select"}
                     required
                   />
 
                   {/* Class - ismein sections embedded hain */}
-                  <SelectField 
-                    label={getTerm('class')} 
-                    name="class_id" 
-                    control={control} 
-                    error={errors.class_id} 
-                    options={classes.map(c => ({ value: c.id, label: c.name }))} 
-                    placeholder={!selectedAcademicYear ? "Select year first" : (classesLoading ? "Loading..." : `Select ${getTerm('class')}`)}    
+                  <SelectField
+                    label={getTerm('class')}
+                    name="class_id"
+                    control={control}
+                    error={errors.class_id}
+                    options={classes.map(c => ({ value: c.id, label: c.name }))}
+                    placeholder={!selectedAcademicYear ? "Select year first" : (classesLoading ? "Loading..." : `Select ${getTerm('class')}`)}
                     required
                     disabled={!selectedAcademicYear}
                   />
 
                   {/* Section - yeh class ke sections se aayega */}
-                  <SelectField 
-                    label={getTerm('section')} 
-                    name="section_id" 
-                    control={control} 
-                    error={errors.section_id} 
-                    options={sections.map(s => ({ value: s.id, label: s.name }))} 
-                    placeholder={!watchClass ? `Select ${getTerm('class')} first` : 'Select section'}    
+                  <SelectField
+                    label={getTerm('section')}
+                    name="section_id"
+                    control={control}
+                    error={errors.section_id}
+                    options={sections.map(s => ({ value: s.id, label: s.name }))}
+                    placeholder={!watchClass ? `Select ${getTerm('class')} first` : 'Select section'}
                     disabled={!watchClass}
                   />
 
                   {/* Roll Number */}
-                  <InputField 
-                    label="Roll Number" 
-                    name="roll_no" 
-                    register={register} 
-                    error={errors.roll_no} 
+                  <InputField
+                    label="Roll Number"
+                    name="roll_no"
+                    register={register}
+                    error={errors.roll_no}
                   />
 
                   {/* Admission Date */}
-                  <DatePickerField 
-                    label="Admission Date" 
-                    name="admission_date" 
-                    control={control} 
-                    error={errors.admission_date} 
+                  <DatePickerField
+                    label="Admission Date"
+                    name="admission_date"
+                    control={control}
+                    error={errors.admission_date}
                     required
                   />
                 </div>
 
                 {/* Previous School Info */}
                 <Separator className="my-4" />
-                
+
                 <h4 className="text-sm font-medium">Previous Education</h4>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <InputField 
-                    label="Previous School/College" 
-                    name="previous_school" 
-                    register={register} 
-                    error={errors.previous_school} 
+                  <InputField
+                    label="Previous School/College"
+                    name="previous_school"
+                    register={register}
+                    error={errors.previous_school}
                   />
-                  <InputField 
-                    label="Previous Class/Grade" 
-                    name="previous_class" 
-                    register={register} 
-                    error={errors.previous_class} 
+                  <InputField
+                    label="Previous Class/Grade"
+                    name="previous_class"
+                    register={register}
+                    error={errors.previous_class}
                   />
                 </div>
               </div>
@@ -718,26 +724,26 @@ export default function StudentForm({
                     <Users className="h-5 w-5 text-muted-foreground" />
                     <h3 className="text-sm font-semibold">Guardian Information</h3>
                   </div>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => appendGuardian({ name: '', relation: 'guardian', phone: '', cnic: '', email: '', type: 'guardian' })}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Guardian
                   </Button>
                 </div>
-                
+
                 {guardianFields.map((field, index) => (
                   <div key={field.id} className="relative border p-4 rounded-lg mb-4">
                     <div className="flex justify-between items-start mb-4">
                       <h4 className="text-sm font-medium">Guardian {index + 1}</h4>
                       {guardianFields.length > 1 && (
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => removeGuardian(index)}
                           className="text-destructive h-8 w-8 p-0"
                         >
@@ -756,18 +762,18 @@ export default function StudentForm({
                         placeholder="Select Type"
                         required
                       />
-                      <InputField 
-                        label="Name *" 
-                        name={`guardians.${index}.name`} 
-                        register={register} 
-                        error={errors.guardians?.[index]?.name} 
-                        required 
+                      <InputField
+                        label="Name *"
+                        name={`guardians.${index}.name`}
+                        register={register}
+                        error={errors.guardians?.[index]?.name}
+                        required
                       />
-                      <InputField 
-                        label="Relation" 
-                        name={`guardians.${index}.relation`} 
-                        register={register} 
-                        error={errors.guardians?.[index]?.relation} 
+                      <InputField
+                        label="Relation"
+                        name={`guardians.${index}.relation`}
+                        register={register}
+                        error={errors.guardians?.[index]?.relation}
                         disabled
                       />
                       <Controller
@@ -811,16 +817,16 @@ export default function StudentForm({
                 ))}
 
                 {guardianFields.length === 0 && (
-                   <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                  <div className="text-center py-8 border-2 border-dashed rounded-lg">
                     <p className="text-sm text-muted-foreground">No guardians added</p>
-                    <Button 
-                      type="button" 
-                      variant="link" 
+                    <Button
+                      type="button"
+                      variant="link"
                       onClick={() => appendGuardian({ name: '', relation: 'father', phone: '', cnic: '', email: '', type: 'father' })}
                     >
                       Add Primary Guardian
                     </Button>
-                   </div>
+                  </div>
                 )}
               </div>
             </CardContent>
@@ -836,7 +842,7 @@ export default function StudentForm({
                   <Phone className="h-5 w-5 text-muted-foreground" />
                   <h3 className="text-sm font-semibold">Contact Details</h3>
                 </div>
-                
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Controller
                     name="phone"
@@ -861,21 +867,21 @@ export default function StudentForm({
                   <h3 className="text-sm font-semibold">Address</h3>
                 </div>
 
-                <TextareaField 
-                  label="Present Address" 
-                  name="present_address" 
-                  register={register} 
-                  error={errors.present_address} 
-                  required 
-                  rows={2} 
+                <TextareaField
+                  label="Present Address"
+                  name="present_address"
+                  register={register}
+                  error={errors.present_address}
+                  required
+                  rows={2}
                 />
 
-                <TextareaField 
-                  label="Permanent Address" 
-                  name="permanent_address" 
-                  register={register} 
-                  error={errors.permanent_address} 
-                  rows={2} 
+                <TextareaField
+                  label="Permanent Address"
+                  name="permanent_address"
+                  register={register}
+                  error={errors.permanent_address}
+                  rows={2}
                 />
 
                 <Separator className="my-4" />
@@ -919,10 +925,85 @@ export default function StudentForm({
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InputField label="Monthly Fee (PKR)" name="monthly_fee" register={register} error={errors.monthly_fee} type="number" />
-                  <InputField label="Admission Fee (PKR)" name="admission_fee" register={register} error={errors.admission_fee} type="number" />
+                  <InputField
+                    placeholder="Enter Monthly Fee charges"
+                    label="Monthly Fee (PKR)"
+                    name="monthly_fee"
+                    register={register}
+                    error={errors.monthly_fee}
+                    type="number"
+                  />
+                  <InputField
+                    label="Admission Fee (PKR)"
+                    name="admission_fee"
+                    register={register}
+                    error={errors.admission_fee}
+                    placeholder="Enter Admission Fee charges"
+                    type="number"
+                  />
                   <SelectField label="Concession" name="concession_type" control={control} error={errors.concession_type} options={CONCESSION_OPTIONS} />
-                  <InputField label="Concession %" name="concession_percentage" register={register} error={errors.concession_percentage} type="number" />
+                  {/* Discount Type and Concession logic */}
+                  <Controller
+                    name="discount_type"
+                    control={control}
+                    defaultValue="fixed"
+                    render={({ field }) => (
+                      <SelectField
+                        label="Discount Type"
+                        options={[
+                          { value: 'fixed', label: 'Fixed' },
+                          { value: 'percentage', label: 'Percentage' },
+                        ]}
+                        value={field.value}
+                        onChange={field.onChange}
+                        error={errors.discount_type}
+                        placeholder="Select discount type"
+                      />
+                    )}
+                  />
+                  {/* Show Concession % only if discount_type is percentage */}
+                  {watch('discount_type') === 'percentage' && (
+                    <InputField
+                      label="Concession %"
+                      name="concession_percentage"
+                      register={register}
+                      error={errors.concession_percentage}
+                      placeholder="Enter Concession %"
+                      type="number"
+                      min={0}
+                      max={100}
+                    />
+                  )}
+                  {/* Show Concession Amount only if discount_type is fixed */}
+                  {watch('discount_type') === 'fixed' && (
+                    <InputField
+                      label="Concession Amount"
+                      name="concession_amount"
+                      register={register}
+                      error={errors.concession_amount}
+                      placeholder="Enter Concession Amount"
+                      type="number"
+                      min={0}
+                    />
+                  )}
+                  <InputField
+                    label="Annual Charges"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    {...register('annual_charges')}
+                    error={errors.annual_charges}
+                    placeholder="Enter annual charges"
+                  />
+                  <InputField
+                    label="Lab Charges"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    {...register('lab_charges')}
+                    error={errors.lab_charges}
+                    placeholder="Enter lab charges"
+                  />
                 </div>
 
                 <TextareaField label="Concession Reason" name="concession_reason" register={register} error={errors.concession_reason} rows={1} />
@@ -941,16 +1022,12 @@ export default function StudentForm({
 
                 {/* Status */}
                 <div className="flex items-center justify-between rounded-lg border p-4">
-                  <div>
-                    <Label htmlFor="is_active">Active Status</Label>
-                    <p className="text-sm text-muted-foreground">Student can login and access portal</p>
-                  </div>
-                  <Controller
+
+                  <SwitchField
+                    label="Active"
                     name="is_active"
                     control={control}
-                    render={({ field }) => (
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    )}
+                    hint="Student can login and access portal"
                   />
                 </div>
               </div>
@@ -968,24 +1045,24 @@ export default function StudentForm({
                     <BookOpen className="h-5 w-5 text-muted-foreground" />
                     <h3 className="text-sm font-semibold">Documents</h3>
                   </div>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => document.getElementById('document-upload').click()}
                   >
                     <Upload className="h-4 w-4 mr-2" />
                     Upload
                   </Button>
                   <input
-                      type="file"
-                      id="document-upload"
-                      multiple
-                      className="hidden"
-                      onChange={handleDocumentUpload}
-                    />
+                    type="file"
+                    id="document-upload"
+                    multiple
+                    className="hidden"
+                    onChange={handleDocumentUpload}
+                  />
                 </div>
-                
+
                 <p className="text-sm text-muted-foreground">Upload Student Documents (Results, B-Form, etc.)</p>
 
                 {docFields.length === 0 ? (
@@ -998,42 +1075,42 @@ export default function StudentForm({
                       <div key={field.id} className="border rounded-lg p-4">
                         <div className="flex justify-between items-start mb-3">
                           <h4 className="font-medium text-sm">Document {index + 1}</h4>
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => removeDoc(index)}
                             className="text-destructive p-0 h-6 w-6"
                           >
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
-                        
+
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <SelectField
-                              label="Type *"
-                              name={`documents.${index}.type`}
-                              control={control}
-                              error={errors.documents?.[index]?.type}
-                              options={DOCUMENT_TYPES}
-                              placeholder="Select Type"
-                              required
-                            />
-                            <InputField
-                                label="Title *"
-                                name={`documents.${index}.title`}
-                                register={register}
-                                error={errors.documents?.[index]?.title}
-                                placeholder="Details.."
-                                required
-                            />
+                          <SelectField
+                            label="Type *"
+                            name={`documents.${index}.type`}
+                            control={control}
+                            error={errors.documents?.[index]?.type}
+                            options={DOCUMENT_TYPES}
+                            placeholder="Select Type"
+                            required
+                          />
+                          <InputField
+                            label="Title *"
+                            name={`documents.${index}.title`}
+                            register={register}
+                            error={errors.documents?.[index]?.title}
+                            placeholder="Details.."
+                            required
+                          />
                         </div>
-                        
+
                         <div className="mt-2 text-xs text-muted-foreground flex items-center justify-between">
-                           <span>{field.file_name}</span>
-                           {field.file_url && (
-                             <a href={field.file_url} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">View</a>
-                           )}
+                          <span>{field.file_name}</span>
+                          {field.file_url && (
+                            <a href={field.file_url} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">View</a>
+                          )}
                         </div>
                       </div>
                     ))}

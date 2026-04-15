@@ -15,13 +15,8 @@ import {
   DollarSign,
   TrendingUp,
   AlertCircle,
-  ArrowUpRight,
-  CheckCircle2,
   MoreHorizontal,
-  Calendar,
-  ChevronRight,
-  Users,
-  CreditCard,
+  ChevronLeft,
   Receipt,
   FileText,
   Sparkles
@@ -29,61 +24,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import DataTable from "@/components/common/DataTable";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import SelectField from "@/components/common/SelectField";
+import { useRouter } from "next/navigation";
 
 // --- Elegant Light-Modern Theme ---
 const MOCK_STATS = [
-  {
-    label: "Annual Revenue",
-    value: "$1.24M",
-    icon: DollarSign,
-    trend: "+12.5%",
-    trendUp: true,
-    color: "text-indigo-600",
-    bg: "bg-gradient-to-br from-indigo-50/80 to-indigo-100/20",
-    border: "border-indigo-100/50",
-    dot: "bg-indigo-400"
-  },
-  {
-    label: "Total Collected",
-    value: "$880.2k",
-    icon: Receipt,
-    trend: "+5.2%",
-    trendUp: true,
-    color: "text-emerald-600",
-    bg: "bg-gradient-to-br from-emerald-50/80 to-emerald-100/20",
-    border: "border-emerald-100/50",
-    dot: "bg-emerald-400"
-  },
-  {
-    label: "Pending Dues",
-    value: "$360.3k",
-    icon: AlertCircle,
-    trend: "-2.1%",
-    trendUp: false,
-    color: "text-amber-600",
-    bg: "bg-gradient-to-br from-amber-50/80 to-amber-100/20",
-    border: "border-amber-100/50",
-    dot: "bg-amber-400"
-  },
-  {
-    label: "Daily Collection",
-    value: "$12.4k",
-    icon: CreditCard,
-    trend: "+14.2%",
-    trendUp: true,
-    color: "text-violet-600",
-    bg: "bg-gradient-to-br from-violet-50/80 to-violet-100/20",
-    border: "border-violet-100/50",
-    dot: "bg-violet-400"
-  },
+  { label: "Annual Revenue", value: "$1.24M", icon: DollarSign, trend: "+12.5%", trendUp: true, color: "text-indigo-600", bg: "bg-indigo-500", grad: "from-indigo-500/10 to-transparent", border: "border-indigo-100" },
+  { label: "Total Collected", value: "$880.2k", icon: Receipt, trend: "+5.2%", trendUp: true, color: "text-emerald-600", bg: "bg-emerald-500", grad: "from-emerald-500/10 to-transparent", border: "border-emerald-100" },
+  { label: "Pending Dues", value: "$360.3k", icon: AlertCircle, trend: "-2.1%", trendUp: false, color: "text-amber-600", bg: "bg-amber-500", grad: "from-amber-500/10 to-transparent", border: "border-amber-100" },
+  { label: "Other Income", value: "$12.4k", icon: Sparkles, trend: "+14.2%", trendUp: true, color: "text-violet-600", bg: "bg-violet-500", grad: "from-violet-500/10 to-transparent", border: "border-violet-100" },
 ];
 
 const MOCK_CHART_DATA = [
@@ -115,22 +64,21 @@ const generateMockData = () => {
 const MOCK_TABLE_DATA = generateMockData();
 
 export default function FeeCollectionDummyApp() {
+  const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+  React.useEffect(() => { setMounted(true); }, []);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [classFilter, setClassFilter] = useState("");
 
   const filteredData = useMemo(() => {
-    return MOCK_TABLE_DATA.filter(
-      (item) =>
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.regNo.toLowerCase().includes(searchTerm.toLowerCase()),
+    return MOCK_TABLE_DATA.filter((item) =>
+      (item.name.toLowerCase().includes(searchTerm.toLowerCase()) || item.regNo.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      (classFilter === "" || item.class === classFilter)
     );
-  }, [searchTerm]);
+  }, [searchTerm, classFilter]);
 
   const totalPages = Math.ceil(filteredData.length / pageSize);
   const paginatedData = useMemo(() => {
@@ -151,7 +99,7 @@ export default function FeeCollectionDummyApp() {
           </div>
           <div className="flex flex-col">
             <span className="font-semibold text-slate-800 text-sm whitespace-nowrap">{row.original.name}</span>
-            <span className="text-[10px] text-slate-400 font-semibold tracking-tight uppercase leading-none mt-1">{row.original.regNo}</span>
+            <span className="text-[10px] text-slate-400 font-semibold tracking-tight uppercase mt-1">{row.original.regNo}</span>
           </div>
         </div>
       ),
@@ -164,12 +112,12 @@ export default function FeeCollectionDummyApp() {
       cell: ({ getValue }) => {
         const val = getValue();
         const config = {
-          Paid: "bg-emerald-50 text-emerald-600 border-emerald-100/50",
-          Overdue: "bg-rose-50 text-rose-600 border-rose-100/50",
-          Partial: "bg-amber-50 text-amber-600 border-amber-100/50",
+          Paid: "bg-emerald-50 text-emerald-600 border-emerald-100",
+          Overdue: "bg-rose-50 text-rose-600 border-rose-100",
+          Partial: "bg-amber-50 text-amber-600 border-amber-100",
         };
         return (
-          <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-semibold border uppercase tracking-wider shadow-sm", config[val] || "bg-slate-50")}>
+          <span className={cn("px-2.5 py-1 rounded-md text-[10px] font-semibold border uppercase tracking-wider shadow-sm", config[val] || "bg-slate-50")}>
             {val}
           </span>
         );
@@ -191,63 +139,50 @@ export default function FeeCollectionDummyApp() {
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-700 max-w-[1600px] mx-auto pb-10">
+    <div className="space-y-6">
       
-      {/* --- ELEGANT SOFT COLORFUL HEADER --- */}
-      <div className="relative rounded-2xl p-8 overflow-hidden bg-white border border-slate-200 shadow-xl shadow-slate-100/50">
-        <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-indigo-50 opacity-40 pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-50 rounded-full blur-3xl opacity-60 pointer-events-none" />
-        
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="text-center md:text-left space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-semibold uppercase tracking-wider border border-indigo-100 shadow-sm">
-              <Sparkles size={12} /> Live Financial Analytics
+      {/* HEADER OVERHAUL */}
+      <div className="relative rounded-2xl p-7 flex flex-col sm:flex-row items-center justify-between gap-6 bg-white border border-slate-200 shadow-xl shadow-slate-200/40">
+         <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-amber-50/50 pointer-events-none" />
+         <div className="flex items-center gap-5 relative z-10 w-full sm:w-auto">
+            <button onClick={() => router.back()} className="h-11 w-11 flex items-center justify-center rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition-all shadow-sm active:scale-95">
+              <ChevronLeft size={22} className="text-slate-600" />
+            </button>
+            <div className="space-y-1">
+               <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-full border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest shadow-sm">
+                 <Receipt size={12} /> Live Financial Analytics
+               </div>
+               <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Fee Collection Report</h1>
             </div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-              Fee Collection Dashboard
-            </h1>
-            <p className="text-slate-500 text-base font-medium max-w-xl">
-              Visualize your institute's collection efficiency with precision and modern analytics.
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Button variant="outline" className="h-10 border-slate-200 rounded-xl px-4 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
-              <Download size={14} className="mr-2" /> Export Excel
-            </Button>
-            <Button className="h-10 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-6 text-xs font-semibold shadow-lg shadow-indigo-100 transition-all active:scale-95">
-              <FileText size={14} className="mr-2" /> Daily Report
-            </Button>
-          </div>
-        </div>
+         </div>
+
+         <div className="flex items-center gap-3 relative z-10 w-full sm:w-auto">
+           <Button variant="outline" className="flex-1 sm:flex-none h-11 border-slate-200 rounded-2xl px-5 text-[13px] font-bold text-slate-600 hover:bg-slate-50 shadow-sm transition-all active:scale-95">
+             <Download size={16} className="mr-2" /> Export Excel
+           </Button>
+           <Button className="flex-1 sm:flex-none h-11 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl px-6 text-[13px] font-bold shadow-lg shadow-slate-200 transition-all active:scale-95">
+             Print PDF
+           </Button>
+         </div>
       </div>
 
-      {/* --- SOFT GRADIENT STATS --- */}
+      {/* STATS OVERHAUL */}
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {MOCK_STATS.map((stat, i) => {
           const Icon = stat.icon;
           return (
-            <div key={i} className={cn("group rounded-2xl border p-5 transition-all hover:shadow-xl hover:-translate-y-1 relative overflow-hidden", stat.bg, stat.border)}>
-              <div className="flex justify-between items-start mb-4 relative z-10">
-                <div className={cn("p-2.5 rounded-xl bg-white shadow-sm transition-all group-hover:scale-110", stat.color)}>
-                  <Icon size={18} strokeWidth={2.5} />
-                </div>
-                <div className={cn("flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-lg border-2 shadow-sm", stat.trendUp ? "bg-emerald-50 text-emerald-600 border-white/50" : "bg-rose-50 text-rose-600 border-white/50")}>
-                  {stat.trendUp ? "+" : ""}{stat.trend}
-                </div>
-              </div>
-              <div className="space-y-0.5 relative z-10">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                <h3 className="text-2xl font-bold text-slate-900 tabular-nums">{stat.value}</h3>
-              </div>
-              {/* Decorative Dot */}
-              <div className={cn("absolute bottom-4 right-4 w-4 h-4 rounded-full blur-sm opacity-20", stat.dot)} />
+            <div key={i} className={cn("group rounded-2xl border bg-white p-5 transition-all hover:shadow-xl relative overflow-hidden group border-slate-200")}>
+              <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", stat.grad)} />
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">{stat.label}</p>
+              <h3 className="text-2xl font-bold text-slate-900 tabular-nums relative z-10 mt-1">{stat.value}</h3>
+              <div className={cn("absolute bottom-4 right-4 h-1 w-8 rounded-full opacity-50 transition-all group-hover:w-12", stat.bg)} />
             </div>
           );
         })}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-12">
-        {/* --- LIGHT ELEGANT CHART --- */}
+        {/* CHART AREA */}
         <div className="lg:col-span-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex justify-between items-center mb-10">
             <div>
@@ -277,90 +212,64 @@ export default function FeeCollectionDummyApp() {
                 <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 700 }} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 700 }} tickFormatter={(v) => `$${v}k`} />
                 <RechartsTooltip 
-                  contentStyle={{ borderRadius: "12px", border: "none", padding: "10px", fontSize: "11px", fontWeight: 800, boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)", backgroundColor: "rgba(255, 255, 255, 0.9)", backdropFilter: "blur(5px)" }}
+                  contentStyle={{ borderRadius: "12px", border: "none", padding: "10px", fontSize: "11px", fontWeight: 700, boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)", backgroundColor: "rgba(255, 255, 255, 0.9)" }}
                   cursor={{ stroke: "#6366f1", strokeWidth: 1.5, strokeDasharray: "4 4" }}
                 />
-                <Area type="monotone" dataKey="collected" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#softWave)" animationDuration={1000} />
-                <Area type="monotone" dataKey="expected" stroke="#cbd5e1" strokeWidth={1} strokeDasharray="5 5" fill="transparent" />
+                <Area type="monotone" dataKey="collected" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#softWave)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* --- PERFORMANCE INSIGHTS --- */}
-        <div className="lg:col-span-4 rounded-2xl border border-slate-200 bg-slate-50/30 p-6 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Sparkles size={14} className="text-indigo-600" />
-              <h3 className="text-sm font-semibold text-slate-900 tracking-tight uppercase">Payment Channels</h3>
-            </div>
-            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest mb-8">Efficiency Breakdown</p>
-            
-            <div className="space-y-7">
-              {[
-                { l: "Digital Banking", p: 82, c: "bg-indigo-500", b: "bg-indigo-100" },
-                { l: "Cash Desk", p: 15, c: "bg-emerald-500", b: "bg-emerald-100" },
-                { l: "Cheques", p: 3, c: "bg-amber-500", b: "bg-amber-100" },
-              ].map((it, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                    <span>{it.l}</span>
-                    <span className="text-slate-900">{it.p}%</span>
-                  </div>
-                  <div className={cn("h-1.5 w-full rounded-full", it.b)}>
-                    <div className={cn("h-full rounded-full transition-all duration-1000")} style={{ width: `${it.p}%`, backgroundColor: it.c }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <div className="mt-10 p-4 rounded-xl bg-white border border-slate-200 shadow-sm relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-16 h-16 bg-amber-50 rounded-full blur-2xl opacity-40 pointer-events-none" />
-            <div className="flex items-center gap-2.5 text-amber-500 mb-2 relative z-10">
-              <AlertCircle size={16} strokeWidth={3} />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Action Required</span>
-            </div>
-            <p className="text-xs text-slate-500 font-medium leading-relaxed relative z-10">
-              There are <span className="text-indigo-600 font-semibold">12 high-priority</span> invoices pending. We recommend sending automated reminders.
-            </p>
-          </div>
+        {/* SIDE ACTIONS */}
+        <div className="lg:col-span-4 rounded-2xl border border-slate-200 bg-slate-50/10 p-6 flex flex-col justify-between">
+           <div className="space-y-6">
+              <div className="space-y-1">
+                 <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-tight flex items-center gap-2">
+                   <Filter size={14} className="text-slate-400" /> Quick Filters
+                 </h3>
+                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pl-6">Narrow down results</p>
+              </div>
+              
+              <div className="space-y-4">
+                 <div className="relative">
+                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                   <input
+                     type="text"
+                     placeholder="Search student..."
+                     value={searchTerm}
+                     onChange={(e) => setSearchTerm(e.target.value)}
+                     className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-xs focus:ring-4 focus:ring-slate-100 transition-all outline-none"
+                   />
+                 </div>
+                 
+                 <SelectField
+                   label="Class Filter"
+                   placeholder="All Classes"
+                   value={classFilter}
+                   onChange={setClassFilter}
+                   options={[
+                     { value: "Grade 10-A", label: "Grade 10-A" },
+                     { value: "Grade 9-B", label: "Grade 9-B" },
+                     { value: "Grade 11-Science", label: "Grade 11-Science" },
+                   ]}
+                 />
+              </div>
+           </div>
+           
+           <div className="mt-8 p-4 rounded-xl bg-white border border-slate-100 shadow-sm relative overflow-hidden group">
+              <div className="flex items-center gap-2 text-amber-500 mb-2 font-bold text-xs uppercase tracking-tight">
+                <AlertCircle size={14} /> Attention
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Collection rate is <span className="text-indigo-600 font-bold">12% lower</span> than last month. Consider review.
+              </p>
+           </div>
         </div>
       </div>
 
-      {/* --- CLEAN LEDGER TABLE --- */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden border-b-2">
-        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white/50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-sm">
-              <Receipt size={18} />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-slate-900 tracking-tight">Recent Transactions</h3>
-              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">Updated 2 minutes ago</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-80 group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" size={16} />
-              <input
-                type="text"
-                placeholder="Search students or vouchers..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full pl-11 pr-5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:bg-white focus:border-indigo-400 transition-all duration-300"
-              />
-            </div>
-            <Button variant="outline" size="sm" className="h-[40px] border-slate-200 text-slate-400 hover:text-indigo-600 rounded-xl px-3 shadow-sm transition-all">
-              <Filter size={16} />
-            </Button>
-          </div>
-        </div>
-
+      {/* REUSABLE DATA TABLE */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/40 overflow-hidden">
         <div className="p-0 compact-table border-none">
           <DataTable
             columns={columns}
@@ -377,9 +286,6 @@ export default function FeeCollectionDummyApp() {
               pageSize: pageSize,
             }}
           />
-        </div>
-        <div className="p-3 bg-slate-50/50 flex items-center justify-center gap-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-t border-slate-100">
-           End of Recent Records
         </div>
       </div>
     </div>

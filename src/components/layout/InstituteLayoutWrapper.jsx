@@ -219,15 +219,6 @@
 // //   );
 // // }
 
-
-
-
-
-
-
-
-
-
 /**
  * InstituteLayoutWrapper — v3
  * Header: AppBreadcrumb + NotificationBell + ThemeToggle + AvatarWithInitials
@@ -236,24 +227,24 @@
  * All provided components used as-is from @/components/shared/.
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { cn } from '@/lib/utils';
-import useAuthStore from '@/store/authStore';
-import { useInstituteNav } from '@/hooks/useInstituteConfig';
-import useInstituteConfig from '@/hooks/useInstituteConfig';
-import * as Icons from 'lucide-react';
-import { toast } from 'sonner';
-import { authService } from '@/services';
+import { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+import useAuthStore from "@/store/authStore";
+import { useInstituteNav } from "@/hooks/useInstituteConfig";
+import useInstituteConfig from "@/hooks/useInstituteConfig";
+import * as Icons from "lucide-react";
+import { toast } from "sonner";
+import { authService } from "@/services";
 
 // ── Shared components ────────────────────────────────────────────
-import AppBreadcrumb      from '@/components/common/AppBreadcrumb';
-import NotificationBell   from '@/components/common/NotificationBell';
-import ThemeToggle        from '@/components/common/ThemeToggle';
-import AvatarWithInitials from '@/components/common/AvatarWithInitials';
+import AppBreadcrumb from "@/components/common/AppBreadcrumb";
+import NotificationBell from "@/components/common/NotificationBell";
+import ThemeToggle from "@/components/common/ThemeToggle";
+import AvatarWithInitials from "@/components/common/AvatarWithInitials";
 
 /* ─────────────────────────────────────────────
    useBreadcrumbs
@@ -275,15 +266,15 @@ function useBreadcrumbs(navItems, pathname, dashboardPath) {
 
     // Exact match on dashboard path
     if (pathname === dashboardPath) {
-      return [{ label: 'Dashboard' }];
+      return [{ label: "Dashboard" }];
     }
 
-    const items = [{ label: 'Dashboard', href: dashboardPath }];
-    const segments = pathname.split('/').filter(Boolean);
-    let accumulated = '';
+    const items = [{ label: "Dashboard", href: dashboardPath }];
+    const segments = pathname.split("/").filter(Boolean);
+    let accumulated = "";
 
     segments.forEach((seg, idx) => {
-      accumulated += '/' + seg;
+      accumulated += "/" + seg;
       const label = map[accumulated];
       const isLast = idx === segments.length - 1;
 
@@ -292,7 +283,7 @@ function useBreadcrumbs(navItems, pathname, dashboardPath) {
       } else if (isLast) {
         // Readable fallback for dynamic segments (IDs, slugs, etc.)
         const readable = seg
-          .replace(/[-_]/g, ' ')
+          .replace(/[-_]/g, " ")
           .replace(/\b\w/g, (c) => c.toUpperCase());
         // Avoid duplicate with previous item
         if (readable !== items[items.length - 1]?.label) {
@@ -309,21 +300,22 @@ function useBreadcrumbs(navItems, pathname, dashboardPath) {
    NavItem
 ───────────────────────────────────────────── */
 function NavItem({ item, isCollapsed, pathname }) {
-  const Icon     = Icons[item.icon] ?? Icons.Circle;
-  const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+  const Icon = Icons[item.icon] ?? Icons.Circle;
+  const isActive =
+    pathname === item.href || pathname.startsWith(item.href + "/");
 
   return (
     <Link
       href={item.href}
       title={item.label}
-      aria-current={isActive ? 'page' : undefined}
+      aria-current={isActive ? "page" : undefined}
       className={cn(
-        'group relative flex items-center gap-3 rounded-lg mx-2 px-2.5 py-2 text-sm font-medium transition-all duration-150',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        "group relative flex items-center gap-3 rounded-lg mx-2 px-2.5 py-2 text-sm font-medium transition-all duration-150",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         isActive
-          ? 'bg-primary/10 text-primary'
-          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-        isCollapsed && 'justify-center px-0 w-10 mx-auto',
+          ? "bg-primary/10 text-primary"
+          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+        isCollapsed && "justify-center px-0 w-10 mx-auto",
       )}
     >
       {isActive && (
@@ -333,20 +325,24 @@ function NavItem({ item, isCollapsed, pathname }) {
       <Icon
         size={16}
         className={cn(
-          'shrink-0 transition-transform duration-150',
-          isActive ? 'text-primary' : 'group-hover:scale-110',
+          "shrink-0 transition-transform duration-150",
+          isActive ? "text-primary" : "group-hover:scale-110",
         )}
       />
 
-      {!isCollapsed && <span className="truncate leading-none">{item.label}</span>}
+      {!isCollapsed && (
+        <span className="truncate leading-none">{item.label}</span>
+      )}
 
       {isCollapsed && (
-        <span className={cn(
-          'pointer-events-none absolute left-full ml-2 z-50 whitespace-nowrap rounded-md',
-          'bg-popover text-popover-foreground px-2.5 py-1.5 text-xs shadow-md border',
-          'opacity-0 scale-95 transition-all duration-100',
-          'group-hover:opacity-100 group-hover:scale-100',
-        )}>
+        <span
+          className={cn(
+            "pointer-events-none absolute left-full ml-2 z-50 whitespace-nowrap rounded-md",
+            "bg-popover text-popover-foreground px-2.5 py-1.5 text-xs shadow-md border",
+            "opacity-0 scale-95 transition-all duration-100",
+            "group-hover:opacity-100 group-hover:scale-100",
+          )}
+        >
           {item.label}
         </span>
       )}
@@ -358,28 +354,40 @@ function NavItem({ item, isCollapsed, pathname }) {
    SidebarContent
 ───────────────────────────────────────────── */
 function SidebarContent({
-  isCollapsed, onCollapse, onMobileClose, isMobile,
-  grouped, pathname, user, typeDefinition, onLogout,
+  isCollapsed,
+  onCollapse,
+  onMobileClose,
+  isMobile,
+  grouped,
+  pathname,
+  user,
+  typeDefinition,
+  onLogout,
 }) {
   return (
     <div className="flex h-full flex-col">
-
       {/* Header */}
-      <div className={cn(
-        'flex h-14 shrink-0 items-center gap-2.5 border-b px-3',
-        isCollapsed && 'justify-center px-0',
-      )}>
+      <div
+        className={cn(
+          "flex h-14 shrink-0 items-center gap-2.5 border-b px-3",
+          isCollapsed && "justify-center px-0",
+        )}
+      >
         {typeDefinition && (
-          <span className="text-xl leading-none select-none">{typeDefinition.icon}</span>
+          <span className="text-xl leading-none select-none">
+            {typeDefinition.icon}
+          </span>
         )}
 
         {!isCollapsed && (
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold leading-snug text-foreground">
-              {user?.school?.name || user?.institute?.name || 'The Clouds Academy'}
+              {user?.school?.name ||
+                user?.institute?.name ||
+                "The Clouds Academy"}
             </p>
             <p className="text-[10px] leading-none text-muted-foreground mt-0.5">
-              {typeDefinition?.label ?? 'Institute'}
+              {typeDefinition?.label ?? "Institute"}
             </p>
           </div>
         )}
@@ -388,15 +396,18 @@ function SidebarContent({
           <button
             onClick={onCollapse}
             className={cn(
-              'ml-auto flex h-7 w-7 items-center justify-center rounded-md shrink-0',
-              'text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              "ml-auto flex h-7 w-7 items-center justify-center rounded-md shrink-0",
+              "text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             )}
-            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             <Icons.PanelLeft
               size={15}
-              className={cn('transition-transform duration-200', isCollapsed && 'rotate-180')}
+              className={cn(
+                "transition-transform duration-200",
+                isCollapsed && "rotate-180",
+              )}
             />
           </button>
         )}
@@ -405,9 +416,9 @@ function SidebarContent({
           <button
             onClick={onMobileClose}
             className={cn(
-              'ml-auto flex h-7 w-7 items-center justify-center rounded-md shrink-0',
-              'text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              "ml-auto flex h-7 w-7 items-center justify-center rounded-md shrink-0",
+              "text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             )}
             aria-label="Close menu"
           >
@@ -420,8 +431,10 @@ function SidebarContent({
       <nav
         className="flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-4"
         style={{
-          maskImage: 'linear-gradient(to bottom, transparent 0%, black 2%, black 96%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 2%, black 96%, transparent 100%)',
+          maskImage:
+            "linear-gradient(to bottom, transparent 0%, black 2%, black 96%, transparent 100%)",
+          WebkitMaskImage:
+            "linear-gradient(to bottom, transparent 0%, black 2%, black 96%, transparent 100%)",
         }}
         aria-label="Navigation"
       >
@@ -436,7 +449,12 @@ function SidebarContent({
             )}
             <div className="space-y-0.5">
               {items.map((item) => (
-                <NavItem key={item.href} item={item} isCollapsed={isCollapsed} pathname={pathname} />
+                <NavItem
+                  key={item.href}
+                  item={item}
+                  isCollapsed={isCollapsed}
+                  pathname={pathname}
+                />
               ))}
             </div>
           </div>
@@ -449,8 +467,8 @@ function SidebarContent({
           <div className="flex items-center gap-2.5">
             <AvatarWithInitials
               src={user?.photo_url}
-              firstName={user?.first_name ?? ''}
-              lastName={user?.last_name ?? ''}
+              firstName={user?.first_name ?? ""}
+              lastName={user?.last_name ?? ""}
               size="sm"
             />
             <div className="min-w-0 flex-1">
@@ -464,9 +482,9 @@ function SidebarContent({
             <button
               onClick={onLogout}
               className={cn(
-                'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
-                'text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+                "text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               )}
               title="Logout"
               aria-label="Logout"
@@ -478,16 +496,16 @@ function SidebarContent({
           <div className="flex flex-col items-center gap-2">
             <AvatarWithInitials
               src={user?.photo_url}
-              firstName={user?.first_name ?? ''}
-              lastName={user?.last_name ?? ''}
+              firstName={user?.first_name ?? ""}
+              lastName={user?.last_name ?? ""}
               size="sm"
             />
             <button
               onClick={onLogout}
               className={cn(
-                'flex h-7 w-7 items-center justify-center rounded-md',
-                'text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                "flex h-7 w-7 items-center justify-center rounded-md",
+                "text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               )}
               title="Logout"
               aria-label="Logout"
@@ -505,43 +523,52 @@ function SidebarContent({
    Main export
 ───────────────────────────────────────────── */
 export default function InstituteLayoutWrapper({ children }) {
-  const [collapsed,  setCollapsed]  = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [mounted,    setMounted]    = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const pathname = usePathname();
-  const router   = useRouter();
+  const router = useRouter();
 
-  useEffect(() => { setMounted(true); }, []);
-  useEffect(() => { setMobileOpen(false); }, [pathname]);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!mobileOpen) return;
-    const onKey = (e) => { if (e.key === 'Escape') setMobileOpen(false); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    const onKey = (e) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [mobileOpen]);
 
   useEffect(() => {
-    document.body.style.overflow = mobileOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    document.body.style.overflow = mobileOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [mobileOpen]);
 
-  const user          = useAuthStore((s) => s.user);
-  const logout        = useAuthStore((s) => s.logout);
-  const getDashPath   = useAuthStore((s) => s.dashboardPath);
-  const dashboardPath = mounted ? getDashPath() : '/';
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+  const getDashPath = useAuthStore((s) => s.dashboardPath);
+  const dashboardPath = mounted ? getDashPath() : "/";
 
   const { typeDefinition } = useInstituteConfig();
-  const allNavItems         = useInstituteNav();
-  const navItems            = mounted ? allNavItems : [];
+  const allNavItems = useInstituteNav();
+  const navItems = mounted ? allNavItems : [];
 
   const grouped = useMemo(
-    () => navItems.reduce((acc, item) => {
-      acc[item.group] = acc[item.group] ?? [];
-      acc[item.group].push(item);
-      return acc;
-    }, {}),
+    () =>
+      navItems.reduce((acc, item) => {
+        acc[item.group] = acc[item.group] ?? [];
+        acc[item.group].push(item);
+        return acc;
+      }, {}),
     [navItems],
   );
 
@@ -549,26 +576,36 @@ export default function InstituteLayoutWrapper({ children }) {
   const breadcrumbItems = useBreadcrumbs(navItems, pathname, dashboardPath);
 
   const handleLogout = useCallback(async () => {
-    try { await authService.logout(); } catch (_) { /* ignore */ }
-    finally {
+    try {
+      await authService.logout();
+    } catch (_) {
+      /* ignore */
+    } finally {
       logout();
-      router.replace('/login');
-      toast.success('Logged out successfully');
+      router.replace("/login");
+      toast.success("Logged out successfully");
     }
   }, [logout, router]);
 
-  const sidebarProps = { grouped, pathname, user, typeDefinition, onLogout: handleLogout };
+  const sidebarProps = {
+    grouped,
+    pathname,
+    user,
+    typeDefinition,
+    onLogout: handleLogout,
+  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-
       {/* Mobile backdrop */}
       <div
         onClick={() => setMobileOpen(false)}
         aria-hidden="true"
         className={cn(
-          'fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden transition-opacity duration-200',
-          mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
+          "fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden transition-opacity duration-200",
+          mobileOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none",
         )}
       />
 
@@ -577,9 +614,9 @@ export default function InstituteLayoutWrapper({ children }) {
         aria-label="Mobile navigation"
         aria-hidden={!mobileOpen}
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 border-r bg-card shadow-xl lg:hidden',
-          'transition-transform duration-200 ease-in-out',
-          mobileOpen ? 'translate-x-0' : '-translate-x-full',
+          "fixed inset-y-0 left-0 z-50 w-64 border-r bg-card shadow-xl lg:hidden",
+          "transition-transform duration-200 ease-in-out",
+          mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <SidebarContent
@@ -594,9 +631,9 @@ export default function InstituteLayoutWrapper({ children }) {
       <aside
         aria-label="Desktop navigation"
         className={cn(
-          'hidden lg:block border-r bg-card shrink-0 overflow-hidden',
-          'transition-[width] duration-200 ease-in-out',
-          collapsed ? 'w-[60px]' : 'w-[220px]',
+          "hidden lg:block border-r bg-card shrink-0 overflow-hidden",
+          "transition-[width] duration-200 ease-in-out",
+          collapsed ? "w-[60px]" : "w-[220px]",
         )}
       >
         <SidebarContent
@@ -609,21 +646,19 @@ export default function InstituteLayoutWrapper({ children }) {
 
       {/* Main */}
       <div className="flex flex-1 flex-col overflow-hidden min-w-0">
-
         {/* ════════════════════════════════════════
             TOP HEADER
             Left  : [hamburger] [mobile-logo] | [breadcrumb]
             Right : [code badge] [ThemeToggle] [NotificationBell] [avatar]
         ════════════════════════════════════════ */}
         <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-card px-3 sm:px-4">
-
           {/* Hamburger — mobile only */}
           <button
             onClick={() => setMobileOpen(true)}
             className={cn(
-              'lg:hidden flex h-8 w-8 shrink-0 items-center justify-center rounded-md',
-              'text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              "lg:hidden flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
+              "text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             )}
             aria-label="Open navigation menu"
             aria-expanded={mobileOpen}
@@ -637,10 +672,14 @@ export default function InstituteLayoutWrapper({ children }) {
             className="flex items-center gap-1.5 lg:hidden min-w-0 shrink-0"
           >
             {typeDefinition && (
-              <span className="text-base leading-none">{typeDefinition.icon}</span>
+              <span className="text-base leading-none">
+                {typeDefinition.icon}
+              </span>
             )}
             <span className="truncate text-sm font-semibold text-foreground max-w-[120px]">
-              {user?.school?.name || user?.institute?.name || 'The Clouds Academy'}
+              {user?.school?.name ||
+                user?.institute?.name ||
+                "The Clouds Academy"}
             </span>
           </Link>
 
@@ -662,7 +701,6 @@ export default function InstituteLayoutWrapper({ children }) {
 
           {/* ── Right actions ── */}
           <div className="flex shrink-0 items-center gap-0.5">
-
             {/* Institute code badge — medium screens+ */}
             {(user?.school?.code || user?.institute?.code) && (
               <span className="hidden md:inline-flex items-center rounded-md border bg-muted px-2 py-0.5 text-[11px] font-mono font-medium text-muted-foreground mr-1.5">
@@ -680,8 +718,8 @@ export default function InstituteLayoutWrapper({ children }) {
             <div className="hidden lg:flex items-center gap-2 pl-2 ml-1 border-l">
               <AvatarWithInitials
                 src={user?.photo_url}
-                firstName={user?.first_name ?? ''}
-                lastName={user?.last_name ?? ''}
+                firstName={user?.first_name ?? ""}
+                lastName={user?.last_name ?? ""}
                 size="sm"
               />
               <div className="hidden xl:block">
@@ -698,9 +736,7 @@ export default function InstituteLayoutWrapper({ children }) {
 
         {/* Page content */}
         <main className="flex-1 overflow-auto">
-          <div className="p-4 md:p-6 h-full">
-            {children}
-          </div>
+          <div className="p-4 md:p-6 h-full">{children}</div>
         </main>
       </div>
     </div>

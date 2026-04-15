@@ -9,29 +9,20 @@
 
 import api from '@/lib/api';
 import { buildQuery } from '@/lib/utils';
-import { withFallback } from '@/lib/withFallback';
-import { DUMMY_FEES, paginate } from '@/data/dummyData';
 
 export const feeService = {
   // ─── Original named methods ───────────────────────────────
-  // List vouchers
   // filters: { student_id, status, month, year, academic_year_id, page, limit }
   getVouchers: (filters = {}) =>
-    withFallback(
-      () => api.get(`/fees/vouchers${buildQuery(filters)}`).then((r) => r.data),
-      () => paginate(DUMMY_FEES, filters.page, filters.limit),
-    ),
+    api.get(`/fees/vouchers${buildQuery(filters)}`).then((r) => r.data),
 
   // ─── Alias methods used by fees/page.js ──────────────────
-  getAll:  (filters = {}) =>
-    withFallback(
-      () => api.get(`/fees/vouchers${buildQuery(filters)}`).then((r) => r.data),
-      () => paginate(DUMMY_FEES, filters.page, filters.limit),
-    ),
-  create:  (body)        => api.post('/fees/vouchers', body).then((r) => r.data),
-  update:  (id, body)    => api.put(`/fees/vouchers/${id}`, body).then((r) => r.data),
-  delete:  (id)          => api.delete(`/fees/vouchers/${id}`).then((r) => r.data),
-  collect: (id, body)    => api.patch(`/fees/vouchers/${id}/collect`, body).then((r) => r.data),
+  getAll: (filters = {}) =>
+    api.get(`/fees/vouchers${buildQuery(filters)}`).then((r) => r.data),
+  create: (body) => api.post('/fees/vouchers', body).then((r) => r.data),
+  update: (id, body) => api.put(`/fees/vouchers/${id}`, body).then((r) => r.data),
+  delete: (id) => api.delete(`/fees/vouchers/${id}`).then((r) => r.data),
+  collect: (id, body) => api.patch(`/fees/vouchers/${id}/collect`, body).then((r) => r.data),
 
   getVoucherById: (id) =>
     api.get(`/fees/vouchers/${id}`).then((r) => r.data),

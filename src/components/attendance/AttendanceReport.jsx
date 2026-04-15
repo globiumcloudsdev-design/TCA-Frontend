@@ -412,7 +412,14 @@ const AttendanceReport = ({ terms = {} }) => {
               <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">
                 {student?.first_name} {student?.last_name}
               </p>
-              <p className="text-xs text-slate-500">Reg: {student?.registration_no || 'N/A'}</p>
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
+                <span className="text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded">
+                  Roll: {student?.roll_no || student?.roll_number || student?.details?.studentDetails?.roll_no || '—'}
+                </span>
+                <span className="text-slate-400 dark:text-slate-500">
+                  Reg: {student?.registration_no || 'N/A'}
+                </span>
+              </div>
             </div>
           </div>
         );

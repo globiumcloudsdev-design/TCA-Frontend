@@ -1,13 +1,12 @@
-
 // frontend/src/services/examService.js
 
-import api from '@/lib/api';
-import { buildQuery } from '@/lib/utils';
+import api from "@/lib/api";
+import { buildQuery } from "@/lib/utils";
 
 export const examService = {
   // Exam CRUD
   getAll: async (params = {}) => {
-    const response = await api.get('/exams', { params });
+    const response = await api.get("/exams", { params });
     // Backend wraps response: { success, message, data, pagination, ... }
     // return response.data.data || response.data;
     return response.data;
@@ -21,7 +20,7 @@ export const examService = {
   },
 
   create: async (data) => {
-    const response = await api.post('/exams', data);
+    const response = await api.post("/exams", data);
     return response.data.data || response.data;
   },
 
@@ -69,19 +68,21 @@ export const examService = {
   },
 
   publishResults: async (examId, publishDate) => {
-    const response = await api.post(`/exams/${examId}/publish-results`, { publish_date: publishDate });
+    const response = await api.post(`/exams/${examId}/publish-results`, {
+      publish_date: publishDate,
+    });
     return response.data;
   },
 
   downloadResults: async (examId) => {
     const response = await api.get(`/exams/${examId}/download-results`, {
-      responseType: 'blob'
+      responseType: "blob",
     });
-    
+
     const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
-    link.setAttribute('download', `exam_${examId}_results.csv`);
+    link.setAttribute("download", `exam_${examId}_results.csv`);
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -94,29 +95,28 @@ export const examService = {
     return response.data;
   },
 
-  generateGradeSheet: async (examId, studentId) => {
-    const response = await api.get(`/exams/${examId}/grade-sheet`, {
-      params: { student_id: studentId }
-    });
+  generateGradeSheet: async (examId, body = {}) => {
+    // Expects student_id, and optionally class_id, section_id in body
+    const response = await api.post(`/exams/${examId}/grade-sheet`, body);
     return response.data;
   },
 
   // Student Views
   getMyExams: async () => {
-    const response = await api.get('/exams/my-exams');
+    const response = await api.get("/exams/my-exams");
     return response.data;
   },
 
   getMyResults: async () => {
-    const response = await api.get('/exams/my-results');
+    const response = await api.get("/exams/my-results");
     return response.data;
   },
 
   // Options/Dropdown
   getOptions: async (params = {}) => {
-    const response = await api.get('/exams/options', { params });
+    const response = await api.get("/exams/options", { params });
     return response.data;
-  }
+  },
 };
 
 export default examService;
