@@ -364,8 +364,6 @@ export const STUDENT_LIST_COLUMNS = {
     { key: 'section_name', label: 'Section' },
     { key: 'date_of_birth', label: 'DOB' },
     { key: 'guardian', label: 'Guardian' },
-    { key: 'status', label: 'Status' },
-    { key: 'fee_status', label: 'Fee Status' },
   ],
   coaching: [
     { key: 'name', label: 'Candidate Name' },
@@ -373,8 +371,6 @@ export const STUDENT_LIST_COLUMNS = {
     { key: 'course_name', label: 'Course' },
     { key: 'batch_name', label: 'Batch' },
     { key: 'target_exam', label: 'Target Exam' },
-    { key: 'fee_status', label: 'Fee Status' },
-    { key: 'is_active', label: 'Status' },
   ],
   academy: [
     { key: 'name', label: 'Trainee Name' },
@@ -382,8 +378,6 @@ export const STUDENT_LIST_COLUMNS = {
     { key: 'program_name', label: 'Program' },
     { key: 'batch_name', label: 'Batch' },
     { key: 'module', label: 'Current Module' },
-    { key: 'fee_status', label: 'Fee Status' },
-    { key: 'is_active', label: 'Status' },
   ],
   college: [
     { key: 'name', label: 'Student Name' },
@@ -391,8 +385,6 @@ export const STUDENT_LIST_COLUMNS = {
     { key: 'department', label: 'Department' },
     { key: 'program_name', label: 'Program' },
     { key: 'semester', label: 'Semester' },
-    { key: 'fee_status', label: 'Fee Status' },
-    { key: 'is_active', label: 'Status' },
   ],
   university: [
     { key: 'name', label: 'Student Name' },
@@ -402,8 +394,6 @@ export const STUDENT_LIST_COLUMNS = {
     { key: 'program_name', label: 'Program' },
     { key: 'semester', label: 'Semester' },
     { key: 'cgpa', label: 'CGPA' },
-    { key: 'fee_status', label: 'Fee Status' },
-    { key: 'is_active', label: 'Status' },
   ],
 };
 

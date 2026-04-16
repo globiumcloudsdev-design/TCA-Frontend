@@ -69,7 +69,8 @@ function buildParentNav(t, navLabels) {
       permission: PERM.DASHBOARD_VIEW,
     },
     {
-      label: navLabels.attendance,
+      // label: navLabels.attendance,
+      label: 'Child Attendance',
       href: "/parent/attendance",
       icon: Calendar,
       permission: PERM.ATTENDANCE_VIEW,
@@ -305,7 +306,12 @@ export default function PortalShell({ children, type }) {
     : isTeacher
       ? buildTeacherNav(t, navLabels)
       : buildStudentNav(t, navLabels);
-  const navItems = allNavItems.filter((item) => canDo(item.permission));
+  
+  // If permission is undefined, it's allowed by default (or handle specially)
+  const navItems = allNavItems.filter((item) => {
+    if (!item.permission) return true;
+    return canDo(item.permission);
+  });
 
   const themeClasses = isParent
     ? {

@@ -35,6 +35,18 @@ const usePortalStore = create(
         });
       },
 
+      updatePortalUser: (updates) => {
+        set((state) => {
+          if (!state.portalUser) return {};
+          return {
+            portalUser: {
+              ...state.portalUser,
+              ...updates
+            }
+          };
+        });
+      },
+
       clearPortal: () => set({ 
         portalUser: null, 
         portalType: null, 
@@ -51,16 +63,6 @@ const usePortalStore = create(
       /** Check if user has specific permission - FIXED VERSION */
       canDo: (permission) => {
         try {
-          const { permissions, portalType } = get();
-
-          // Debug logging
-          console.log('🔍 canDo check:', { 
-            permission, 
-            portalType,
-            permissionsCount: permissions?.length || 0,
-            permissionsSample: permissions?.slice(0, 3) || []
-          });
-
           // SAFE hasPermission function with null checks
           const hasPermission = (list = [], required) => {
             if (!required) return true;
@@ -89,7 +91,9 @@ const usePortalStore = create(
               return permString.endsWith('.*') && required.startsWith(permString.slice(0, -2));
             });
           };
-          
+
+          const { permissions, portalType } = get();
+
           // If permissions array is empty or not array, use defaults
           if (!Array.isArray(permissions) || permissions.length === 0) {
             console.log('⚠️ No permissions found, using role-based defaults for:', portalType);
@@ -115,9 +119,9 @@ const usePortalStore = create(
               const parentDefaults = [
                 'dashboard.view',
                 'attendance.view',
-                'fees.view',
-                'results.view',
-                'announcements.view'
+                'fees.read',
+                'exam_results.view',
+                'notices.read'
               ];
               return hasPermission(parentDefaults, permission);
             }
@@ -145,8 +149,6 @@ const usePortalStore = create(
           // Clean permissions array before using
           const cleanPermissions = permissions.filter(p => p != null);
           
-          // Use actual permissions if available
-          console.log('✅ Using actual permissions from user, count:', cleanPermissions.length);
           return hasPermission(cleanPermissions, permission);
           
         } catch (error) {

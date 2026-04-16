@@ -14,7 +14,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Plus, Eye, Pencil, Trash2, Loader2, IdCard, Power } from 'lucide-react';
+import { Plus, Eye, Pencil, Trash2, Loader2, IdCard, Power, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 
 import useInstituteConfig from '@/hooks/useInstituteConfig';
@@ -29,6 +29,14 @@ import ConfirmDialog from '@/components/common/ConfirmDialog';
 import { cn } from '@/lib/utils';
 import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 // Status badge color map
 const STATUS_COLORS = {
@@ -141,7 +149,7 @@ export default function StudentsPage({ type }) {
   const { terms, studentColumns } = useInstituteConfig();
 
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('active');
+  const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [deleting, setDeleting] = useState(null);
@@ -149,9 +157,65 @@ export default function StudentsPage({ type }) {
   const [editingId, setEditingId] = useState(null);
   const [mounted, setMounted] = useState(false);
 
+  // Filter state
+  const [academicYearId, setAcademicYearId] = useState('');
+  const [classId, setClassId] = useState('');
+  const [sectionId, setSectionId] = useState('');
+  const [feeStatus, setFeeStatus] = useState('');
+
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Fetch academic years and set current as default
+  const { data: academicYearsData } = useQuery({
+    queryKey: ['academic-years', currentInstitute?.id],
+    queryFn: () => academicYearService.getAll({ 
+      institute_id: currentInstitute?.id,
+      is_active: true 
+    }),
+    enabled: !!currentInstitute?.id,
+  });
+
+  // Set current academic year as default on first load
+  useEffect(() => {
+    if (academicYearsData?.data && !academicYearId) {
+      const currentYear = academicYearsData.data.find(y => y.is_current);
+      if (currentYear) {
+        setAcademicYearId(currentYear.id);
+      } else if (academicYearsData.data.length > 0) {
+        setAcademicYearId(academicYearsData.data[0].id);
+      }
+    }
+  }, [academicYearsData?.data]);
+
+  // Fetch classes for selected academic year
+  const { data: classesData } = useQuery({
+    queryKey: ['classes', academicYearId],
+    queryFn: () => classService.getAll({ 
+      academic_year_id: academicYearId,
+      is_active: true 
+    }),
+    enabled: !!academicYearId,
+  });
+
+  // Extract sections from selected class
+  const sections = useMemo(() => {
+    if (!classId || !classesData?.data) return [];
+    const selectedClass = classesData.data.find(c => String(c.id) === String(classId));
+    return selectedClass?.sections || [];
+  }, [classId, classesData?.data]);
+
+  // Reset class and section when academic year changes
+  useEffect(() => {
+    setClassId('');
+    setSectionId('');
+  }, [academicYearId]);
+
+  // Reset section when class changes
+  useEffect(() => {
+    setSectionId('');
+  }, [classId]);
 
   const addStudent = useMutation({
     mutationFn: async (data) => {
@@ -213,9 +277,29 @@ export default function StudentsPage({ type }) {
     }
   });
 
-  const filters = useMemo(() => ({
-    page, limit: pageSize, search, is_active: status,
-  }), [page, pageSize, search, status]);
+  const filters = useMemo(() => {
+    const f = {
+      page, 
+      limit: pageSize, 
+      search, 
+    };
+
+    // Handle student status filter
+    if (status === 'active') {
+      f.is_active = true;
+    } else if (status === 'inactive') {
+      f.is_active = false;
+    }
+    // If status === 'all', don't add is_active filter (shows both active and inactive)
+
+    // Add optional filters only if they're selected
+    if (academicYearId) f.academic_year_id = academicYearId;
+    if (classId) f.class_id = classId;
+    if (sectionId) f.section_id = sectionId;
+    if (feeStatus) f.fee_status = feeStatus;
+
+    return f;
+  }, [page, pageSize, search, status, academicYearId, classId, sectionId, feeStatus]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['students', type, filters],
@@ -227,6 +311,7 @@ export default function StudentsPage({ type }) {
       }
       return res;
     },
+    enabled: !!classId, // Only fetch when class is selected
     placeholderData: (prev) => prev,
   });
 
@@ -256,9 +341,40 @@ export default function StudentsPage({ type }) {
   );
 
   const statusOptions = [
+    { value: 'all', label: 'All Students' },
     { value: 'active', label: 'Active' },
     { value: 'inactive', label: 'Inactive' },
   ];
+
+  const feeStatusOptions = [
+    { value: 'paid', label: 'Paid' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'overdue', label: 'Overdue' },
+    { value: 'partial', label: 'Partial' },
+  ];
+
+  const academicYearOptions = useMemo(() => {
+    if (!academicYearsData?.data) return [];
+    return academicYearsData.data.map(year => ({
+      value: year.id,
+      label: year.name || `${year.start_year} - ${year.end_year}`
+    }));
+  }, [academicYearsData?.data]);
+
+  const classOptions = useMemo(() => {
+    if (!classesData?.data) return [];
+    return classesData.data.map(cls => ({
+      value: cls.id,
+      label: cls.name
+    }));
+  }, [classesData?.data]);
+
+  const sectionOptions = useMemo(() => {
+    return sections.map(s => ({
+      value: s.id,
+      label: s.name || s.section_name
+    }));
+  }, [sections]);
 
   const handleAddStudent = (formData) => {
     addStudent.mutate(formData);
@@ -484,24 +600,124 @@ export default function StudentsPage({ type }) {
         description={`${total} ${total === 1 ? terms.student : terms.students} total`}
       />
 
+      {/* Filters Card */}
+      <Card className="border">
+        <CardHeader className="py-3">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="py-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-5">
+            {/* Academic Year Filter */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-muted-foreground">
+                Academic Year
+              </label>
+              <Select value={academicYearId} onValueChange={setAcademicYearId}>
+                <SelectTrigger className="w-full h-9 text-sm">
+                  <SelectValue placeholder="Select Year" />
+                </SelectTrigger>
+                <SelectContent className="max-h-56">
+                  {academicYearOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value} className="text-sm cursor-pointer">
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Class Filter */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-muted-foreground">
+                {terms.class || 'Class'}
+              </label>
+              <Select value={classId} onValueChange={setClassId} disabled={!academicYearId}>
+                <SelectTrigger className="w-full h-9 text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled={!academicYearId}>
+                  <SelectValue placeholder={`Select ${terms.class || 'Class'}`} />
+                </SelectTrigger>
+                <SelectContent className="max-h-56">
+                  {classOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value} className="text-sm cursor-pointer">
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Section Filter */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-muted-foreground">
+                {terms.section || 'Section'}
+              </label>
+              <Select value={sectionId} onValueChange={setSectionId} disabled={!classId || sections.length === 0}>
+                <SelectTrigger className="w-full h-9 text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled={!classId || sections.length === 0}>
+                  <SelectValue placeholder="All Sections" />
+                </SelectTrigger>
+                <SelectContent className="max-h-56">
+                  {sectionOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value} className="text-sm cursor-pointer">
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-muted-foreground">
+                Student Status
+              </label>
+              <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
+                <SelectTrigger className="w-full h-9 text-sm">
+                  <SelectValue placeholder="Select Status" />
+                </SelectTrigger>
+                <SelectContent className="max-h-56">
+                  {statusOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value} className="text-sm cursor-pointer">
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Fee Status Filter */}
+            {/* <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-muted-foreground">
+                Fee Status
+              </label>
+              <Select value={feeStatus} onValueChange={(v) => { setFeeStatus(v); setPage(1); }}>
+                <SelectTrigger className="w-full h-9 text-sm">
+                  <SelectValue placeholder="Select Fee Status" />
+                </SelectTrigger>
+                <SelectContent className="max-h-56">
+                  {feeStatusOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value} className="text-sm cursor-pointer">
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div> */}
+          </div>
+        </CardContent>
+      </Card>
+
       <DataTable
         columns={columns}
         data={students}
         loading={isLoading}
-        emptyMessage={`No ${terms.students.toLowerCase()} found`}
+        emptyMessage={!classId ? `Select a ${terms.class || 'Class'} to view ${terms.students.toLowerCase()}` : `No ${terms.students.toLowerCase()} found`}
         // Toolbar props
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1); }}
         searchPlaceholder={`Search ${terms.students.toLowerCase()}…`}
-        filters={[
-          {
-            name: 'status',
-            label: 'Status',
-            value: status,
-            onChange: (v) => { setStatus(v); setPage(1); },
-            options: statusOptions,
-          },
-        ]}
+        filters={[]}
         action={addButton}
         enableColumnVisibility
         importConfig={{
