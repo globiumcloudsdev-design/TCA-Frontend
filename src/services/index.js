@@ -10,6 +10,7 @@ export { classService }             from './classService';
 export { sectionService }           from './sectionService';
 export { admissionService }         from './admissionService';
 export { parentService }            from './parentService';
+export { staffService }             from './staffService';
 export { timetableService }         from './timetableService';
 export { subjectService }           from './subjectService';
 export { feeTemplateService }       from './feeTemplateService';

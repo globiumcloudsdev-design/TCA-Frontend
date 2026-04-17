@@ -16,6 +16,10 @@ import { getPortalTerms } from '@/constants/portalInstituteConfig';
 import { useChildFees, usePayFee, useFeeSummary } from '@/hooks/useParentPortal';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import {
+  PageHeader, SelectField, StatusBadge, PageLoader, 
+  AppModal, StatsCard
+} from '@/components/common';
 
 const STATUS_CONFIG = {
   paid: { 
@@ -51,30 +55,30 @@ const STATUS_CONFIG = {
 // Voucher Details Modal
 const VoucherDetailsModal = ({ voucher, isOpen, onClose, onPay }) => {
   const [showFullDetails, setShowFullDetails] = useState(false);
-  
-  if (!isOpen || !voucher) return null;
+
+  if (!voucher) return null;
 
   const statusConfig = STATUS_CONFIG[voucher.status] || STATUS_CONFIG.pending;
   const StatusIcon = statusConfig.icon;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-slate-100 p-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <Receipt className="w-6 h-6 text-indigo-600" />
-            <div>
-              <h2 className="text-lg font-bold text-slate-800">Fee Voucher Details</h2>
-              <p className="text-xs text-slate-500">{voucher.voucher_number}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-5">
+    <AppModal
+      open={isOpen}
+      onClose={onClose}
+      title="Fee Voucher Details"
+      description={voucher?.voucher_number}
+      size="lg"
+      footer={
+        <button
+          onClick={() => window.print()}
+          className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-50 flex items-center gap-2"
+        >
+          <Printer className="w-4 h-4" />
+          Print
+        </button>
+      }
+    >
+      <div className="space-y-5">
           {/* Status Banner */}
           <div className={`${statusConfig.bg} rounded-xl p-4 border ${statusConfig.cls}`}>
             <div className="flex items-center gap-3">
@@ -112,28 +116,6 @@ const VoucherDetailsModal = ({ voucher, isOpen, onClose, onPay }) => {
             </div>
           )}
 
-          {/* Fee Breakdown */}
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Fee Breakdown
-            </h3>
-            <div className="space-y-2">
-              {voucher.fee_breakdown && Object.keys(voucher.fee_breakdown).length > 0 ? (
-                Object.entries(voucher.fee_breakdown).map(([key, value]) => (
-                  <div key={key} className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-sm text-slate-600 capitalize">{key}</span>
-                    <span className="text-sm font-medium text-slate-800">
-                      PKR {typeof value === 'number' ? value.toLocaleString() : 0}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500 py-2">No fee breakdown available</p>
-              )}
-            </div>
-          </div>
-
           {/* Summary */}
           <div className="bg-slate-50 rounded-xl p-4">
             <div className="space-y-2">
@@ -168,28 +150,8 @@ const VoucherDetailsModal = ({ voucher, isOpen, onClose, onPay }) => {
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
-            <button
-              onClick={() => window.print()}
-              className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-50 flex items-center justify-center gap-2"
-            >
-              <Printer className="w-4 h-4" />
-              Print
-            </button>
-            {/* {voucher.status !== 'paid' && (
-              <button
-                onClick={() => onPay(voucher)}
-                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 flex items-center justify-center gap-2"
-              >
-                <CreditCard className="w-4 h-4" />
-                Pay Now
-              </button>
-            )} */}
-          </div>
-        </div>
       </div>
-    </div>
+    </AppModal>
   );
 };
 
@@ -200,7 +162,7 @@ const PaymentModal = ({ voucher, isOpen, onClose, onSubmit, isLoading }) => {
     reference: ''
   });
 
-  if (!isOpen || !voucher) return null;
+  if (!voucher) return null;
 
   const remainingAmount = voucher.net_amount || 0;
 
@@ -210,16 +172,23 @@ const PaymentModal = ({ voucher, isOpen, onClose, onSubmit, isLoading }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full">
-        <div className="border-b border-slate-100 p-4 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-slate-800">Make Payment</h2>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+    <AppModal
+      open={isOpen}
+      onClose={onClose}
+      title="Make Payment"
+      size="sm"
+      footer={
+        <button
+          type="submit"
+          form="paymentForm"
+          disabled={isLoading}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {isLoading ? 'Processing...' : `Pay PKR ${remainingAmount.toLocaleString()}`}
+        </button>
+      }
+    >
+      <form id="paymentForm" onSubmit={handleSubmit} className="space-y-4">
           <div className="bg-slate-50 rounded-xl p-4 text-center">
             <p className="text-sm text-slate-500">Amount to Pay</p>
             <p className="text-2xl font-bold text-indigo-600">PKR {remainingAmount.toLocaleString()}</p>
@@ -252,16 +221,8 @@ const PaymentModal = ({ voucher, isOpen, onClose, onSubmit, isLoading }) => {
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {isLoading ? 'Processing...' : `Pay PKR ${remainingAmount.toLocaleString()}`}
-          </button>
-        </form>
-      </div>
-    </div>
+      </form>
+    </AppModal>
   );
 };
 
@@ -356,6 +317,33 @@ export default function ParentFeesPage() {
 
   const child = children[selectedChild];
   
+  // Generate available years based on admission_date
+  const getAvailableYears = (admissionDate) => {
+    if (!admissionDate) {
+      const currentYear = new Date().getFullYear();
+      return [currentYear - 1, currentYear, currentYear + 1];
+    }
+    
+    const admission = new Date(admissionDate);
+    const today = new Date();
+    const years = [];
+    
+    for (let year = admission.getFullYear(); year <= today.getFullYear(); year++) {
+      years.push(year);
+    }
+    
+    return years;
+  };
+  
+  const availableYears = getAvailableYears(child?.admission_date);
+  
+  // Validate selected year is within valid range
+  useEffect(() => {
+    if (!availableYears.includes(yearFilter)) {
+      setYearFilter(availableYears[availableYears.length - 1] || new Date().getFullYear());
+    }
+  }, [child?.id, availableYears]);
+  
   const { data: feesData, isLoading, refetch } = useChildFees(child?.id, {
     status: statusFilter !== 'all' ? statusFilter : null,
     year: yearFilter
@@ -449,20 +437,20 @@ export default function ParentFeesPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-slate-900">Fee Management</h1>
-          <p className="text-sm text-slate-500 mt-1">View vouchers, payment history, and manage fees</p>
-        </div>
-        <button
-          onClick={handleExport}
-          disabled={!vouchers.length}
-          className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold hover:bg-slate-50 transition flex items-center gap-2 disabled:opacity-50"
-        >
-          <Download className="w-4 h-4" />
-          Export
-        </button>
-      </div>
+      <PageHeader
+        title="Fee Management"
+        description="View vouchers, payment history, and manage fees"
+        action={(
+          <button
+            onClick={handleExport}
+            disabled={!vouchers.length}
+            className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold hover:bg-slate-50 transition flex items-center gap-2 disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" />
+            Export
+          </button>
+        )}
+      />
 
       {/* Overall Summary (if multiple children) */}
       {children.length > 1 && getOverallSummary()}
@@ -506,30 +494,26 @@ export default function ParentFeesPage() {
       {/* Summary Cards */}
       {summary && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
-            <p className="text-xs text-slate-500 mb-1">Total Paid</p>
-            <p className="text-xl font-extrabold text-emerald-600">
-              PKR {summary.total_paid?.toLocaleString() || 0}
-            </p>
-          </div>
-          <div className="bg-amber-50 rounded-xl p-4 border border-amber-100">
-            <p className="text-xs text-slate-500 mb-1">Total Due</p>
-            <p className="text-xl font-extrabold text-amber-600">
-              PKR {summary.total_due?.toLocaleString() || 0}
-            </p>
-          </div>
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <p className="text-xs text-slate-500 mb-1">Total Invoiced</p>
-            <p className="text-xl font-extrabold text-slate-700">
-              PKR {summary.total_invoiced?.toLocaleString() || 0}
-            </p>
-          </div>
-          <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
-            <p className="text-xs text-slate-500 mb-1">Compliance Rate</p>
-            <p className="text-xl font-extrabold text-purple-600">
-              {fees?.stats?.payment_compliance_rate || 0}%
-            </p>
-          </div>
+          <StatsCard
+            label="Total Paid"
+            value={`PKR ${(summary.total_paid || 0).toLocaleString()}`}
+            icon={<CheckCircle className="w-5 h-5 text-emerald-600" />}
+          />
+          <StatsCard
+            label="Total Due"
+            value={`PKR ${(summary.total_due || 0).toLocaleString()}`}
+            icon={<AlertCircle className="w-5 h-5 text-amber-600" />}
+          />
+          <StatsCard
+            label="Total Invoiced"
+            value={`PKR ${(summary.total_invoiced || 0).toLocaleString()}`}
+            icon={<DollarSign className="w-5 h-5 text-slate-600" />}
+          />
+          <StatsCard
+            label="Compliance Rate"
+            value={`${fees?.stats?.payment_compliance_rate || 0}%`}
+            icon={<TrendingUp className="w-5 h-5 text-purple-600" />}
+          />
         </div>
       )}
 
@@ -584,28 +568,33 @@ export default function ParentFeesPage() {
           </div>
           
           {showFilters && (
-            <div className="flex flex-wrap gap-3">
-              <select
+            <div className="flex flex-wrap gap-4">
+              <SelectField
+                label="Status"
+                name="status"
+                options={[
+                  { value: 'all', label: 'All Status' },
+                  { value: 'paid', label: 'Paid' },
+                  { value: 'pending', label: 'Pending' },
+                  { value: 'overdue', label: 'Overdue' },
+                  { value: 'partial', label: 'Partial' }
+                ]}
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm"
-              >
-                <option value="all">All Status</option>
-                <option value="paid">Paid</option>
-                <option value="pending">Pending</option>
-                <option value="overdue">Overdue</option>
-                <option value="partial">Partial</option>
-              </select>
+                onChange={(e) => setStatusFilter(e)}
+                placeholder="Select status"
+              />
               
-              <select
-                value={yearFilter}
-                onChange={(e) => setYearFilter(parseInt(e.target.value))}
-                className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm"
-              >
-                {[2023, 2024, 2025, 2026].map(year => (
-                  <option key={year} value={year}>{year}</option>
-                ))}
-              </select>
+              <SelectField
+                label="Year"
+                name="year"
+                options={availableYears.map(year => ({
+                  value: String(year),
+                  label: String(year)
+                }))}
+                value={String(yearFilter)}
+                onChange={(e) => setYearFilter(parseInt(e))}
+                placeholder="Select year"
+              />
             </div>
           )}
         </div>
@@ -613,10 +602,7 @@ export default function ParentFeesPage() {
 
       {/* Vouchers Grid */}
       {isLoading ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-slate-500">Loading fee vouchers...</p>
-        </div>
+        <PageLoader message="Loading fee vouchers..." />
       ) : vouchers.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
           <Receipt className="w-16 h-16 text-slate-300 mx-auto mb-4" />

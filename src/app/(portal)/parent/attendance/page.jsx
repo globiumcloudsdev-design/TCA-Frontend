@@ -15,6 +15,10 @@ import { getPortalTerms } from '@/constants/portalInstituteConfig';
 import { useChildAttendance, useChildDetails } from '@/hooks/useParentPortal';
 import { useParentLeaveRequests, useCreateParentLeaveRequest, useParentLeaveBalance } from '@/hooks/useParentPortal';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday } from 'date-fns';
+import {
+  PageHeader, SelectField, StatusBadge, PageLoader, 
+  AppModal, StatsCard, DatePickerField
+} from '@/components/common';
 
 const STATUS_CONFIG = {
   present: { color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500', icon: CheckCircle, label: 'Present', bg: 'bg-emerald-50' },
@@ -24,7 +28,7 @@ const STATUS_CONFIG = {
   holiday: { color: 'bg-purple-100 text-purple-700', dot: 'bg-purple-500', icon: Calendar, label: 'Holiday', bg: 'bg-purple-50' }
 };
 
-// Leave Request Modal Component
+// Leave Request Modal Component - Using reusable AppModal
 const LeaveRequestModal = ({ isOpen, onClose, child, onSubmit, isLoading, leaveBalances }) => {
   const [formData, setFormData] = useState({
     leave_type_id: '',
@@ -60,78 +64,82 @@ const LeaveRequestModal = ({ isOpen, onClose, child, onSubmit, isLoading, leaveB
     });
   };
 
-  if (!isOpen) return null;
+  const leaveTypeOptions = leaveBalances
+    ? Object.entries(leaveBalances).map(([id, balance]) => ({
+        value: id,
+        label: balance.leave_type_name
+      }))
+    : [];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-slate-100 p-4 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-slate-800">Request Leave for {child?.name}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Leave Type</label>
-            <select
-              value={formData.leave_type_id}
-              onChange={(e) => setFormData({ ...formData, leave_type_id: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              required
-            >
-              {leaveBalances && Object.entries(leaveBalances).map(([id, balance]) => (
-                <option key={id} value={id}>{balance.leave_type_name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">From Date</label>
-              <input
-                type="date"
-                value={formData.from_date}
-                onChange={(e) => setFormData({ ...formData, from_date: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">To Date</label>
-              <input
-                type="date"
-                value={formData.to_date}
-                onChange={(e) => setFormData({ ...formData, to_date: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
-            <textarea
-              value={formData.reason}
-              onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-              rows={3}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Please provide reason for leave..."
-              required
-            />
-          </div>
-
+    <AppModal
+      open={isOpen}
+      onClose={onClose}
+      title={`Request Leave for ${child?.name || 'Student'}`}
+      size="md"
+      footer={
+        <>
           <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50"
+            onClick={onClose}
+            className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-50"
           >
-            {isLoading ? 'Submitting...' : 'Submit Leave Request'}
+            Cancel
           </button>
-        </form>
-      </div>
-    </div>
+          <button
+            onClick={handleSubmit}
+            disabled={isLoading}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {isLoading ? 'Submitting...' : 'Submit Request'}
+          </button>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <SelectField
+          label="Leave Type"
+          name="leave_type_id"
+          options={leaveTypeOptions}
+          value={formData.leave_type_id}
+          onChange={(e) => setFormData({ ...formData, leave_type_id: e })}
+          placeholder="Select leave type"
+          required
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <DatePickerField
+            label="From Date"
+            value={formData.from_date}
+            onChange={(date) => setFormData({ ...formData, from_date: date })}
+            placeholder="Select date"
+            disablePastDates
+            required
+          />
+          <DatePickerField
+            label="To Date"
+            value={formData.to_date}
+            onChange={(date) => setFormData({ ...formData, to_date: date })}
+            placeholder="Select date"
+            disablePastDates
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Reason <span className="text-destructive">*</span>
+          </label>
+          <textarea
+            value={formData.reason}
+            onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+            rows={3}
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="Please provide reason for leave..."
+            required
+          />
+        </div>
+      </form>
+    </AppModal>
   );
 };
 
@@ -171,15 +179,6 @@ const RecentLeaveRequests = ({ requests, onViewAll }) => {
     );
   }
 
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'APPROVED': return 'bg-emerald-100 text-emerald-700';
-      case 'REJECTED': return 'bg-red-100 text-red-700';
-      case 'PENDING': return 'bg-amber-100 text-amber-700';
-      default: return 'bg-slate-100 text-slate-700';
-    }
-  };
-
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
       <div className="flex justify-between items-center mb-4">
@@ -202,9 +201,7 @@ const RecentLeaveRequests = ({ requests, onViewAll }) => {
               </p>
             </div>
             <div className="text-right">
-              <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(req.status)}`}>
-                {req.status}
-              </span>
+              <StatusBadge status={req.status?.toLowerCase()} label={req.status} />
               <p className="text-[10px] text-slate-400 mt-1">{req.number_of_days} days</p>
             </div>
           </div>
@@ -224,9 +221,8 @@ export default function ParentAttendancePage() {
   const [selectedChild, setSelectedChild] = useState(0);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedSubject, setSelectedSubject] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState('calendar'); // calendar, subject, monthly
+  const [viewMode, setViewMode] = useState('calendar'); // calendar or monthly
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showAllLeaves, setShowAllLeaves] = useState(false);
 
@@ -237,8 +233,7 @@ export default function ParentAttendancePage() {
     child?.id,
     {
       month: selectedMonth + 1,
-      year: selectedYear,
-      subject_id: selectedSubject !== 'all' ? selectedSubject : null
+      year: selectedYear
     }
   );
 
@@ -248,19 +243,6 @@ export default function ParentAttendancePage() {
   const createLeaveMutation = useCreateParentLeaveRequest();
 
   const attendance = attendanceData?.data;
-  
-  // Get available months for filtering
-  const availableMonths = attendance?.monthly_history?.map(m => ({
-    month: new Date(m.month).getMonth(),
-    year: new Date(m.month).getFullYear(),
-    name: m.month
-  })) || [];
-
-  // Get unique subjects from attendance data
-  const subjects = attendance?.subject_wise?.map(s => ({
-    id: s.subject_id,
-    name: s.subject
-  })) || [];
 
   const handleMonthChange = (month, year) => {
     setSelectedMonth(month);
@@ -268,16 +250,65 @@ export default function ParentAttendancePage() {
     refetch();
   };
 
+  // Generate available months and years based on admission_date
+  const getAvailableDateRange = (admissionDate) => {
+    if (!admissionDate) {
+      const today = new Date();
+      return { years: [today.getFullYear()], months: Array.from({ length: 12 }, (_, i) => i) };
+    }
+
+    const admission = new Date(admissionDate);
+    const today = new Date();
+    
+    const years = new Set();
+    const monthsInRange = [];
+    
+    // Add all years from admission year to current year
+    for (let year = admission.getFullYear(); year <= today.getFullYear(); year++) {
+      years.add(year);
+    }
+    
+    // Add months based on year
+    for (let year = admission.getFullYear(); year <= today.getFullYear(); year++) {
+      const startMonth = year === admission.getFullYear() ? admission.getMonth() : 0;
+      const endMonth = year === today.getFullYear() ? today.getMonth() : 11;
+      
+      for (let month = startMonth; month <= endMonth; month++) {
+        monthsInRange.push({ month, year, label: format(new Date(year, month, 1), 'MMMM yyyy') });
+      }
+    }
+    
+    return { 
+      years: Array.from(years).sort((a, b) => a - b),
+      months: monthsInRange 
+    };
+  };
+
+  const dateRange = getAvailableDateRange(child?.admission_date);
+
+  // Validate selected month/year are within valid range
+  useEffect(() => {
+    if (dateRange.months.length > 0) {
+      const validMonth = dateRange.months.find(m => m.month === selectedMonth && m.year === selectedYear);
+      if (!validMonth) {
+        // Set to the most recent month
+        const mostRecent = dateRange.months[dateRange.months.length - 1];
+        setSelectedMonth(mostRecent.month);
+        setSelectedYear(mostRecent.year);
+      }
+    }
+  }, [child?.id, dateRange]);
+
   const handleExportAttendance = () => {
     if (!attendance?.all_records) return;
     
     const csvContent = [
-      ['Date', 'Day', 'Status', 'Subject', 'Check In', 'Check Out', 'Remarks'].join(','),
+      ['Date', 'Day', 'Status', 'Class', 'Check In', 'Check Out', 'Remarks'].join(','),
       ...attendance.all_records.map(record => [
         record.date_formatted,
         record.day,
         record.status,
-        record.subject || '',
+        record.class_name || '',
         record.check_in_time || '',
         record.check_out_time || '',
         record.remarks || ''
@@ -316,28 +347,28 @@ export default function ParentAttendancePage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-slate-900">Attendance & Leave Management</h1>
-          <p className="text-sm text-slate-500 mt-1">Track attendance, request leaves, and monitor your child's progress</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowLeaveModal(true)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Request Leave
-          </button>
-          <button
-            onClick={handleExportAttendance}
-            className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold hover:bg-slate-50 transition flex items-center gap-2"
-          >
-            <Download className="w-4 h-4" />
-            Export
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Attendance & Leave Management"
+        description="Track attendance, request leaves, and monitor your child's progress"
+        action={
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowLeaveModal(true)}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Request Leave
+            </button>
+            <button
+              onClick={handleExportAttendance}
+              className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold hover:bg-slate-50 transition flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Export
+            </button>
+          </div>
+        }
+      />
 
       {/* Child Selector */}
       {children.length > 1 && (
@@ -378,41 +409,31 @@ export default function ParentAttendancePage() {
       {/* Stats Cards */}
       {attendance?.summary && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-          <div className="bg-white rounded-xl p-4 border border-slate-200">
-            <div className="flex items-center gap-2 mb-2">
-              <Activity className="w-4 h-4 text-slate-400" />
-              <span className="text-xs text-slate-500">Total Days</span>
-            </div>
-            <p className="text-2xl font-extrabold text-slate-800">{attendance.summary.total_days}</p>
-          </div>
-          <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="w-4 h-4 text-emerald-600" />
-              <span className="text-xs text-emerald-600">Present</span>
-            </div>
-            <p className="text-2xl font-extrabold text-emerald-700">{attendance.summary.present}</p>
-          </div>
-          <div className="bg-red-50 rounded-xl p-4 border border-red-100">
-            <div className="flex items-center gap-2 mb-2">
-              <XCircle className="w-4 h-4 text-red-600" />
-              <span className="text-xs text-red-600">Absent</span>
-            </div>
-            <p className="text-2xl font-extrabold text-red-700">{attendance.summary.absent}</p>
-          </div>
-          <div className="bg-amber-50 rounded-xl p-4 border border-amber-100">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="w-4 h-4 text-amber-600" />
-              <span className="text-xs text-amber-600">Late</span>
-            </div>
-            <p className="text-2xl font-extrabold text-amber-700">{attendance.summary.late}</p>
-          </div>
-          <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="w-4 h-4 text-blue-600" />
-              <span className="text-xs text-blue-600">Attendance %</span>
-            </div>
-            <p className="text-2xl font-extrabold text-blue-700">{attendance.summary.percentage}%</p>
-          </div>
+          <StatsCard
+            label="Total Days"
+            value={attendance.summary.total_days}
+            icon={<Activity className="w-4 h-4" />}
+          />
+          <StatsCard
+            label="Present"
+            value={attendance.summary.present}
+            icon={<CheckCircle className="w-4 h-4" />}
+          />
+          <StatsCard
+            label="Absent"
+            value={attendance.summary.absent}
+            icon={<XCircle className="w-4 h-4" />}
+          />
+          <StatsCard
+            label="Late"
+            value={attendance.summary.late}
+            icon={<Clock className="w-4 h-4" />}
+          />
+          <StatsCard
+            label="Attendance %"
+            value={`${attendance.summary.percentage}%`}
+            icon={<TrendingUp className="w-4 h-4" />}
+          />
         </div>
       )}
 
@@ -429,7 +450,7 @@ export default function ParentAttendancePage() {
               <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
             </button>
             <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
-              {['calendar', 'subject', 'monthly'].map((mode) => (
+              {['calendar', 'monthly'].map((mode) => (
                 <button
                   key={mode}
                   onClick={() => setViewMode(mode)}
@@ -444,49 +465,28 @@ export default function ParentAttendancePage() {
           </div>
           
           {showFilters && (
-            <div className="flex flex-wrap gap-3">
-              <select
-                value={selectedMonth}
-                onChange={(e) => handleMonthChange(parseInt(e.target.value), selectedYear)}
-                className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm"
-              >
-                {Array.from({ length: 12 }, (_, i) => (
-                  <option key={i} value={i}>{format(new Date(selectedYear, i, 1), 'MMMM')}</option>
-                ))}
-              </select>
-              
-              <select
-                value={selectedYear}
-                onChange={(e) => handleMonthChange(selectedMonth, parseInt(e.target.value))}
-                className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm"
-              >
-                {[2024, 2025, 2026].map(year => (
-                  <option key={year} value={year}>{year}</option>
-                ))}
-              </select>
-              
-              <select
-                value={selectedSubject}
-                onChange={(e) => setSelectedSubject(e.target.value)}
-                className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm"
-              >
-                <option value="all">All Subjects</option>
-                {subjects.map(sub => (
-                  <option key={sub.id} value={sub.id}>{sub.name}</option>
-                ))}
-              </select>
+            <div className="flex flex-wrap gap-4">
+              <SelectField
+                label="Month-Year"
+                name="month"
+                options={dateRange.months.map((m, idx) => ({
+                  value: JSON.stringify({ month: m.month, year: m.year }),
+                  label: m.label
+                }))}
+                value={JSON.stringify({ month: selectedMonth, year: selectedYear })}
+                onChange={(e) => {
+                  const date = JSON.parse(e);
+                  handleMonthChange(date.month, date.year);
+                }}
+                placeholder="Select month-year"
+              />
             </div>
           )}
         </div>
       </div>
 
       {/* Loading State */}
-      {attendanceLoading && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-slate-500">Loading attendance data...</p>
-        </div>
-      )}
+      {attendanceLoading && <PageLoader message="Loading attendance data..." />}
 
       {/* View Modes */}
       {!attendanceLoading && attendance && (
@@ -561,37 +561,6 @@ export default function ParentAttendancePage() {
             </div>
           )}
 
-          {/* Subject-wise View */}
-          {viewMode === 'subject' && attendance.subject_wise?.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-              <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-indigo-600" />
-                Subject-wise Attendance
-              </h2>
-              <div className="space-y-4">
-                {attendance.subject_wise.map((subject) => (
-                  <div key={subject.subject}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="font-medium text-slate-700">{subject.subject}</span>
-                      <span className="text-slate-500">{subject.percentage}%</span>
-                    </div>
-                    <div className="flex gap-2 text-xs text-slate-500 mb-1">
-                      <span>Present: {subject.present}</span>
-                      <span>Absent: {subject.absent}</span>
-                      <span>Late: {subject.late}</span>
-                    </div>
-                    <div className="bg-slate-100 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-emerald-500 transition-all"
-                        style={{ width: `${subject.percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Monthly History View */}
           {viewMode === 'monthly' && attendance.monthly_history?.length > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
@@ -655,6 +624,7 @@ export default function ParentAttendancePage() {
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="text-left py-2 text-slate-600">Class</th>
+                  <th className="text-left py-2 text-slate-600">Section</th>
                   <th className="text-center py-2 text-slate-600">Total</th>
                   <th className="text-center py-2 text-slate-600">Present</th>
                   <th className="text-center py-2 text-slate-600">Absent</th>
@@ -664,8 +634,9 @@ export default function ParentAttendancePage() {
               </thead>
               <tbody>
                 {attendance.class_wise.map((cls) => (
-                  <tr key={cls.class} className="border-b border-slate-50">
+                  <tr key={`${cls.class_id}-${cls.section_id}`} className="border-b border-slate-50">
                     <td className="py-2 font-medium">{cls.class}</td>
+                    <td className="py-2">{cls.section || '-'}</td>
                     <td className="text-center">{cls.total}</td>
                     <td className="text-center text-emerald-600">{cls.present}</td>
                     <td className="text-center text-red-600">{cls.absent}</td>
@@ -690,44 +661,39 @@ export default function ParentAttendancePage() {
       />
 
       {/* All Leave Requests Modal */}
-      {showAllLeaves && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-slate-100 p-4 flex justify-between items-center">
-              <h2 className="text-lg font-bold text-slate-800">All Leave Requests</h2>
-              <button onClick={() => setShowAllLeaves(false)} className="p-1 hover:bg-slate-100 rounded-lg">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 space-y-3">
-              {leaveRequests?.data?.map((req) => (
-                <div key={req.id} className="p-4 bg-slate-50 rounded-xl">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium text-slate-800 capitalize">{req.leaveType?.leave_type_name}</p>
-                      <p className="text-sm text-slate-600">
-                        {format(new Date(req.from_date), 'dd MMM yyyy')} - {format(new Date(req.to_date), 'dd MMM yyyy')}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-1">{req.reason}</p>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      req.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' :
-                      req.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {req.status}
-                    </span>
-                  </div>
-                  {req.remarks && (
-                    <p className="text-xs text-slate-500 mt-2 border-t border-slate-200 pt-2">
-                      Remarks: {req.remarks}
-                    </p>
-                  )}
+      <AppModal
+        open={showAllLeaves}
+        onClose={() => setShowAllLeaves(false)}
+        title="All Leave Requests"
+        size="md"
+      >
+        <div className="space-y-3">
+          {leaveRequests?.data?.map((req) => (
+            <div key={req.id} className="p-4 bg-slate-50 rounded-xl">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-medium text-slate-800 capitalize">{req.leaveType?.leave_type_name}</p>
+                  <p className="text-sm text-slate-600">
+                    {format(new Date(req.from_date), 'dd MMM yyyy')} - {format(new Date(req.to_date), 'dd MMM yyyy')}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">{req.reason}</p>
                 </div>
-              ))}
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  req.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' :
+                  req.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                }`}>
+                  {req.status}
+                </span>
+              </div>
+              {req.remarks && (
+                <p className="text-xs text-slate-500 mt-2 border-t border-slate-200 pt-2">
+                  Remarks: {req.remarks}
+                </p>
+              )}
             </div>
-          </div>
+          ))}
         </div>
-      )}
+      </AppModal>
     </div>
   );
 }

@@ -1,151 +1,552 @@
 'use client';
 /**
- * NoticesPage — School notices, circulars, announcements
+ * NotificationsPage — Send & View Notifications
+ * Perfect cascading audience selection with dropdown-based UI
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Bell } from 'lucide-react';
+import { Send, Bell, Eye } from 'lucide-react';
 import useAuthStore from '@/store/authStore';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
 import SelectField from '@/components/common/SelectField';
-import DatePickerField from '@/components/common/DatePickerField';
 import StatsCard from '@/components/common/StatsCard';
 import { cn } from '@/lib/utils';
-import { DUMMY_NOTICES } from '@/data/dummyData';
 
-const AUDIENCE_OPTS = [{ value:'all', label:'Everyone' }, { value:'students', label:'Students' }, { value:'teachers', label:'Teachers' }, { value:'parents', label:'Parents' }, { value:'staff', label:'Staff' }];
-const PRIORITY_OPTS = [{ value:'low', label:'Low' }, { value:'normal', label:'Normal' }, { value:'high', label:'High' }, { value:'urgent', label:'Urgent' }];
-const PRIORITY_COLORS = { low:'bg-gray-100 text-gray-600', normal:'bg-blue-100 text-blue-600', high:'bg-amber-100 text-amber-700', urgent:'bg-red-100 text-red-700' };
+const AUDIENCE_OPTS = [
+  { value: 'all', label: '📢 Everyone' },
+  { value: 'students', label: '👨‍🎓 Students' },
+  { value: 'teachers', label: '👨‍🏫 Teachers' },
+  { value: 'parents', label: '👨‍👩‍👧 Parents' },
+  { value: 'staff', label: '👥 Staff' },
+];
+
+const NOTIF_TYPE_OPTS = [
+  { value: 'fee', label: 'Fee' },
+  { value: 'attendance', label: 'Attendance' },
+  { value: 'exam', label: 'Exam' },
+  { value: 'general', label: 'General' },
+  { value: 'alert', label: 'Alert' },
+  { value: 'system', label: 'System' },
+];
 
 const schema = z.object({
-  title:      z.string().min(5, 'Required'),
-  content:    z.string().min(10, 'Required'),
-  audience:   z.string().min(1, 'Required'),
-  priority:   z.string().min(1, 'Required'),
-  notice_date:z.string().optional(),
+  title: z.string().min(5, 'Title required (min 5 chars)'),
+  body: z.string().min(10, 'Message required (min 10 chars)'),
+  audience: z.string().min(1, 'Select audience'),
+  notification_type: z.string().default('general'),
 });
 
-
-
-export default function NoticesPage({ type }) {
-  const qc    = useQueryClient();
-  const canDo = useAuthStore((s) => s.canDo);
-  const [search,   setSearch]   = useState('');
-  const [priority, setPriority] = useState('');
-  const [page,     setPage]     = useState(1);
+export default function NotificationsPage() {
+  const qc = useQueryClient();
+  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [modal,    setModal]    = useState(false);
-  const [editing,  setEditing]  = useState(null);
-  const [deleting, setDeleting] = useState(null);
+  const [selectedRecipient, setSelectedRecipient] = useState('all');
+  const [recipientOptions, setRecipientOptions] = useState([]);
+  const [sendModalOpen, setSendModalOpen] = useState(false);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [selectedNotificationForView, setSelectedNotificationForView] = useState(null);
 
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm({ resolver: zodResolver(schema), defaultValues: { audience:'all', priority:'normal' } });
+  const { register, handleSubmit, control, reset, formState: { errors }, watch } = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: { audience: 'all', notification_type: 'general' },
+  });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['notices', type, page, pageSize, search, priority],
+  const watchAudience = useWatch({ control, name: 'audience' });
+
+  // Fetch users by audience type and build dropdown options
+  const loadRecipientOptions = async (audienceType) => {
+    try {
+      let users = [];
+      const { studentService, teacherService, parentService, staffService } = await import('@/services');
+
+      if (audienceType === 'students') {
+        const res = await studentService.getAll({ limit: 1000 });
+        users = res.data?.rows || res.data || [];
+      } else if (audienceType === 'teachers') {
+        const res = await teacherService.getAll({ limit: 1000 });
+        users = res.data?.rows || res.data || [];
+      } else if (audienceType === 'parents') {
+        const res = await parentService.getAll({ limit: 1000 });
+        users = res.data?.rows || res.data || [];
+      } else if (audienceType === 'staff') {
+        const res = await staffService.getAll({ limit: 1000 });
+        users = res.data?.rows || res.data || [];
+      }
+
+      console.log(`Loaded ${audienceType}:`, users);
+
+      // Build options: "All {Type}" + individual users
+      const allOption = {
+        value: `all_${audienceType}`,
+        label: `📢 All ${audienceType.charAt(0).toUpperCase() + audienceType.slice(1)}`,
+      };
+      const userOptions = users.map((u) => ({
+        value: u.id,
+        label: `👤 ${u.first_name || u.name} ${u.last_name || ''}`.trim(),
+      }));
+
+      const options = [allOption, ...userOptions];
+      console.log('Recipient options:', options);
+      return options;
+    } catch (error) {
+      console.error('Error loading recipient options:', error);
+      toast.error('Failed to load users');
+      return [];
+    }
+  };
+
+  // Update recipient options when audience changes
+  useEffect(() => {
+    if (watchAudience && watchAudience !== 'all') {
+      loadRecipientOptions(watchAudience).then((options) => {
+        setRecipientOptions(options);
+        setSelectedRecipient(options[0]?.value || 'all');
+      });
+    } else {
+      setRecipientOptions([]);
+      setSelectedRecipient('all');
+    }
+  }, [watchAudience]);
+
+  // Fetch notifications
+  const { data: notificationsData, isLoading: notifLoading, refetch } = useQuery({
+    queryKey: ['notifications', page, pageSize],
     queryFn: async () => {
-      try { const { noticeService } = await import('@/services'); return await noticeService.getAll({ page, limit: pageSize, search, priority }); }
-      catch {
-        const d = DUMMY_NOTICES.filter(r => (!search || r.title.toLowerCase().includes(search.toLowerCase())) && (!priority || r.priority === priority));
-        const slice = d.slice((page-1)*pageSize, page*pageSize);
-        return { data: { rows: slice, total: d.length, totalPages: Math.max(1, Math.ceil(d.length / pageSize)) } };
+      try {
+        const { notificationService } = await import('@/services');
+        const result = await notificationService.getAll({ page, limit: pageSize });
+        console.log('Notifications fetched:', result);
+        return result;
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+        toast.error('Failed to fetch notifications');
+        return { rows: [], pagination: { total: 0, pages: 1 } };
       }
     },
     placeholderData: (p) => p,
   });
 
-  const rows = data?.data?.rows ?? DUMMY_NOTICES;
-  const total = data?.data?.total ?? rows.length;
-  const totalPages = data?.data?.totalPages ?? 1;
+  const notifications = Array.isArray(notificationsData?.data)
+    ? notificationsData.data
+    : notificationsData?.rows ?? [];
+  const pagination = notificationsData?.pagination ?? { total: 0, pages: 1 };
 
-  const save = useMutation({
+  // Send notification
+  const sendNotification = useMutation({
     mutationFn: async (vals) => {
-      try { const { noticeService } = await import('@/services'); return editing ? await noticeService.update(editing.id, vals) : await noticeService.create(vals); }
-      catch { return { data: vals }; }
+      try {
+        const { notificationService } = await import('@/services');
+
+        const notifData = {
+          title: vals.title,
+          body: vals.body,
+          type: vals.notification_type,
+          channel: 'in_app',
+          data: {},
+        };
+
+        if (vals.audience === 'all') {
+          // Broadcast to everyone
+          await Promise.all([
+            notificationService.broadcast({ recipient_type: 'ALL_STUDENTS', ...notifData }),
+            notificationService.broadcast({ recipient_type: 'ALL_TEACHERS', ...notifData }),
+            notificationService.broadcast({ recipient_type: 'ALL_PARENTS', ...notifData }),
+            notificationService.broadcast({ recipient_type: 'ALL_STAFF', ...notifData }),
+            notificationService.broadcast({ recipient_type: 'ALL_ADMINS', ...notifData }),
+          ]);
+        } else {
+          // Send based on recipient selection
+          const typeMap = {
+            students: 'ALL_STUDENTS',
+            teachers: 'ALL_TEACHERS',
+            parents: 'ALL_PARENTS',
+            staff: 'ALL_STAFF',
+          };
+
+          if (selectedRecipient?.startsWith('all_')) {
+            // Send to all of that type
+            const type = selectedRecipient.replace('all_', '');
+            const recipientType = typeMap[type] || `ALL_${type.toUpperCase()}`;
+            await notificationService.broadcast({
+              recipient_type: recipientType,
+              ...notifData,
+            });
+          } else {
+            // Send to specific user
+            await notificationService.send({
+              user_id: selectedRecipient,
+              ...notifData,
+            });
+          }
+        }
+
+        return { success: true };
+      } catch (error) {
+        console.error('Error sending notification:', error);
+        throw error;
+      }
     },
-    onSuccess: () => { toast.success(editing ? 'Updated' : 'Published'); qc.invalidateQueries({ queryKey: ['notices'] }); closeModal(); },
-    onError: () => toast.error('Save failed'),
+    onSuccess: () => {
+      toast.success('✅ Notification sent successfully!');
+      reset({ audience: 'all', notification_type: 'general' });
+      setSelectedRecipient('all');
+      setRecipientOptions([]);
+      setSendModalOpen(false);
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(`❌ Failed to send: ${error.message}`);
+    },
   });
 
-  const remove = useMutation({
-    mutationFn: async (id) => {
-      try { const { noticeService } = await import('@/services'); return await noticeService.delete(id); }
-      catch { return { success: true }; }
-    },
-    onSuccess: () => { toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['notices'] }); setDeleting(null); },
-    onError: () => toast.error('Delete failed'),
-  });
-
-  const openAdd  = () => { setEditing(null); reset({ audience:'all', priority:'normal' }); setModal(true); };
-  const openEdit = (row) => { setEditing(row); reset({ ...row }); setModal(true); };
-  const closeModal = () => { setModal(false); setEditing(null); reset(); };
-
-  const columns = useMemo(() => [
-    {
-      accessorKey: 'title', header: 'Notice', cell: ({ row: { original: r } }) => (
-        <div><p className="font-medium">{r.title}</p><p className="text-xs text-muted-foreground line-clamp-1">{r.content}</p></div>
-      ),
-    },
-    { accessorKey: 'audience',    header: 'Audience',  cell: ({ getValue }) => <span className="capitalize">{getValue()}</span> },
-    { accessorKey: 'notice_date', header: 'Date',      cell: ({ getValue }) => getValue() ? new Date(getValue()).toLocaleDateString('en-PK') : '—' },
-    { accessorKey: 'priority', header: 'Priority', cell: ({ getValue }) => { const p = getValue(); return <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', PRIORITY_COLORS[p])}>{p}</span>; } },
-    { id: 'actions', header: 'Actions', enableHiding: false, cell: ({ row }) => (
-      <div className="flex items-center justify-end gap-1">
-        {canDo('notices.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
-        {canDo('notices.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
-      </div>
-    )},
-  ], [canDo]);
+  const notificationColumns = useMemo(
+    () => [
+      {
+        accessorKey: 'title',
+        header: 'Title',
+        cell: ({ row: { original: n } }) => (
+          <div>
+            <p className="font-medium text-sm">{n.title}</p>
+            <p className="text-xs text-muted-foreground line-clamp-1">{n.body}</p>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'type',
+        header: 'Type',
+        cell: ({ getValue }) => {
+          const t = getValue();
+          const colors = {
+            fee: 'bg-green-100 text-green-700',
+            attendance: 'bg-blue-100 text-blue-700',
+            exam: 'bg-purple-100 text-purple-700',
+            alert: 'bg-red-100 text-red-700',
+            general: 'bg-gray-100 text-gray-700',
+            system: 'bg-yellow-100 text-yellow-700',
+          };
+          return (
+            <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', colors[t])}>
+              {t}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'is_read',
+        header: 'Status',
+        cell: ({ getValue }) => (getValue() ? '✅ Read' : '📬 Unread'),
+      },
+      {
+        accessorKey: 'created_at',
+        header: 'Sent At',
+        cell: ({ getValue }) => {
+          const date = new Date(getValue());
+          return date.toLocaleString('en-PK', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+        },
+      },
+      {
+        id: 'actions',
+        header: 'Actions',
+        enableHiding: false,
+        cell: ({ row: { original: n } }) => (
+          <button
+            onClick={() => {
+              setSelectedNotificationForView(n);
+              setViewModalOpen(true);
+            }}
+            className="rounded p-1.5 hover:bg-accent"
+            title="View Details"
+          >
+            <Eye size={14} />
+          </button>
+        ),
+      },
+    ],
+    []
+  );
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Notices & Circulars" description={`${total} notices`} />
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatsCard label="Total Notices" value={total}                                              icon={<Bell size={18} />} />
-        <StatsCard label="Urgent"        value={rows.filter(r => r.priority === 'urgent').length}   icon={<Bell size={18} />} />
-        <StatsCard label="High Priority" value={rows.filter(r => r.priority === 'high').length}     icon={<Bell size={18} />} />
-      </div>
-      <DataTable columns={columns} data={rows} loading={isLoading} emptyMessage="No notices found"
-        search={search} onSearch={(v) => { setSearch(v); setPage(1); }} searchPlaceholder="Search notices…"
-        filters={[{ name:'priority', label:'Priority', value:priority, onChange:(v) => { setPriority(v); setPage(1); }, options:PRIORITY_OPTS }]}
-        action={canDo('notices.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> New Notice</button> : null}
-        enableColumnVisibility
-        exportConfig={{ fileName: 'notices' }}
-        pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }} />
+      <PageHeader 
+        title="📢 Notifications" 
+        description="Send & manage notifications" 
+        action={
+          <button
+            onClick={() => setSendModalOpen(true)}
+            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+          >
+            <Send size={16} />
+            Send Notification
+          </button>
+        }
+      />
 
-      <AppModal open={modal} onClose={closeModal} title={editing ? 'Edit Notice' : 'New Notice'} size="lg"
-        footer={<><button type="button" onClick={closeModal} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button><button type="submit" form="notice-form" disabled={save.isPending} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60">{save.isPending ? 'Publishing…' : editing ? 'Update' : 'Publish'}</button></>}>
-        <form id="notice-form" onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4">
-          <div className="space-y-1.5"><label className="text-sm font-medium">Title *</label><input {...register('title')} className="input-base" />{errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}</div>
-          <div className="grid grid-cols-3 gap-4">
-            <SelectField label="Audience *"  name="audience" control={control} error={errors.audience} options={AUDIENCE_OPTS} required />
-            <SelectField label="Priority *"  name="priority" control={control} error={errors.priority} options={PRIORITY_OPTS} required />
-            <DatePickerField label="Date"    name="notice_date" control={control} />
+      {/* Stats */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatsCard label="Total Notifications" value={pagination.total || 0} icon={<Bell size={18} />} />
+        <StatsCard label="Unread" value={notifications.filter((n) => !n.is_read).length} icon={<Send size={18} />} />
+      </div>
+
+      {/* Notifications Table */}
+      <div className="rounded-lg border bg-card">
+        <DataTable
+          columns={notificationColumns}
+          data={notifications}
+          loading={notifLoading}
+          emptyMessage="No notifications yet"
+          pagination={{
+            page,
+            totalPages: pagination.pages,
+            onPageChange: setPage,
+            total: pagination.total,
+            pageSize,
+            onPageSizeChange: (s) => {
+              setPageSize(s);
+              setPage(1);
+            },
+          }}
+        />
+      </div>
+
+      {/* Send Notification Modal */}
+      <AppModal
+        open={sendModalOpen}
+        onClose={() => {
+          setSendModalOpen(false);
+          reset({ audience: 'all', notification_type: 'general' });
+          setSelectedRecipient('all');
+        }}
+        title="📤 Send Notification"
+        size="lg"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setSendModalOpen(false);
+                reset({ audience: 'all', notification_type: 'general' });
+                setSelectedRecipient('all');
+              }}
+              className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="send-notification-form"
+              disabled={sendNotification.isPending}
+              className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+            >
+              <Send size={14} />
+              {sendNotification.isPending ? 'Sending...' : 'Send Notification'}
+            </button>
+          </>
+        }
+      >
+        <form id="send-notification-form" onSubmit={handleSubmit((v) => sendNotification.mutate(v))} className="space-y-4">
+          {/* Row 1: Title & Type */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Title *</label>
+              <input
+                {...register('title')}
+                placeholder="Notification title"
+                className="input-base"
+              />
+              {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
+            </div>
+            <SelectField
+              label="Type *"
+              name="notification_type"
+              control={control}
+              options={NOTIF_TYPE_OPTS}
+            />
           </div>
+
+          {/* Row 2: Audience & Recipient */}
+          <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectField
+                label="Send To *"
+                name="audience"
+                control={control}
+                error={errors.audience}
+                options={AUDIENCE_OPTS}
+                required
+              />
+
+              {watchAudience && watchAudience !== 'all' && recipientOptions.length > 0 && (
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Select Recipient *</label>
+                  <select
+                    value={selectedRecipient}
+                    onChange={(e) => setSelectedRecipient(e.target.value)}
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    {recipientOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedRecipient?.startsWith('all_')
+                      ? `📢 Will broadcast to all ${watchAudience}`
+                      : '👤 Will send to this specific person'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Message Body */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Content *</label>
-            <textarea {...register('content')} rows={5} className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none" />
-            {errors.content && <p className="text-xs text-destructive">{errors.content.message}</p>}
+            <label className="text-sm font-medium">Message *</label>
+            <textarea
+              {...register('body')}
+              placeholder="Notification message..."
+              rows={4}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
+            />
+            {errors.body && <p className="text-xs text-destructive">{errors.body.message}</p>}
           </div>
         </form>
       </AppModal>
 
-      {/* Delete Confirm */}
-      <AppModal open={!!deleting} onClose={() => setDeleting(null)} title="Delete Notice" size="sm"
+      {/* View Notification Details Modal */}
+      <AppModal
+        open={viewModalOpen}
+        onClose={() => {
+          setViewModalOpen(false);
+          setSelectedNotificationForView(null);
+        }}
+        title="📋 Notification Details"
+        size="md"
         footer={
-          <>
-            <button onClick={() => setDeleting(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button>
-            <button onClick={() => remove.mutate(deleting.id)} disabled={remove.isPending} className="rounded-md bg-destructive px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
-              {remove.isPending ? 'Deleting\u2026' : 'Delete'}
-            </button>
-          </>
-        }>
-        <p className="text-sm text-muted-foreground">Delete <strong>{deleting?.title}</strong>? This cannot be undone.</p>
+          <button
+            onClick={() => {
+              setViewModalOpen(false);
+              setSelectedNotificationForView(null);
+            }}
+            className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
+          >
+            Close
+          </button>
+        }
+      >
+        {selectedNotificationForView && (
+          <div className="space-y-4">
+            {/* Title & Body */}
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm">{selectedNotificationForView.title}</h4>
+              <p className="text-sm text-muted-foreground">{selectedNotificationForView.body}</p>
+            </div>
+
+            {/* Details Grid */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {/* Type Badge */}
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Type</p>
+                <div>
+                  {(() => {
+                    const t = selectedNotificationForView.type;
+                    const colors = {
+                      fee: 'bg-green-100 text-green-700',
+                      attendance: 'bg-blue-100 text-blue-700',
+                      exam: 'bg-purple-100 text-purple-700',
+                      alert: 'bg-red-100 text-red-700',
+                      general: 'bg-gray-100 text-gray-700',
+                      system: 'bg-yellow-100 text-yellow-700',
+                    };
+                    return (
+                      <span className={cn('rounded-full px-2 py-1 text-xs font-medium capitalize', colors[t])}>
+                        {t}
+                      </span>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Status */}
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Status</p>
+                <p className="text-sm font-medium">
+                  {selectedNotificationForView.is_read ? '✅ Read' : '📬 Unread'}
+                </p>
+              </div>
+
+              {/* Sent At */}
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Sent At</p>
+                <p className="text-sm font-medium">
+                  {new Date(selectedNotificationForView.created_at).toLocaleString('en-PK', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+              </div>
+
+              {/* Channel */}
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Channel</p>
+                <p className="text-sm font-medium capitalize">{selectedNotificationForView.channel}</p>
+              </div>
+
+              {/* Read At (if read) */}
+              {selectedNotificationForView.read_at && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Read At</p>
+                  <p className="text-sm font-medium">
+                    {new Date(selectedNotificationForView.read_at).toLocaleString('en-PK', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Additional Data (if present) */}
+            {selectedNotificationForView.data && Object.keys(selectedNotificationForView.data).length > 0 && (
+              <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+                <p className="text-xs font-medium">Additional Information</p>
+                <div className="space-y-1">
+                  {Object.entries(selectedNotificationForView.data).map(([key, value]) => (
+                    <div key={key} className="flex justify-between text-xs">
+                      <span className="text-muted-foreground capitalize">{key}:</span>
+                      <span className="font-medium">{JSON.stringify(value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ID */}
+            <div className="space-y-1 border-t pt-3">
+              <p className="text-xs font-medium text-muted-foreground">Notification ID</p>
+              <p className="text-xs font-mono text-muted-foreground break-all">{selectedNotificationForView.id}</p>
+            </div>
+          </div>
+        )}
       </AppModal>
     </div>
   );

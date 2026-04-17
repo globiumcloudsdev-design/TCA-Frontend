@@ -88,7 +88,7 @@ function ChildCard({ child, index, t }) {
         </Link>
         <Link href="/parent/announcements" className="flex items-center gap-2 px-3 py-2 bg-rose-50 text-rose-700 rounded-lg text-xs font-semibold hover:bg-rose-100 transition-colors">
           <Bell className="w-3.5 h-3.5" />
-          {t.announcementsLabel}
+          {t.announcementLabel}
         </Link>
       </div>
     </div>
