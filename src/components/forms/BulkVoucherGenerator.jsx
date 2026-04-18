@@ -13,11 +13,11 @@ import {
   DatePickerField,
   ConfirmDialog
 } from '@/components/common';
-import { classService, academicYearService, studentService } from '@/services';
+import { classService, academicYearService, studentService, feeTemplateService } from '@/services';
 import { feeVoucherService } from '@/services';
 import useInstituteStore from '@/store/instituteStore';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, CheckCircle, AlertTriangle, DollarSign, Info } from 'lucide-react';
 
 // Month options for dropdown
 const MONTH_OPTIONS = [
@@ -33,6 +33,15 @@ const MONTH_OPTIONS = [
   { value: 10, label: 'October' },
   { value: 11, label: 'November' },
   { value: 12, label: 'December' },
+];
+
+// Fee type options
+const FEE_TYPE_OPTIONS = [
+  { value: 'monthly', label: 'Monthly Fee' },
+  { value: 'annual', label: 'Annual Fee' },
+  { value: 'lab', label: 'Lab Charges' },
+  { value: 'admission', label: 'Admission Fee' },
+  { value: 'fee_template', label: 'Fee Template' },
 ];
 
 export default function BulkVoucherGenerator({ instituteId: propInstituteId, onSuccess }) {
@@ -52,9 +61,45 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
       classId: '',
       academicYearId: '',
       month: String(new Date().getMonth() + 1),
-      dueDate: '', // Today's date as default
+      dueDate: '',
+      feeTemplateId: '',
+      feeType: 'monthly',
     }
   });
+
+  // Fetch fee templates
+  const { data: feeTemplates = [] } = useQuery({
+    queryKey: ['fee-templates', instituteId],
+    queryFn: async () => {
+      try {
+        const response = await feeTemplateService.getOptions({ 
+          institute_id: instituteId,
+          is_active: true
+        });
+        return response.data || [];
+      } catch (error) {
+        console.error('Failed to fetch fee templates:', error);
+        return [];
+      }
+    },
+    enabled: !!instituteId
+  });
+
+  const selectedTemplateId = watch('feeTemplateId');
+  const selectedFeeType = watch('feeType');
+  const selectedTemplate = feeTemplates.find(t => t.value === selectedTemplateId);
+
+  // Auto-lock fee type to fee_template whenever a fee template is selected.
+  useEffect(() => {
+    if (selectedTemplateId) {
+      setValue('feeType', 'fee_template', { shouldDirty: true });
+      return;
+    }
+
+    if (selectedFeeType === 'fee_template') {
+      setValue('feeType', 'monthly', { shouldDirty: true });
+    }
+  }, [selectedTemplateId, selectedFeeType, setValue]);
 
   // Fetch academic years
   const { data: academicYears = [] } = useQuery({
@@ -191,20 +236,35 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
           confirmData.studentId, 
           month, 
           year,
-          { academicYearId: confirmData.academicYearId, dueDate }
+          { 
+            academicYearId: confirmData.academicYearId, 
+            dueDate,
+            feeType: confirmData.feeType,
+            feeTemplateId: confirmData.feeTemplateId || undefined
+          }
         );
       } else if (confirmData.mode === 'class') {
         response = await feeVoucherService.generateClass(
           confirmData.classId, 
           month, 
           year,
-          { academicYearId: confirmData.academicYearId, dueDate }
+          { 
+            academicYearId: confirmData.academicYearId, 
+            dueDate,
+            feeType: confirmData.feeType,
+            feeTemplateId: confirmData.feeTemplateId || undefined
+          }
         );
       } else if (confirmData.mode === 'institute') {
         response = await feeVoucherService.generateInstitute(
           month, 
           year,
-          { academicYearId: confirmData.academicYearId, dueDate }
+          { 
+            academicYearId: confirmData.academicYearId, 
+            dueDate,
+            feeType: confirmData.feeType,
+            feeTemplateId: confirmData.feeTemplateId || undefined
+          }
         );
       }
 
@@ -292,7 +352,7 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
 
             {/* Single Student Mode */}
             <TabsContent value="single" className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <Controller
                   name="classId"
                   control={control}
@@ -322,10 +382,49 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
                     />
                   )}
                 />
+                <Controller
+                  name="feeTemplateId"
+                  control={control}
+                  render={({ field }) => (
+                    <SelectField
+                      label="Fee Template (Optional)"
+                      options={feeTemplates}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Choose a fee template..."
+                    />
+                  )}
+                />
               </div>
+
+              {/* Fee Template Breakdown Preview */}
+              {selectedTemplate && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                  <div className="flex items-center gap-2">
+                    <DollarSign size={16} className="text-blue-600" />
+                    <h4 className="font-semibold text-blue-900">Fee Template: {selectedTemplate.label}</h4>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="bg-white p-3 rounded border border-blue-100">
+                      <p className="text-muted-foreground text-xs font-semibold">Total Amount</p>
+                      <p className="font-bold text-lg text-blue-600">PKR {selectedTemplate.total_amount?.toLocaleString('en-PK') || 0}</p>
+                    </div>
+                    <div className="bg-white p-3 rounded border border-blue-100">
+                      <p className="text-muted-foreground text-xs font-semibold">Fee Basis</p>
+                      <p className="font-semibold capitalize text-gray-700">{selectedTemplate.fee_basis || 'N/A'}</p>
+                    </div>
+                    {selectedTemplate.is_default && (
+                      <div className="bg-green-100 p-3 rounded text-green-700 text-xs font-semibold col-span-2 flex items-center gap-2">
+                        <CheckCircle size={14} /> Default Template
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {!selectedClassId && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
-                  ℹ️ Please select a class first to see available students.
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700 flex items-center gap-2">
+                  <Info size={16} /> Please select a class first to see available students.
                 </div>
               )}
             </TabsContent>
@@ -347,21 +446,101 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
                     />
                   )}
                 />
+                <Controller
+                  name="feeTemplateId"
+                  control={control}
+                  render={({ field }) => (
+                    <SelectField
+                      label="Fee Template (Optional)"
+                      options={feeTemplates}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Choose a fee template..."
+                    />
+                  )}
+                />
               </div>
+
+              {/* Fee Template Breakdown Preview */}
+              {selectedTemplate && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                  <div className="flex items-center gap-2">
+                    <DollarSign size={16} className="text-blue-600" />
+                    <h4 className="font-semibold text-blue-900">Fee Template: {selectedTemplate.label}</h4>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="bg-white p-3 rounded border border-blue-100">
+                      <p className="text-muted-foreground text-xs font-semibold">Total Amount</p>
+                      <p className="font-bold text-lg text-blue-600">PKR {selectedTemplate.total_amount?.toLocaleString('en-PK') || 0}</p>
+                    </div>
+                    <div className="bg-white p-3 rounded border border-blue-100">
+                      <p className="text-muted-foreground text-xs font-semibold">Fee Basis</p>
+                      <p className="font-semibold capitalize text-gray-700">{selectedTemplate.fee_basis || 'N/A'}</p>
+                    </div>
+                    {selectedTemplate.is_default && (
+                      <div className="bg-green-100 p-3 rounded text-green-700 text-xs font-semibold col-span-2 flex items-center gap-2">
+                        <CheckCircle size={14} /> Default Template
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </TabsContent>
 
             {/* Institute Mode */}
             <TabsContent value="institute" className="space-y-4">
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800 font-medium">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-1">
+                <Controller
+                  name="feeTemplateId"
+                  control={control}
+                  render={({ field }) => (
+                    <SelectField
+                      label="Fee Template (Optional)"
+                      options={feeTemplates}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Choose a fee template..."
+                    />
+                  )}
+                />
+              </div>
+
+              {/* Fee Template Breakdown Preview */}
+              {selectedTemplate && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                  <div className="flex items-center gap-2">
+                    <DollarSign size={16} className="text-blue-600" />
+                    <h4 className="font-semibold text-blue-900">Fee Template: {selectedTemplate.label}</h4>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="bg-white p-3 rounded border border-blue-100">
+                      <p className="text-muted-foreground text-xs font-semibold">Total Amount</p>
+                      <p className="font-bold text-lg text-blue-600">PKR {selectedTemplate.total_amount?.toLocaleString('en-PK') || 0}</p>
+                    </div>
+                    <div className="bg-white p-3 rounded border border-blue-100">
+                      <p className="text-muted-foreground text-xs font-semibold">Fee Basis</p>
+                      <p className="font-semibold capitalize text-gray-700">{selectedTemplate.fee_basis || 'N/A'}</p>
+                    </div>
+                    {selectedTemplate.is_default && (
+                      <div className="bg-green-100 p-3 rounded text-green-700 text-xs font-semibold col-span-2 flex items-center gap-2">
+                        <CheckCircle size={14} /> Default Template
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                <Info size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800 font-medium">
                   ℹ️ This will generate vouchers for ALL active students in your institute.
                 </p>
               </div>
             </TabsContent>
           </Tabs>
 
-          {/* Academic Year, Month and Due Date Selection */}
-          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          {/* Academic Year, Month, Fee Type and Due Date Selection */}
+          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
             <Controller
               name="academicYearId"
               control={control}
@@ -373,6 +552,21 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
                   onChange={field.onChange}
                   error={errors.academicYearId}
                   placeholder="Select academic year..."
+                />
+              )}
+            />
+            <Controller
+              name="feeType"
+              control={control}
+              render={({ field }) => (
+                <SelectField
+                  label="Fee Type"
+                  options={FEE_TYPE_OPTIONS}
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.feeType}
+                  placeholder="Select fee type..."
+                  disabled={!!selectedTemplateId}
                 />
               )}
             />

@@ -58,6 +58,8 @@ export default function FeesPage() {
   const [voucherPage, setVoucherPage] = useState(1);
   const [voucherPageSize, setVoucherPageSize] = useState(20);
   const [markingAsPaid, setMarkingAsPaid] = useState(null);
+  const [recordingPayment, setRecordingPayment] = useState(null);
+  const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'cash', referenceNo: '', remarks: '' });
 
   // Filters
   const currentMonth = String(new Date().getMonth() + 1);
@@ -162,6 +164,34 @@ export default function FeesPage() {
     },
   });
 
+  // Record partial payment
+  const recordPaymentMutation = useMutation({
+    mutationFn: (paymentData) => feeVoucherService.recordPayment(paymentData.voucherId, {
+      amount: parseFloat(paymentData.amount),
+      paymentMethod: paymentData.method,
+      referenceNo: paymentData.referenceNo || null,
+      remarks: paymentData.remarks || null
+    }),
+    onSuccess: (result) => {
+      toast.success('Payment recorded successfully');
+      setPaymentForm({ amount: '', method: 'cash', referenceNo: '', remarks: '' });
+      setRecordingPayment(null);
+      refetchVouchers();
+      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to record payment');
+    },
+  });
+
+  const handleRecordPayment = async (voucherId) => {
+    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
+      toast.error('Please enter a valid payment amount');
+      return;
+    }
+    recordPaymentMutation.mutate({ voucherId, ...paymentForm });
+  };
+
   // Download voucher PDF (reuse from original, but simplified)
   const handleDownloadVoucher = async (voucher) => {
     // You can re‑use the full PDF generation logic from the original component
@@ -215,14 +245,24 @@ export default function FeesPage() {
           <div className="flex items-center gap-1">
             <button onClick={() => setViewingVoucher(row.original)} className="rounded p-1 hover:bg-accent" title="View Details" size={14}><FileText size={14} /></button>
             {row.original.status !== 'paid' && canDo('fees.update') && (
-              <button
-                onClick={() => setMarkingAsPaid(row.original.id)}
-                disabled={markingAsPaid === row.original.id}
-                className="rounded p-1 hover:bg-green-100 text-green-700 hover:text-green-800 disabled:opacity-50"
-                title="Mark as Paid"
-              >
-                {markingAsPaid === row.original.id ? '⏳' : '✓'}
-              </button>
+              <>
+                <button
+                  onClick={() => { setRecordingPayment(row.original); setPaymentForm({ amount: '', method: 'cash', referenceNo: '', remarks: '' }); }}
+                  disabled={recordingPayment?.id === row.original.id}
+                  className="rounded p-1 hover:bg-blue-100 text-blue-700 hover:text-blue-800 disabled:opacity-50"
+                  title="Record Payment"
+                >
+                  {recordingPayment?.id === row.original.id ? '⏳' : '💰'}
+                </button>
+                <button
+                  onClick={() => setMarkingAsPaid(row.original.id)}
+                  disabled={markingAsPaid === row.original.id}
+                  className="rounded p-1 hover:bg-green-100 text-green-700 hover:text-green-800 disabled:opacity-50"
+                  title="Mark as Paid"
+                >
+                  {markingAsPaid === row.original.id ? '⏳' : '✓'}
+                </button>
+              </>
             )}
             <button onClick={() => handleDownloadVoucher(row.original)} className="rounded p-1 hover:bg-accent" title="Download"><Download size={14} /></button>
             {canDo('fees.delete') && (
@@ -232,7 +272,7 @@ export default function FeesPage() {
         ),
       },
     ],
-    [terms.student, canDo, setViewingVoucher, setDeletingVoucher, handleDownloadVoucher, markingAsPaid]
+    [terms.student, canDo, setViewingVoucher, setDeletingVoucher, handleDownloadVoucher, markingAsPaid, recordingPayment, setRecordingPayment, setPaymentForm]
   );
 
   return (
@@ -291,7 +331,7 @@ export default function FeesPage() {
       />
 
       {/* Bulk Voucher Generator Modal */}
-      <AppModal open={voucherGeneratorModal} onClose={() => setVoucherGeneratorModal(false)} title="Generate Bulk Vouchers" size="lg">
+      <AppModal open={voucherGeneratorModal} onClose={() => setVoucherGeneratorModal(false)} title="Generate Bulk Vouchers" size="xl">
         <BulkVoucherGenerator
           instituteId={currentInstitute?.id}
           onSuccess={() => {
@@ -325,6 +365,94 @@ export default function FeesPage() {
         confirmLabel="Delete"
         variant="destructive"
       />
+
+      {/* Record Payment Modal */}
+      <AppModal open={!!recordingPayment} onClose={() => setRecordingPayment(null)} title={`Record Payment - ${recordingPayment?.voucherNumber}`} size="md">
+        {recordingPayment && (
+          <div className="space-y-4">
+            {/* Amount Info */}
+            <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg">
+              <div>
+                <p className="text-xs text-muted-foreground font-semibold">Total Amount</p>
+                <p className="font-bold text-lg text-blue-600">PKR {(recordingPayment.netAmount || recordingPayment.amount || 0).toLocaleString('en-PK')}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground font-semibold">Outstanding</p>
+                <p className="font-bold text-lg text-orange-600">PKR {(recordingPayment.netAmount || recordingPayment.amount || 0).toLocaleString('en-PK')}</p>
+              </div>
+            </div>
+
+            {/* Payment Form */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-semibold">Payment Amount *</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={paymentForm.amount}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                  placeholder="Enter payment amount"
+                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold">Payment Method *</label>
+                <select
+                  value={paymentForm.method}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
+                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="cash">Cash</option>
+                  <option value="cheque">Cheque</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="jazzcash">JazzCash</option>
+                  <option value="easypaisa">Easypaisa</option>
+                  <option value="stripe">Card (Stripe)</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold">Reference No. (Optional)</label>
+                <input
+                  type="text"
+                  value={paymentForm.referenceNo}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, referenceNo: e.target.value })}
+                  placeholder="e.g., Check #, Transaction ID"
+                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold">Remarks (Optional)</label>
+                <textarea
+                  value={paymentForm.remarks}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, remarks: e.target.value })}
+                  placeholder="Additional notes..."
+                  rows="2"
+                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 justify-end pt-4 border-t">
+              <button onClick={() => setRecordingPayment(null)} className="rounded-md border px-4 py-2 text-sm">
+                Cancel
+              </button>
+              <button
+                onClick={() => handleRecordPayment(recordingPayment.id)}
+                disabled={recordPaymentMutation.isPending}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {recordPaymentMutation.isPending ? '⏳ Recording...' : '💾 Record Payment'}
+              </button>
+            </div>
+          </div>
+        )}
+      </AppModal>
 
       {/* Voucher Detail View Modal */}
       <AppModal open={!!viewingVoucher} onClose={() => setViewingVoucher(null)} title="Voucher Details" size="lg">

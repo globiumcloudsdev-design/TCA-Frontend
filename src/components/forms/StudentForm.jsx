@@ -110,6 +110,14 @@ export default function StudentForm({
       console.log('🔄 Resetting form with:', defaultValues);
       reset(defaultValues);
 
+      const fallbackAdmissionFee =
+        defaultValues?.admission_fee ??
+        defaultValues?.details?.studentDetails?.admission_fee ??
+        defaultValues?.details?.studentDetails?.admission_charges;
+      if (fallbackAdmissionFee !== undefined && fallbackAdmissionFee !== null) {
+        setValue('admission_fee', fallbackAdmissionFee, { shouldDirty: false });
+      }
+
       // Set selected values
       if (defaultValues.details?.studentDetails?.academic_year_id) {
         setSelectedAcademicYear(defaultValues.details.studentDetails.academic_year_id);
@@ -119,7 +127,7 @@ export default function StudentForm({
         prevClassRef.current = defaultValues.details.studentDetails.class_id;
       }
     }
-  }, [defaultValues?.id, reset]);
+  }, [defaultValues?.id, reset, setValue]);
 
   // ─────────────────────────────────────────────────────────────────
   // FETCH ACADEMIC YEARS
