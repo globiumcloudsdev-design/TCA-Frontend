@@ -297,18 +297,20 @@ export default function LoginPage() {
           </Tabs>
         </div>
 
-        {/* Demo Quick Login */}
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          {QUICK_LOGINS.map((cred) => (
-            <button
-              key={cred.email} type="button" onClick={() => fillCredentials(cred)}
-              className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-slate-500 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest"
-              disabled={loading}
-            >
-              Demo: {cred.label}
-            </button>
-          ))}
-        </div>
+        {/* Demo Quick Login - Only in Development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            {QUICK_LOGINS.map((cred) => (
+              <button
+                key={cred.email} type="button" onClick={() => fillCredentials(cred)}
+                className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-slate-500 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest"
+                disabled={loading}
+              >
+                Demo: {cred.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Account Selector Modal */}

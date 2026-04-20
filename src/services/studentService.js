@@ -91,7 +91,18 @@ export const studentService = {
 
   update: (id, body) => api.put(`/students/${id}`, body).then((r) => r.data),
 
-  delete: (id) => api.delete(`/students/${id}`).then((r) => r.data),
+  // delete: (id) => api.delete(`/students/${id}`).then((r) => r.data),
+
+  /**
+   * Delete/Activate/Deactivate student with single API
+   * @param {string} id - Student ID
+   * @param {string} type - 'delete', 'active', 'inactive' (default)
+   */
+  delete: (id, type = 'inactive') => {
+    const queryParams = type !== 'inactive' ? `?type=${type}` : '';
+    return api.delete(`/students/${id}${queryParams}`).then((r) => r.data);
+  },
+  
   toggleStatus: (id, is_active) =>
     api
       .patch(`/students/${id}/toggle-status`, { is_active })

@@ -167,7 +167,7 @@ export const NAV = {
     { group: 'Operations', label: 'Exams', href: '/school/exams', icon: 'ClipboardCheck', permission: 'exams.read' },
     { group: 'Finance', label: 'Expense', href: '/school/expense', icon: 'Wallet', permission: 'expenses.read' },
     { group: 'Finance', label: 'Vendors', href: '/school/vendors', icon: 'Store', permission: 'fees.read' },
-    { group: 'Finance', label: 'Fees', href: '/school/fees', icon: 'CreditCard', permission: 'fees.read' },
+    { group: 'Finance', label: 'Fees Voucher', href: '/school/fees', icon: 'CreditCard', permission: 'fees.read' },
     { group: 'Finance', label: 'Fee Templates', href: '/school/fee-templates', icon: 'Receipt', permission: 'fee_templates.create' },
     { group: 'Finance', label: 'Payroll', href: '/school/payroll', icon: 'DollarSign', permission: 'payroll.read' },
     { group: 'Finance', label: 'Reports', href: '/school/reports', icon: 'BarChart2', permission: 'reports.student' },
