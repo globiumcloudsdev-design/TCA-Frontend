@@ -506,54 +506,56 @@ function PortalLoginContent() {
                 </Button>
               </form>
 
-              {/* Quick Demo Login */}
-              <div className="mt-5 pt-5 border-t border-slate-100">
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2.5">Quick Demo Login</p>
+              {/* Quick Demo Login - Only in Development */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-5 pt-5 border-t border-slate-100">
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2.5">Quick Demo Login</p>
 
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {INSTITUTE_TABS.map((tab) => (
-                    <button
-                      key={tab.value}
-                      type="button"
-                      onClick={() => setDemoInstitute(tab.value)}
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${demoInstitute === tab.value
-                        ? 'bg-slate-800 text-white'
-                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                        }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {INSTITUTE_TABS.map((tab) => (
+                      <button
+                        key={tab.value}
+                        type="button"
+                        onClick={() => setDemoInstitute(tab.value)}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${demoInstitute === tab.value
+                          ? 'bg-slate-800 text-white'
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
 
-                <div className="grid grid-cols-3 gap-2">
-                  {DEMO_ACCOUNTS
-                    .filter((a) => a.institute_type === demoInstitute)
-                    .map((acc) => {
-                      const rs = ROLE_STYLES[acc.role];
-                      const Icon = rs.icon;
-                      return (
-                        <button
-                          key={acc.email}
-                          type="button"
-                          onClick={() => fillDemoAccount(acc)}
-                          className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-slate-200 hover:border-slate-400 bg-slate-50 hover:bg-white hover:shadow-sm transition-all text-center group"
-                        >
-                          <div className={`w-8 h-8 rounded-lg ${rs.bg} flex items-center justify-center`}>
-                            <Icon className={`w-4 h-4 ${rs.ic}`} />
-                          </div>
-                          <p className="text-[11px] font-bold text-slate-800 leading-tight">{acc.name.split(' ')[0]}</p>
-                          <p className="text-[10px] text-slate-400 capitalize leading-none">{acc.role.toLowerCase()}</p>
-                          {acc.password ? (
-                            <p className="text-[9px] text-slate-300 leading-none font-mono">{acc.password}</p>
-                          ) : (
-                            <p className="text-[9px] text-amber-500 leading-none">Dual Account</p>
-                          )}
-                        </button>
-                      );
-                    })}
+                  <div className="grid grid-cols-3 gap-2">
+                    {DEMO_ACCOUNTS
+                      .filter((a) => a.institute_type === demoInstitute)
+                      .map((acc) => {
+                        const rs = ROLE_STYLES[acc.role];
+                        const Icon = rs.icon;
+                        return (
+                          <button
+                            key={acc.email}
+                            type="button"
+                            onClick={() => fillDemoAccount(acc)}
+                            className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-slate-200 hover:border-slate-400 bg-slate-50 hover:bg-white hover:shadow-sm transition-all text-center group"
+                          >
+                            <div className={`w-8 h-8 rounded-lg ${rs.bg} flex items-center justify-center`}>
+                              <Icon className={`w-4 h-4 ${rs.ic}`} />
+                            </div>
+                            <p className="text-[11px] font-bold text-slate-800 leading-tight">{acc.name.split(' ')[0]}</p>
+                            <p className="text-[10px] text-slate-400 capitalize leading-none">{acc.role.toLowerCase()}</p>
+                            {acc.password ? (
+                              <p className="text-[9px] text-slate-300 leading-none font-mono">{acc.password}</p>
+                            ) : (
+                              <p className="text-[9px] text-amber-500 leading-none">Dual Account</p>
+                            )}
+                          </button>
+                        );
+                      })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Staff login link */}
               <div className="mt-6 pt-5 border-t border-slate-100 text-center">
