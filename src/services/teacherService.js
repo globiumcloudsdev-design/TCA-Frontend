@@ -49,8 +49,13 @@ export const teacherService = {
    */
   create: async (data) => {
     try {
-      const formData = new FormData();
-      
+        if (data instanceof FormData) {
+          const response = await api.post('/teachers', data, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          return response.data;
+        }
+
       // Basic info
       formData.append('first_name', data.first_name);
       formData.append('last_name', data.last_name);
@@ -142,8 +147,13 @@ export const teacherService = {
    */
   update: async (id, data) => {
     try {
-      const formData = new FormData();
-      
+        if (data instanceof FormData) {
+          const response = await api.put(`/teachers/${id}`, data, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          return response.data;
+        }
+
       // Same as create but without password fields
       formData.append('first_name', data.first_name);
       formData.append('last_name', data.last_name);

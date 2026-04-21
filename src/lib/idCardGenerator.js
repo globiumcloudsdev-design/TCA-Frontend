@@ -295,28 +295,6 @@ const DEFAULT_POLICY_CONFIG = {
   ]
 };
 
-// // Helper to flatten student data
-// const flattenStudentData = (student) => {
-//   const details = student?.details?.studentDetails || {};
-//   const academicSession = student?.details?.academicSessions?.find(s => s.status === 'active') || {};
-  
-//   return {
-//     full_name: `${student?.first_name || ''} ${student?.last_name || ''}`.trim() || details?.first_name || 'Student Name',
-//     parent_name: details?.guardian_name || student?.details?.guardians?.[0]?.name || 'Parent Name',
-//     roll_number: academicSession?.roll_no || details?.roll_no || student?.registration_no || student?.roll_number || 'ROLL-001',
-//     class: academicSession?.class_name || details?.class_name || 'Class',
-//     section: academicSession?.section_name || details?.section_name || 'A',
-//     blood_group: details?.blood_group || 'O+',
-//     dob: details?.dob || student?.details?.date_of_birth || '01 Jan 2000',
-//     valid_upto: '31 Dec 2025',
-//     photo_url: student?.avatar_url || null,
-//     phone: details?.phone || student?.phone || '',
-//     email: details?.email || student?.email || '',
-//     address: details?.present_address || details?.permanent_address || '',
-//     qr_value: student?.qr_code_url || student?.roll_number || student?.registration_no || `STD-${student?.id?.slice(-6) || '001'}`
-//   };
-// };
-
 const flattenStudentData = (student) => {
   const details = student?.details?.studentDetails || {};
   const academicSession =
@@ -694,6 +672,9 @@ export const generateAndDownloadIdCard = async ({ role, person, institute, polic
 };
 
 export default generateAndDownloadIdCard;
+
+
+
 
 
 

@@ -54,32 +54,43 @@ export function useTerm(key) {
  */
 // export function useInstituteNav() {
 //   const { nav } = useInstituteConfig();
-//   const canDo            = useAuthStore((s) => s.canDo);
+//   const canDo = useAuthStore((s) => s.canDo);
 //   const schoolHasBranches = useAuthStore((s) => s.schoolHasBranches);
+//   const user = useAuthStore((s) => s.user);
 
-//   return useMemo(
-//     () =>
-//       nav.filter((item) => {
-//         // Permission check
-//         if (item.permission && !canDo(item.permission)) return false;
-//         // Branches/Campuses: only show when institute has_branches === true
-//         if (item.requiresBranches && !schoolHasBranches()) return false;
-//         return true;
-//       }),
-//     [nav, canDo, schoolHasBranches],
-//   );
+//   const filteredNav = useMemo(() => {
+//     // Basic dependency check
+//     if (!nav) return [];
+
+//     return nav.filter((item) => {
+//       // Permission check
+//       if (item.permission) {
+//         if (!canDo(item.permission)) return false;
+//       }
+
+//       // Branches check
+//       if (item.requiresBranches) {
+//         if (!schoolHasBranches()) return false;
+//       }
+
+//       return true;
+//     });
+//   }, [nav, canDo, schoolHasBranches, user]);
+
+//   return filteredNav;
 // }
 
-// useInstituteConfig.js
+
+
 
 export function useInstituteNav() {
   const { nav } = useInstituteConfig();
   const canDo = useAuthStore((s) => s.canDo);
   const schoolHasBranches = useAuthStore((s) => s.schoolHasBranches);
+  const currentBranch = useAuthStore((s) => s.branch); // ✅ add this line
   const user = useAuthStore((s) => s.user);
 
   const filteredNav = useMemo(() => {
-    // Basic dependency check
     if (!nav) return [];
 
     return nav.filter((item) => {
@@ -91,11 +102,13 @@ export function useInstituteNav() {
       // Branches check
       if (item.requiresBranches) {
         if (!schoolHasBranches()) return false;
+        // ✅ Agar school ke branches hain, lekin current branch main nahi hai to hide karo
+        if (currentBranch && !currentBranch.is_main) return false;
       }
 
       return true;
     });
-  }, [nav, canDo, schoolHasBranches, user]);
+  }, [nav, canDo, schoolHasBranches, currentBranch, user]);
 
   return filteredNav;
 }

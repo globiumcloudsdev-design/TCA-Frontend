@@ -1,14 +1,12 @@
-'use client';
 /**
  * PayrollPage — Staff salary management
  */
+'use client';
+
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Wallet, FileText, Printer } from 'lucide-react';
+import { Plus, Pencil, Trash2, Wallet, FileText, Printer, CheckCircle, XCircle } from 'lucide-react';
 import useAuthStore from '@/store/authStore';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
@@ -16,166 +14,177 @@ import AppModal from '@/components/common/AppModal';
 import SelectField from '@/components/common/SelectField';
 import StatsCard from '@/components/common/StatsCard';
 import PayslipTemplate from '@/components/payroll/PayslipTemplate';
+import PayrollGeneratorModal from '@/components/payroll/PayrollGeneratorModal';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
+import { payrollService } from '@/services/payrollService';
 import { cn } from '@/lib/utils';
-import { DUMMY_PAYROLL } from '@/data/dummyData';
 
-const STATUS_OPTS = [{ value:'paid', label:'Paid' }, { value:'pending', label:'Pending' }, { value:'on_hold', label:'On Hold' }];
-const STATUS_COLORS = { paid:'bg-emerald-100 text-emerald-700', pending:'bg-amber-100 text-amber-700', on_hold:'bg-red-100 text-red-700' };
-const MONTH_OPTS  = ['January','February','March','April','May','June','July','August','September','October','November','December'].map(m => ({ value: m.toLowerCase(), label: m }));
+const STATUS_OPTIONS = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'on_hold', label: 'On Hold' },
+];
+const STATUS_COLORS = {
+  paid: 'bg-emerald-100 text-emerald-700',
+  pending: 'bg-amber-100 text-amber-700',
+  on_hold: 'bg-red-100 text-red-700',
+};
+const MONTH_OPTIONS = [
+  { value: 1, label: 'January' }, { value: 2, label: 'February' },
+  { value: 3, label: 'March' }, { value: 4, label: 'April' },
+  { value: 5, label: 'May' }, { value: 6, label: 'June' },
+  { value: 7, label: 'July' }, { value: 8, label: 'August' },
+  { value: 9, label: 'September' }, { value: 10, label: 'October' },
+  { value: 11, label: 'November' }, { value: 12, label: 'December' },
+];
 
-const schema = z.object({
-  staff_name:  z.string().min(2, 'Required'),
-  designation: z.string().optional(),
-  basic_salary:z.coerce.number().min(1, 'Required'),
-  allowances:  z.coerce.number().optional(),
-  deductions:  z.coerce.number().optional(),
-  month:       z.string().min(1, 'Required'),
-  status:      z.string().min(1, 'Required'),
-});
-
-
-
-export default function PayrollPage({ type }) {
-  const qc    = useQueryClient();
+export default function PayrollPage() {
+  const queryClient = useQueryClient();
   const canDo = useAuthStore((s) => s.canDo);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
-  const [month,  setMonth]  = useState('');
-  const [page,   setPage]   = useState(1);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [monthFilter, setMonthFilter] = useState('');
+  const [yearFilter, setYearFilter] = useState('');
+  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [modal,   setModal]   = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [deleting,setDeleting]= useState(null);
+  const [showGenerator, setShowGenerator] = useState(false);
   const [selectedPayslip, setSelectedPayslip] = useState(null);
+  
+  // Dialog states
+  const [statusDialog, setStatusDialog] = useState(null); // { payslip, newStatus }
+  const [deleteDialog, setDeleteDialog] = useState(null); // { payslip }
 
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm({ resolver: zodResolver(schema), defaultValues: { status:'pending' } });
+  // Fetch distinct years from existing payroll for filter
+  const { data: yearsData } = useQuery({
+    queryKey: ['payroll-years'],
+    queryFn: () => payrollService.getYears(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const yearOptions = (yearsData?.data || []).map(y => ({ value: y, label: y }));
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['payroll', type, page, pageSize, search, status, month],
-    queryFn: async () => {
-      try { const { payrollService } = await import('@/services'); return await payrollService.getAll({ page, limit: pageSize, search, status, month }); }
-      catch {
-        const d = DUMMY_PAYROLL.filter(r => (!search || r.staff_name.toLowerCase().includes(search.toLowerCase())) && (!status || r.status === status) && (!month || r.month === month));
-        const slice = d.slice((page-1)*pageSize, page*pageSize);
-        return { data: { rows: slice, total: d.length, totalPages: Math.max(1, Math.ceil(d.length / pageSize)) } };
-      }
-    },
-    placeholderData: (p) => p,
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['payroll', page, pageSize, search, statusFilter, monthFilter, yearFilter],
+    queryFn: () => payrollService.getAll({
+      page, limit: pageSize,
+      search: search || undefined,
+      status: statusFilter || undefined,
+      month: monthFilter || undefined,
+      year: yearFilter || undefined,
+    }),
   });
 
-  const rows = data?.data?.rows ?? DUMMY_PAYROLL;
-  const total = data?.data?.total ?? rows.length;
-  const totalPages = data?.data?.totalPages ?? 1;
+  const rows = data?.data || [];
+  const total = data?.pagination?.total || 0;
+  const totalPages = data?.pagination?.totalPages || 1;
 
-  const save = useMutation({
-    mutationFn: async (vals) => {
-      const net = (vals.basic_salary ?? 0) + (vals.allowances ?? 0) - (vals.deductions ?? 0);
-      try { const { payrollService } = await import('@/services'); return editing ? await payrollService.update(editing.id, { ...vals, net }) : await payrollService.create({ ...vals, net }); }
-      catch { return { data: vals }; }
+  const totals = useMemo(() => {
+    let paidSum = 0, pendingSum = 0;
+    rows.forEach(p => {
+      const net = parseFloat(p.net_salary) || 0;
+      if (p.status === 'paid') paidSum += net;
+      else pendingSum += net;
+    });
+    return { paidSum, pendingSum };
+  }, [rows]);
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status, payment_method }) => payrollService.update(id, { status, payment_method }),
+    onSuccess: () => {
+      toast.success('Status updated');
+      queryClient.invalidateQueries(['payroll']);
+      setStatusDialog(null);
     },
-    onSuccess: () => { toast.success(editing ? 'Updated' : 'Created'); qc.invalidateQueries({ queryKey: ['payroll'] }); closeModal(); },
-    onError: () => toast.error('Save failed'),
+    onError: (err) => toast.error(err.response?.data?.message || 'Update failed'),
   });
 
-  const remove = useMutation({
-    mutationFn: async (id) => {
-      try { const { payrollService } = await import('@/services'); return await payrollService.delete(id); }
-      catch { return { success: true }; }
+  const deleteMutation = useMutation({
+    mutationFn: (id) => payrollService.delete(id),
+    onSuccess: () => {
+      toast.success('Payslip deleted');
+      queryClient.invalidateQueries(['payroll']);
+      setDeleteDialog(null);
     },
-    onSuccess: () => { toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['payroll'] }); setDeleting(null); },
-    onError: () => toast.error('Delete failed'),
+    onError: (err) => toast.error(err.response?.data?.message || 'Delete failed'),
   });
-
-  const openAdd  = () => { setEditing(null); reset({ status:'pending' }); setModal(true); };
-  const openEdit = (row) => { setEditing(row); reset({ ...row }); setModal(true); };
-  const closeModal = () => { setModal(false); setEditing(null); reset(); };
-
-  const totalNetPay = useMemo(() => rows.filter(r => r.status === 'paid').reduce((s, r) => s + (r.net ?? 0), 0), [rows]);
-  const totalPending = useMemo(() => rows.filter(r => r.status !== 'paid').reduce((s, r) => s + (r.net ?? 0), 0), [rows]);
 
   const columns = useMemo(() => [
-    { accessorKey: 'staff_name',  header: 'Staff Member', cell: ({ row: { original: r } }) => <div><p className="font-medium">{r.staff_name}</p><p className="text-xs text-muted-foreground">{r.designation}</p></div> },
-    { accessorKey: 'month',       header: 'Month',       cell: ({ getValue }) => <span className="capitalize">{getValue()}</span> },
-    { accessorKey: 'basic_salary',header: 'Basic',       cell: ({ getValue }) => `PKR ${(getValue() ?? 0).toLocaleString()}` },
-    { accessorKey: 'allowances',  header: 'Allowances',  cell: ({ getValue }) => `+${(getValue() ?? 0).toLocaleString()}` },
-    { accessorKey: 'deductions',  header: 'Deductions',  cell: ({ getValue }) => getValue() ? `-${getValue().toLocaleString()}` : '—' },
-    { accessorKey: 'net',         header: 'Net Pay',     cell: ({ getValue }) => <span className="font-semibold">PKR {(getValue() ?? 0).toLocaleString()}</span> },
-    { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => { const s = getValue(); return <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', STATUS_COLORS[s])}>{s?.replace('_', ' ')}</span>; } },
-    { id: 'actions', header: 'Actions', enableHiding: false, cell: ({ row }) => (
-      <div className="flex items-center justify-end gap-1">
-        <button onClick={() => setSelectedPayslip(row.original)} className="rounded p-1.5 hover:bg-accent" title="View Payslip"><FileText size={13} /></button>
-        {canDo('payroll.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
-        {canDo('payroll.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
+    { accessorKey: 'staff', header: 'Staff Member', cell: ({ row }) => {
+      const staff = row.original.staff;
+      return <div><p className="font-medium">{staff?.first_name} {staff?.last_name}</p><p className="text-xs text-muted-foreground">{staff?.user_type}</p></div>;
+    } },
+    { accessorKey: 'month', header: 'Month', cell: ({ getValue }) => MONTH_OPTIONS.find(m => m.value === getValue())?.label || getValue() },
+    { accessorKey: 'year', header: 'Year' },
+    { accessorKey: 'basic_salary', header: 'Basic', cell: ({ getValue }) => `PKR ${Number(getValue()).toLocaleString()}` },
+    { accessorKey: 'net_salary', header: 'Net Pay', cell: ({ getValue }) => <span className="font-semibold">PKR {Number(getValue()).toLocaleString()}</span> },
+    { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => {
+      const s = getValue();
+      return <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', STATUS_COLORS[s])}>{s?.replace('_', ' ')}</span>;
+    } },
+    { id: 'actions', header: 'Actions', cell: ({ row }) => (
+      <div className="flex items-center gap-1">
+        <button onClick={() => setSelectedPayslip(row.original)} className="rounded p-1.5 hover:bg-accent" title="View Payslip"><FileText size={14} /></button>
+        {canDo('payroll.create') && row.original.status !== 'paid' && (
+          <button onClick={() => setStatusDialog({ payslip: row.original, newStatus: 'paid' })} className="rounded p-1.5 text-emerald-600 hover:bg-emerald-50" title="Mark Paid"><CheckCircle size={14} /></button>
+        )}
+        {canDo('payroll.create') && (
+          <button onClick={() => setStatusDialog({ payslip: row.original, newStatus: 'on_hold' })} className="rounded p-1.5 text-amber-600 hover:bg-amber-50" title="On Hold"><XCircle size={14} /></button>
+        )}
+        {canDo('payroll.create') && (
+          <button onClick={() => setDeleteDialog({ payslip: row.original })} className="rounded p-1.5 text-destructive hover:bg-destructive/10"><Trash2 size={14} /></button>
+        )}
       </div>
-    )},
+    ) },
   ], [canDo]);
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Payroll" description="Staff salary management" />
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatsCard label="Paid This Month"    value={`PKR ${totalNetPay.toLocaleString()}`}   icon={<Wallet size={18} />} />
-        <StatsCard label="Pending"            value={`PKR ${totalPending.toLocaleString()}`}  icon={<Wallet size={18} />} />
-        <StatsCard label="Total Staff"        value={total}                                    icon={<Wallet size={18} />} />
+      <PageHeader
+        title="Payroll Management"
+        description={`${total} payslip records`}
+        action={
+          <div className="flex items-center gap-2">
+            {canDo('payroll.process') && (
+              <button onClick={() => setShowGenerator(true)} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90">
+                <Plus size={14} /> Generate Payroll
+              </button>
+            )}
+          </div>
+        }
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatsCard label="Total Paid" value={`PKR ${totals.paidSum.toLocaleString()}`} icon={<Wallet size={18} />} />
+        <StatsCard label="Total Pending" value={`PKR ${totals.pendingSum.toLocaleString()}`} icon={<Wallet size={18} />} />
       </div>
-      <DataTable columns={columns} data={rows} loading={isLoading} emptyMessage="No payroll records"
-        search={search} onSearch={(v) => { setSearch(v); setPage(1); }} searchPlaceholder="Search staff…"
+
+      <DataTable
+        columns={columns}
+        data={rows}
+        loading={isLoading}
+        emptyMessage="No payslips found"
+        search={search}
+        onSearch={setSearch}
+        searchPlaceholder="Search by staff name..."
         filters={[
-          { name:'status', label:'Status', value:status, onChange:(v) => { setStatus(v); setPage(1); }, options:STATUS_OPTS },
-          { name:'month',  label:'Month',  value:month,  onChange:(v) => { setMonth(v);  setPage(1); }, options:MONTH_OPTS  },
+          { name: 'status', label: 'Status', value: statusFilter, onChange: setStatusFilter, options: STATUS_OPTIONS },
+          { name: 'month', label: 'Month', value: monthFilter, onChange: setMonthFilter, options: MONTH_OPTIONS },
+          { name: 'year', label: 'Year', value: yearFilter, onChange: setYearFilter, options: yearOptions },
         ]}
-        action={canDo('payroll.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> Add Record</button> : null}
-        enableColumnVisibility
-        exportConfig={{ fileName: 'payroll' }}
-        pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }} />
+        pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: setPageSize }}
+      />
 
-      <AppModal open={modal} onClose={closeModal} title={editing ? 'Edit Payroll' : 'New Payroll Record'} size="md"
-        footer={<><button type="button" onClick={closeModal} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button><button type="submit" form="pay-form" disabled={save.isPending} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60">{save.isPending ? 'Saving…' : editing ? 'Update' : 'Save'}</button></>}>
-        <form id="pay-form" onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><label className="text-sm font-medium">Staff Name *</label><input {...register('staff_name')} className="input-base" />{errors.staff_name && <p className="text-xs text-destructive">{errors.staff_name.message}</p>}</div>
-            <div className="space-y-1.5"><label className="text-sm font-medium">Designation</label><input {...register('designation')} className="input-base" /></div>
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-1.5"><label className="text-sm font-medium">Basic Salary *</label><input type="number" {...register('basic_salary')} className="input-base" />{errors.basic_salary && <p className="text-xs text-destructive">{errors.basic_salary.message}</p>}</div>
-            <div className="space-y-1.5"><label className="text-sm font-medium">Allowances</label><input type="number" {...register('allowances')} className="input-base" /></div>
-            <div className="space-y-1.5"><label className="text-sm font-medium">Deductions</label><input type="number" {...register('deductions')} className="input-base" /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <SelectField label="Month *"  name="month"  control={control} error={errors.month}  options={MONTH_OPTS}  required />
-            <SelectField label="Status *" name="status" control={control} error={errors.status} options={STATUS_OPTS} required />
-          </div>
-        </form>
-      </AppModal>
+      <PayrollGeneratorModal open={showGenerator} onClose={() => setShowGenerator(false)} />
 
-      {/* Delete Confirm */}
-      <AppModal open={!!deleting} onClose={() => setDeleting(null)} title="Delete Payroll Record" size="sm"
-        footer={
-          <>
-            <button onClick={() => setDeleting(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button>
-            <button onClick={() => remove.mutate(deleting.id)} disabled={remove.isPending} className="rounded-md bg-destructive px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
-              {remove.isPending ? 'Deleting\u2026' : 'Delete'}
-            </button>
-          </>
-        }>
-        <p className="text-sm text-muted-foreground">Delete payroll record for <strong>{deleting?.staff_name}</strong>? This cannot be undone.</p>
-      </AppModal>
-
+      {/* Payslip Preview Modal */}
       <AppModal
         open={!!selectedPayslip}
         onClose={() => setSelectedPayslip(null)}
         title="Payslip Preview"
         size="xl"
         footer={
-          <div className="flex items-center gap-2 payslip-no-print">
-            <button type="button" onClick={() => setSelectedPayslip(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">
-              Close
-            </button>
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-            >
+          <div className="flex items-center gap-2">
+            <button onClick={() => setSelectedPayslip(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Close</button>
+            <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90">
               <Printer size={14} /> Print
             </button>
           </div>
@@ -183,6 +192,38 @@ export default function PayrollPage({ type }) {
       >
         <PayslipTemplate record={selectedPayslip} />
       </AppModal>
+
+      {/* Status Update Confirm Dialog */}
+      <ConfirmDialog
+        open={!!statusDialog}
+        onClose={() => setStatusDialog(null)}
+        onConfirm={() => {
+          if (statusDialog) {
+            updateStatusMutation.mutate({
+              id: statusDialog.payslip.id,
+              status: statusDialog.newStatus,
+              payment_method: statusDialog.newStatus === 'paid' ? 'cash' : undefined,
+            });
+          }
+        }}
+        loading={updateStatusMutation.isPending}
+        title={`Mark as ${statusDialog?.newStatus === 'paid' ? 'Paid' : 'On Hold'}`}
+        description={`Are you sure you want to mark payslip for ${statusDialog?.payslip?.staff?.first_name} ${statusDialog?.payslip?.staff?.last_name} as ${statusDialog?.newStatus}?`}
+        confirmLabel="Confirm"
+        variant="default"
+      />
+
+      {/* Delete Confirm Dialog */}
+      <ConfirmDialog
+        open={!!deleteDialog}
+        onClose={() => setDeleteDialog(null)}
+        onConfirm={() => deleteMutation.mutate(deleteDialog.payslip.id)}
+        loading={deleteMutation.isPending}
+        title="Delete Payslip"
+        description={`This will permanently delete the payslip for ${deleteDialog?.payslip?.staff?.first_name} ${deleteDialog?.payslip?.staff?.last_name} (${MONTH_OPTIONS.find(m => m.value === deleteDialog?.payslip?.month)?.label} ${deleteDialog?.payslip?.year}). This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+      />
     </div>
   );
 }

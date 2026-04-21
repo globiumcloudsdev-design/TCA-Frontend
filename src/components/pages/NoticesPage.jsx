@@ -121,7 +121,7 @@ export default function NotificationsPage() {
       try {
         const { notificationService } = await import('@/services');
         const result = await notificationService.getAll({ page, limit: pageSize });
-        console.log('Notifications fetched:', result);
+        // console.log('Notifications fetched:', result);
         return result;
       } catch (error) {
         console.error('Error fetching notifications:', error);

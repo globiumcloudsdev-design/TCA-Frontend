@@ -225,6 +225,18 @@ export const teacherPortalService = {
         params: { ...filters, page, limit },
       })
       .then(unwrap),
+
+  // Payroll (teacher self-service)
+  getMyPayslips: (filters = {}, page = 1, limit = 10) =>
+    api
+      .get("/portal/teacher/payroll", {
+        params: { ...filters, page, limit },
+      })
+      .then(unwrap),
+
+  getMyPayslipById: (id) => api.get(`/portal/teacher/payroll/${id}`).then(unwrap),
+
+  getMyPayrollYears: () => api.get("/portal/teacher/payroll/years").then(unwrap),
 };
 
 export default teacherPortalService;

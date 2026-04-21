@@ -42,7 +42,6 @@ export default function PhoneInputField({
             error && "border-red-500 focus-visible:ring-red-500"
           )}
           placeholder="Enter phone number..."
-          {...props}
         />
       </div>
 

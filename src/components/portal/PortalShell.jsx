@@ -58,6 +58,7 @@ import usePortalStore from "@/store/portalStore";
 import useAuthStore from "@/store/authStore";
 import { getPortalTerms, getNavItems } from "@/constants/portalInstituteConfig";
 import { PERM } from "@/constants/permissions";
+import { NotificationBell } from "../common";
 
 // ─── Nav helpers with updated permissions ────────────────────────────────────
 function buildParentNav(t, navLabels) {
@@ -542,19 +543,7 @@ export default function PortalShell({ children, type }) {
 
           <div className="flex items-center gap-2">
             {/* Notifications */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative text-slate-600 hover:bg-slate-100"
-              onClick={() => toast.info("Notifications coming soon")}
-            >
-              <Bell className="w-5 h-5" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                  {unreadCount}
-                </span>
-              )}
-            </Button>
+            <NotificationBell />
 
             {/* User Role Badge - Original preserved */}
             <span

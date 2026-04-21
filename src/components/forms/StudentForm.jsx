@@ -55,13 +55,24 @@ export default function StudentForm({
   isEdit = false,
 }) {
   const [activeTab, setActiveTab] = useState('personal');
-  // const [documents, setDocuments] = useState(defaultValues.documents || []); // Using useFieldArray now
   const [selectedAcademicYear, setSelectedAcademicYear] = useState(
     defaultValues.details?.studentDetails?.academic_year_id || ''
   );
+  const [avatarPreview, setAvatarPreview] = useState(defaultValues.avatar_url || null);
+  const avatarFileRef = useRef(null);
 
   // Use refs to track previous values for reset logic without triggering re-renders
   const prevClassRef = useRef(defaultValues.details?.studentDetails?.class_id || '');
+
+  // Debug: Log component props
+  useEffect(() => {
+    console.log('🎯 StudentForm mounted/updated with:', {
+      instituteId,
+      instituteType,
+      isEdit,
+      defaultValuesId: defaultValues?.id
+    });
+  }, [instituteId, instituteType, isEdit, defaultValues?.id]);
 
   const isMobile = useMediaQuery('(max-width: 640px)');
   const isTablet = useMediaQuery('(max-width: 1024px)');
@@ -132,28 +143,37 @@ export default function StudentForm({
   // ─────────────────────────────────────────────────────────────────
   // FETCH ACADEMIC YEARS
   // ─────────────────────────────────────────────────────────────────
-  const { data: academicYears = [], isLoading: yearsLoading } = useQuery({
+  const { data: rawAcademicYearsData = [], isLoading: yearsLoading, isError: yearsError, error: yearsErrorMsg } = useQuery({
     queryKey: ['academic-years', instituteId],
     queryFn: async () => {
-      try {
-        const response = await academicYearService.getAll({
-          institute_id: instituteId,
-          is_active: true
-        });
-        const data = response.data || response || [];
-        const finalYears = Array.isArray(data.rows) ? data.rows : (Array.isArray(data) ? data : []);
-        
-        return finalYears.map(y => ({
-          value: y.id,
-          label: y.name
-        }));
-      } catch (error) {
-        console.error('Error fetching academic years:', error);
-        return [];
-      }
+      const response = await academicYearService.getAll({
+        institute_id: instituteId,
+        is_active: true
+      });
+      return response;
     },
     enabled: !!instituteId,
   });
+
+  // Since React Query caches by queryKey, we might get the raw response object if it was 
+  // fetched elsewhere in the app. We'll extract and map the final array safely here.
+  const academicYears = useMemo(() => {
+    // 1. Extract array wherever it might be nested
+    let arr = [];
+    if (Array.isArray(rawAcademicYearsData)) {
+      arr = rawAcademicYearsData;
+    } else if (Array.isArray(rawAcademicYearsData?.data)) {
+      arr = rawAcademicYearsData.data;
+    } else if (Array.isArray(rawAcademicYearsData?.data?.data)) {
+      arr = rawAcademicYearsData.data.data;
+    }
+
+    // 2. Map to dropdown format { value, label }
+    return arr.map(y => ({
+      value: y.id,
+      label: y.name || `${y.start_date} to ${y.end_date}`
+    }));
+  }, [rawAcademicYearsData]);
 
   // ─────────────────────────────────────────────────────────────────
   // FETCH CLASSES with their SECTIONS
@@ -265,8 +285,45 @@ export default function StudentForm({
 
 
   // ─────────────────────────────────────────────────────────────────
+  // AVATAR HANDLING
   // ─────────────────────────────────────────────────────────────────
-  // Document Handlers
+  const handleAvatarChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB');
+      return;
+    }
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+
+    // Store file for upload
+    setValue('avatar_file', file, { shouldDirty: true });
+  };
+
+  const removeAvatar = () => {
+    setAvatarPreview(null);
+    setValue('avatar_file', null);
+    if (avatarFileRef.current) {
+      avatarFileRef.current.value = '';
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────
+  // DOCUMENT HANDLERS
   // ─────────────────────────────────────────────────────────────────
   const handleDocumentUpload = (e) => {
     const files = Array.from(e.target.files);
@@ -416,6 +473,11 @@ export default function StudentForm({
     if (className) formData.set('class_name', className);
     if (sectionName) formData.set('section_name', sectionName);
 
+    // 🖼️ AVATAR FILE UPLOAD
+    if (data.avatar_file && data.avatar_file instanceof File) {
+      formData.append('photo', data.avatar_file); // Backend expects 'photo' field
+    }
+
     // 2. Guardians (normalize: guardian type == relation + include email)
     const normalizedGuardians = (Array.isArray(data.guardians) ? data.guardians : [])
       .map((g) => {
@@ -545,91 +607,141 @@ export default function StudentForm({
         <TabsContent value="personal">
           <Card>
             <CardContent className="p-4 sm:p-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <User className="h-5 w-5 text-muted-foreground" />
-                  <h3 className="text-sm font-semibold">Basic Information</h3>
+              <div className="space-y-6">
+                {/* Avatar/Profile Photo Section */}
+                <div className="flex flex-col items-center p-4 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-300">
+                  {avatarPreview ? (
+                    <div className="relative">
+                      <img 
+                        src={avatarPreview} 
+                        alt="Avatar preview" 
+                        className="w-32 h-32 rounded-full object-cover shadow-lg"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeAvatar}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-all"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-32 h-32 rounded-full bg-slate-200 flex items-center justify-center">
+                      <User className="w-16 h-16 text-slate-400" />
+                    </div>
+                  )}
+                  
+                  <Label className="mt-4 text-sm font-semibold text-slate-700">Profile Photo</Label>
+                  <input
+                    ref={avatarFileRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                    disabled={loading}
+                  />
+                  
+                  <Button
+                    type="button"
+                    variant="black"
+                    onClick={() => avatarFileRef.current?.click()}
+                    disabled={loading}
+                  >
+                    <Upload className="w-4 h-4" />
+                    {avatarPreview ? 'Change Photo' : 'Upload Photo'}
+                  </Button>
+                  <p className="text-[11px] text-slate-500 mt-2 text-center">JPG, PNG, GIF (Max 5MB)</p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InputField
-                    label="First Name"
-                    name="first_name"
-                    register={register}
-                    error={errors.first_name}
-                    required
-                    placeholder="e.g. Ahmed"
-                  />
-                  <InputField
-                    label="Last Name"
-                    name="last_name"
-                    register={register}
-                    error={errors.last_name}
-                    required
-                    placeholder="e.g. Ali"
-                  />
-                  <InputField
-                    label="GR/Reg No"
-                    name="registration_no"
-                    register={register}
-                    error={errors.registration_no}
-                    placeholder="e.g. 2024-001"
-                  />
-                  <DatePickerField
-                    label="Date of Birth"
-                    name="dob"
-                    control={control}
-                    error={errors.dob}
-                    required
-                  />
-                  <SelectField
-                    label="Gender"
-                    name="gender"
-                    control={control}
-                    error={errors.gender}
-                    options={GENDER_OPTIONS}
-                    placeholder="Select gender"
-                    required
-                  />
-                  <SelectField
-                    label="Blood Group"
-                    name="blood_group"
-                    control={control}
-                    error={errors.blood_group}
-                    options={BLOOD_GROUP_OPTIONS}
-                    placeholder="Select blood group"
-                  />
-                  <SelectField
-                    label="Religion"
-                    name="religion"
-                    control={control}
-                    error={errors.religion}
-                    options={RELIGION_OPTIONS}
-                    placeholder="Select religion"
-                  />
-                  <InputField
-                    label="Nationality"
-                    name="nationality"
-                    register={register}
-                    error={errors.nationality}
-                    placeholder="e.g. Pakistani"
-                    defaultValue="Pakistani"
-                  />
-                  <Controller
-                    name="cnic"
-                    control={control}
-                    render={({ field }) => (
-                      <CnicInput
-                        label="CNIC / B-Form"
-                        value={field.value || ''}
-                        onChange={field.onChange}
-                        country="pk"
-                        placeholder="00000-0000000-0"
-                        error={errors.cnic}
-                        {...field}
-                      />
-                    )}
-                  />
+                <Separator />
+
+                {/* Basic Information */}
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <User className="h-5 w-5 text-muted-foreground" />
+                    <h3 className="text-sm font-semibold">Basic Information</h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <InputField
+                      label="First Name"
+                      name="first_name"
+                      register={register}
+                      error={errors.first_name}
+                      required
+                      placeholder="e.g. Ahmed"
+                    />
+                    <InputField
+                      label="Last Name"
+                      name="last_name"
+                      register={register}
+                      error={errors.last_name}
+                      required
+                      placeholder="e.g. Ali"
+                    />
+                    <InputField
+                      label="GR/Reg No"
+                      name="registration_no"
+                      register={register}
+                      error={errors.registration_no}
+                      placeholder="e.g. 2024-001"
+                    />
+                    <DatePickerField
+                      label="Date of Birth"
+                      name="dob"
+                      control={control}
+                      error={errors.dob}
+                      required
+                    />
+                    <SelectField
+                      label="Gender"
+                      name="gender"
+                      control={control}
+                      error={errors.gender}
+                      options={GENDER_OPTIONS}
+                      placeholder="Select gender"
+                      required
+                    />
+                    <SelectField
+                      label="Blood Group"
+                      name="blood_group"
+                      control={control}
+                      error={errors.blood_group}
+                      options={BLOOD_GROUP_OPTIONS}
+                      placeholder="Select blood group"
+                    />
+                    <SelectField
+                      label="Religion"
+                      name="religion"
+                      control={control}
+                      error={errors.religion}
+                      options={RELIGION_OPTIONS}
+                      placeholder="Select religion"
+                    />
+                    <InputField
+                      label="Nationality"
+                      name="nationality"
+                      register={register}
+                      error={errors.nationality}
+                      placeholder="e.g. Pakistani"
+                      defaultValue="Pakistani"
+                    />
+                    <Controller
+                      name="cnic"
+                      control={control}
+                      render={({ field }) => (
+                        <CnicInput
+                          label="CNIC / B-Form"
+                          value={field.value || ''}
+                          onChange={field.onChange}
+                          country="pk"
+                          placeholder="00000-0000000-0"
+                          error={errors.cnic}
+                          {...field}
+                        />
+                      )}
+                    />
+                  </div>
                 </div>
               </div>
             </CardContent>

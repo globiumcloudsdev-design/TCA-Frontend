@@ -51,7 +51,14 @@ export default function SelectField({
   className,
   rules,
 }) {
-  const normalizedOptions = (options || []).filter((opt) => {
+  // Ensure options is always an array, even if it's an object or other type
+  const optionsArray = Array.isArray(options) 
+    ? options 
+    : typeof options === 'object' && options !== null
+      ? Object.values(options)
+      : [];
+
+  const normalizedOptions = (optionsArray || []).filter((opt) => {
     const value = String(opt?.value ?? '').trim();
     return value !== '';
   });
