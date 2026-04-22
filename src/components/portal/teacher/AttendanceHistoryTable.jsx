@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { History } from "lucide-react";
 import DataTable from "@/components/common/DataTable";
+import SelectField from "@/components/common/SelectField";
 import { MonthPicker } from "@/components/common/MonthPicker";
 
 export function AttendanceHistoryTable({ 
@@ -112,21 +113,22 @@ export function AttendanceHistoryTable({
           <History className="w-4 h-4 text-blue-600" /> Attendance History
         </h2>
         <div className="flex items-center flex-wrap gap-2">
-          <select
+          <SelectField
+            placeholder="All Statuses"
             value={filters.status}
-            onChange={(e) => {
-              setFilters((prev) => ({ ...prev, status: e.target.value }));
+            onChange={(val) => {
+              setFilters((prev) => ({ ...prev, status: val }));
               setPage(1); // Reset page on filter
             }}
-            className="text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 outline-none focus:ring-2 focus:ring-blue-100"
-          >
-             <option value="">All Statuses</option>
-             <option value="PRESENT">Present</option>
-             <option value="LATE">Late</option>
-             <option value="ABSENT">Absent</option>
-             <option value="LEAVE">Leave</option>
-             <option value="NOT_MARKED">Not Marked</option>
-          </select>
+            options={[
+              { value: "PRESENT", label: "Present" },
+              { value: "LATE", label: "Late" },
+              { value: "ABSENT", label: "Absent" },
+              { value: "LEAVE", label: "Leave" },
+              { value: "NOT_MARKED", label: "Not Marked" },
+            ]}
+            className="w-32"
+          />
           <MonthPicker 
             value={filters.month} 
             onChange={(val) => {

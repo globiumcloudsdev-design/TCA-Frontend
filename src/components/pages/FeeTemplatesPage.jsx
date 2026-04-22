@@ -37,6 +37,7 @@ import { feeTemplateService } from '@/services/feeTemplateService';
 import { classService } from '@/services/classService';
 import { branchService } from '@/services/branchService';
 import { academicYearService } from '@/services/academicYearService';
+import { studentService } from '@/services/studentService';
 
 // Constants
 const FEE_BASIS_OPTIONS = [
@@ -70,6 +71,7 @@ export default function FeeTemplatesPage({ type }) {
   // Data states
   const [branches, setBranches] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [students, setStudents] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
 
   // Debug logs
@@ -158,6 +160,34 @@ export default function FeeTemplatesPage({ type }) {
       setClasses(classesData.data);
     }
   }, [classesData]);
+
+  // Fetch students for applicability selection
+  const {
+    data: studentsData,
+    refetch: refetchStudents
+  } = useQuery({
+    queryKey: ['students-options-fee-template', instituteId()],
+    queryFn: async () => {
+      const response = await studentService.getAll({
+        institute_id: instituteId(),
+        is_active: true,
+        limit: 1000,
+      }, instituteType() || 'school');
+
+      const rows = response?.data?.rows || response?.data || [];
+      return rows.map((s) => ({
+        value: s.id,
+        label: `${s.first_name || ''} ${s.last_name || ''}`.trim() || s.registration_no || 'Student',
+      }));
+    },
+    enabled: !!instituteId(),
+  });
+
+  useEffect(() => {
+    if (studentsData) {
+      setStudents(studentsData);
+    }
+  }, [studentsData]);
 
   // Fetch fee templates
   const {
@@ -301,6 +331,7 @@ export default function FeeTemplatesPage({ type }) {
     if (hasBranches()) refetchBranches();
     refetchAcademicYears();
     refetchClasses();
+    refetchStudents();
     toast.info('Refreshing data...');
   };
 
@@ -680,6 +711,7 @@ export default function FeeTemplatesPage({ type }) {
           loading={createMutation.isPending || updateMutation.isPending}
           branches={branches}
           classes={classes}
+          students={students}
           academicYears={academicYears}
           isEdit={!!editingTemplate}
         />

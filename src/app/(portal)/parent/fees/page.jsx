@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   DollarSign, CheckCircle, AlertCircle, Clock, Download, 
   Eye, FileText, CreditCard, Calendar, ChevronDown, 
@@ -11,7 +11,10 @@ import {
   Search, ExternalLink, MessageCircle, Phone, Mail,
   Building, User, FileCheck, Wallet, ArrowRight
 } from 'lucide-react';
+import { toast } from 'sonner';
 import usePortalStore from '@/store/portalStore';
+import useInstituteStore from '@/store/instituteStore';
+import useAuthStore from '@/store/authStore';
 import { getPortalTerms } from '@/constants/portalInstituteConfig';
 import { useChildFees, usePayFee, useFeeSummary } from '@/hooks/useParentPortal';
 import { format } from 'date-fns';
@@ -20,6 +23,10 @@ import {
   PageHeader, SelectField, StatusBadge, PageLoader, 
   AppModal, StatsCard
 } from '@/components/common';
+import { downloadBlob } from '@/lib/download';
+import { generateFeeVoucherPdfBlob } from '@/lib/pdf/feeVoucherPdf';
+import FeeVoucherPreviewModal from '@/fees-template/FeeVoucherPreviewModal';
+
 
 const STATUS_CONFIG = {
   paid: { 
@@ -52,108 +59,144 @@ const STATUS_CONFIG = {
   },
 };
 
-// Voucher Details Modal
-const VoucherDetailsModal = ({ voucher, isOpen, onClose, onPay }) => {
-  const [showFullDetails, setShowFullDetails] = useState(false);
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
 
-  if (!voucher) return null;
-
-  const statusConfig = STATUS_CONFIG[voucher.status] || STATUS_CONFIG.pending;
-  const StatusIcon = statusConfig.icon;
-
-  return (
-    <AppModal
-      open={isOpen}
-      onClose={onClose}
-      title="Fee Voucher Details"
-      description={voucher?.voucher_number}
-      size="lg"
-      footer={
-        <button
-          onClick={() => window.print()}
-          className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-50 flex items-center gap-2"
-        >
-          <Printer className="w-4 h-4" />
-          Print
-        </button>
-      }
-    >
-      <div className="space-y-5">
-          {/* Status Banner */}
-          <div className={`${statusConfig.bg} rounded-xl p-4 border ${statusConfig.cls}`}>
-            <div className="flex items-center gap-3">
-              <StatusIcon className={`w-6 h-6 ${statusConfig.ic}`} />
-              <div>
-                <p className="font-semibold text-slate-800">Status: {statusConfig.label}</p>
-                <p className="text-sm text-slate-600">
-                  Due Date: {format(new Date(voucher.due_date), 'dd MMM yyyy')}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Student Info */}
-          {voucher.student && (
-            <div className="bg-slate-50 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                <User className="w-4 h-4" />
-                Student Information
-              </h3>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-slate-500">Name</p>
-                  <p className="font-medium text-slate-800">{voucher.student.name}</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Registration No</p>
-                  <p className="font-medium text-slate-800">{voucher.student.registration_no}</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Class</p>
-                  <p className="font-medium text-slate-800">{voucher.student.class} - {voucher.student.section}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Summary */}
-          <div className="bg-slate-50 rounded-xl p-4">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Amount</span>
-                <span className="font-medium">PKR {voucher.amount?.toLocaleString() || 0}</span>
-              </div>
-              {voucher.discount > 0 && (
-                <div className="flex justify-between text-sm text-emerald-600">
-                  <span>Discount</span>
-                  <span>- PKR {voucher.discount?.toLocaleString() || 0}</span>
-                </div>
-              )}
-              {voucher.fine > 0 && (
-                <div className="flex justify-between text-sm text-red-600">
-                  <span>Fine</span>
-                  <span>+ PKR {voucher.fine?.toLocaleString() || 0}</span>
-                </div>
-              )}
-              <div className="flex justify-between pt-2 border-t border-slate-200">
-                <span className="font-semibold text-slate-800">Net Amount</span>
-                <span className="font-bold text-slate-900 text-lg">
-                  PKR {voucher.net_amount?.toLocaleString() || 0}
-                </span>
-              </div>
-              {voucher.notes && (
-                <div className="mt-3 pt-3 border-t border-slate-200">
-                  <p className="text-xs text-slate-500 uppercase tracking-wide">Notes</p>
-                  <p className="text-sm text-slate-700">{voucher.notes}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-      </div>
-    </AppModal>
-  );
+const toNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 };
+
+const isNonZeroValue = (value) => {
+  if (value === null || value === undefined || value === '') return false;
+  if (typeof value === 'string' && value.includes('%')) {
+    const parsed = Number(value.replace('%', '').trim());
+    return Number.isFinite(parsed) && parsed !== 0;
+  }
+  return toNumber(value) !== 0;
+};
+
+const pickFirst = (...values) => values.find((value) => value !== undefined && value !== null && value !== '') || null;
+
+const resolveInstituteForVoucher = (portalInstitute = {}, storeInstitute = {}, authUser = {}) => {
+  const authInstitute = authUser?.institute || authUser?.school || {};
+
+  return {
+    name: pickFirst(
+      storeInstitute?.name,
+      storeInstitute?.title,
+      authInstitute?.name,
+      authInstitute?.title,
+      portalInstitute?.name,
+      portalInstitute?.title,
+      'Institute Name'
+    ),
+    logo: pickFirst(
+      storeInstitute?.logo_url,
+      storeInstitute?.logo,
+      storeInstitute?.institute_logo,
+      authInstitute?.logo_url,
+      authInstitute?.logo,
+      authInstitute?.institute_logo,
+      portalInstitute?.logo_url,
+      portalInstitute?.logo,
+      portalInstitute?.institute_logo
+    ),
+    address: pickFirst(
+      storeInstitute?.address,
+      storeInstitute?.campus_address,
+      authInstitute?.address,
+      authInstitute?.campus_address,
+      portalInstitute?.address,
+      portalInstitute?.campus_address,
+      'Campus address not available'
+    ),
+    phone: pickFirst(
+      storeInstitute?.phone,
+      storeInstitute?.phone_number,
+      storeInstitute?.contact_number,
+      authInstitute?.phone,
+      authInstitute?.phone_number,
+      authInstitute?.contact_number,
+      portalInstitute?.phone,
+      portalInstitute?.phone_number,
+      portalInstitute?.contact_number,
+      'N/A'
+    ),
+    email: pickFirst(
+      storeInstitute?.email,
+      storeInstitute?.contact_email,
+      authInstitute?.email,
+      authInstitute?.contact_email,
+      portalInstitute?.email,
+      portalInstitute?.contact_email,
+      'N/A'
+    ),
+  };
+};
+
+// Helper function to map parent voucher data for FeeVoucher component
+function mapParentVoucherViewData(voucher, child, instituteData) {
+  const amount = toNumber(voucher?.amount);
+  const discount = toNumber(voucher?.discount);
+  const fine = toNumber(voucher?.fine);
+  const netAmount = toNumber(voucher?.net_amount || amount - discount + fine);
+  const paidAmount = toNumber(voucher?.paid_amount);
+
+  const monthIndex = Number(voucher?.month);
+  const monthLabel = MONTHS[monthIndex - 1] || voucher?.month || '-';
+
+  const feeStructure = [];
+  const addRow = (feeType, rowAmount) => {
+    if (isNonZeroValue(rowAmount)) {
+      feeStructure.push({ feeType, amount: rowAmount });
+    }
+  };
+
+  addRow('Fee Amount', amount);
+  addRow('Discount', discount);
+  addRow('Fine', fine);
+  addRow('Paid Amount', paidAmount);
+  addRow('Total Amount', netAmount);
+  addRow('Remaining Amount', Math.max(netAmount - paidAmount, 0));
+
+  return {
+    studentData: {
+      studentName: child?.name || voucher?.student?.name || 'Student Name',
+      fatherName: child?.father_name || voucher?.student?.father_name || 'N/A',
+      className: child?.class_name || child?.class || voucher?.student?.class || 'N/A',
+      section: child?.section_name || child?.section || voucher?.student?.section || 'N/A',
+      rollNumber: child?.roll_no || voucher?.student?.roll_no || 'N/A',
+      studentId: child?.registration_no || voucher?.student?.registration_no || child?.id || 'N/A',
+    },
+    voucherMeta: {
+      title: 'School Fee Voucher',
+      voucherNumber: voucher?.voucher_number || voucher?.id || 'N/A',
+      issueDate: voucher?.issued_date,
+      dueDate: voucher?.due_date,
+      month: monthLabel,
+      year: voucher?.year || new Date(voucher?.issued_date || Date.now()).getFullYear(),
+      feeStatus: voucher?.status || 'pending',
+      copyLabel: 'Parent Copy',
+    },
+    instituteData,
+    feeStructure,
+  };
+}
+
+
 
 // Payment Modal
 const PaymentModal = ({ voucher, isOpen, onClose, onSubmit, isLoading }) => {
@@ -227,7 +270,7 @@ const PaymentModal = ({ voucher, isOpen, onClose, onSubmit, isLoading }) => {
 };
 
 // Voucher Card Component
-const VoucherCard = ({ voucher, onView, onPay }) => {
+const VoucherCard = ({ voucher, onView, onDownload, onPay, isDownloading }) => {
   const statusConfig = STATUS_CONFIG[voucher.status] || STATUS_CONFIG.pending;
   const StatusIcon = statusConfig.icon;
   const isOverdue = voucher.status === 'overdue' || (voucher.status === 'pending' && new Date(voucher.due_date) < new Date());
@@ -277,24 +320,33 @@ const VoucherCard = ({ voucher, onView, onPay }) => {
         </div>
       </div>
 
-      <div className="flex gap-2">
+      <div className={`grid gap-2 ${voucher.status !== 'paid' ? 'grid-cols-3' : 'grid-cols-2'}`}>
         <button
           onClick={() => onView(voucher)}
-          className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-sm hover:bg-slate-50 flex items-center justify-center gap-1"
+          className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm hover:bg-slate-50 flex items-center justify-center gap-1"
         >
           <Eye className="w-3 h-3" />
           View
         </button>
-        {/* {voucher.status !== 'paid' && (
+        <button
+          onClick={() => onDownload(voucher)}
+          disabled={isDownloading}
+          className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm hover:bg-slate-50 flex items-center justify-center gap-1 disabled:opacity-60"
+        >
+          <Download className="w-3 h-3" />
+          {isDownloading ? 'Downloading...' : 'Download PDF'}
+        </button>
+        {voucher.status !== 'paid' ? (
           <button
             onClick={() => onPay(voucher)}
-            className="flex-1 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 flex items-center justify-center gap-1"
+            className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 flex items-center justify-center gap-1"
           >
             <CreditCard className="w-3 h-3" />
             Pay
           </button>
-        )} */}
+        ) : null}
       </div>
+
     </div>
   );
 };
@@ -302,6 +354,8 @@ const VoucherCard = ({ voucher, onView, onPay }) => {
 // Main Fees Page Component
 export default function ParentFeesPage() {
   const { portalUser } = usePortalStore();
+  const currentInstitute = useInstituteStore((state) => state.currentInstitute);
+  const authUser = useAuthStore((state) => state.user);
   const parent = portalUser;
   const t = getPortalTerms(parent?.institute_type);
   const children = parent?.children || [];
@@ -314,8 +368,14 @@ export default function ParentFeesPage() {
   const [showVoucherModal, setShowVoucherModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [payingVoucher, setPayingVoucher] = useState(null);
+  const [downloadingVoucherId, setDownloadingVoucherId] = useState(null);
 
   const child = children[selectedChild];
+  const selectedInstitute = parent?.institute || parent?.school || {};
+  const voucherInstituteData = useMemo(
+    () => resolveInstituteForVoucher(selectedInstitute, currentInstitute, authUser),
+    [selectedInstitute, currentInstitute, authUser]
+  );
   
   // Generate available years based on admission_date
   const getAvailableYears = (admissionDate) => {
@@ -357,6 +417,10 @@ export default function ParentFeesPage() {
   const summary = fees?.summary;
   const upcomingDues = fees?.upcoming_dues || [];
   const overdueDues = fees?.overdue_dues || [];
+  const selectedVoucherView = useMemo(
+    () => mapParentVoucherViewData(selectedVoucher || {}, child || {}, voucherInstituteData),
+    [selectedVoucher, child, voucherInstituteData]
+  );
 
   const handleViewVoucher = (voucher) => {
     setSelectedVoucher(voucher);
@@ -376,6 +440,38 @@ export default function ParentFeesPage() {
       refetch();
     } catch (error) {
       console.error('Payment failed:', error);
+    }
+  };
+
+  const handleDownloadVoucher = (voucher) => {
+    if (!voucher) {
+      toast.error('Voucher data not found');
+      return;
+    }
+
+    try {
+      setDownloadingVoucherId(voucher.id);
+
+      const voucherBlob = generateFeeVoucherPdfBlob({
+        voucher,
+        student: {
+          name: child?.name,
+          registration_no: child?.registration_no,
+          class: child?.class,
+          section: child?.section,
+          gender: child?.gender
+        },
+        instituteName: selectedInstitute?.name || selectedInstitute?.title || parent?.institute_name || 'ABC School'
+      });
+
+      const voucherRef = voucher?.voucher_number || voucher?.id || 'receipt';
+      downloadBlob(voucherBlob, `fee-voucher-${voucherRef}.pdf`);
+      toast.success('Voucher downloaded successfully');
+    } catch (error) {
+      console.error('Failed to download voucher PDF:', error);
+      toast.error('Failed to download voucher');
+    } finally {
+      setDownloadingVoucherId(null);
     }
   };
 
@@ -615,7 +711,9 @@ export default function ParentFeesPage() {
               key={voucher.id}
               voucher={voucher}
               onView={handleViewVoucher}
+              onDownload={handleDownloadVoucher}
               onPay={handlePayVoucher}
+              isDownloading={downloadingVoucherId === voucher.id}
             />
           ))}
         </div>
@@ -650,17 +748,18 @@ export default function ParentFeesPage() {
       )}
 
       {/* Modals */}
-      <VoucherDetailsModal
-        voucher={selectedVoucher}
-        isOpen={showVoucherModal}
+      <FeeVoucherPreviewModal
+        open={showVoucherModal}
         onClose={() => {
           setShowVoucherModal(false);
           setSelectedVoucher(null);
         }}
-        onPay={(voucher) => {
-          setShowVoucherModal(false);
-          handlePayVoucher(voucher);
-        }}
+        studentData={selectedVoucherView.studentData}
+        feeStructure={selectedVoucherView.feeStructure}
+        instituteData={selectedVoucherView.instituteData}
+        voucherMeta={selectedVoucherView.voucherMeta}
+        initialCopyMode="triple"
+        allowCopyToggle
       />
 
       <PaymentModal

@@ -87,6 +87,7 @@ export default function StudentForm({
     reset,
     formState: { errors },
   } = useForm({
+    mode: 'onTouched', // Validates as user interacts
     defaultValues: {
       documents: [],
       guardians: [{ name: '', relation: 'guardian', phone: '', cnic: '', email: '', type: 'guardian' }],
@@ -404,6 +405,12 @@ export default function StudentForm({
   // Form Submit
   // ─────────────────────────────────────────────────────────────────
   const onSubmitForm = (data) => {
+    // Check if there are any validation errors before proceeding
+    if (Object.keys(errors).length > 0) {
+      toast.error("Please fill all required fields correctly.");
+      // Optional: switch to the first tab with an error
+      return;
+    }
     console.log('📤 Submitting form data:', data);
 
     // Create FormData for multipart/form-data submission (required for files)
@@ -685,6 +692,7 @@ export default function StudentForm({
                       register={register}
                       error={errors.registration_no}
                       placeholder="e.g. 2024-001"
+                      required
                     />
                     <DatePickerField
                       label="Date of Birth"
@@ -791,6 +799,7 @@ export default function StudentForm({
                     options={sections.map(s => ({ value: s.id, label: s.name }))}
                     placeholder={!watchClass ? `Select ${getTerm('class')} first` : 'Select section'}
                     disabled={!watchClass}
+                    required
                   />
 
                   {/* Roll Number */}
@@ -799,6 +808,7 @@ export default function StudentForm({
                     name="roll_no"
                     register={register}
                     error={errors.roll_no}
+                    required
                   />
 
                   {/* Admission Date */}
@@ -1252,9 +1262,16 @@ export default function StudentForm({
             Next
           </Button>
         ) : (
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Saving...' : (isEdit ? 'Update' : 'Add')}
-          </Button>
+          <div className="flex flex-col items-center gap-2">
+            {!Object.keys(errors).length === false && (
+              <p className="text-xs text-rose-500 font-medium animate-pulse">
+                Please fix errors in other tabs before submitting
+              </p>
+            )}
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Saving...' : (isEdit ? 'Update' : 'Add')}
+            </Button>
+          </div>
         )}
       </div>
     </form>

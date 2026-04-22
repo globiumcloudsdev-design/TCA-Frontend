@@ -430,6 +430,7 @@ export default function FeeTemplateForm({
     loading = false,
     branches = [],
     classes = [],
+    students = [],
     academicYears = [],
     isEdit = false,
 }) {
@@ -1106,16 +1107,30 @@ export default function FeeTemplateForm({
 
                     <Card>
                         <CardContent className="p-4 sm:p-6 space-y-4">
-                            <h3 className="font-semibold">Template Status</h3>
+                            <h3 className="font-semibold">Student Applicability</h3>
+
+                            <MultiSelectField
+                                label="Specific Students (Optional)"
+                                name="applicable_to.student_ids"
+                                control={control}
+                                options={students}
+                                placeholder="Select students..."
+                            />
+
+                            <Alert>
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>
+                                    If no students are selected, template will apply based on class/branch rules above.
+                                </AlertDescription>
+                            </Alert>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardContent className="p-4 sm:p-6 space-y-4">
+                            <h3 className="font-semibold">Default Setting</h3>
 
                             <div className="flex flex-col sm:flex-row gap-4">
-                                {/* ✅ Using CheckboxField */}
-                                <CheckboxField
-                                    label="Active"
-                                    name="is_active"
-                                    control={control}
-                                />
-
                                 {/* ✅ Using CheckboxField */}
                                 <CheckboxField
                                     label="Set as Default Template"

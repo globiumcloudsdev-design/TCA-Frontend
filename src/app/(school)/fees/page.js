@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Plus, Coins } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { feeService, studentService } from '@/services';
@@ -69,7 +69,7 @@ const buildColumns = (onEdit, onDelete, onCollect) => [
     cell: ({ row }) => {
       const f = row.original;
       const extraActions = onCollect && f.status !== 'paid' ? [
-        { label: 'Collect Payment', onClick: () => onCollect(f) },
+        { label: 'Collect Payment', icon: Coins, onClick: () => onCollect(f.id) },
       ] : [];
       return <TableRowActions onEdit={onEdit ? () => onEdit(f) : undefined} onDelete={onDelete ? () => onDelete(f) : undefined} extraActions={extraActions} />;
     },
@@ -94,6 +94,16 @@ export default function FeesPage() {
   const [editTarget,    setEditTarget]    = useState(null);
   const [deleteTarget,  setDeleteTarget]  = useState(null);
 
+  const { data: latestVoucher, isLoading: isLoadingVoucher } = useQuery({
+    queryKey: ['fee-voucher-detail', collectTarget],
+    queryFn: async () => {
+      if (!collectTarget) return null;
+      const response = await feeService.getVoucherById(collectTarget);
+      return response?.data ?? response ?? null;
+    },
+    enabled: !!collectTarget,
+  });
+
   const { data, isLoading } = useQuery({
     queryKey: ['fees', { page, pageSize, statusFilter, monthFilter }],
     queryFn:  () => feeService.getAll({ page, limit: pageSize, status: statusFilter || undefined, month: monthFilter || undefined }),
@@ -105,6 +115,9 @@ export default function FeesPage() {
   const totalPages     = extractPages(data);
   const total          = data?.data?.total ?? fees.length;
   const studentOptions = toOptions(extractRows(studentsData), (s) => `${s.first_name} ${s.last_name}`);
+  const collectTargetOutstanding = latestVoucher
+    ? Math.max((Number(latestVoucher.amount) || 0) - (Number(latestVoucher.discount) || 0), 0)
+    : null;
 
   const createMutation = useMutation({
     mutationFn: feeService.create,
@@ -172,7 +185,24 @@ export default function FeesPage() {
       </AppModal>
 
       <AppModal open={!!collectTarget} onClose={() => setCollectTarget(null)} title="Collect Payment" size="md">
-        <FeeCollectForm fee={collectTarget} onSubmit={(body) => collectMutation.mutate({ id: collectTarget.id, body })} onCancel={() => setCollectTarget(null)} loading={collectMutation.isPending} />
+        {isLoadingVoucher ? (
+          <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading payment details...
+          </div>
+        ) : (
+          <FeeCollectForm
+            defaultValues={{
+              amount_paid: collectTargetOutstanding ?? '',
+              payment_method: 'cash',
+              transaction_id: '',
+              notes: '',
+            }}
+            maxAmount={collectTargetOutstanding}
+            onSubmit={(body) => collectMutation.mutate({ id: collectTarget, body })}
+            onCancel={() => setCollectTarget(null)}
+            loading={collectMutation.isPending}
+          />
+        )}
       </AppModal>
 
       <ConfirmDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={() => deleteMutation.mutate(deleteTarget)} loading={deleteMutation.isPending} title="Delete Fee" description="Delete this fee voucher? This action is irreversible." confirmLabel="Delete" variant="destructive" />

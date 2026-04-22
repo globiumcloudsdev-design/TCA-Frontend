@@ -192,7 +192,6 @@ export const SCHOOL_NAV = [
 export const GENDER_OPTIONS = [
   { value: 'male', label: 'Male' },
   { value: 'female', label: 'Female' },
-  { value: 'other', label: 'Other' },
 ];
 
 // ── Attendance status options ─────────────────────────────────────────────
@@ -387,9 +386,9 @@ export const BLOOD_GROUP_OPTIONS = [
 
 export const RELIGION_OPTIONS = [
   { value: 'islam', label: 'Islam' },
-  { value: 'christianity', label: 'Christianity' },
-  { value: 'hinduism', label: 'Hinduism' },
-  { value: 'sikhism', label: 'Sikhism' },
+  // { value: 'christianity', label: 'Christianity' },
+  // { value: 'hinduism', label: 'Hinduism' },
+  // { value: 'sikhism', label: 'Sikhism' },
   { value: 'other', label: 'Other' },
 ];
 

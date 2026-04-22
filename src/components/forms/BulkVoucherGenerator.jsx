@@ -44,7 +44,7 @@ const FEE_TYPE_OPTIONS = [
   { value: 'fee_template', label: 'Fee Template' },
 ];
 
-export default function BulkVoucherGenerator({ instituteId: propInstituteId, onSuccess }) {
+export default function BulkVoucherGenerator({ instituteId: propInstituteId, onSuccess, onGeneratingChange }) {
   const currentInstitute = useInstituteStore((s) => s.currentInstitute);
   const instituteId = propInstituteId || currentInstitute?.id;
   
@@ -53,6 +53,10 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmData, setConfirmData] = useState(null);
   const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    onGeneratingChange?.(submitting);
+  }, [submitting, onGeneratingChange]);
 
   const { control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
