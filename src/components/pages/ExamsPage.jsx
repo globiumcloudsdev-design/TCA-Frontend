@@ -259,7 +259,7 @@ export default function ExamsPage({ type }) {
         }
 
         // View Results (results published or completed)
-        if (canDo('exam_results.view') && ['completed', 'results_published'].includes(exam.status)) {
+        if (canDo('exam_results.view') ) {
           extraActions.push({
             label: 'View Results',
             icon: '👁️',

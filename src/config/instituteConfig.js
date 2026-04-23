@@ -157,6 +157,7 @@ export const NAV = {
     // { group: 'Academic',   label: 'Subjects',         href: '/school/subjects',         icon: 'FileText',          permission: 'subjects.read' },
     { group: 'Academic', label: 'Timetable', href: '/school/timetable', icon: 'Calendar', permission: 'timetable.read' },
     { group: 'People', label: 'Students', href: '/school/students', icon: 'Users', permission: 'students.read' },
+    { group: 'People', label: 'Students Promote', href: '/school/students/promote', icon: 'Users', permission: 'students.promote' },
     { group: 'People', label: 'Teachers', href: '/school/teachers', icon: 'GraduationCap', permission: 'teachers.read' },
     { group: 'People', label: 'Staff', href: '/school/staff', icon: 'Heart', permission: 'staff.read' },
     { group: 'People', label: 'Parents', href: '/school/parents', icon: 'Heart', permission: 'parents.read' },

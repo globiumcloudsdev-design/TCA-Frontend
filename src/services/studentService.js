@@ -102,7 +102,7 @@ export const studentService = {
     const queryParams = type !== 'inactive' ? `?type=${type}` : '';
     return api.delete(`/students/${id}${queryParams}`).then((r) => r.data);
   },
-  
+
   toggleStatus: (id, is_active) =>
     api
       .patch(`/students/${id}/toggle-status`, { is_active })
@@ -155,4 +155,38 @@ export const studentService = {
       throw error;
     }
   },
+  // In studentService object
+  search: (query, limit = 20) =>
+    api.get(`/students/search?q=${encodeURIComponent(query)}&limit=${limit}`).then(r => r.data),
+
+  bulkDelete: (ids) => api.post('/students/bulk-delete', { ids }).then(r => r.data),
+  /**
+   * Check if a single student is eligible for promotion
+   * @param {string} id - Student ID
+   */
+  checkPromotionEligibility: (id) =>
+    api.get(`/students/${id}/promotion-eligibility`).then((r) => r.data),
+
+  /**
+   * Get promotion eligibility for all students in a class
+   * @param {string} classId - Class ID
+   * @param {string} academicYearId - Current academic year ID
+   */
+  getClassPromotionEligibility: (classId, academicYearId) =>
+    api.get(`/students/classes/${classId}/promotion-eligibility?academicYearId=${academicYearId}`).then((r) => r.data),
+
+  /**
+   * Promote a single student
+   * @param {string} id - Student ID
+   * @param {object} data - { targetClassId, targetSectionId, targetAcademicYearId, force? }
+   */
+  promoteStudent: (id, data) =>
+    api.post(`/students/${id}/promote`, data).then((r) => r.data),
+
+  /**
+   * Bulk promote students by current class
+   * @param {object} data - { fromClassId, toClassId, toSectionId, targetAcademicYearId, force? }
+   */
+  bulkPromoteStudents: (data) =>
+    api.post('/students/bulk-promote', data).then((r) => r.data),
 };

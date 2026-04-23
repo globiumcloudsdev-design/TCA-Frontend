@@ -1,5 +1,4 @@
-
-
+//src/app/(portal)/teacher/exams/[examId]/report/page.jsx
 'use client';
 
 import { useState } from 'react';
@@ -7,124 +6,32 @@ import { useParams, useRouter } from 'next/navigation';
 import { useTeacherExamDetails, useTeacherExamResults } from '@/hooks/useTeacherPortal';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Loader, AlertCircle, Download, ArrowLeft, Printer } from 'lucide-react';
+import { Loader, AlertCircle, Download, ArrowLeft, Printer, X } from 'lucide-react';
+import ResultCard from '@/components/cards/ResultCard'; // Shared component
 
-// ResultCard component for printing
-const ResultCard = ({ result, exam, student }) => {
-  const totalMarks = exam?.total_marks || exam?.subject_schedules?.reduce((sum, s) => sum + (s.total_marks || 0), 0) || 0;
-  const obtainedMarks = result?.total_marks_obtained || 0;
-  const percentage = totalMarks > 0 ? ((obtainedMarks / totalMarks) * 100).toFixed(2) : 0;
+// Helper: Calculate grade based on percentage (standard scale)
+const getGradeFromPercentage = (percentage) => {
+  const p = parseFloat(percentage);
+  if (p >= 90) return 'A+';
+  if (p >= 80) return 'A';
+  if (p >= 70) return 'B+';
+  if (p >= 60) return 'B';
+  if (p >= 50) return 'C';
+  if (p >= 40) return 'D';
+  return 'F';
+};
 
-  const getGrade = (percentage) => {
-    const p = parseFloat(percentage);
-    if (p >= 90) return 'A+';
-    if (p >= 80) return 'A';
-    if (p >= 70) return 'B+';
-    if (p >= 60) return 'B';
-    if (p >= 50) return 'C';
-    if (p >= 40) return 'D';
-    return 'F';
-  };
+// Helper: Determine pass/fail status for a subject
+const isSubjectPass = (marksObtained, passMarks) => {
+  return marksObtained >= passMarks;
+};
 
-  const getStatus = (percentage) => {
-    const p = parseFloat(percentage);
-    if (result?.status === 'absent') return 'ABSENT';
-    if (p >= 40) return 'PASS';
-    return 'FAIL';
-  };
-
-  const status = getStatus(percentage);
-  const statusColor = status === 'PASS' ? 'text-green-600' : status === 'ABSENT' ? 'text-orange-600' : 'text-red-600';
-
-  return (
-    <div className="p-8 bg-white border-2 border-gray-300 min-h-screen flex flex-col">
-      {/* Header */}
-      <div className="text-center mb-8 border-b-2 border-gray-300 pb-4">
-        <h1 className="text-3xl font-bold">Examination Result</h1>
-        <p className="text-gray-600 mt-2">{exam?.name || 'Exam Result'}</p>
-        <p className="text-gray-500 text-sm">
-          {exam?.class_name || exam?.class?.name || 'Class'} 
-          {exam?.section_name || exam?.section?.name ? ` - Section ${exam.section_name || exam.section?.name}` : ''}
-        </p>
-      </div>
-
-      {/* Student Info */}
-      <div className="grid grid-cols-2 gap-6 mb-8">
-        <div>
-          <p className="text-sm text-gray-600">Student Name</p>
-          <p className="text-lg font-semibold">
-            {student?.first_name} {student?.last_name}
-          </p>
-        </div>
-        <div>
-          <p className="text-sm text-gray-600">Roll Number</p>
-          <p className="text-lg font-semibold">{student?.roll_number || student?.registration_no || 'N/A'}</p>
-        </div>
-      </div>
-
-      {/* Marks Table */}
-      <table className="w-full mb-8 border-collapse">
-        <thead>
-          <tr className="border-b-2 border-gray-400">
-            <th className="py-3 text-left font-bold">Subject</th>
-            <th className="py-3 text-center font-bold">Marks</th>
-            <th className="py-3 text-center font-bold">Out of</th>
-            <th className="py-3 text-center font-bold">Percentage</th>
-            <th className="py-3 text-center font-bold">Grade</th>
-           </tr>
-        </thead>
-        <tbody>
-          {exam?.subject_schedules?.map((subject, idx) => {
-            const subjectMark = result?.subject_marks?.find(sm => sm.subject_id === subject.subject_id);
-            const marksObtained = subjectMark?.marks_obtained || 0;
-            const subjectPercentage = subject.total_marks > 0 
-              ? ((marksObtained / subject.total_marks) * 100).toFixed(2)
-              : 0;
-            const subjectGrade = subjectMark?.grade || getGrade(subjectPercentage);
-            return (
-              <tr key={subject.subject_id} className="border-b border-gray-200">
-                <td className="py-3 px-2 font-medium">{subject.subject_name}</td>
-                <td className="py-3 text-center font-semibold">{marksObtained}</td>
-                <td className="py-3 text-center">{subject.total_marks}</td>
-                <td className="py-3 text-center">{subjectPercentage}%</td>
-                <td className="py-3 text-center font-semibold">{subjectGrade}</td>
-               </tr>
-            );
-          })}
-        </tbody>
-       </table>
-
-      {/* Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8 p-4 bg-gray-100 rounded">
-        <div className="text-center">
-          <p className="text-sm text-gray-600">Total Marks</p>
-          <p className="text-2xl font-bold">{obtainedMarks}</p>
-        </div>
-        <div className="text-center">
-          <p className="text-sm text-gray-600">Out of</p>
-          <p className="text-2xl font-bold">{totalMarks}</p>
-        </div>
-        <div className="text-center">
-          <p className="text-sm text-gray-600">Percentage</p>
-          <p className="text-2xl font-bold">{percentage}%</p>
-        </div>
-        <div className="text-center">
-          <p className="text-sm text-gray-600">Grade</p>
-          <p className="text-2xl font-bold">{getGrade(percentage)}</p>
-        </div>
-        <div className="text-center">
-          <p className="text-sm text-gray-600">Status</p>
-          <p className={`text-2xl font-bold ${statusColor}`}>{status}</p>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="border-t-2 border-gray-300 pt-4 mt-auto text-sm text-gray-600 text-center">
-        <p>This is an official document of The Clouds Academy</p>
-        <p className="text-xs mt-1">Generated on {new Date().toLocaleDateString()}</p>
-      </div>
-    </div>
-  );
+// Helper: Determine overall exam status
+const getExamStatus = (totalPercentage, examPassPercentage, subjectResults) => {
+  if (totalPercentage >= examPassPercentage && subjectResults.every(sub => sub.passed)) {
+    return 'pass';
+  }
+  return 'fail';
 };
 
 export default function ExamReportPage() {
@@ -132,18 +39,20 @@ export default function ExamReportPage() {
   const router = useRouter();
   const examId = params.examId;
 
-  const [selectedStudentId, setSelectedStudentId] = useState(null);
+  const [selectedResultData, setSelectedResultData] = useState(null); // Store full result object for modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const { exam, loading: examLoading, error: examError } = useTeacherExamDetails(examId);
   const { results, loading: resultsLoading, refetch } = useTeacherExamResults(examId);
 
-  const handlePrintResult = (studentId) => {
-    setSelectedStudentId(studentId);
-    setTimeout(() => {
-      window.print();
-      // Reset after print dialog closes
-      setTimeout(() => setSelectedStudentId(null), 500);
-    }, 100);
+  const handlePrintResult = (result) => {
+    setSelectedResultData(result);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedResultData(null);
   };
 
   if (examLoading || resultsLoading) {
@@ -190,63 +99,79 @@ export default function ExamReportPage() {
     );
   }
 
-  // If a student is selected for printing, show the print view
-  if (selectedStudentId) {
-    const selectedResult = results.find(r => r.student_id === selectedStudentId);
-    const selectedStudentData = selectedResult?.student;
-    
-    if (selectedResult) {
-      return (
-        <div className="print:block">
-          <div className="print:hidden p-6">
-            <div className="flex gap-4 mb-6">
-              <Button onClick={() => setSelectedStudentId(null)} variant="outline">
-                <ArrowLeft className="mr-2" size={16} />
-                Back to Results
-              </Button>
-              <Button onClick={() => handlePrintResult(selectedStudentId)} className="bg-blue-600 hover:bg-blue-700">
-                <Printer className="mr-2" size={16} />
-                Print Result
-              </Button>
-            </div>
-          </div>
-          <div className="print:p-0 p-6">
-            <ResultCard 
-              result={selectedResult} 
-              exam={exam} 
-              student={selectedStudentData} 
-            />
-          </div>
-        </div>
-      );
-    }
-  }
+  // Prepare subject schedules with pass marks
+  const subjectSchedules = exam.subject_schedules || [];
+  const examPassPercentage = parseFloat(exam.pass_percentage) || 40;
+  const totalExamMarks = subjectSchedules.reduce((sum, s) => sum + (s.total_marks || 0), 0);
 
-  // Calculate exam statistics
-  const totalMarks = exam?.total_marks || exam?.subject_schedules?.reduce((sum, s) => sum + (s.total_marks || 0), 0) || 0;
-  
+  // Calculate statistics
   const stats = {
     total_students: results.length,
-    submitted: results.filter(r => r.status !== 'pending' && r.total_marks_obtained > 0).length,
-    passed: results.filter(r => {
-      if (r.status === 'absent') return false;
-      const percentage = totalMarks > 0 ? (r.total_marks_obtained / totalMarks) * 100 : 0;
-      return percentage >= 40;
-    }).length,
-    failed: results.filter(r => {
-      if (r.status === 'absent') return false;
-      const percentage = totalMarks > 0 ? (r.total_marks_obtained / totalMarks) * 100 : 0;
-      return percentage < 40 && r.total_marks_obtained > 0;
-    }).length,
-    absent: results.filter(r => r.status === 'absent' || r.is_present === false).length,
-    avg_percentage: results.filter(r => r.status !== 'absent' && r.total_marks_obtained > 0).length > 0
-      ? (results.filter(r => r.status !== 'absent' && r.total_marks_obtained > 0).reduce((sum, r) => {
-          return sum + ((r.total_marks_obtained / totalMarks) * 100);
-        }, 0) / results.filter(r => r.status !== 'absent' && r.total_marks_obtained > 0).length).toFixed(2)
-      : '0'
+    passed: 0,
+    failed: 0,
+    absent: 0,
+    totalPercentageSum: 0,
+    validResultsCount: 0,
   };
 
-  const subjectSchedules = exam?.subject_schedules || [];
+  // Pre-process each result to compute subject-wise pass/fail and overall status
+  const processedResults = results.map(result => {
+    const isAbsent = result.status === 'absent' || result.is_present === false;
+    let obtainedTotal = 0;
+    let subjectDetails = [];
+
+    if (!isAbsent && result.subject_marks) {
+      subjectSchedules.forEach(subject => {
+        const subjectMark = result.subject_marks.find(sm => sm.subject_id === subject.subject_id);
+        const marksObtained = subjectMark?.marks_obtained || 0;
+        const passMarks = subject.pass_marks || (subject.total_marks * examPassPercentage / 100);
+        const passed = isSubjectPass(marksObtained, passMarks);
+        const percentage = subject.total_marks > 0 ? (marksObtained / subject.total_marks) * 100 : 0;
+        const grade = subjectMark?.grade || getGradeFromPercentage(percentage);
+        
+        subjectDetails.push({
+          subject_id: subject.subject_id,
+          subject_name: subject.subject_name,
+          marks_obtained: marksObtained,
+          total_marks: subject.total_marks,
+          percentage: percentage.toFixed(2),
+          grade: grade,
+          passed: passed,
+          pass_marks: passMarks,
+        });
+        obtainedTotal += marksObtained;
+      });
+    }
+
+    const totalPercentage = totalExamMarks > 0 ? (obtainedTotal / totalExamMarks) * 100 : 0;
+    const examStatus = isAbsent ? 'absent' : getExamStatus(totalPercentage, examPassPercentage, subjectDetails);
+    const isPassed = examStatus === 'pass';
+    const isFailed = examStatus === 'fail';
+
+    // Update stats
+    if (!isAbsent) {
+      stats.totalPercentageSum += totalPercentage;
+      stats.validResultsCount++;
+      if (isPassed) stats.passed++;
+      else if (isFailed) stats.failed++;
+    } else {
+      stats.absent++;
+    }
+
+    const finalGrade = getGradeFromPercentage(totalPercentage);
+
+    return {
+      ...result,
+      obtained_total: obtainedTotal,
+      total_percentage: totalPercentage.toFixed(2),
+      exam_status: examStatus,
+      grade: finalGrade,
+      subject_details: subjectDetails,
+      student: result.student || {},
+    };
+  });
+
+  stats.avg_percentage = stats.validResultsCount > 0 ? (stats.totalPercentageSum / stats.validResultsCount).toFixed(2) : '0';
 
   return (
     <div className="p-6">
@@ -254,13 +179,14 @@ export default function ExamReportPage() {
         <div>
           <h1 className="text-3xl font-bold">Exam Report</h1>
           <p className="text-gray-600 mt-2">
-            {exam?.name || 'Exam'} • {exam?.class_name || exam?.class?.name || 'Class'}
-            {exam?.section_name || exam?.section?.name ? ` - Section ${exam.section_name || exam.section?.name}` : ''}
+            {exam.name} • {exam.class_name || exam.class?.name || 'Class'}
+            {exam.section_name || exam.section?.name ? ` - Section ${exam.section_name || exam.section?.name}` : ''}
           </p>
           <p className="text-sm text-gray-500 mt-1">
-            {exam?.start_date ? new Date(exam.start_date).toLocaleDateString() : 'N/A'} 
-            {exam?.end_date ? ` to ${new Date(exam.end_date).toLocaleDateString()}` : ''}
+            {exam.start_date ? new Date(exam.start_date).toLocaleDateString() : 'N/A'} 
+            {exam.end_date ? ` to ${new Date(exam.end_date).toLocaleDateString()}` : ''}
           </p>
+          <p className="text-sm text-gray-500">Passing Percentage: {examPassPercentage}%</p>
         </div>
         <Button onClick={() => router.back()} variant="outline">
           <ArrowLeft className="mr-2" size={16} />
@@ -268,7 +194,7 @@ export default function ExamReportPage() {
         </Button>
       </div>
 
-      {/* Exam Statistics Cards */}
+      {/* Statistics Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <Card className="p-4 bg-blue-50">
           <p className="text-sm text-gray-600">Total Students</p>
@@ -312,71 +238,56 @@ export default function ExamReportPage() {
                 <th className="p-3 text-center font-semibold text-gray-700">Grade</th>
                 <th className="p-3 text-center font-semibold text-gray-700">Status</th>
                 <th className="p-3 text-center font-semibold text-gray-700">Action</th>
-               </tr>
+              </tr>
             </thead>
             <tbody>
-              {results.map((result, idx) => {
-                const obtainedMarks = parseFloat(result?.total_marks_obtained) || 0;
-                const percentage = totalMarks > 0 ? ((obtainedMarks / totalMarks) * 100).toFixed(2) : 0;
-                const isPassed = result?.status === 'pass';
-                const isAbsent = result?.status === 'absent' || result?.is_present === false;
-                
+              {processedResults.map((result, idx) => {
+                const isAbsent = result.exam_status === 'absent';
                 let statusText = 'Pending';
                 let statusClass = 'bg-gray-100 text-gray-800';
                 if (isAbsent) {
                   statusText = 'Absent';
                   statusClass = 'bg-orange-100 text-orange-800';
-                } else if (isPassed) {
+                } else if (result.exam_status === 'pass') {
                   statusText = 'Passed';
                   statusClass = 'bg-green-100 text-green-800';
-                } else if (result?.status === 'fail') {
+                } else if (result.exam_status === 'fail') {
                   statusText = 'Failed';
                   statusClass = 'bg-red-100 text-red-800';
                 }
 
-                const getGradeForPercentage = (p) => {
-                  const perc = parseFloat(p);
-                  if (perc >= 90) return 'A+';
-                  if (perc >= 80) return 'A';
-                  if (perc >= 70) return 'B+';
-                  if (perc >= 60) return 'B';
-                  if (perc >= 50) return 'C';
-                  if (perc >= 40) return 'D';
-                  return 'F';
-                };
-
-                const displayGrade = result?.grade || getGradeForPercentage(percentage);
-                const studentData = result?.student || {};
-
                 return (
-                  <tr key={result.student_id || result.id} className={`border-b hover:bg-gray-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                  <tr key={result.id || result.student_id || `result-${idx}`} className={`border-b hover:bg-gray-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                     <td className="p-3 text-gray-500 text-sm">{idx + 1}</td>
                     <td className="p-3">
                       <p className="font-medium text-gray-900">
-                        {studentData?.first_name} {studentData?.last_name}
+                        {result.student.first_name} {result.student.last_name}
                       </p>
-                      <p className="text-xs text-gray-500">{studentData?.email || ''}</p>
+                      <p className="text-xs text-gray-500">{result.student.email || ''}</p>
                     </td>
                     <td className="p-3 text-gray-600">
-                      {studentData?.roll_number || studentData?.registration_no || '-'}
+                      {result.student.roll_number || result.student.registration_no || '-'}
                     </td>
                     {subjectSchedules.map((subject) => {
-                      const subjectMark = result?.subject_marks?.find(sm => sm.subject_id === subject.subject_id);
-                      const marksObtained = subjectMark?.marks_obtained || 0;
+                      const subDetail = result.subject_details.find(sd => sd.subject_id === subject.subject_id);
+                      const marks = subDetail?.marks_obtained ?? '-';
+                      const isSubFail = subDetail && !subDetail.passed;
                       return (
                         <td key={subject.subject_id} className="p-3 text-center font-medium">
-                          {isAbsent ? <span className="text-gray-400">-</span> : marksObtained}
+                          {isAbsent ? <span className="text-gray-400">-</span> : 
+                            <span className={isSubFail ? 'text-red-600 font-bold' : ''}>{marks}</span>
+                          }
                         </td>
                       );
                     })}
                     <td className="p-3 text-center font-bold">
-                      {isAbsent ? <span className="text-gray-400">-</span> : obtainedMarks}
+                      {isAbsent ? <span className="text-gray-400">-</span> : result.obtained_total}
                     </td>
                     <td className="p-3 text-center font-bold">
-                      {isAbsent ? <span className="text-gray-400">-</span> : `${percentage}%`}
+                      {isAbsent ? <span className="text-gray-400">-</span> : `${result.total_percentage}%`}
                     </td>
                     <td className="p-3 text-center font-semibold">
-                      {isAbsent ? <span className="text-gray-400">-</span> : displayGrade}
+                      {isAbsent ? <span className="text-gray-400">-</span> : result.grade}
                     </td>
                     <td className="p-3 text-center">
                       <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusClass}`}>
@@ -387,25 +298,80 @@ export default function ExamReportPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setSelectedStudentId(result.student_id)}
+                        onClick={() => handlePrintResult(result)}
                         className="text-blue-600 border-blue-200 hover:bg-blue-50"
                       >
                         <Printer size={14} className="mr-1" />
-                        Print
+                        Result Card
                       </Button>
                     </td>
-                   </tr>
+                  </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-        
-        {/* Footer */}
         <div className="px-4 py-3 bg-gray-50 border-t text-sm text-gray-500">
-          Showing {results.length} of {stats.total_students} students
+          Showing {processedResults.length} of {stats.total_students} students
         </div>
       </Card>
+
+      {/* Result Card Modal */}
+      {isModalOpen && selectedResultData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-5xl rounded-[32px] overflow-hidden shadow-2xl relative">
+            <button
+              onClick={closeModal}
+              className="absolute top-5 right-5 z-10 w-9 h-9 rounded-full bg-slate-900/80 text-white flex items-center justify-center hover:bg-slate-900 transition"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="p-5 max-h-[90vh] overflow-y-auto">
+              {/* Prepare data for ResultCard component */}
+              <ResultCard
+                student={{
+                  first_name: selectedResultData.student.first_name || '',
+                  last_name: selectedResultData.student.last_name || '',
+                  registration_no: selectedResultData.student.registration_no || 'N/A',
+                  roll_number: selectedResultData.student.roll_number || 'N/A',
+                }}
+                exam={{
+                  name: exam.name,
+                  total_marks: totalExamMarks,
+                  subject_schedules: subjectSchedules.map(s => ({
+                    subject_id: s.subject_id,
+                    subject_name: s.subject_name,
+                    total_marks: s.total_marks,
+                  })),
+                }}
+                result={{
+                  subject_marks: selectedResultData.subject_details.map(sd => ({
+                    subject_id: sd.subject_id,
+                    subject_name: sd.subject_name,
+                    marks_obtained: sd.marks_obtained,
+                    total_marks: sd.total_marks,
+                    grade: sd.grade,
+                    remarks: sd.passed ? '' : `Fail (Need ${sd.pass_marks} to pass)`,
+                  })),
+                  total_marks: totalExamMarks,
+                  total_marks_obtained: selectedResultData.obtained_total,
+                  percentage: parseFloat(selectedResultData.total_percentage),
+                  grade: selectedResultData.grade,
+                  status: selectedResultData.exam_status,
+                }}
+                institute={{ name: exam.school?.name || 'The Clouds Academy', code: exam.school?.code || '' }}
+              />
+              <div className="mt-4 flex justify-end">
+                <Button onClick={() => window.print()} className="bg-emerald-600 hover:bg-emerald-700">
+                  <Printer className="w-4 h-4 mr-2" />
+                  Print Result
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

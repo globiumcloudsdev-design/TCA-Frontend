@@ -155,8 +155,8 @@ export default function TeacherOverview() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
         <h2 className="text-base font-bold text-slate-800 mb-4">My Assigned {t.classesLabel}</h2>
         <div className="grid sm:grid-cols-2 gap-3">
-          {(classes || []).map((cls) => (
-            <div key={cls.id || cls.class_id} className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+          {(classes || []).map((cls, idx) => (
+            <div key={cls.id || cls.class_id || `class-${idx}`} className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
               <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white text-xs font-extrabold flex-shrink-0">
                 {(cls.class_name || cls.name || 'C').split(' ')[1] || 'C'}
               </div>
@@ -187,8 +187,8 @@ export default function TeacherOverview() {
           <p className="text-sm text-slate-500">No periods scheduled for today.</p>
         ) : (
           <div className="space-y-2">
-            {todaySchedule.slice(0, 4).map((slot) => (
-              <div key={slot.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+            {todaySchedule.slice(0, 4).map((slot, idx) => (
+              <div key={slot.id || `slot-${idx}`} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
                 <Clock className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-slate-800 truncate">{slot.subject || 'Subject'}</p>
@@ -208,8 +208,8 @@ export default function TeacherOverview() {
             <Link href="/teacher/assignments" className="text-xs text-blue-600 font-semibold hover:underline">View all</Link>
           </div>
           <div className="space-y-2">
-            {recentWork.map((item) => (
-              <div key={item.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+            {recentWork.map((item, idx) => (
+              <div key={item.id || `work-${idx}`} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
                 <NotebookPen className="w-4 h-4 text-cyan-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -238,8 +238,8 @@ export default function TeacherOverview() {
             <p className="text-sm text-slate-500">No pending submissions right now.</p>
           ) : (
             <div className="space-y-2">
-              {pendingWork.slice(0, 5).map((item) => (
-                <div key={item.id} className="p-3 bg-amber-50 border border-amber-100 rounded-lg">
+              {pendingWork.slice(0, 5).map((item, idx) => (
+                <div key={item.id || `pending-${idx}`} className="p-3 bg-amber-50 border border-amber-100 rounded-lg">
                   <p className="text-sm font-semibold text-slate-800 truncate">{item.title}</p>
                   <p className="text-xs text-slate-600 mt-0.5">{item.subject || 'General'} · {item.pending_count || 0} pending</p>
                 </div>
@@ -254,8 +254,8 @@ export default function TeacherOverview() {
             <p className="text-sm text-slate-500">No activity yet.</p>
           ) : (
             <div className="space-y-2">
-              {recentActivity.slice(0, 5).map((item) => (
-                <div key={item.id} className="p-3 bg-slate-50 rounded-lg">
+              {recentActivity.slice(0, 5).map((item, idx) => (
+                <div key={item.id || `activity-${idx}`} className="p-3 bg-slate-50 rounded-lg">
                   <p className="text-sm font-semibold text-slate-800">{item.title}</p>
                   <p className="text-xs text-slate-500 mt-0.5">{item.time || 'Just now'}</p>
                 </div>

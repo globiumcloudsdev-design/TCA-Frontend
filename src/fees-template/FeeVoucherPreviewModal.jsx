@@ -160,6 +160,11 @@ export default function FeeVoucherPreviewModal({
             background: #fff !important;
           }
 
+          .fee-voucher-print-target th:first-child,
+          .fee-voucher-print-target .month-row {
+            display: none !important;
+          }
+
           .fee-voucher-modal-shell,
           .fee-voucher-modal-actions,
           [data-radix-dialog-overlay] {

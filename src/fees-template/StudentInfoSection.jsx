@@ -8,7 +8,7 @@ const Cell = ({ label, value, borderedRight = false, labelWidth = '66px' }) => (
       <span className="border-r px-1 py-[2px] font-semibold" style={{ borderColor: '#bcbcbc', backgroundColor: '#f6f6f6' }}>
         {label}
       </span>
-      <span className="px-1 py-[2px]">{value || 'N/A'}</span>
+      <span className="px-1 py-[2px]">{value}</span>
     </div>
   </td>
 );
@@ -23,6 +23,10 @@ export default function StudentInfoSection({ studentData = {}, voucherMeta = {} 
             <Cell label="Reg #" value={studentData.studentId || studentData.rollNumber} />
           </tr>
           <tr className="border-b" style={{ borderColor: '#bcbcbc' }}>
+            <Cell label="Class" value={studentData.className || studentData.class_name } borderedRight />
+            <Cell label="Section" value={studentData.sectionName || studentData.section_name} />
+          </tr>
+          <tr className="month-row border-b" style={{ borderColor: '#bcbcbc' }}>
             <Cell label="Generate Date" value={fmtDate(voucherMeta.issueDate)} borderedRight />
             <Cell label="Due Date" value={fmtDate(voucherMeta.dueDate)} />
           </tr>
