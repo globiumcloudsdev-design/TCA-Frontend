@@ -1,123 +1,153 @@
 /**
- * Event API Service
- * GET    /events
- * POST   /events
- * GET    /events/:id
- * PUT    /events/:id
- * DELETE /events/:id
- * POST   /events/:id/send-sms
- * POST   /events/import
+ * Event Service — CRUD for Events with attendance support
+ *
+ * Usage:
+ *   eventService.getAll(filters)           → List events
+ *   eventService.getById(id)               → Single event
+ *   eventService.create(body)              → Create event
+ *   eventService.update(id, body)          → Update event
+ *   eventService.delete(id)                → Delete event
+ *   eventService.toggleStatus(id, status)  → Change status
+ *   eventService.getUpcoming(filters)      → Upcoming events
+ *   eventService.getMyEvents()             → Portal: my events
+ *   eventService.getAttendanceSummary(id)  → Event attendance report
+ *   eventService.markStudentAttendance(...) → Mark student attendance
+ *   eventService.markStaffAttendance(...)  → Mark staff attendance
+ *   eventService.bulkMarkStudents(...)     → Bulk mark students
+ *   eventService.bulkMarkStaff(...)        → Bulk mark staff
  */
 
-import api from '@/lib/api';
-import { buildQuery } from '@/lib/utils';
-import { withFallback } from '@/lib/withFallback';
+import api from "@/lib/api";
+import { buildQuery } from "@/lib/utils";
 
-const DUMMY_EVENTS = [
-  {
-    id: 'evt-001',
-    event_name: 'Annual Sports Day',
-    description: 'Inter-house sports competitions and prize distribution.',
-    event_type: 'Sports',
-    date: '2026-04-20',
-    time: '09:00',
-    location: 'Main Ground',
-    audience: 'all_students',
-    status: 'scheduled',
-    selected_classes: [],
-    custom_users: [],
-  },
-  {
-    id: 'evt-002',
-    event_name: 'Parent Teacher Meeting',
-    description: 'PTM for Term 2 progress discussion.',
-    event_type: 'PTM',
-    date: '2026-04-28',
-    time: '11:30',
-    location: 'Auditorium',
-    audience: 'selected_classes',
-    status: 'draft',
-    selected_classes: ['class-1', 'class-3'],
-    custom_users: [],
-  },
-];
-
-const paginateData = (items, page = 1, limit = 10) => {
-  const p = Number(page) || 1;
-  const l = Number(limit) || 10;
-  const start = (p - 1) * l;
-  const rows = items.slice(start, start + l);
-  return {
-    data: {
-      rows,
-      total: items.length,
-      totalPages: Math.max(1, Math.ceil(items.length / l)),
-      page: p,
-      limit: l,
-    },
+// ─────────────────────────────────────────────────────────────────────────────
+// Normalize event filters
+// ─────────────────────────────────────────────────────────────────────────────
+function normalizeFilters(filters = {}) {
+  const base = {
+    page: filters.page ?? 1,
+    limit: filters.limit ?? 20,
   };
-};
 
-const normalizeText = (v) => String(v ?? '').toLowerCase();
+  if (filters.search !== undefined && filters.search !== null && filters.search !== "") {
+    base.search = filters.search;
+  }
+  if (filters.institute_id) base.institute_id = filters.institute_id;
+  if (filters.branch_id) base.branch_id = filters.branch_id;
+  if (filters.event_type) base.event_type = filters.event_type;
+  if (filters.status) base.status = filters.status;
+  if (filters.audience_type) base.audience_type = filters.audience_type;
+  if (filters.from_date) base.from_date = filters.from_date;
+  if (filters.to_date) base.to_date = filters.to_date;
+  if (filters.created_by) base.created_by = filters.created_by;
+
+  return base;
+}
 
 export const eventService = {
-  getAll: (filters = {}) =>
-    withFallback(
-      () => api.get(`/events${buildQuery(filters)}`).then((r) => r.data),
-      () => {
-        let data = [...DUMMY_EVENTS];
+  // ── CRUD ──────────────────────────────────────────────────────────────────
 
-        if (filters.search) {
-          const q = normalizeText(filters.search);
-          data = data.filter((e) =>
-            [e.event_name, e.event_type, e.location, e.audience, e.status]
-              .some((f) => normalizeText(f).includes(q))
-          );
-        }
+  /**
+   * List events — with filters & pagination
+   * @param {object} filters
+   */
+  getAll: (filters = {}) => {
+    const normalized = normalizeFilters(filters);
+    return api.get(`/events${buildQuery(normalized)}`).then((r) => r.data);
+  },
 
-        if (filters.event_type) data = data.filter((e) => e.event_type === filters.event_type);
-        if (filters.audience) data = data.filter((e) => e.audience === filters.audience);
-        if (filters.status) data = data.filter((e) => e.status === filters.status);
-        if (filters.from_date) data = data.filter((e) => e.date >= filters.from_date);
-        if (filters.to_date) data = data.filter((e) => e.date <= filters.to_date);
+  /**
+   * Get single event by ID
+   * @param {string} id
+   */
+  getById: (id) => api.get(`/events/${id}`).then((r) => r.data),
 
-        return paginateData(data, filters.page, filters.limit);
-      }
-    ),
+  /**
+   * Create new event
+   * @param {object} body
+   */
+  create: (body) => api.post("/events", body).then((r) => r.data),
 
-  getById: (id) =>
-    withFallback(
-      () => api.get(`/events/${id}`).then((r) => r.data),
-      () => ({ data: DUMMY_EVENTS.find((e) => e.id === id) ?? null })
-    ),
+  /**
+   * Update event
+   * @param {string} id
+   * @param {object} body
+   */
+  update: (id, body) => api.put(`/events/${id}`, body).then((r) => r.data),
 
-  create: (body) =>
-    withFallback(
-      () => api.post('/events', body).then((r) => r.data),
-      () => ({ data: { ...body, id: `evt-${Date.now()}` } })
-    ),
+  /**
+   * Delete event (soft delete)
+   * @param {string} id
+   */
+  delete: (id) => api.delete(`/events/${id}`).then((r) => r.data),
 
-  update: (id, body) =>
-    withFallback(
-      () => api.put(`/events/${id}`, body).then((r) => r.data),
-      () => ({ data: { id, ...body } })
-    ),
+  /**
+   * Toggle event status
+   * @param {string} id
+   * @param {string} status — draft | scheduled | completed | cancelled
+   */
+  toggleStatus: (id, status) =>
+    api.patch(`/events/${id}/status`, { status }).then((r) => r.data),
 
-  delete: (id) =>
-    withFallback(
-      () => api.delete(`/events/${id}`).then((r) => r.data),
-      () => ({ data: { id } })
-    ),
+  // ── Queries ───────────────────────────────────────────────────────────────
 
-  sendSMS: (id) =>
-    withFallback(
-      () => api.post(`/events/${id}/send-sms`).then((r) => r.data),
-      () => ({ data: { id, sms_sent: true } })
-    ),
+  /**
+   * Get upcoming events
+   * @param {object} filters — { branch_id, limit }
+   */
+  getUpcoming: (filters = {}) => {
+    const params = {};
+    if (filters.branch_id) params.branch_id = filters.branch_id;
+    if (filters.limit) params.limit = filters.limit;
+    return api.get(`/events/upcoming${buildQuery(params)}`).then((r) => r.data);
+  },
 
-  bulkImport: (rows = []) =>
-    withFallback(
-      () => api.post('/events/import', { rows }).then((r) => r.data),
-      () => ({ data: { imported: rows.length } })
-    ),
+  /**
+   * Get my events (for portal users)
+   */
+  getMyEvents: () => api.get("/events/my").then((r) => r.data),
+
+  // ── Event Attendance ──────────────────────────────────────────────────────
+
+  /**
+   * Get event attendance summary
+   * @param {string} eventId
+   */
+  getAttendanceSummary: (eventId) =>
+    api.get(`/events/${eventId}/attendance`).then((r) => r.data),
+
+  /**
+   * Mark student attendance for an event
+   * @param {string} eventId
+   * @param {object} data — { student_id, status, remarks }
+   */
+  markStudentAttendance: (eventId, data) =>
+    api.post(`/events/${eventId}/attendance/student`, data).then((r) => r.data),
+
+  /**
+   * Mark staff attendance for an event
+   * @param {string} eventId
+   * @param {object} data — { staff_id, status, remarks }
+   */
+  markStaffAttendance: (eventId, data) =>
+    api.post(`/events/${eventId}/attendance/staff`, data).then((r) => r.data),
+
+  /**
+   * Bulk mark student attendance for an event
+   * @param {string} eventId
+   * @param {object} data — { student_ids: [], status }
+   */
+  bulkMarkStudents: (eventId, data) =>
+    api.post(`/events/${eventId}/attendance/students/bulk`, data).then((r) => r.data),
+
+  /**
+   * Bulk mark staff attendance for an event
+   * @param {string} eventId
+   * @param {object} data — { staff_ids: [], status }
+   */
+  bulkMarkStaff: (eventId, data) =>
+    api.post(`/events/${eventId}/attendance/staff/bulk`, data).then((r) => r.data),
 };
+
+export default eventService;
+

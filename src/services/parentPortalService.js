@@ -151,5 +151,11 @@ getNoticesForChild: (childId, filters = {}) =>
     api.get('/portal/parent/leave-requests/statistics', { params: { child_id: childId } }).then(r => r.data),
 
   getLeaveBalance: (childId) =>
-    api.get('/portal/parent/leave-balance', { params: { child_id: childId } }).then(r => r.data)
+    api.get('/portal/parent/leave-balance', { params: { child_id: childId } }).then(r => r.data),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // EVENTS
+  // ─────────────────────────────────────────────────────────────────────────
+  getMyEvents: () =>
+    api.get('/portal/parent/events').then(r => r.data),
 };

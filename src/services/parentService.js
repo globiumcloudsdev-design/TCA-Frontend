@@ -22,4 +22,25 @@ export const parentService = {
   update: (id, body) => api.put(`/parents/${id}`, body).then((r) => r.data),
 
   delete: (id) => api.delete(`/parents/${id}`).then((r) => r.data),
+
+  /**
+   * Get parent options for dropdown (no pagination)
+   */
+  getOptions: async (params = {}) => {
+    try {
+      const queryString = buildQuery({ limit: 200, is_active: true, ...params });
+      const response = await api.get(`/parents${queryString}`);
+      const list = response.data?.data || [];
+      return {
+        data: list.map(p => ({
+          value: p.id,
+          label: `${p.first_name} ${p.last_name}`.trim() || p.email || `Parent ${p.id}`,
+          email: p.email,
+        }))
+      };
+    } catch (error) {
+      console.error('Error fetching parent options:', error);
+      return { data: [] };
+    }
+  },
 };

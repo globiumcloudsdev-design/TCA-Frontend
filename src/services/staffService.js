@@ -6,6 +6,7 @@
  */
 
 import api from '@/lib/api';
+import { buildQuery } from '@/lib/utils';
 
 export const staffService = {
   // Get available roles for staff (from institute's assigned role)
@@ -58,4 +59,25 @@ export const staffService = {
   // Update staff permissions
   updatePermissions: (id, permissions) => 
     api.patch(`/staff/${id}/permissions`, { permissions }).then(r => r.data),
+
+  /**
+   * Get staff options for dropdown (no pagination)
+   */
+  getOptions: async (params = {}) => {
+    try {
+      const queryString = buildQuery({ limit: 200, is_active: true, ...params });
+      const response = await api.get(`/staff${queryString}`);
+      const list = response.data?.data || [];
+      return {
+        data: list.map(s => ({
+          value: s.id,
+          label: `${s.first_name} ${s.last_name}`.trim() || s.email || `Staff ${s.id}`,
+          email: s.email,
+        }))
+      };
+    } catch (error) {
+      console.error('Error fetching staff options:', error);
+      return { data: [] };
+    }
+  },
 };

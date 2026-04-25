@@ -80,7 +80,13 @@ export const studentPortalService = {
     api.get('/portal/student/leave-requests/statistics').then(unwrap),
 
   getLeaveBalance: () =>
-    api.get('/portal/student/leave-balance').then(unwrap)
+    api.get('/portal/student/leave-balance').then(unwrap),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // EVENTS
+  // ─────────────────────────────────────────────────────────────────────────
+  getMyEvents: () =>
+    api.get('/portal/student/events').then(unwrap),
 };
 
 export default studentPortalService;

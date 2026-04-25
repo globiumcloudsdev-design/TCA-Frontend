@@ -16,6 +16,7 @@ import {
   MultiSelectField,
   PageHeader,
   SelectField,
+  SwitchField,
   TableRowActions,
 } from '@/components/common';
 import TimePickerField from '@/components/common/TimePickerField';
@@ -23,7 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { classService, eventService, userService } from '@/services';
+import { classService, eventService, userService, staffService, teacherService, studentService, parentService } from '@/services';
 import { PERMISSIONS } from '@/constants';
 import { cn, formatDate } from '@/lib/utils';
 
@@ -38,12 +39,27 @@ const EVENT_TYPES = [
 ];
 
 const AUDIENCE_OPTIONS = [
+  { value: 'all', label: 'All (Everyone)' },
   { value: 'all_students', label: 'All Students' },
   { value: 'all_teachers', label: 'All Teachers' },
   { value: 'all_staff', label: 'All Staff' },
   { value: 'selected_classes', label: 'Selected Classes' },
   { value: 'custom_users', label: 'Custom Users' },
 ];
+
+const CUSTOM_USER_TYPE_OPTIONS = [
+  { value: 'STUDENT', label: 'Students' },
+  { value: 'TEACHER', label: 'Teachers' },
+  { value: 'STAFF', label: 'Staff' },
+  { value: 'PARENT', label: 'Parents' },
+];
+
+const USER_TYPE_SERVICE_MAP = {
+  STUDENT: studentService,
+  TEACHER: teacherService,
+  STAFF: staffService,
+  PARENT: parentService,
+};
 
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Draft' },
@@ -66,10 +82,13 @@ const schema = z.object({
   description: z.string().optional(),
   event_type: z.string().min(1, 'Event type is required'),
   date: z.string().min(1, 'Date is required'),
-  time: z.string().min(1, 'Time is required'),
+  has_time: z.boolean().default(false),
+  time: z.string().optional(),
   location: z.string().min(1, 'Location is required'),
   audience: z.string().min(1, 'Audience is required'),
   status: z.string().min(1, 'Status is required'),
+  attendance_enabled: z.boolean().default(false),
+  self_attendance_allowed: z.boolean().default(false),
   selected_classes: z.array(z.string()).optional(),
   custom_users: z.array(z.string()).optional(),
 }).superRefine((val, ctx) => {
@@ -88,6 +107,14 @@ const schema = z.object({
       message: 'Select at least one user',
     });
   }
+
+  if (val.has_time && (!val.time || val.time.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['time'],
+      message: 'Time is required when enabled',
+    });
+  }
 });
 
 const extractRows = (d) => d?.data?.rows ?? d?.data ?? [];
@@ -104,6 +131,7 @@ export default function EventsPage({ type }) {
     'fees.read',
     'calendar.events',
   ]);
+  
   const canCreate = canDoAny([PERMISSIONS.EVENT_CREATE, 'fees.create', 'calendar.events']);
   const canUpdate = canDoAny([PERMISSIONS.EVENT_UPDATE, 'fees.update', 'calendar.events']);
   const canDelete = canDoAny([PERMISSIONS.EVENT_DELETE, 'fees.delete', 'calendar.events']);
@@ -130,16 +158,39 @@ export default function EventsPage({ type }) {
       description: '',
       event_type: '',
       date: '',
+      has_time: false,
       time: '',
       location: '',
       audience: 'all_students',
       status: 'draft',
+      attendance_enabled: false,
+      self_attendance_allowed: false,
       selected_classes: [],
+      custom_user_type: '',
       custom_users: [],
     },
   });
 
   const selectedAudience = watch('audience');
+  const selectedCustomUserType = watch('custom_user_type');
+  const hasTime = watch('has_time');
+  const [customUserSearch, setCustomUserSearch] = useState('');
+
+  const { data: customUserOptionsData, isLoading: customUsersLoading } = useQuery({
+    queryKey: ['event-custom-users', selectedCustomUserType, customUserSearch],
+    queryFn: async () => {
+      if (!selectedCustomUserType) return { data: [] };
+      const service = USER_TYPE_SERVICE_MAP[selectedCustomUserType];
+      if (!service || !service.getOptions) return { data: [] };
+      const params = customUserSearch ? { search: customUserSearch } : {};
+      return service.getOptions(params);
+    },
+    enabled: selectedAudience === 'custom_users' && !!selectedCustomUserType && (createOpen || !!editing),
+  });
+
+  const customUserOptions = useMemo(() => {
+    return customUserOptionsData?.data || [];
+  }, [customUserOptionsData]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['events', type, page, pageSize, search, eventTypeFilter, audienceFilter, statusFilter, fromDate, toDate],
@@ -148,7 +199,7 @@ export default function EventsPage({ type }) {
       limit: pageSize,
       search: search || undefined,
       event_type: eventTypeFilter || undefined,
-      audience: audienceFilter || undefined,
+      audience_type: audienceFilter || undefined, // ✅ Backend expects audience_type
       status: statusFilter || undefined,
       from_date: fromDate || undefined,
       to_date: toDate || undefined,
@@ -233,9 +284,15 @@ export default function EventsPage({ type }) {
   const onSubmit = (vals) => {
     const payload = {
       ...vals,
+      audience_type: vals.audience, // ✅ Map frontend 'audience' to backend 'audience_type'
       selected_classes: vals.audience === 'selected_classes' ? vals.selected_classes : [],
       custom_users: vals.audience === 'custom_users' ? vals.custom_users : [],
+      // ✅ Time: send null when disabled, send value when enabled
+      time: vals.has_time ? vals.time : null,
     };
+    // Remove frontend-only fields
+    delete payload.audience;
+    delete payload.has_time;
 
     if (editing) {
       updateMutation.mutate({ id: editing.id, body: payload });
@@ -252,31 +309,42 @@ export default function EventsPage({ type }) {
       description: '',
       event_type: '',
       date: '',
+      has_time: false,
       time: '',
       location: '',
       audience: 'all_students',
       status: 'draft',
+      attendance_enabled: false,
+      self_attendance_allowed: false,
       selected_classes: [],
+      custom_user_type: '',
       custom_users: [],
     });
+    setCustomUserSearch('');
     setCreateOpen(true);
   };
 
   const openEdit = (event) => {
     setCreateOpen(false);
     setEditing(event);
+    const hasExistingTime = !!event.time;
     reset({
       event_name: event.event_name ?? '',
       description: event.description ?? '',
       event_type: event.event_type ?? '',
       date: event.date ?? '',
+      has_time: hasExistingTime,
       time: event.time ?? '',
       location: event.location ?? '',
-      audience: event.audience ?? 'all_students',
+      audience: event.audience_type ?? 'all_students',
       status: event.status ?? 'draft',
+      attendance_enabled: event.attendance_enabled ?? false,
+      self_attendance_allowed: event.self_attendance_allowed ?? false,
       selected_classes: (event.selected_classes ?? []).map(String),
+      custom_user_type: event.custom_user_type ?? '',
       custom_users: (event.custom_users ?? []).map(String),
     });
+    setCustomUserSearch('');
   };
 
   const columns = useMemo(() => [
@@ -306,7 +374,7 @@ export default function EventsPage({ type }) {
     },
     { accessorKey: 'location', header: 'Location' },
     {
-      accessorKey: 'audience',
+      accessorKey: 'audience_type',
       header: 'Audience',
       cell: ({ getValue }) => audienceLabel[getValue()] ?? getValue(),
     },
@@ -464,7 +532,7 @@ export default function EventsPage({ type }) {
         }}
       />
 
-      <AppModal open={createOpen || !!editing} onClose={() => { setCreateOpen(false); setEditing(null); }} title={editing ? 'Edit Event' : 'Create Event'} size="2xl">
+      <AppModal open={createOpen || !!editing} onClose={() => { setCreateOpen(false); setEditing(null); }} title={editing ? 'Edit Event' : 'Create Event'} size="xl">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-1">
           <div className="space-y-1.5">
             <Label>Event Name <span className="text-destructive">*</span></Label>
@@ -489,10 +557,19 @@ export default function EventsPage({ type }) {
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <DatePickerField label="Date" name="date" control={control} error={errors.date} required />
-            <div className="space-y-1.5">
-              <Label>Time <span className="text-destructive">*</span></Label>
-              <TimePickerField value={watch('time')} onChange={(v) => setValue('time', v)} mode="simple" />
-              {errors.time && <p className="text-xs text-destructive">{errors.time.message}</p>}
+            <div className="space-y-2">
+              <SwitchField
+                label="Set Event Time"
+                name="has_time"
+                control={control}
+                hint="Enable to specify a start time"
+              />
+              {hasTime && (
+                <div className="space-y-1.5">
+                  <TimePickerField value={watch('time')} onChange={(v) => setValue('time', v)} mode="simple" />
+                  {errors.time && <p className="text-xs text-destructive">{errors.time.message}</p>}
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Location <span className="text-destructive">*</span></Label>
@@ -502,6 +579,21 @@ export default function EventsPage({ type }) {
           </div>
 
           <SelectField label="Audience" name="audience" control={control} error={errors.audience} options={AUDIENCE_OPTIONS} required />
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <SwitchField
+              label="Attendance Enabled"
+              name="attendance_enabled"
+              control={control}
+              hint="Enable to track attendance for this event"
+            />
+            <SwitchField
+              label="Self Attendance Allowed"
+              name="self_attendance_allowed"
+              control={control}
+              hint="Allow users to mark their own attendance"
+            />
+          </div>
 
           {selectedAudience === 'selected_classes' && (
             <MultiSelectField
@@ -516,15 +608,47 @@ export default function EventsPage({ type }) {
           )}
 
           {selectedAudience === 'custom_users' && (
-            <MultiSelectField
-              label="Custom Users"
-              name="custom_users"
-              control={control}
-              options={usersOptions}
-              required
-              error={errors.custom_users?.message}
-              placeholder="Select users"
-            />
+            <div className="space-y-3 rounded-lg border p-3">
+              <p className="text-sm font-medium">Custom Users</p>
+              {/* Step 1: Select User Type */}
+              <SelectField
+                label="User Type"
+                name="custom_user_type"
+                control={control}
+                error={errors.custom_user_type}
+                options={CUSTOM_USER_TYPE_OPTIONS}
+                required
+              />
+
+              {/* Step 2: Search Users */}
+              {selectedCustomUserType && (
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-2">
+                    Search {CUSTOM_USER_TYPE_OPTIONS.find(o => o.value === selectedCustomUserType)?.label}
+                    {customUsersLoading && <span className="text-xs text-muted-foreground">(loading...)</span>}
+                  </Label>
+                  <Input
+                    type="text"
+                    placeholder={`Search ${CUSTOM_USER_TYPE_OPTIONS.find(o => o.value === selectedCustomUserType)?.label?.toLowerCase()} by name...`}
+                    value={customUserSearch}
+                    onChange={(e) => setCustomUserSearch(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {/* Step 3: MultiSelect with fetched options */}
+              {selectedCustomUserType && (
+                <MultiSelectField
+                  label={`Select ${CUSTOM_USER_TYPE_OPTIONS.find(o => o.value === selectedCustomUserType)?.label}`}
+                  name="custom_users"
+                  control={control}
+                  options={customUserOptions}
+                  required
+                  error={errors.custom_users?.message}
+                  placeholder={customUsersLoading ? 'Loading...' : `Select ${CUSTOM_USER_TYPE_OPTIONS.find(o => o.value === selectedCustomUserType)?.label?.toLowerCase()}`}
+                />
+              )}
+            </div>
           )}
 
           <div className="flex justify-end gap-2 pt-2">
@@ -551,7 +675,7 @@ export default function EventsPage({ type }) {
               <Info label="Date" value={formatDate(viewing.date)} />
               <Info label="Time" value={viewing.time || '-'} />
               <Info label="Location" value={viewing.location || '-'} />
-              <Info label="Audience" value={audienceLabel[viewing.audience] ?? viewing.audience} />
+              <Info label="Audience" value={audienceLabel[viewing.audience_type] ?? viewing.audience_type} />
             </div>
             <Info label="Description" value={viewing.description || '-'} />
           </div>

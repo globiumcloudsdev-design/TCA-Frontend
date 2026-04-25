@@ -189,4 +189,25 @@ export const studentService = {
    */
   bulkPromoteStudents: (data) =>
     api.post('/students/bulk-promote', data).then((r) => r.data),
+
+  /**
+   * Get student options for dropdown (no pagination)
+   */
+  getOptions: async (params = {}) => {
+    try {
+      const normalized = normalizeFilters({ limit: 200, is_active: true, ...params }, 'school');
+      const response = await api.get(`/students${buildQuery(normalized)}`);
+      const list = response.data?.data || [];
+      return {
+        data: list.map(s => ({
+          value: s.id,
+          label: `${s.first_name} ${s.last_name}`.trim() || s.registration_no || `Student ${s.id}`,
+          registration_no: s.registration_no,
+        }))
+      };
+    } catch (error) {
+      console.error('Error fetching student options:', error);
+      return { data: [] };
+    }
+  },
 };

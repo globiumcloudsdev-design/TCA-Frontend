@@ -237,6 +237,12 @@ export const teacherPortalService = {
   getMyPayslipById: (id) => api.get(`/portal/teacher/payroll/${id}`).then(unwrap),
 
   getMyPayrollYears: () => api.get("/portal/teacher/payroll/years").then(unwrap),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // EVENTS
+  // ─────────────────────────────────────────────────────────────────────────
+  getMyEvents: () =>
+    api.get("/portal/teacher/events").then(unwrap),
 };
 
 export default teacherPortalService;
