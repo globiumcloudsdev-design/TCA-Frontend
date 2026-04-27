@@ -67,7 +67,11 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/auth/login')
+    ) {
       if (isRefreshing) {
         // Queue all requests that come in while refresh is in progress
         return new Promise((resolve, reject) => {
@@ -85,7 +89,7 @@ api.interceptors.response.use(
 
       try {
         const { data } = await axios.post(
-          `${BASE_URL}/auth/refresh`,
+          `${BASE_URL}/auth/refresh-token`,
           {},
           { withCredentials: true }
         );

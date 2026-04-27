@@ -23,6 +23,7 @@ export default function FormSubmitButton({
   className,
   variant = 'default',
   disabled,
+  ...props
 }) {
   return (
     <Button
@@ -30,6 +31,7 @@ export default function FormSubmitButton({
       variant={variant}
       disabled={loading || disabled}
       className={cn('min-w-[100px]', className)}
+      {...props}
     >
       {loading && <Loader2 size={14} className="mr-2 animate-spin" />}
       {loading ? loadingLabel : label}

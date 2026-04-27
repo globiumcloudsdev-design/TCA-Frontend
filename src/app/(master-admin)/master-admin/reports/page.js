@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -9,15 +9,12 @@ import {
 } from 'lucide-react';
 
 import {
-  DUMMY_REVENUE_REPORT,
-  DUMMY_SUBSCRIPTION_REPORT,
-  DUMMY_INSTITUTES_REPORT,
-  DUMMY_USER_ACTIVITY,
   REPORT_SUMMARY,
 } from '@/data/masterAdminDummyData';
 import { PageHeader, DataTable } from '@/components/common';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { masterAdminService } from '@/services/masterAdminService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtDate   = (v) => v ? new Date(v).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -259,24 +256,27 @@ function usePaginatedTable(data, searchFields = []) {
 }
 
 // ─── Tab components ───────────────────────────────────────────────────────────
-function RevenueTab() {
-  const tbl = usePaginatedTable(DUMMY_REVENUE_REPORT, ['institute', 'plan', 'status', 'month']);
+function RevenueTab({ data = [] }) {
+  const finalData = data.length ? data : [];
+  const tbl = usePaginatedTable(finalData, ['institute', 'plan', 'status', 'month']);
 
   // Build chart data from full dataset
   const chartData = useMemo(() => {
     const map = {};
-    DUMMY_REVENUE_REPORT.forEach(({ month, amount }) => {
+    finalData.forEach(({ month, amount }) => {
       if (!map[month]) map[month] = { month, Revenue: 0 };
       map[month].Revenue += amount;
     });
     return Object.values(map).sort((a, b) => a.month.localeCompare(b.month));
-  }, []);
+  }, [finalData]);
 
   return (
     <div className="space-y-4">
       {/* Mini chart */}
       <div className="rounded-xl border bg-white p-4 shadow-sm">
-        <p className="text-sm font-semibold text-slate-700 mb-3">Monthly Revenue (Dummy Preview)</p>
+        <p className="text-sm font-semibold text-slate-700 mb-3">
+          {data.length ? 'Monthly Revenue Breakdown' : 'Monthly Revenue (Dummy Preview)'}
+        </p>
         <ResponsiveContainer width="100%" height={180}>
           <BarChart data={chartData} barSize={28}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -303,8 +303,9 @@ function RevenueTab() {
   );
 }
 
-function SubscriptionsTab() {
-  const tbl = usePaginatedTable(DUMMY_SUBSCRIPTION_REPORT, ['institute', 'plan', 'status']);
+function SubscriptionsTab({ data = [] }) {
+  const finalData = data.length ? data : [];
+  const tbl = usePaginatedTable(finalData, ['institute', 'plan', 'status']);
   return (
     <DataTable
       columns={SUBSCRIPTION_COLUMNS}
@@ -320,8 +321,9 @@ function SubscriptionsTab() {
   );
 }
 
-function InstitutesTab() {
-  const tbl = usePaginatedTable(DUMMY_INSTITUTES_REPORT, ['name', 'city', 'plan', 'type', 'status']);
+function InstitutesTab({ data = [] }) {
+  const finalData = data.length ? data : [];
+  const tbl = usePaginatedTable(finalData, ['name', 'city', 'plan', 'type', 'status']);
   return (
     <DataTable
       columns={INSTITUTES_COLUMNS}
@@ -337,8 +339,9 @@ function InstitutesTab() {
   );
 }
 
-function UserActivityTab() {
-  const tbl = usePaginatedTable(DUMMY_USER_ACTIVITY, ['name', 'role', 'institute', 'status']);
+function UserActivityTab({ data = [] }) {
+  const finalData = data.length ? data : [];
+  const tbl = usePaginatedTable(finalData, ['name', 'role', 'institute', 'status']);
   return (
     <DataTable
       columns={USER_ACTIVITY_COLUMNS}
@@ -365,8 +368,8 @@ const SUMMARY_CARDS = [
     fmt:   fmtCcy,
   },
   {
-    key:   'total_revenue_ytd',
-    label: 'Revenue (YTD)',
+    key:   'prev_month_revenue',
+    label: 'Revenue (Prev Month)',
     icon:  TrendingUp,
     bg:    'bg-blue-50',
     color: 'text-blue-600',
@@ -378,14 +381,6 @@ const SUMMARY_CARDS = [
     icon:  Building2,
     bg:    'bg-violet-50',
     color: 'text-violet-600',
-    fmt:   (v) => v,
-  },
-  {
-    key:   'expiring_subs',
-    label: 'Expiring Soon',
-    icon:  CalendarDays,
-    bg:    'bg-amber-50',
-    color: 'text-amber-600',
     fmt:   (v) => v,
   },
   {
@@ -408,6 +403,114 @@ const SUMMARY_CARDS = [
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function ReportsPage() {
+  const [reportsData, setReportsData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const [revenueList, setRevenueList] = useState([]);
+  const [subscriptionsList, setSubscriptionsList] = useState([]);
+  const [institutesList, setInstitutesList] = useState([]);
+  const [usersList, setUsersList] = useState([]);
+
+  useEffect(() => {
+    const loadReports = async () => {
+      try {
+        setLoading(true);
+        const data = await masterAdminService.getReports();
+        setReportsData(data);
+      } catch (e) {
+        console.error('Failed to load master admin reports:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadReports();
+  }, []);
+
+  useEffect(() => {
+    const loadAllData = async () => {
+      try {
+        // 1. Invoices
+        const invRes = await masterAdminService.getAllInvoices({ limit: 100 });
+        const invRows = invRes?.data?.rows ?? invRes?.rows ?? invRes?.data ?? invRes ?? [];
+        
+        if (Array.isArray(invRows)) {
+          const revData = invRows.map(inv => ({
+            id: inv.id,
+            institute: inv.institute?.institute_name || 'Unknown',
+            type: inv.institute?.type?.name || 'School',
+            plan: inv.plan?.name || 'Standard',
+            amount: parseFloat(inv.total_amount) || 0,
+            month: new Date(inv.period_start || inv.created_at).toLocaleString('en-US', { month: 'short', year: 'numeric' }),
+            status: inv.status,
+            paid_on: inv.paid_at || inv.created_at,
+          }));
+          setRevenueList(revData);
+
+          const subData = invRows.map(inv => ({
+            id: inv.id,
+            institute: inv.institute?.institute_name || 'Unknown',
+            plan: inv.plan?.name || 'Standard',
+            start: inv.period_start,
+            expires: inv.period_end,
+            status: inv.status === 'PAID' ? 'active' : inv.status === 'OVERDUE' ? 'expired' : 'trial',
+            amount: parseFloat(inv.total_amount) || 0
+          }));
+          setSubscriptionsList(subData);
+        }
+
+        // 2. Institutes
+        const instRes = await masterAdminService.getSchools({ limit: 100 });
+        const instRows = instRes?.data?.rows ?? instRes?.rows ?? instRes?.data ?? instRes ?? [];
+        if (Array.isArray(instRows)) {
+          const mappedInst = instRows.map(inst => ({
+            id: inst.id,
+            name: inst.institute_name || 'Unknown',
+            type: inst.type?.name || 'School',
+            city: inst.institute_city || '—',
+            plan: inst.plan?.name || 'Standard',
+            students: inst.student_count || 0,
+            teachers: inst.teacher_count || 0,
+            branches: inst.branch_count || 1,
+            status: inst.is_active ? 'active' : 'inactive',
+            joined: inst.created_at
+          }));
+          setInstitutesList(mappedInst);
+        }
+
+        // 3. Users
+        const userRes = await masterAdminService.getUsers({ limit: 100 });
+        const userRows = userRes?.data?.rows ?? userRes?.rows ?? userRes?.data ?? userRes ?? [];
+        if (Array.isArray(userRows)) {
+          const mappedUsers = userRows.map(u => ({
+            id: u.id,
+            name: `${u.first_name} ${u.last_name || ''}`,
+            email: u.email,
+            role: u.user_type,
+            institute: u.institute?.institute_name || 'Platform Admin',
+            logins: u.login_count || 1,
+            last_login: u.last_login_at || u.created_at,
+            status: u.is_active ? 'active' : 'inactive'
+          }));
+          setUsersList(mappedUsers);
+        }
+      } catch (e) {
+        console.error('Failed to fetch real lists data', e);
+      }
+    };
+    loadAllData();
+  }, []);
+
+  const liveSummary = useMemo(() => {
+    if (!reportsData) return REPORT_SUMMARY;
+    return {
+      total_revenue_mtd: reportsData.thisMonthRevenue || 0,
+      prev_month_revenue: reportsData.prevMonthRevenue || 0,
+      active_institutes: reportsData.activeInstitutes || 0,
+      overdue_payments: reportsData.overduePayments || 0,
+      new_institutes_mtd: reportsData.newInstitutesMTD || 0
+    };
+  }, [reportsData]);
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -416,7 +519,7 @@ export default function ReportsPage() {
       />
 
       {/* Summary strip */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {SUMMARY_CARDS.map((c) => (
           <div key={c.key} className="flex items-center gap-2 rounded-xl border bg-white p-3 shadow-sm">
             <div className={cn('rounded-lg p-2 shrink-0', c.bg)}>
@@ -424,7 +527,7 @@ export default function ReportsPage() {
             </div>
             <div className="min-w-0">
               <p className="text-sm font-extrabold leading-none text-slate-800 truncate">
-                {c.fmt(REPORT_SUMMARY[c.key])}
+                {c.fmt(liveSummary[c.key] ?? 0)}
               </p>
               <p className="text-[10px] text-muted-foreground leading-tight mt-0.5 line-clamp-2">
                 {c.label}
@@ -433,6 +536,51 @@ export default function ReportsPage() {
           </div>
         ))}
       </div>
+
+      {/* Dynamic Analytics Block (When Real Data Loaded) */}
+      {reportsData && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Revenue by Plan Breakdown */}
+          <div className="rounded-2xl border bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-800 mb-4">Revenue Breakdown by Plan</h3>
+            {reportsData.planBreakdown?.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-8">No breakdown available</p>
+            ) : (
+              <div className="space-y-3">
+                {reportsData.planBreakdown.map((p, i) => (
+                  <div key={i} className="flex justify-between items-center border-b border-slate-100 pb-2 last:border-none last:pb-0">
+                    <div>
+                      <p className="text-xs font-bold text-slate-700">{p.plan_name}</p>
+                      <p className="text-[10px] text-slate-400">{p.count} Transactions</p>
+                    </div>
+                    <span className="font-extrabold text-sm text-slate-800">{fmtCcy(p.total)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Revenue by Institute Breakdown */}
+          <div className="rounded-2xl border bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-800 mb-4">Revenue by Institute</h3>
+            {reportsData.instituteBreakdown?.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-8">No breakdown available</p>
+            ) : (
+              <div className="space-y-3">
+                {reportsData.instituteBreakdown.map((inst, i) => (
+                  <div key={i} className="flex justify-between items-center border-b border-slate-100 pb-2 last:border-none last:pb-0">
+                    <div>
+                      <p className="text-xs font-bold text-slate-700">{inst.institute_name}</p>
+                      <p className="text-[10px] text-slate-400">{inst.count} Transactions</p>
+                    </div>
+                    <span className="font-extrabold text-sm text-emerald-600">{fmtCcy(inst.total)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <Tabs defaultValue="revenue" className="w-full">
@@ -444,19 +592,19 @@ export default function ReportsPage() {
         </TabsList>
 
         <TabsContent value="revenue">
-          <RevenueTab />
+          <RevenueTab data={revenueList} />
         </TabsContent>
 
         <TabsContent value="subscriptions">
-          <SubscriptionsTab />
+          <SubscriptionsTab data={subscriptionsList} />
         </TabsContent>
 
         <TabsContent value="institutes">
-          <InstitutesTab />
+          <InstitutesTab data={institutesList} />
         </TabsContent>
 
         <TabsContent value="users">
-          <UserActivityTab />
+          <UserActivityTab data={usersList} />
         </TabsContent>
       </Tabs>
     </div>

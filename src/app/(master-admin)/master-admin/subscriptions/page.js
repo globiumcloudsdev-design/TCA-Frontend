@@ -5,12 +5,12 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Receipt, RefreshCw, CheckCircle2, AlertTriangle,
-  TrendingUp, X, Loader2, Building2, FileText, CreditCard,
+  TrendingUp, X, Loader2, Building2, FileText, CreditCard, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { masterAdminService } from '@/services';
-import { PageHeader, AppModal, StatsCard, DataTable, SelectField } from '@/components/common';
+import { PageHeader, AppModal, StatsCard, DataTable, SelectField, ConfirmDialog } from '@/components/common';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -61,6 +61,9 @@ export default function MasterAdminInvoicesPage() {
     payment_reference: '',
     notes: '',
   });
+  const [selectedInvoices, setSelectedInvoices] = useState([]);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   // react-hook-form for SelectField
   const { control, watch, reset } = useForm({
@@ -101,6 +104,36 @@ export default function MasterAdminInvoicesPage() {
     },
     onError: (e) => toast.error(e?.response?.data?.message ?? e.message ?? 'Failed'),
   });
+
+  // ── Invoice Deletions ─────────────────────────────────────────────────────
+  const deleteInvoiceMutation = useMutation({
+    mutationFn: (id) => masterAdminService.deleteInvoice(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['all-invoices'] });
+      toast.success('Invoice deleted successfully 🗑️');
+      setSelectedInvoices([]);
+    },
+    onError: (e) => toast.error(e?.response?.data?.message ?? e.message ?? 'Failed to delete invoice'),
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids) => masterAdminService.bulkDeleteInvoices(ids),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['all-invoices'] });
+      toast.success('Selected invoices deleted successfully 🗑️');
+      setSelectedInvoices([]);
+    },
+    onError: (e) => toast.error(e?.response?.data?.message ?? e.message ?? 'Failed to delete invoices'),
+  });
+
+  const handleDelete = (inv) => {
+    setDeleteTarget(inv);
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedInvoices.length === 0) return;
+    setBulkDeleteOpen(true);
+  };
 
   const openPayModal = (inv) => {
     setPayModal(inv);
@@ -212,18 +245,30 @@ export default function MasterAdminInvoicesPage() {
       id: 'actions',
       header: '',
       enableHiding: false,
-      cell: ({ row: { original: inv } }) =>
-        inv.status !== 'PAID' && inv.status !== 'CANCELLED' ? (
+      cell: ({ row: { original: inv } }) => (
+        <div className="flex items-center gap-1.5 justify-end">
+          {inv.status !== 'PAID' && inv.status !== 'CANCELLED' && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs gap-1 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+              onClick={() => openPayModal(inv)}
+            >
+              <CreditCard size={11} />
+              Mark Paid
+            </Button>
+          )}
           <Button
             size="sm"
-            variant="outline"
-            className="h-7 text-xs gap-1 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-            onClick={() => openPayModal(inv)}
+            variant="ghost"
+            className="h-7 text-xs px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+            onClick={() => handleDelete(inv)}
+            disabled={deleteInvoiceMutation.isPending}
           >
-            <CreditCard size={11} />
-            Mark Paid
+            <Trash2 size={12} />
           </Button>
-        ) : null,
+        </div>
+      ),
     },
   ], []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -286,6 +331,24 @@ export default function MasterAdminInvoicesPage() {
         columns={columns}
         data={invoices}
         loading={isLoading || isFetching}
+        enableRowSelection
+        onRowSelectionChange={setSelectedInvoices}
+        selectionActions={
+          <Button
+            size="sm"
+            variant="destructive"
+            className="h-9 gap-1 text-xs font-medium bg-red-600 hover:bg-red-700 text-white shadow-sm"
+            onClick={() => handleBulkDelete()}
+            disabled={bulkDeleteMutation.isPending}
+          >
+            {bulkDeleteMutation.isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Trash2 size={14} />
+            )}
+            Delete Selected
+          </Button>
+        }
         enableColumnVisibility
         exportConfig={{ fileName: 'invoices', dateField: 'created_at' }}
         filters={[
@@ -428,6 +491,37 @@ export default function MasterAdminInvoicesPage() {
           </div>
         </AppModal>
       )}
+
+      {/* ── Delete Confirm ── */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          deleteInvoiceMutation.mutate(deleteTarget.id);
+          setDeleteTarget(null);
+        }}
+        loading={deleteInvoiceMutation.isPending}
+        title="🗑️ Delete Invoice"
+        description={`Permanently delete invoice "${deleteTarget?.invoice_number ?? deleteTarget?.id}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+      />
+
+      {/* ── Bulk Delete Confirm ── */}
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        onConfirm={() => {
+          const ids = selectedInvoices.map((inv) => inv.id);
+          bulkDeleteMutation.mutate(ids);
+          setBulkDeleteOpen(false);
+        }}
+        loading={bulkDeleteMutation.isPending}
+        title="🗑️ Delete Selected Invoices"
+        description={`Permanently delete ${selectedInvoices.length} selected invoices? This action cannot be undone.`}
+        confirmLabel="Delete All"
+        variant="destructive"
+      />
     </div>
   );
 }

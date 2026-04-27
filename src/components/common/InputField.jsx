@@ -23,6 +23,8 @@
  *     required
  *   />
  */
+import { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -40,6 +42,10 @@ export default function InputField({
   hint,
   ...props
 }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === 'password';
+  const inputType = isPassword ? (showPassword ? 'text' : 'password') : type;
+
   return (
     <div className={cn('space-y-1.5', className)}>
       {label && (
@@ -49,15 +55,28 @@ export default function InputField({
         </Label>
       )}
 
-      <Input
-        id={name}
-        name={name}
-        type={type}
-        placeholder={placeholder}
-        disabled={disabled}
-        aria-invalid={!!error}
-        {...(register ? register(name) : props)}
-      />
+      <div className="relative">
+        <Input
+          id={name}
+          name={name}
+          type={inputType}
+          placeholder={placeholder}
+          disabled={disabled}
+          aria-invalid={!!error}
+          className={cn(isPassword && "pr-10")}
+          {...(register ? register(name) : props)}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+            onClick={() => setShowPassword(!showPassword)}
+            tabIndex={-1}
+          >
+            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        )}
+      </div>
 
       {hint && !error && (
         <p className="text-xs text-muted-foreground">{hint}</p>

@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
   Building2, Users, TrendingUp,
@@ -11,9 +13,7 @@ import {
   Tooltip, PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import { masterAdminService } from '@/services';
-import {
-  REVENUE_TREND, PIE_DATA, TOP_INSTITUTES, ACTIVITIES, QUICK_ACTIONS,
-} from '@/data/masterAdminDummyData';
+import { QUICK_ACTIONS } from '@/data/masterAdminDummyData';
 import { PageHeader, StatsCard } from '@/components/common';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,13 +22,12 @@ import useAuthStore from '@/store/authStore';
 
 const fmtPKR = (n) => `₨ ${(n / 100000).toFixed(2)}L`;
 
-// ── Custom tooltip for line chart ────────────────────────────────────────
-function CustomTooltip({ active, payload, label }) {
+function CustomGrowthTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-xl border bg-white px-3 py-2 shadow-lg text-xs">
       <p className="font-semibold text-slate-700 mb-1">{label}</p>
-      <p className="text-emerald-600">Revenue: {fmtPKR(payload[0].value)}</p>
+      <p className="text-emerald-600">Institutes: {payload[0].value}</p>
     </div>
   );
 }
@@ -36,30 +35,48 @@ function CustomTooltip({ active, payload, label }) {
 export default function MasterAdminDashboard() {
   const user  = useAuthStore((s) => s.user);
   const canDo = useAuthStore((s) => s.canDo);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ['master-stats'],
     queryFn:  () => masterAdminService.getStats(),
+    enabled: !!(mounted && canDo('report.platform_overview')),
   });
 
   const STAT_CARDS = [
     {
-      label: 'Total Institutes', value: stats?.total_schools ?? 245,
-      sub: '↑ 8 new this month', icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50',
+      label: 'Total Institutes', value: stats?.overview?.total_institutes ?? 0,
+      sub: 'Total registered on platform', icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50',
     },
     {
-      label: 'Active', value: stats?.active_schools ?? 198,
-      sub: '82% of total', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50',
+      label: 'Active', value: stats?.overview?.active_institutes ?? 0,
+      sub: `${stats?.overview?.active_percentage ?? 0}% of total`, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50',
     },
     {
-      label: 'Revenue (Mar)', value: '₨ 31L',
-      sub: '+12.5% vs last month', icon: TrendingUp, color: 'text-violet-600', bg: 'bg-violet-50',
+      label: 'Revenue (Month)', value: `₨ ${(stats?.revenue?.current_month || 0).toLocaleString()}`,
+      sub: `${stats?.revenue?.growth_percentage >= 0 ? '+' : ''}${stats?.revenue?.growth_percentage ?? 0}% vs last month`, icon: TrendingUp, color: 'text-violet-600', bg: 'bg-violet-50',
     },
     {
-      label: 'Platform Users', value: stats?.total_users ?? 1240,
+      label: 'Platform Users', value: stats?.users?.total_users ?? 0,
       sub: 'Across all institutes', icon: Users, color: 'text-amber-600', bg: 'bg-amber-50',
     },
   ];
+
+  const growthData = stats?.growth_chart?.months?.map((m, i) => ({
+    month: m,
+    institutes: stats.growth_chart.counts[i]
+  })) || [];
+
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+  const pieData = stats?.type_distribution?.map((t, i) => ({
+    name: t.type_name || 'Other',
+    value: t.count,
+    color: COLORS[i % COLORS.length]
+  })) || [];
 
   const visibleQuickActions = QUICK_ACTIONS.filter((qa) => {
     const permMap = {
@@ -76,6 +93,10 @@ export default function MasterAdminDashboard() {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
 
+  if (!mounted) {
+    return <div className="h-full w-full flex items-center justify-center p-8 text-muted-foreground animate-pulse">Loading dashboard...</div>;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -84,9 +105,9 @@ export default function MasterAdminDashboard() {
         description={`Welcome back, ${user?.first_name ?? 'Admin'}! — ${today}`}
         action={
           canDo('institute.create') && (
-            <a href="/master-admin/schools">
+            <Link href="/master-admin/institutes">
               <Button size="sm" className="gap-1.5"><Plus size={14} /> New Institute</Button>
-            </a>
+            </Link>
           )
         }
       />
@@ -112,14 +133,14 @@ export default function MasterAdminDashboard() {
         {/* Line chart */}
         {canDo('report.revenue') && (
           <div className="lg:col-span-2 rounded-2xl border bg-white p-5 shadow-sm">
-            <p className="font-bold text-slate-800 mb-4">📈 Revenue Trend (Last 6 Months)</p>
+            <p className="font-bold text-slate-800 mb-4">📈 Institute Growth (Last 6 Months)</p>
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={REVENUE_TREND} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
+              <LineChart data={growthData} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={(v) => `${(v/100000).toFixed(0)}L`} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: '#10b981' }} activeDot={{ r: 6 }} />
+                <YAxis tickFormatter={(v) => v} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomGrowthTooltip />} />
+                <Line type="monotone" dataKey="institutes" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: '#10b981' }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -131,22 +152,22 @@ export default function MasterAdminDashboard() {
             <p className="font-bold text-slate-800 mb-3">🥧 Institute Types</p>
             <ResponsiveContainer width="100%" height={160}>
               <PieChart>
-                <Pie data={PIE_DATA} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
-                  {PIE_DATA.map((entry) => (
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
+                  {pieData.map((entry) => (
                     <Cell key={entry.name} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v) => `${v}%`} />
+                <Tooltip formatter={(v) => `${v} institutes`} />
               </PieChart>
             </ResponsiveContainer>
             <div className="mt-2 space-y-1">
-              {PIE_DATA.map((d) => (
+              {pieData.map((d) => (
                 <div key={d.name} className="flex items-center justify-between text-xs">
                   <span className="flex items-center gap-1.5">
                     <span className="inline-block h-2 w-2 rounded-full" style={{ background: d.color }} />
                     <span className="text-slate-600">{d.name}</span>
                   </span>
-                  <span className="font-semibold text-slate-700">{d.value}%</span>
+                  <span className="font-semibold text-slate-700">{d.value}</span>
                 </div>
               ))}
             </div>
@@ -159,46 +180,48 @@ export default function MasterAdminDashboard() {
         {/* Top institutes */}
         {canDo('report.institute_wise') && (
           <div className="rounded-2xl border bg-white p-5 shadow-sm">
-            <p className="font-bold text-slate-800 mb-4">📊 Top Performing Institutes</p>
+            <p className="font-bold text-slate-800 mb-4">🏫 Recent Institutes</p>
             <div className="space-y-3">
-              {TOP_INSTITUTES.map((inst, idx) => (
-                <div key={inst.name} className="flex items-center gap-3">
+              {stats?.recent_institutes?.slice(0, 5).map((inst, idx) => (
+                <div key={inst.id} className="flex items-center gap-3">
                   <span className="text-xs font-bold text-muted-foreground w-4">{idx + 1}.</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-800 truncate">{inst.name}</p>
-                    <p className="text-xs text-muted-foreground">{inst.revenue}</p>
+                    <p className="text-xs text-muted-foreground">{inst.type || 'N/A'}</p>
                   </div>
                   <span className={cn(
                     'flex items-center gap-0.5 text-[11px] font-semibold',
-                    inst.change >= 0 ? 'text-emerald-600' : 'text-red-500',
+                    inst.status === 'active' ? 'text-emerald-600' : 'text-slate-500',
                   )}>
-                    {inst.change >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                    {Math.abs(inst.change)}%
+                    {inst.status === 'active' ? 'Active' : 'Inactive'}
                   </span>
                 </div>
               ))}
+              {!stats?.recent_institutes?.length && <p className="text-xs text-muted-foreground">No recent institutes.</p>}
             </div>
           </div>
         )}
 
-        {/* Activity feed */}
-        {canDo('platform.audit_logs') && (
+        {/* Recent Invoices */}
+        {canDo('subscription.read') && (
           <div className="rounded-2xl border bg-white p-5 shadow-sm">
-            <p className="font-bold text-slate-800 mb-4">🔔 Recent Activities</p>
+            <p className="font-bold text-slate-800 mb-4">💳 Recent Invoices</p>
             <div className="space-y-3">
-              {ACTIVITIES.map((a, i) => (
-                <div key={i} className="flex gap-2.5">
+              {stats?.recent_invoices?.slice(0, 5).map((inv, i) => (
+                <div key={inv.id} className="flex items-center gap-2.5">
                   <span className={cn(
                     'mt-0.5 flex-shrink-0 h-2 w-2 rounded-full',
-                    a.type === 'success' ? 'bg-emerald-500' :
-                    a.type === 'warning' ? 'bg-amber-500' : 'bg-blue-400',
+                    inv.status === 'PAID' ? 'bg-emerald-500' :
+                    inv.status === 'PENDING' ? 'bg-amber-500' : 'bg-red-400',
                   )} />
-                  <div>
-                    <p className="text-xs text-slate-700 leading-snug">{a.text}</p>
-                    <p className="text-[10px] text-muted-foreground">{a.time}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-slate-700 leading-snug truncate">{inv.institute}</p>
+                    <p className="text-[10px] text-muted-foreground">{inv.invoice_number}</p>
                   </div>
+                  <span className="text-xs font-bold text-slate-700">₨ {inv.amount?.toLocaleString()}</span>
                 </div>
               ))}
+              {!stats?.recent_invoices?.length && <p className="text-xs text-muted-foreground">No recent invoices.</p>}
             </div>
           </div>
         )}

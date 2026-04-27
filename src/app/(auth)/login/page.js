@@ -109,7 +109,7 @@ export default function LoginPage() {
 
     toast.success(`Welcome, ${user.first_name}!`);
     const role = user.user_type;
-    if (role === 'MASTER_ADMIN') router.replace('/master-admin');
+    if (['MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPPORT_STAFF'].includes(role)) router.replace('/master-admin');
     else if (role === 'INSTITUTE_ADMIN' || role === 'STAFF') router.replace(`/${instType}/dashboard`);
     else if (role === 'TEACHER') router.replace('/teacher');
     else if (role === 'STUDENT') router.replace('/student');

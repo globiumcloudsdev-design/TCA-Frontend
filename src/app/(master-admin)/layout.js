@@ -16,8 +16,8 @@ import { toast } from 'sonner';
 import Cookies from 'js-cookie';
 
 import useAuthStore from '@/store/authStore';
-import { authService } from '@/services';
-import { DUMMY_INSTITUTES_REPORT } from '@/data/masterAdminDummyData';
+import { useQuery } from '@tanstack/react-query';
+import { masterAdminService } from '@/services';
 import {
   AppModal, InputField, SelectField, TextareaField, FormSubmitButton, DatePickerField,
 } from '@/components/common';
@@ -28,20 +28,11 @@ const NAV = [
   { href: '/master-admin/roles',                  label: 'Roles',           icon: ShieldCheck,     perm: 'platform_role.read'     },
   { href: '/master-admin/subscription-templates', label: 'Sub. Templates',  icon: FileText,        perm: 'sub_template.read'      },
   { href: '/master-admin/institutes',                label: 'Institutes',      icon: Building2,       perm: 'institute.read'         },
-  // { href: '/master-admin/users',                  label: 'Users',           icon: Users,           perm: 'platform_user.read'     },
   { href: '/master-admin/subscriptions',          label: 'Invoices',   icon: CreditCard,      perm: 'subscription.read'      },
-  { href: '/master-admin/emails',                 label: 'Bulk Emails',     icon: Mail,            perm: 'email.view_history'     },
+  { href: '/master-admin/users',                  label: 'Users',           icon: Users,           perm: 'platform_user.read'     },
   { href: '/master-admin/reports',                label: 'Reports',         icon: BarChart3,       perm: 'report.platform_overview'},
+  { href: '/master-admin/emails',                 label: 'Bulk Emails',     icon: Mail,            perm: 'email.view_history'     },
   { href: '/master-admin/notifications',          label: 'Notifications',   icon: BellRing,        perm: 'notification.broadcast' },
-];
-
-// ── Notification recipient options ──────────────────────────────────────────
-const NOTIF_RECIPIENT_OPTIONS = [
-  { value: 'all', label: 'All Institutes' },
-  ...DUMMY_INSTITUTES_REPORT.map((i) => ({
-    value: i.id.toString(),
-    label: `${i.name} — ${i.city}`,
-  })),
 ];
 
 const NOTIF_TYPE_OPTIONS = [
@@ -69,6 +60,22 @@ export default function MasterAdminLayout({ children }) {
   // Delay permission-filtering until after hydration so server HTML matches
   // first client render (Zustand reads localStorage only on client).
   useEffect(() => { setMounted(true); }, []);
+
+  // Route Protection: Prevent manual URL navigation to unauthorized pages
+  useEffect(() => {
+    if (!mounted) return;
+    
+    const currentNav = NAV.find((n) => 
+      n.href !== '/master-admin' 
+        ? pathname.startsWith(n.href) 
+        : pathname === '/master-admin'
+    );
+
+    if (currentNav && currentNav.perm && !canDo(currentNav.perm)) {
+      toast.error('Access Denied: You do not have permission to view this page');
+      router.replace('/master-admin');
+    }
+  }, [pathname, mounted, canDo, router]);
 
   const visibleNav = mounted
     ? NAV.filter(({ perm }) => !perm || canDo(perm))
@@ -194,6 +201,23 @@ export default function MasterAdminLayout({ children }) {
 // ── SendNotificationModal ─────────────────────────────────────────────────────
 function SendNotificationModal({ open, onClose }) {
   const [sending, setSending] = useState(false);
+  
+  // Fetch real institutes for dropdown
+  const { data: schoolsData } = useQuery({
+    queryKey: ['master-schools-all'],
+    queryFn: () => masterAdminService.getSchools({ limit: 1000 }),
+    enabled: open, // Only fetch when modal opens
+  });
+
+  const institutes = schoolsData?.data?.rows || [];
+  const NOTIF_RECIPIENT_OPTIONS = [
+    { value: 'all', label: 'All Institutes' },
+    ...institutes.map((i) => ({
+      value: i.id,
+      label: `${i.institute_name} — ${i.institute_code || 'N/A'}`,
+    })),
+  ];
+
   const {
     register, control, handleSubmit, reset, watch,
     formState: { errors },
@@ -211,7 +235,7 @@ function SendNotificationModal({ open, onClose }) {
   const recipientLabel =
     recipients === 'all'
       ? 'All Institutes'
-      : DUMMY_INSTITUTES_REPORT.find((i) => i.id.toString() === recipients)?.name ?? recipients;
+      : institutes.find((i) => i.id === recipients)?.institute_name ?? recipients;
 
   const handleSend = (data) => {
     if (!data.subject?.trim()) { toast.error('Subject is required'); return; }

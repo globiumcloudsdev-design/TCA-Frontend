@@ -62,6 +62,7 @@ export const PLATFORM_PERMISSIONS = {
       { code: 'subscription.create',       label: 'Institute ke liye subscription create karna'    },
       { code: 'subscription.read',         label: 'Tamam subscriptions ki list dekhna'             },
       { code: 'subscription.update',       label: 'Subscription details update karna'              },
+      { code: 'subscription.delete',       label: 'Invoice / Subscription permanently delete karna'},
       { code: 'subscription.cancel',       label: 'Subscription cancel karna'                      },
       { code: 'subscription.renew',        label: 'Subscription manually renew karna'              },
       { code: 'subscription.export',       label: 'Subscription data export karna'                 },

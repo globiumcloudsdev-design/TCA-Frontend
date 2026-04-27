@@ -23,7 +23,7 @@ export const endpoint = (path, params = {}) =>
 export const AUTH = {
   LOGIN:           '/auth/login',           // POST  { school_code, email, password }
   LOGOUT:          '/auth/logout',          // POST
-  REFRESH:         '/auth/refresh',         // POST  (uses httpOnly refresh cookie)
+  REFRESH:         '/auth/refresh-token',         // POST  (uses httpOnly refresh cookie)
   ME:              '/auth/me',              // GET   → { user }
   FORGOT_PASSWORD: '/auth/forgot-password', // POST  { email, school_code }
   RESET_PASSWORD:  '/auth/reset-password',  // POST  { token, new_password }

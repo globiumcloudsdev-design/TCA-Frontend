@@ -1,4 +1,4 @@
-﻿/**
+/**
  * DataTable â€” Advanced generic table using @tanstack/react-table v8
  * â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
  * Props:
@@ -42,7 +42,7 @@ import {
   getFilteredRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   ChevronUp,
   ChevronDown,
@@ -175,6 +175,19 @@ export default function DataTable({
   const [sorting, setSorting] = useState([]);
   const [rowSelection, setRowSelection] = useState({});
   const [columnVisibility, setColumnVisibility] = useState({});
+
+  const prevDataRef = useRef(data);
+  // Auto-clear selection when data changes (indices change, old selection becomes invalid)
+  // Uses length gate to prevent infinite loop when data is empty array reference recreation
+  useEffect(() => {
+    if (prevDataRef.current !== data) {
+      if ((prevDataRef.current && prevDataRef.current.length > 0) || (data && data.length > 0)) {
+        setRowSelection({});
+      }
+      prevDataRef.current = data;
+    }
+  }, [data]);
+  
   const [exportOpen, setExportOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 

@@ -18,10 +18,10 @@ import {
 export const masterAdminService = {
   // ─── Stats ────────────────────────────────────────────────
   getStats: () =>
-    withFallback(
-      () => api.get('/master-admin/stats').then((r) => r.data?.data ?? r.data),
-      () => DUMMY_MA_STATS,
-    ),
+    api.get('/dashboard/master').then((r) => r.data?.data ?? r.data),
+
+  getReports: (params = {}) =>
+    api.get(`/master-admin/reports${buildQuery(params)}`).then((r) => r.data?.data ?? r.data),
 
   // ─── Lookup tables (for dropdowns) ───────────────────────
   getInstituteTypes: () =>
@@ -114,6 +114,12 @@ export const masterAdminService = {
   markInvoicePaid: (invoiceId, paymentData) =>
     api.post(`/master-admin/invoices/${invoiceId}/mark-paid`, paymentData).then((r) => r.data),
 
+  deleteInvoice: (id) =>
+    api.delete(`/master-admin/invoices/${id}`).then((r) => r.data),
+
+  bulkDeleteInvoices: (ids) =>
+    api.post('/master-admin/invoices/bulk-delete', { ids }).then((r) => r.data),
+
   getSubscriptionHistory: (instituteId) =>
     withFallback(
       () => api.get(`/master-admin/institutes/${instituteId}/subscription/history`).then((r) => r.data),
@@ -143,13 +149,22 @@ export const masterAdminService = {
 
   // ─── Users ────────────────────────────────────────────────
   getUsers: (filters = {}) =>
-    withFallback(
-      () => api.get(`/master-admin/users${buildQuery(filters)}`).then((r) => r.data),
-      () => paginate(DUMMY_MA_USERS, filters.page, filters.limit),
-    ),
+    api.get(`/master-admin/users${buildQuery(filters)}`).then((r) => r.data),
 
   getUserById: (id) =>
     api.get(`/master-admin/users/${id}`).then((r) => r.data),
+
+  // NEW: Create platform user (Support Staff, etc.)
+  createPlatformUser: (userData) => 
+    api.post('/master-admin/users', userData).then((r) => r.data),
+
+  // NEW: Update platform user
+  updateUser: (id, userData) =>
+    api.put(`/master-admin/users/${id}`, userData).then((r) => r.data),
+
+  // NEW: Toggle user status
+  toggleUserStatus: (id, is_active) =>
+    api.patch(`/master-admin/users/${id}/status`, { is_active }).then((r) => r.data),
 
   // ─── Subscription Plans (CRUD) ───────────────────────────
   getSubscriptionTemplates: (filters = {}) =>

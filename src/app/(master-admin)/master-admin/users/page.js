@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { Plus, Users, UserCheck, UserX, ShieldCheck } from 'lucide-react';
@@ -15,15 +15,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge }  from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { PLATFORM_PERMISSIONS } from '@/data/masterAdminPermissions';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const ROLE_OPTIONS = [
-  { value: 'super_admin',   label: '👑 Super Admin'   },
-  { value: 'school_admin',  label: '🏢 School Admin'  },
-  { value: 'teacher',       label: '👩‍🏫 Teacher'      },
-  { value: 'accountant',    label: '💼 Accountant'    },
-  { value: 'receptionist',  label: '📋 Receptionist'  },
-  { value: 'librarian',     label: '📚 Librarian'     },
+  { value: 'SYSTEM_ADMIN',  label: '👑 System Admin'   },
+  { value: 'SUPPORT_STAFF', label: '🎧 Support Staff'  },
 ];
 
 const STATUS_OPTIONS = [
@@ -32,12 +29,8 @@ const STATUS_OPTIONS = [
 ];
 
 const ROLE_BADGE = {
-  super_admin:  'bg-purple-100 text-purple-700',
-  school_admin: 'bg-blue-100 text-blue-700',
-  teacher:      'bg-emerald-100 text-emerald-700',
-  accountant:   'bg-amber-100 text-amber-700',
-  receptionist: 'bg-cyan-100 text-cyan-700',
-  librarian:    'bg-indigo-100 text-indigo-700',
+  SYSTEM_ADMIN:  'bg-purple-100 text-purple-700',
+  SUPPORT_STAFF: 'bg-emerald-100 text-emerald-700',
 };
 
 const fmtDate = (v) => v ? new Date(v).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -82,8 +75,8 @@ function buildColumns(onEdit, onToggle, onDelete) {
       id: 'role',
       header: 'Role',
       cell: ({ row }) => {
-        const roleCode = row.original.role?.code ?? row.original.role_code;
-        const roleName = row.original.role?.name ?? roleCode;
+        const roleCode = row.original.user_type ?? row.original.role?.code ?? row.original.role_code;
+        const roleName = row.original.user_type ?? row.original.role?.name ?? roleCode;
         if (!roleName) return <span className="text-xs text-muted-foreground">—</span>;
         return (
           <span className={cn(
@@ -164,7 +157,7 @@ export default function MasterUsersPage() {
   const inactive = users.length - active;
 
   const createMutation = useMutation({
-    mutationFn: (body) => masterAdminService.createUser?.(body) ?? Promise.reject(new Error('createUser not available')),
+    mutationFn: (body) => masterAdminService.createPlatformUser?.(body) ?? Promise.reject(new Error('createPlatformUser not available')),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['master-users'] });
       toast.success('User created');
@@ -315,17 +308,29 @@ function UserFormModal({ open, onClose, defaultValues, onSubmit, loading, isEdit
   const { register, control, handleSubmit, reset, formState: { errors } } = useForm({
     defaultValues: {
       is_active: true,
+      permissions: [],
       ...defaultValues,
     },
   });
 
+  useEffect(() => {
+    reset({
+      is_active: true,
+      permissions: [],
+      ...defaultValues,
+    });
+  }, [defaultValues, reset]);
+
   // Fetch schools for dropdown
   const { data: schoolRows } = useQuery({
     queryKey: ['master-schools-all'],
-    queryFn: () => masterAdminService.getSchools({ limit: 100 }).then((r) => r?.data?.rows ?? r?.data ?? []),
+    queryFn: () => masterAdminService.getSchools({ limit: 100 }).then((r) => {
+      const raw = r?.data?.rows ?? r?.data ?? r?.rows ?? r;
+      return Array.isArray(raw) ? raw : [];
+    }),
     enabled: open,
   });
-  const schoolOptions = (schoolRows ?? []).map((s) => ({ value: s.id, label: s.name }));
+  const schoolOptions = (Array.isArray(schoolRows) ? schoolRows : []).map((s) => ({ value: s.id, label: s.name }));
 
   const handleClose = () => { reset(); onClose(); };
 
@@ -371,9 +376,34 @@ function UserFormModal({ open, onClose, defaultValues, onSubmit, loading, isEdit
 
         <SectionLabel>Role &amp; Access</SectionLabel>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <SelectField label="Role" name="role_code" control={control} options={ROLE_OPTIONS} placeholder="Select role" />
-          <SelectField label="Institute" name="school_id" control={control} options={schoolOptions} placeholder="Select institute" />
+          <SelectField label="User Type" name="user_type" control={control} options={ROLE_OPTIONS} placeholder="Select User Type" />
         </div>
+        
+        <SectionLabel>Permissions</SectionLabel>
+        <div className="max-h-64 overflow-y-auto pr-2 space-y-4 rounded-md border p-3 bg-slate-50">
+          {Object.entries(PLATFORM_PERMISSIONS).map(([key, group]) => (
+            <div key={key}>
+              <p className="font-semibold text-sm text-slate-800 mb-2">{group.label}</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {group.permissions.map(perm => (
+                  <label key={perm.code} className="flex items-start gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      value={perm.code}
+                      {...register('permissions')}
+                      className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <div>
+                      <span className="text-xs font-medium text-slate-700 group-hover:text-blue-700">{perm.code}</span>
+                      <p className="text-[10px] text-slate-500 leading-tight">{perm.label}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
         <SwitchField label="Active" name="is_active" control={control}
           hint="User can log in and access the platform" />
 
