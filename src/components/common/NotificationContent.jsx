@@ -520,13 +520,13 @@ export function NotificationContent({ onClose }) {
                         <Check size={14} />
                       </button>
                     )}
-                    <button
+                    {/* <button
                       onClick={() => handleDelete(notif.id)}
                       className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                       title="Delete"
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </button> */}
                   </div>
                 </div>
               </div>

@@ -18,6 +18,7 @@ import {
   Eye,
   PieChart,
   ArrowLeft,
+  Calendar,
 } from "lucide-react";
 import useInstituteConfig from "@/hooks/useInstituteConfig";
 import useAuthStore from "@/store/authStore";
@@ -64,11 +65,13 @@ const STATUS_OPTIONS = [
 ];
 
 export default function AttendancePage({ type }) {
-  const canDo = useAuthStore((s) => s.canDo);
+  const { canDo, user } = useAuthStore();
+  const schoolId = user?.school_id;
   const { terms, attendanceConfig } = useInstituteConfig();
 
   const [view, setView] = useState("list"); // 'list' or 'report'
   const [isMarkOpen, setIsMarkOpen] = useState({ open: false, mode: "class" });
+  const [isHolidayOpen, setIsHolidayOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -93,8 +96,9 @@ export default function AttendancePage({ type }) {
 
   // Fetch Academic Years
   const { data: yearsData } = useQuery({
-    queryKey: ["academic-years"],
-    queryFn: () => academicYearService.getAll({ is_active: true }),
+    queryKey: ["academic-years", schoolId],
+    queryFn: () => academicYearService.getOptions(schoolId),
+    enabled: !!schoolId,
   });
 
   // Set default current academic year
@@ -112,15 +116,16 @@ export default function AttendancePage({ type }) {
         }) || yearsData.data[0];
 
       if (currentYear) {
-        setFilters((prev) => ({ ...prev, academic_year_id: currentYear.id }));
+        setFilters((prev) => ({ ...prev, academic_year_id: currentYear.value }));
       }
     }
   }, [yearsData?.data, filters.academic_year_id]);
 
   // Fetch Classes
   const { data: classesData } = useQuery({
-    queryKey: ["classes"],
-    queryFn: () => classService.getAll(),
+    queryKey: ["classes", schoolId, filters.academic_year_id],
+    queryFn: () => classService.getOptions(schoolId, filters.academic_year_id),
+    enabled: !!schoolId,
   });
 
   // Extract Sections from selected class
@@ -128,7 +133,7 @@ export default function AttendancePage({ type }) {
     if (!filters.class_id || filters.class_id === "all" || !classesData?.data)
       return [];
     const selectedClass = classesData.data.find(
-      (c) => String(c.id) === String(filters.class_id),
+      (c) => String(c.value) === String(filters.class_id),
     );
     return selectedClass?.sections || [];
   }, [filters.class_id, classesData]);
@@ -247,11 +252,22 @@ export default function AttendancePage({ type }) {
         accessorKey: "student.registration_no",
         header: "Roll / Reg No",
         cell: ({ row }) => {
-          const student = row.original.Student || row.original.student;
+          const attendance = row.original;
+          const student = attendance.Student;
+          
+          // Find matching session for this attendance record's class and section
+          const sDetails = student?.details?.studentDetails || student?.details || {};
+          const sessions = student?.details?.studentDetails?.academicSessions || sDetails?.academicSessions || [];
+          
+          const session = sessions.find(s => 
+            String(s.class_id) === String(attendance.class_id) && 
+            (!attendance.section_id || String(s.section_id) === String(attendance.section_id))
+          ) || sessions[0];
+
           return (
             <div className="flex flex-col">
               <span className="font-bold text-xs text-slate-700 dark:text-slate-300">
-                {student?.roll_no || student?.roll_number || student?.details?.studentDetails?.roll_no || "—"}
+                {session?.roll_no || sDetails?.roll_no || student?.roll_no || "—"}
               </span>
               <span className="text-[10px] text-slate-400 font-medium">
                 {student?.registration_no || "—"}
@@ -266,9 +282,14 @@ export default function AttendancePage({ type }) {
         cell: ({ row }) => {
           const student = row.original.Student;
           return (
-            <span className="font-medium">
-              {student?.first_name || ""} {student?.last_name || ""}
-            </span>
+            <div className="flex flex-col">
+              <span className="font-medium text-slate-900 dark:text-slate-100">
+                {student?.first_name || ""} {student?.last_name || ""}
+              </span>
+              <span className="text-[10px] text-slate-400">
+                {row.original.Class?.name || "No Class"} • {row.original.Section?.name || "No Section"}
+              </span>
+            </div>
           );
         },
       },
@@ -329,14 +350,15 @@ export default function AttendancePage({ type }) {
         title="Student Attendance"
         description="Track and manage student daily attendance"
         action={
-          <div className="flex gap-2">
-            <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl mr-2">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full md:w-auto">
+            {/* View Toggle */}
+            <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setView("list")}
                 className={cn(
-                  "px-4 py-1.5 h-auto text-xs font-bold transition-all",
+                  "flex-1 md:flex-none px-4 py-1.5 h-auto text-[10px] sm:text-xs font-bold transition-all",
                   view === "list"
                     ? "bg-white dark:bg-slate-800 shadow-sm text-primary"
                     : "text-slate-500 hover:text-slate-700",
@@ -349,7 +371,7 @@ export default function AttendancePage({ type }) {
                 size="sm"
                 onClick={() => setView("report")}
                 className={cn(
-                  "px-4 py-1.5 h-auto text-xs font-bold transition-all",
+                  "flex-1 md:flex-none px-4 py-1.5 h-auto text-[10px] sm:text-xs font-bold transition-all",
                   view === "report"
                     ? "bg-white dark:bg-slate-800 shadow-sm text-primary"
                     : "text-slate-500 hover:text-slate-700",
@@ -358,21 +380,41 @@ export default function AttendancePage({ type }) {
                 Report Mode
               </Button>
             </div>
-            <Button
-              variant="emerald"
-              onClick={() => setIsMarkOpen({ open: true, mode: "scan" })}
-            >
-              <QrCode className="mr-2 h-4 w-4" />
-              Scan QR
-            </Button>
-            {mounted && canDo("attendance.mark") && (
+
+            {/* Main Actions */}
+            <div className="flex flex-wrap items-center gap-2">
               <Button
-                onClick={() => setIsMarkOpen({ open: true, mode: "class" })}
+                variant="emerald"
+                size="sm"
+                className="flex-1 sm:flex-none"
+                onClick={() => setIsMarkOpen({ open: true, mode: "scan" })}
               >
-                <CheckSquare className="mr-2 h-4 w-4" />
-                Bulk Mark
+                <QrCode className="mr-1.5 h-4 w-4" />
+                Scan QR
               </Button>
-            )}
+              
+              {mounted && canDo("attendance.mark") && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 sm:flex-none border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 dark:bg-amber-900/10 dark:border-amber-800"
+                    onClick={() => setIsHolidayOpen(true)}
+                  >
+                    <Calendar className="mr-1.5 h-4 w-4" />
+                    Holiday
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 sm:flex-none"
+                    onClick={() => setIsMarkOpen({ open: true, mode: "class" })}
+                  >
+                    <CheckSquare className="mr-1.5 h-4 w-4" />
+                    Bulk Mark
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         }
       />
@@ -390,10 +432,7 @@ export default function AttendancePage({ type }) {
 
             <SelectField
               label="Academic Year"
-              options={
-                yearsData?.data?.map((y) => ({ value: y.id, label: y.name })) ||
-                []
-              }
+              options={yearsData?.data || []}
               value={filters.academic_year_id}
               onChange={(val) => handleFilterChange("academic_year_id", val)}
               placeholder="Select Year"
@@ -403,10 +442,7 @@ export default function AttendancePage({ type }) {
               label="Class"
               options={[
                 { value: "all", label: `All ${terms.class || "Classes"}s` },
-                ...(classesData?.data?.map((c) => ({
-                  value: String(c.id),
-                  label: c.name,
-                })) || []),
+                ...(classesData?.data || []),
               ]}
               value={String(filters.class_id)}
               onChange={(val) => handleFilterChange("class_id", val)}
@@ -535,7 +571,87 @@ export default function AttendancePage({ type }) {
         defaultMode={isMarkOpen.mode}
         type={type}
       />
+
+      <MarkHolidayModal
+        open={isHolidayOpen}
+        onClose={() => setIsHolidayOpen(false)}
+        onSuccess={() => {
+          refetch();
+          setIsHolidayOpen(false);
+        }}
+      />
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mark Holiday Modal
+// ─────────────────────────────────────────────────────────────────────────────
+function MarkHolidayModal({ open, onClose, onSuccess }) {
+  const [holidayDate, setHolidayDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [remarks, setRemarks] = useState("Public Holiday");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleMarkHoliday = async () => {
+    if (!holidayDate) {
+      toast.error("Please select a date");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await studentAttendanceService.markHoliday({
+        date: holidayDate,
+        remarks: remarks,
+      });
+      toast.success(`Successfully marked ${holidayDate} as a holiday`);
+      onSuccess();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to mark holiday");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <AppModal
+      open={open}
+      onClose={onClose}
+      title="Mark as Holiday"
+      description="Marking a day as a holiday will set all students' attendance to 'Holiday' for that date. This will overwrite any existing records for the day."
+    >
+      <div className="space-y-4 py-4">
+        <DatePickerField
+          label="Holiday Date"
+          value={holidayDate}
+          onChange={setHolidayDate}
+          disableFutureDates={false}
+        />
+        <div className="space-y-2">
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Remarks / Holiday Name
+          </label>
+          <Input
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+            placeholder="e.g. Eid-ul-Fitr, Winter Break, etc."
+          />
+        </div>
+
+        <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button
+            className="bg-amber-600 hover:bg-amber-700 text-white"
+            onClick={handleMarkHoliday}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Marking..." : "Confirm Mark as Holiday"}
+          </Button>
+        </div>
+      </div>
+    </AppModal>
   );
 }
 

@@ -246,4 +246,11 @@ export const staffAttendanceService = {
     ),
 
   remove: (id) => api.delete(`/staff-attendance/${id}`).then((r) => r.data),
+
+  // Bulk mark holiday for all staff
+  markHoliday: (body) =>
+    api.post('/staff-attendance/holiday', {
+      date: body.date,
+      remarks: body.remarks || 'Public Holiday',
+    }).then((r) => r.data),
 };

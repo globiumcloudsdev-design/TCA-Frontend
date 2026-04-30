@@ -1331,7 +1331,7 @@ export default function SubscriptionTemplatesPage() {
         </div>
       )}
 
-      <DebugPanel
+      {/* <DebugPanel
         open={debugOpen}
         onToggle={() => setDebugOpen((v) => !v)}
         rawData={rawData}
@@ -1341,7 +1341,7 @@ export default function SubscriptionTemplatesPage() {
         isFetching={isFetching}
         dataUpdatedAt={dataUpdatedAt}
         planCount={planList.length}
-      />
+      /> */}
 
       <PlanFormModal
         open={createOpen || !!editTarget}

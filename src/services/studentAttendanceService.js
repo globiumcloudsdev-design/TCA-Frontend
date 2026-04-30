@@ -55,6 +55,20 @@ export const studentAttendanceService = {
       throw error;
     }
   },
+  
+  /**
+   * Mark a specific date as a holiday for all students
+   * @param {Object} data - { date, remarks, branch_id }
+   */
+  markHoliday: async (data) => {
+    try {
+      const response = await api.post('/attendance/holiday', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error marking holiday:', error);
+      throw error;
+    }
+  },
 
   /**
    * Process QR Scan for attendance

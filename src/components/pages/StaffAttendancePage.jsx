@@ -4,7 +4,7 @@
  */
 import { useState, useMemo, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckSquare, X, Minus } from 'lucide-react';
+import { CheckSquare, X, Minus, Calendar } from 'lucide-react';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
 import DataTable from '@/components/common/DataTable';
@@ -19,7 +19,14 @@ import TimePickerField from '@/components/common/TimePickerField';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-const STATUS_COLORS = { present: 'bg-emerald-100 text-emerald-700', absent: 'bg-red-100 text-red-700', late: 'bg-amber-100 text-amber-700', leave: 'bg-blue-100 text-blue-700' };
+const STATUS_COLORS = { 
+  present: 'bg-emerald-100 text-emerald-700', 
+  absent: 'bg-red-100 text-red-700', 
+  late: 'bg-amber-100 text-amber-700', 
+  leave: 'bg-blue-100 text-blue-700',
+  holiday: 'bg-slate-100 text-slate-600',
+  weekend: 'bg-slate-50 text-slate-400'
+};
 const STATUS_OPTS = [{ value: 'present', label: 'Present' }, { value: 'absent', label: 'Absent' }, { value: 'late', label: 'Late' }];
 
 const MANUAL_STATUS_OPTS = [
@@ -50,14 +57,19 @@ const toISODateTime = (date, time) => {
 const formatTimeDisplay = (value) => {
   if (!value) return '—';
 
-  if (/^\d{2}:\d{2}/.test(String(value))) {
-    return String(value).slice(0, 5);
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) {
+    if (/^\d{2}:\d{2}/.test(String(value))) {
+      const [h, m] = String(value).split(':');
+      const hour = parseInt(h);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const h12 = hour % 12 || 12;
+      return `${String(h12).padStart(2, '0')}:${m} ${ampm}`;
+    }
+    return String(value);
   }
 
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-
-  return d.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return d.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true });
 };
 
 const toInputTime = (value) => {
@@ -78,6 +90,7 @@ export default function StaffAttendancePage({ type }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isMarkModalOpen, setIsMarkModalOpen] = useState(false);
+  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
   const [editingAttendanceId, setEditingAttendanceId] = useState(null);
   const [deletingRecord, setDeletingRecord] = useState(null);
   const [manualForm, setManualForm] = useState({
@@ -226,6 +239,22 @@ export default function StaffAttendancePage({ type }) {
     },
   });
 
+  const markHolidayMutation = useMutation({
+    mutationFn: async (payload) => {
+      const { staffAttendanceService } = await import('@/services');
+      return staffAttendanceService.markHoliday(payload);
+    },
+    onSuccess: () => {
+      toast.success('Staff holiday marked successfully');
+      setIsHolidayModalOpen(false);
+      setManualForm(prev => ({ ...prev, remarks: '' }));
+      qc.invalidateQueries({ queryKey: ['staff-attendance'] });
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to mark holiday');
+    },
+  });
+
   const rows = data?.data?.rows ?? [];
   const total = data?.data?.total ?? 0;
   const totalPages = data?.data?.totalPages ?? 1;
@@ -261,8 +290,8 @@ export default function StaffAttendancePage({ type }) {
     }
     const payload = {
       status: manualForm.status,
-      check_in: toISODateTime(manualForm.date, manualForm.check_in),
-      check_out: toISODateTime(manualForm.date, manualForm.check_out),
+      check_in: manualForm.check_in ? toISODateTime(manualForm.date, manualForm.check_in) : null,
+      check_out: manualForm.check_out ? toISODateTime(manualForm.date, manualForm.check_out) : null,
       remarks: manualForm.remarks,
     };
 
@@ -330,24 +359,50 @@ export default function StaffAttendancePage({ type }) {
   ], [canDo, isMounted]);
 
   return (
-    <div className="space-y-5">
-      <PageHeader title="Staff Attendance" description="Daily staff attendance tracking" />
+    <div className="space-y-6">
+      <PageHeader 
+        title="Staff Attendance" 
+        description="Daily staff attendance tracking" 
+        action={
+          (isMounted && (canDo('staff_attendance.create') || canDo('staff_attendance.mark'))) ? (
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setIsHolidayModalOpen(true)}
+                className="flex items-center justify-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100 transition-all active:scale-95 shadow-sm"
+              >
+                <Calendar size={16} /> Mark Holiday
+              </button>
+              <button
+                type="button"
+                onClick={openMarkModal}
+                className="flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-all active:scale-95 shadow-sm"
+              >
+                <CheckSquare size={16} /> Bulk Mark
+              </button>
+            </div>
+          ) : null
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-3">
-        <label className="text-sm font-medium">Date:</label>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-2xl border bg-card/50 backdrop-blur-sm p-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Calendar className="text-primary h-5 w-5" />
+          <span className="text-sm font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">Attendance Date:</span>
+        </div>
         <DatePickerField
           value={dateFilter}
           onChange={(v) => setDateFilter(v || '')}
           disableFutureDates
-          className="w-48"
+          className="w-full sm:w-64"
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-4">
-        <StatsCard label="Attendance Rate" value={`${stats.rate}%`} icon={<CheckSquare size={18} />} />
-        <StatsCard label="Present" value={stats.present} icon={<CheckSquare size={18} />} />
-        <StatsCard label="Absent" value={stats.absent} icon={<X size={18} />} />
-        <StatsCard label="Late" value={stats.late} icon={<Minus size={18} />} />
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        <StatsCard label="Attendance Rate" value={`${stats.rate}%`} icon={<CheckSquare size={18} />} className="bg-primary/5 border-primary/10" />
+        <StatsCard label="Present" value={stats.present} icon={<CheckSquare size={18} />} className="bg-emerald-50 border-emerald-100 dark:bg-emerald-950/10 dark:border-emerald-900/20" />
+        <StatsCard label="Absent" value={stats.absent} icon={<X size={18} />} className="bg-red-50 border-red-100 dark:bg-red-950/10 dark:border-red-900/20" />
+        <StatsCard label="Late" value={stats.late} icon={<Minus size={18} />} className="bg-amber-50 border-amber-100 dark:bg-amber-950/10 dark:border-amber-900/20" />
       </div>
 
       <DataTable
@@ -360,17 +415,6 @@ export default function StaffAttendancePage({ type }) {
           { name: 'status', label: 'Status', value: statusFilter, onChange: (v) => { setStatusFilter(v); setPage(1); }, options: STATUS_OPTS },
           { name: 'staff_type', label: 'Staff Type', value: staffTypeFilter, onChange: (v) => { setStaffTypeFilter(v); setPage(1); }, options: STAFF_TYPE_OPTS },
         ]}
-        action={
-          (isMounted && (canDo('staff_attendance.create') || canDo('staff_attendance.mark'))) ? (
-            <button
-              type="button"
-              onClick={openMarkModal}
-              className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-            >
-              <CheckSquare size={14} /> Mark Attendance
-            </button>
-          ) : null
-        }
         enableColumnVisibility
         importConfig={{
           columns: [
@@ -500,6 +544,55 @@ export default function StaffAttendancePage({ type }) {
         confirmLabel="Delete"
         variant="destructive"
       />
+
+      <AppModal
+        open={isHolidayModalOpen}
+        onClose={() => setIsHolidayModalOpen(false)}
+        title="Mark as Holiday (Staff)"
+        description="Marking a day as a holiday will set all staff members' attendance to 'Holiday' for that date. This will overwrite any existing records."
+      >
+        <div className="space-y-4 py-4">
+          <DatePickerField
+            label="Holiday Date"
+            value={manualForm.date}
+            onChange={(v) => setManualForm(prev => ({ ...prev, date: v || '' }))}
+            disableFutureDates={false}
+          />
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Remarks / Holiday Name
+            </label>
+            <input
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary dark:border-slate-800 dark:bg-slate-900"
+              value={manualForm.remarks}
+              onChange={(e) => setManualForm(prev => ({ ...prev, remarks: e.target.value }))}
+              placeholder="e.g. Public Holiday, Annual Event, etc."
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="button"
+              className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+              onClick={() => setIsHolidayModalOpen(false)}
+              disabled={markHolidayMutation.isPending}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rounded-md bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+              onClick={() => markHolidayMutation.mutate({
+                date: manualForm.date,
+                remarks: manualForm.remarks || 'Public Holiday'
+              })}
+              disabled={markHolidayMutation.isPending}
+            >
+              {markHolidayMutation.isPending ? 'Marking...' : 'Confirm Mark Holiday'}
+            </button>
+          </div>
+        </div>
+      </AppModal>
     </div>
   );
 }

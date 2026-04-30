@@ -46,8 +46,9 @@ export function MonthPicker({ value, onChange, placeholder = "Select Month" }) {
           <div className="text-sm font-extrabold text-slate-800 tracking-tight">{viewYear}</div>
           <Button 
             variant="ghost" 
-            className="h-8 w-8 p-0 hover:bg-slate-100 rounded-lg text-slate-500" 
+            className="h-8 w-8 p-0 hover:bg-slate-100 rounded-lg text-slate-500 disabled:opacity-30" 
             onClick={() => setViewYear(v => v + 1)}
+            disabled={viewYear >= new Date().getFullYear()}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>

@@ -39,9 +39,9 @@ const PORTAL_BUTTONS = [
 ];
 
 const QUICK_LOGINS = [
-  { label: 'School Admin', email: 'hafizshoaibraza190@gmail.com', password: '123456', type: 'INSTITUTE_ADMIN' },
+  { label: 'School Admin', email: 'demo@gmail.com', password: '12345678', type: 'INSTITUTE_ADMIN' },
   { label: 'Master Admin', email: 'admin@thecloudsacademy.com', password: 'Admin@TCA2026!', type: 'MASTER_ADMIN' },
-    { label: 'Accountant', email: 'hafizshoaibraza140@gmail.com', password: '123456', type: 'STAFF' },
+  { label: 'Accountant', email: 'hafizshoaibraza140@gmail.com', password: '123456', type: 'STAFF' },
 ];
 
 export default function LoginPage() {
@@ -191,7 +191,7 @@ export default function LoginPage() {
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-violet-600/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="w-full max-w-lg relative z-10">
-        
+
         {/* Portal Shortcuts */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           {PORTAL_BUTTONS.map((portal) => {
@@ -230,7 +230,7 @@ export default function LoginPage() {
                     <Label className="text-slate-300 font-bold text-[10px] uppercase tracking-[0.2em] ml-1">Email Address</Label>
                     <div className="relative">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                      <Input 
+                      <Input
                         {...registerSingle('email', { required: 'Email is required' })}
                         type="email" placeholder="name@institute.com"
                         className="h-13 bg-white/5 border-white/10 text-white pl-11 focus:ring-indigo-500 rounded-2xl"
@@ -247,7 +247,7 @@ export default function LoginPage() {
                     </div>
                     <div className="relative">
                       <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                      <Input 
+                      <Input
                         {...registerSingle('password', { required: 'Password is required' })}
                         type={showPass ? 'text' : 'password'} placeholder="••••••••"
                         className="h-13 bg-white/5 border-white/10 text-white pl-11 pr-11 focus:ring-indigo-500 rounded-2xl"
@@ -272,7 +272,7 @@ export default function LoginPage() {
                     <Label className="text-slate-300 font-bold text-[10px] uppercase tracking-[0.2em] ml-1">Registered Email</Label>
                     <div className="relative">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                      <Input 
+                      <Input
                         {...registerDual('email', { required: 'Email is required' })}
                         type="email" placeholder="your-email@example.com"
                         className="h-13 bg-white/5 border-white/10 text-white pl-11 rounded-2xl"
@@ -314,12 +314,12 @@ export default function LoginPage() {
       </div>
 
       {/* Account Selector Modal */}
-      <AccountSelectionModal 
-        open={showAccountSelector} 
-        onOpenChange={setShowAccountSelector} 
-        accounts={accounts} 
-        email={tempEmail} 
-        onSelectAccount={handleSelectAccount} 
+      <AccountSelectionModal
+        open={showAccountSelector}
+        onOpenChange={setShowAccountSelector}
+        accounts={accounts}
+        email={tempEmail}
+        onSelectAccount={handleSelectAccount}
       />
 
       {/* Password Dialog for Selection */}
@@ -344,11 +344,11 @@ export default function LoginPage() {
             <div className="space-y-2">
               <Label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Password</Label>
               <div className="relative">
-                <Input 
-                  type={showAccountPass ? 'text' : 'password'} 
+                <Input
+                  type={showAccountPass ? 'text' : 'password'}
                   placeholder="••••••••"
                   className="h-12 bg-white/5 border-white/10 text-white pr-10 focus:border-indigo-500 rounded-xl"
-                  value={accountPassword} 
+                  value={accountPassword}
                   onChange={(e) => setAccountPassword(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handlePasswordSubmit()}
                   autoFocus
