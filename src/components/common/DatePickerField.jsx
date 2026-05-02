@@ -42,7 +42,7 @@ export default function DatePickerField({
   disabled,
   className,
   fromYear = 1950,
-  toYear = new Date().getFullYear(),
+  toYear = new Date().getFullYear() + 1,
   disablePastDates = false,
   disableFutureDates = false,
   minDate,
