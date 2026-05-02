@@ -90,7 +90,8 @@ export default function StudentForm({
     mode: 'onTouched', // Validates as user interacts
     defaultValues: {
       documents: [],
-      guardians: [{ name: '', relation: 'guardian', phone: '', cnic: '', email: '', type: 'guardian' }],
+      guardians: [{ name: '', relation: '', phone: '', cnic: '', email: '', type: 'father' }],
+      nationality: defaultValues.nationality || 'Pakistan',
       ...defaultValues,
       details: {
         studentDetails: {
@@ -99,6 +100,11 @@ export default function StudentForm({
       }
     }
   });
+
+  // Watch values
+  const watchAcademicYear = watch('academic_year_id');
+  const watchClass = watch('class_id');
+  const watchSection = watch('section_id');
 
   // Guardians Array
   const { fields: guardianFields, append: appendGuardian, remove: removeGuardian } = useFieldArray({
@@ -170,11 +176,25 @@ export default function StudentForm({
     }
 
     // 2. Map to dropdown format { value, label }
-    return arr.map(y => ({
+    const mapped = arr.map(y => ({
       value: y.id,
-      label: y.name || `${y.start_date} to ${y.end_date}`
+      label: y.name || `${y.start_date} to ${y.end_date}`,
+      is_current: y.is_current
     }));
+
+    return mapped;
   }, [rawAcademicYearsData]);
+
+  // Auto-select current academic year
+  useEffect(() => {
+    if (academicYears.length > 0 && !watchAcademicYear && !selectedAcademicYear && !isEdit) {
+      const current = academicYears.find(y => y.is_current) || academicYears[0];
+      if (current) {
+        setValue('academic_year_id', current.value);
+        setSelectedAcademicYear(current.value);
+      }
+    }
+  }, [academicYears, watchAcademicYear, selectedAcademicYear, setValue, isEdit]);
 
   // ─────────────────────────────────────────────────────────────────
   // FETCH CLASSES with their SECTIONS
@@ -204,10 +224,6 @@ export default function StudentForm({
     enabled: !!selectedAcademicYear,
   });
 
-  // Watch values
-  const watchAcademicYear = watch('academic_year_id');
-  const watchClass = watch('class_id');
-  const watchSection = watch('section_id');
 
   const selectedClassData = useMemo(() => {
     if (!Array.isArray(classes)) return null;
@@ -269,20 +285,9 @@ export default function StudentForm({
     setValue('details.studentDetails.section_name', sectionName, { shouldDirty: false });
   }, [selectedClassData, selectedSectionData, setValue]);
 
-  // Keep guardian relation aligned with guardian type
-  useEffect(() => {
-    if (!Array.isArray(watchGuardians)) return;
-
-    watchGuardians.forEach((g, index) => {
-      const normalizedType = String(g?.type || 'guardian').toLowerCase();
-      if (g?.type !== normalizedType) {
-        setValue(`guardians.${index}.type`, normalizedType, { shouldDirty: true });
-      }
-      if (g?.relation !== normalizedType) {
-        setValue(`guardians.${index}.relation`, normalizedType, { shouldDirty: true });
-      }
-    });
-  }, [watchGuardians, setValue]);
+  // Watch for concession type to show/hide fields
+  const watchConcessionType = watch('concession_type');
+  const isConcessionNone = watchConcessionType === 'none' || !watchConcessionType;
 
 
   // ─────────────────────────────────────────────────────────────────
@@ -683,7 +688,6 @@ export default function StudentForm({
                       name="last_name"
                       register={register}
                       error={errors.last_name}
-                      required
                       placeholder="e.g. Ali"
                     />
                     <InputField
@@ -700,6 +704,8 @@ export default function StudentForm({
                       control={control}
                       error={errors.dob}
                       required
+                      disableFutureDates
+                      placeholder="Select birth date"
                     />
                     <SelectField
                       label="Gender"
@@ -742,10 +748,8 @@ export default function StudentForm({
                           label="CNIC / B-Form"
                           value={field.value || ''}
                           onChange={field.onChange}
-                          country="pk"
-                          placeholder="00000-0000000-0"
+                          placeholder="XXXXX-XXXXXXX-X"
                           error={errors.cnic}
-                          {...field}
                         />
                       )}
                     />
@@ -803,11 +807,12 @@ export default function StudentForm({
                   />
 
                   {/* Roll Number */}
-                  <InputField
+                   <InputField
                     label="Roll Number"
                     name="roll_no"
                     register={register}
                     error={errors.roll_no}
+                    placeholder="e.g. 101"
                     required
                   />
 
@@ -818,6 +823,8 @@ export default function StudentForm({
                     control={control}
                     error={errors.admission_date}
                     required
+                    disableFutureDates
+                    placeholder="Select admission date"
                   />
                 </div>
 
@@ -831,12 +838,14 @@ export default function StudentForm({
                     name="previous_school"
                     register={register}
                     error={errors.previous_school}
+                    placeholder="Enter previous school name"
                   />
                   <InputField
                     label="Previous Class/Grade"
                     name="previous_class"
                     register={register}
                     error={errors.previous_class}
+                    placeholder="Enter previous class"
                   />
                 </div>
               </div>
@@ -904,7 +913,7 @@ export default function StudentForm({
                         name={`guardians.${index}.relation`}
                         register={register}
                         error={errors.guardians?.[index]?.relation}
-                        disabled
+                        placeholder="e.g. Father"
                       />
                       <Controller
                         name={`guardians.${index}.cnic`}
@@ -914,10 +923,8 @@ export default function StudentForm({
                             label="Guardian CNIC / B-Form"
                             value={field.value || ''}
                             onChange={field.onChange}
-                            country="pk"
-                            placeholder="00000-0000000-0"
+                            placeholder="XXXXX-XXXXXXX-X"
                             error={errors.guardians?.[index]?.cnic}
-                            {...field}
                           />
                         )}
                       />
@@ -931,7 +938,10 @@ export default function StudentForm({
                             onChange={field.onChange}
                             country="pk"
                             error={errors.guardians?.[index]?.phone}
-                            inputProps={{ required: true, name: field.name }}
+                            inputProps={{ 
+                              required: true, 
+                              name: field.name
+                            }}
                           />
                         )}
                       />
@@ -941,6 +951,13 @@ export default function StudentForm({
                         register={register}
                         error={errors.guardians?.[index]?.email}
                         type="email"
+                        placeholder="e.g. guardian@example.com"
+                        rules={{
+                          pattern: {
+                            value: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+                            message: "Invalid email format"
+                          }
+                        }}
                       />
                     </div>
                   </div>
@@ -984,12 +1001,28 @@ export default function StudentForm({
                         onChange={field.onChange}
                         country="pk"
                         error={errors.phone}
-                        inputProps={{ required: true, name: field.name }}
+                        inputProps={{ 
+                          required: true, 
+                          name: field.name
+                        }}
                       />
                     )}
                   />
-                  <InputField label="Email" name="email" register={register} error={errors.email} type="email" />
-                  <InputField label="City" name="city" register={register} error={errors.city} required />
+                  <InputField 
+                    label="Email" 
+                    name="email" 
+                    register={register} 
+                    error={errors.email} 
+                    type="email" 
+                    placeholder="e.g. student@example.com" 
+                    rules={{
+                      pattern: {
+                        value: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+                        message: "Invalid email format"
+                      }
+                    }}
+                  />
+                  <InputField label="City" name="city" register={register} error={errors.city} required placeholder="Enter city" />
                 </div>
 
                 <div className="flex items-center gap-2 mt-4">
@@ -1022,8 +1055,8 @@ export default function StudentForm({
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InputField label="Contact Person" name="emergency_contact_name" register={register} error={errors.emergency_contact_name} />
-                  <InputField label="Relation" name="emergency_contact_relation" register={register} error={errors.emergency_contact_relation} />
+                  <InputField label="Contact Person" name="emergency_contact_name" register={register} error={errors.emergency_contact_name} placeholder="Enter contact person name" />
+                  <InputField label="Relation" name="emergency_contact_relation" register={register} error={errors.emergency_contact_relation} placeholder="e.g. Uncle" />
                   <Controller
                     name="emergency_contact_phone"
                     control={control}
@@ -1034,7 +1067,9 @@ export default function StudentForm({
                         onChange={field.onChange}
                         country="pk"
                         error={errors.emergency_contact_phone}
-                        inputProps={{ name: field.name }}
+                        inputProps={{ 
+                          name: field.name
+                        }}
                       />
                     )}
                   />
@@ -1073,48 +1108,53 @@ export default function StudentForm({
                   />
                   <SelectField label="Concession" name="concession_type" control={control} error={errors.concession_type} options={CONCESSION_OPTIONS} />
                   {/* Discount Type and Concession logic */}
-                  <Controller
-                    name="discount_type"
-                    control={control}
-                    defaultValue="fixed"
-                    render={({ field }) => (
-                      <SelectField
-                        label="Discount Type"
-                        options={[
-                          { value: 'fixed', label: 'Fixed' },
-                          { value: 'percentage', label: 'Percentage' },
-                        ]}
-                        value={field.value}
-                        onChange={field.onChange}
-                        error={errors.discount_type}
-                        placeholder="Select discount type"
+                  {!isConcessionNone && (
+                    <>
+                      <Controller
+                        name="discount_type"
+                        control={control}
+                        defaultValue="fixed"
+                        render={({ field }) => (
+                          <SelectField
+                            label="Discount Type"
+                            options={[
+                              { value: 'fixed', label: 'Fixed' },
+                              { value: 'percentage', label: 'Percentage' },
+                            ]}
+                            value={field.value}
+                            onChange={field.onChange}
+                            error={errors.discount_type}
+                            placeholder="Select discount type"
+                            required
+                          />
+                        )}
                       />
-                    )}
-                  />
-                  {/* Show Concession % only if discount_type is percentage */}
-                  {watch('discount_type') === 'percentage' && (
-                    <InputField
-                      label="Concession %"
-                      name="concession_percentage"
-                      register={register}
-                      error={errors.concession_percentage}
-                      placeholder="Enter Concession %"
-                      type="number"
-                      min={0}
-                      max={100}
-                    />
-                  )}
-                  {/* Show Concession Amount only if discount_type is fixed */}
-                  {watch('discount_type') === 'fixed' && (
-                    <InputField
-                      label="Concession Amount"
-                      name="concession_amount"
-                      register={register}
-                      error={errors.concession_amount}
-                      placeholder="Enter Concession Amount"
-                      type="number"
-                      min={0}
-                    />
+                      {watch('discount_type') === 'percentage' && (
+                        <InputField
+                          label="Concession %"
+                          name="concession_percentage"
+                          register={register}
+                          error={errors.concession_percentage}
+                          placeholder="Enter Concession %"
+                          type="number"
+                          min={0}
+                          max={100}
+                          required
+                        />
+                      )}
+                      {watch('discount_type') === 'fixed' && (
+                        <InputField
+                          label="Concession Amount"
+                          name="concession_amount"
+                          register={register}
+                          error={errors.concession_amount}
+                          placeholder="Enter Concession Amount"
+                          type="number"
+                          min={0}
+                          required
+                        />
+                      )}
+                    </>
                   )}
                   <InputField
                     label="Annual Charges"
@@ -1136,7 +1176,9 @@ export default function StudentForm({
                   />
                 </div>
 
-                <TextareaField label="Concession Reason" name="concession_reason" register={register} error={errors.concession_reason} rows={1} />
+                {!isConcessionNone && (
+                  <TextareaField label="Concession Reason" name="concession_reason" register={register} error={errors.concession_reason} rows={1} required />
+                )}
 
                 <Separator className="my-4" />
 
@@ -1145,8 +1187,8 @@ export default function StudentForm({
                   <h3 className="text-sm font-semibold">Medical Information</h3>
                 </div>
 
-                <TextareaField label="Medical Conditions" name="medical_conditions" register={register} error={errors.medical_conditions} rows={2} />
-                <TextareaField label="Allergies" name="allergies" register={register} error={errors.allergies} rows={2} />
+                <TextareaField label="Medical Conditions" name="medical_conditions" register={register} error={errors.medical_conditions} rows={2} placeholder="Enter any medical conditions" />
+                <TextareaField label="Allergies" name="allergies" register={register} error={errors.allergies} rows={2} placeholder="Enter any allergies" />
 
                 <Separator className="my-4" />
 

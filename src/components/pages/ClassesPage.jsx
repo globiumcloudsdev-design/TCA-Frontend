@@ -45,6 +45,7 @@ import { Separator } from '@/components/ui/separator';
 
 import { classService } from '@/services/classService';
 import { academicYearService } from '@/services/academicYearService';
+import { SimpleTooltip } from '../ui/SimpleTooltip';
 
 export default function ClassesPage({ type }) {
   const queryClient = useQueryClient();
@@ -540,6 +541,15 @@ export default function ClassesPage({ type }) {
     return <PageLoader message={`Loading ${classTermPlural.toLowerCase()}...`} />;
   }
 
+  const addClassButton = canDo('classes.create') ? (
+    <SimpleTooltip content={`Add new ${classTerm.toLowerCase()}`} side="bottom">
+      <Button onClick={openAddModal} size="sm">
+        <Plus className="mr-2 h-4 w-4" />
+        Add {classTerm}
+      </Button>
+    </SimpleTooltip>
+  ) : null;
+
   return (
     <div className="space-y-6">
       {/* Header with Actions */}
@@ -556,14 +566,6 @@ export default function ClassesPage({ type }) {
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
               Refresh
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExport}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export
             </Button>
             {canDo('classes.create') && (
               <Button onClick={openAddModal} size="sm">
@@ -681,9 +683,10 @@ export default function ClassesPage({ type }) {
         columns={columns}
         data={data?.data || []}
         loading={isLoading || isFetching}
-        search={search}
-        onSearch={setSearch}
-        searchPlaceholder={`Search ${classTermPlural.toLowerCase()}...`}
+        // action={addClassButton}
+        // search={search}
+        // onSearch={setSearch}
+        // searchPlaceholder={`Search ${classTermPlural.toLowerCase()}...`}
         enableColumnVisibility
         exportConfig={{
           fileName: classTermPlural.toLowerCase().replace(/\s+/g, '-'),

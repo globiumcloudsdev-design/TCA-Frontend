@@ -273,13 +273,13 @@ export default function ExportModal({
     });
   }
   
-  // Professional PDF Generation
-  // Professional PDF Generation (Tabular)
-  async function generateProfessionalPDF(data, headers, orderedCols) {
+  // Professional PDF Generation (Tabular) — with smart orientation & auto-scaling
+  async function generateProfessionalPDF(data, headers, orderedCols, orientationOverride) {
     const { default: jsPDF } = await import('jspdf');
     const { default: autoTable } = await import('jspdf-autotable');
     
-    const orientation = pdfSettings.orientation;
+    // Use override orientation if provided (smart landscape for many columns)
+    const orientation = orientationOverride || (orderedCols.length >= 8 ? 'l' : 'p');
     const doc = new jsPDF({ 
       orientation, 
       unit: 'mm',
@@ -289,255 +289,214 @@ export default function ExportModal({
     
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 12;
+    const margin = 10;
     let yPos = margin;
+
+    // Auto-scale: reduce font size when there are many columns
+    const colCount = orderedCols.length;
+    let tableFontSize = pdfSettings.fontSize;
+    let headerFontSize = pdfSettings.fontSize;
+    let cellPad = { top: 3, right: 2, bottom: 3, left: 2 };
     
-    // ============ HEADER SECTION ============
+    if (colCount >= 12) {
+      tableFontSize = 5.5;
+      headerFontSize = 5.5;
+      cellPad = { top: 1.5, right: 1, bottom: 1.5, left: 1 };
+    } else if (colCount >= 10) {
+      tableFontSize = 6.5;
+      headerFontSize = 6.5;
+      cellPad = { top: 2, right: 1.5, bottom: 2, left: 1.5 };
+    } else if (colCount >= 7) {
+      tableFontSize = 7.5;
+      headerFontSize = 7.5;
+      cellPad = { top: 2.5, right: 1.5, bottom: 2.5, left: 1.5 };
+    }
     
-    // Logo and Institute Header
-    const logoWidth = 25;
-    const logoHeight = 18;
-    let headerYPos = yPos;
-    let headerHeight = 0;
+    // ============ BRANDING & HEADER SECTION ============
     
-    // Try to load and display logo
+    // Header background
+    if (pdfSettings.headerBackground) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(0, 0, pageWidth, 40, 'F');
+    }
+
+    const logoSize = orientation === 'l' ? 18 : 20;
+    
+    // 1. Logo
     if (pdfSettings.showLogo && instituteInfo.logo) {
       try {
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.src = instituteInfo.logo;
         
-        await Promise.race([
-          new Promise((resolve) => {
-            img.onload = () => {
-              try {
-                doc.addImage(img, 'PNG', margin, headerYPos + 3, logoWidth, logoHeight);
-                headerHeight = Math.max(headerHeight, logoHeight + 6);
-              } catch (e) {
-                console.error('Error adding image:', e);
-              }
-              resolve();
-            };
-            img.onerror = resolve;
-          }),
-          new Promise((resolve) => setTimeout(resolve, 2000)) // Timeout after 2 seconds
-        ]);
-      } catch (err) {
-        console.error('Logo loading error:', err);
-      }
+        await new Promise((resolve) => {
+          img.onload = () => {
+            try {
+              const ratio = img.width / img.height;
+              const w = ratio >= 1 ? logoSize : logoSize * ratio;
+              const h = ratio >= 1 ? logoSize / ratio : logoSize;
+              doc.addImage(img, 'PNG', margin, yPos, w, h);
+            } catch (e) {}
+            resolve();
+          };
+          img.onerror = resolve;
+          setTimeout(resolve, 1500);
+        });
+      } catch (err) {}
     }
     
-    // Institute Info - Always display prominently
+    // 2. Institute Info
+    const textStartX = pdfSettings.showLogo ? margin + logoSize + 5 : margin;
+    
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
+    doc.setFontSize(orientation === 'l' ? 15 : 18);
     doc.setTextColor(30, 41, 59);
-    const logoOffsetX = pdfSettings.showLogo ? (logoWidth + 12) : 0;
-    const instituteNameText = instituteInfo.name || 'The Clouds Academy';
-    doc.text(instituteNameText, margin + logoOffsetX, headerYPos + 5);
-    headerHeight = Math.max(headerHeight, 10);
+    doc.text(instituteInfo.name?.toUpperCase() || 'THE CLOUDS ACADEMY', textStartX, yPos + 6);
     
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(107, 114, 128);
-    
-    let infoYPos = headerYPos + 12;
-    if (instituteInfo.address) {
-      const addressText = instituteInfo.address + (instituteInfo.city ? ', ' + instituteInfo.city : '');
-      doc.text(addressText, margin + logoOffsetX, infoYPos);
-      infoYPos += 4;
-      headerHeight = Math.max(headerHeight, 18);
-    }
-    if (instituteInfo.phone && instituteInfo.email) {
-      doc.text(`${instituteInfo.phone} | ${instituteInfo.email}`, margin + logoOffsetX, infoYPos);
-      headerHeight = Math.max(headerHeight, 22);
-    } else if (instituteInfo.phone) {
-      doc.text(`Phone: ${instituteInfo.phone}`, margin + logoOffsetX, infoYPos);
-      headerHeight = Math.max(headerHeight, 22);
-    } else if (instituteInfo.email) {
-      doc.text(`Email: ${instituteInfo.email}`, margin + logoOffsetX, infoYPos);
-      headerHeight = Math.max(headerHeight, 22);
-    }
-    
-    yPos = headerYPos + headerHeight + 8;
-    
-    // Solid Divider Line
-    doc.setDrawColor(51, 65, 85);
-    doc.setLineWidth(1.2);
-    doc.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 8;
-    
-    // ============ REPORT TITLE & INFO ============
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(15, 23, 42);
-    doc.text(fileName, margin, yPos);
-    yPos += 5;
-    
-    // Report metadata - Two columns
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
+    doc.setFontSize(orientation === 'l' ? 8 : 9);
     doc.setTextColor(71, 85, 105);
     
-    // Left column
-    let leftInfo = [];
-    if (dateRange.from || dateRange.to) {
-      let dateText = 'Period: ';
-      if (dateRange.from) dateText += dateRange.from;
-      if (dateRange.to) dateText += ` to ${dateRange.to}`;
-      leftInfo.push(dateText);
+    let infoY = yPos + 11;
+    if (instituteInfo.address) {
+      doc.text(instituteInfo.address, textStartX, infoY);
+      infoY += 4;
     }
-    leftInfo.forEach((text, i) => {
-      doc.text(text, margin, yPos + (i * 3.5));
-    });
-    
-    // Right column - Total Records
+    if (instituteInfo.phone || instituteInfo.email) {
+      const contactInfo = [instituteInfo.phone, instituteInfo.email].filter(Boolean).join('  |  ');
+      doc.text(contactInfo, textStartX, infoY);
+    }
+
+    // 3. Right Side - Report Badge & Date
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(51, 65, 85);
-    const recordsText = `Total Records: ${data.length}`;
-    const recordsWidth = doc.getTextWidth(recordsText);
-    doc.text(recordsText, pageWidth - margin - recordsWidth, yPos);
+    doc.setFontSize(9);
+    doc.setTextColor(79, 70, 229);
+    const catText = 'OFFICIAL REPORT';
+    const catWidth = doc.getTextWidth(catText);
+    doc.text(catText, pageWidth - margin - catWidth, yPos + 6);
     
-    // Generated timestamp
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(148, 163, 175);
-    const generatedDate = new Date().toLocaleDateString('en-PK', { 
-      year: 'numeric', 
-      month: '2-digit', 
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
+    // Removed Printed Date
+
+    yPos = 40;
+    
+    // Accent Line
+    doc.setDrawColor(79, 70, 229);
+    doc.setLineWidth(0.5);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    
+    yPos += 7;
+    
+    // ============ REPORT TITLE & COUNT ============
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text(fileName.toUpperCase(), margin, yPos);
+    
+    // Total Count Badge
+    const countText = `RECORDS: ${data.length}`;
+    doc.setFontSize(7.5);
+    const countW = doc.getTextWidth(countText) + 6;
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(pageWidth - margin - countW, yPos - 4, countW, 6, 1, 1, 'F');
+    doc.setTextColor(71, 85, 105);
+    doc.text(countText, pageWidth - margin - countW + 3, yPos - 0.5);
+    
+    yPos += 6;
+    
+    // Date Range Info
+    if (dateRange.from || dateRange.to) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Date Range: ${dateRange.from || 'Beginning'} — ${dateRange.to || 'Today'}`, margin, yPos);
+      yPos += 5;
+    }
+    
+    yPos += 2;
+    
+    // ============ TABLE SECTION ============
+    
+    // Filter out "Archived" if colCount is very high to save space
+    const finalHeaders = [];
+    const finalCols = [];
+    headers.forEach((h, i) => {
+      if (colCount >= 12 && h.toUpperCase() === 'ARCHIVED') return;
+      finalHeaders.push(h.toUpperCase());
+      finalCols.push(orderedCols[i]);
     });
-    doc.text(`Generated: ${generatedDate}`, margin, yPos + 8);
-    
-    yPos += 12;
-    
-    // ============ DATA TABLE ============
-    
-    const tableHeaders = orderedCols.map(key => {
-      const col = colDefs.find(c => c.key === key);
-      const label = col?.label || key;
-      return label.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    });
-    
+
     const tableBody = data.map(row => 
-      orderedCols.map(key => {
+      finalCols.map(key => {
         const val = row[key];
-        if (typeof val === 'boolean') return val ? 'Yes' : 'No';
-        if (typeof val === 'object' && val !== null) return JSON.stringify(val).substring(0, 20) + '...';
-        return String(val ?? '').substring(0, 50);
+        if (typeof val === 'boolean') return val ? 'YES' : 'NO';
+        return String(val ?? '').trim();
       })
     );
-    
-    // Calculate available width for table
-    const availableWidth = pageWidth - (margin * 2);
-    const numColumns = orderedCols.length;
-    
-    // Smart column width distribution
-    const columnWidths = orderedCols.map(key => {
-      // Smaller width for IDs, status, dates
-      if (key.includes('id') || key === 'status' || key.includes('date')) {
-        return 12;
+
+    // Smart column widths: give more space to name/text columns, less to numeric
+    const columnStyles = {};
+    finalCols.forEach((key, i) => {
+      const k = key.toLowerCase();
+      if (k.includes('amount') || k.includes('fee') || k.includes('fine') || k.includes('net') || k.includes('discount')) {
+        columnStyles[i] = { halign: 'right', cellWidth: 'auto' };
+      } else if (k === 'status' || k === 'archived' || k === 'year' || k === 'month') {
+        columnStyles[i] = { halign: 'center', cellWidth: 'auto' };
+      } else if (k.includes('date')) {
+        columnStyles[i] = { halign: 'center', cellWidth: 'auto' };
+      } else if (k.includes('name') || k.includes('student')) {
+        columnStyles[i] = { halign: 'left', cellWidth: 'auto' };
+      } else {
+        columnStyles[i] = { cellWidth: 'auto' };
       }
-      // Medium width for amounts
-      if (key.includes('amount') || key.includes('total') || key.includes('sum') || key.includes('fine')) {
-        return 16;
-      }
-      // Larger width for names and descriptions
-      if (key.includes('name') || key.includes('desc') || key.includes('title')) {
-        return 28;
-      }
-      // Default width for other columns
-      return 15;
     });
     
-    // Adjust column widths to fit page if needed
-    const totalWidth = columnWidths.reduce((a, b) => a + b, 0);
-    const scaleFactor = availableWidth / totalWidth;
-    const scaledWidths = columnWidths.map(w => w * scaleFactor);
-
     autoTable(doc, {
-      head: [tableHeaders],
+      head: [finalHeaders],
       body: tableBody,
       startY: yPos,
-      margin: { top: margin, left: margin, right: margin, bottom: margin + 8 },
+      margin: { left: margin, right: margin, bottom: 15 },
       theme: 'grid',
       styles: {
         font: 'helvetica',
-        fontSize: pdfSettings.fontSize,
-        cellPadding: 2.5,
+        fontSize: tableFontSize,
+        cellPadding: cellPad,
         valign: 'middle',
         halign: 'left',
         lineColor: [226, 232, 240],
-        lineWidth: 0.2,
+        lineWidth: 0.1,
         textColor: [51, 65, 85],
         overflow: 'linebreak',
       },
-      columnStyles: Object.fromEntries(
-        orderedCols.map((key, index) => {
-          let halign = 'left';
-          
-          if (key.includes('amount') || key.includes('total') || key.includes('sum')) {
-            halign = 'right';
-          }
-          if (key === 'status' || key.includes('status')) {
-            halign = 'center';
-          }
-          if (key.includes('voucher') || key.includes('number') || key.includes('id')) {
-            halign = 'center';
-          }
-          if (key.includes('date')) {
-            halign = 'center';
-          }
-          
-          return [index, { halign, cellWidth: scaledWidths[index] }];
-        })
-      ),
       headStyles: {
-        fontStyle: 'bold',
-        fontSize: pdfSettings.fontSize + 0.5,
-        fillColor: [51, 65, 85],
+        fillColor: [30, 41, 59],
         textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: headerFontSize,
         halign: 'center',
-        valign: 'middle',
-        cellPadding: 4,
-        lineColor: [51, 65, 85],
-        lineWidth: 0.3,
+        cellPadding: cellPad,
       },
-      alternateRowStyles: pdfSettings.tableStriped ? {
+      alternateRowStyles: {
         fillColor: [248, 250, 252],
-      } : {},
-      bodyStyles: {
-        lineColor: [226, 232, 240],
-        lineWidth: 0.2,
       },
-      didDrawPage: (data) => {
-        const pageSize = doc.internal.pageSize;
-        const pageHeight = pageSize.getHeight();
-        const pageWidth = pageSize.getWidth();
+      columnStyles,
+      didDrawPage: (d) => {
+        const pageCount = doc.internal.getNumberOfPages();
+        const currPage = doc.internal.getCurrentPageInfo().pageNumber;
         
-        // Footer divider
-        doc.setDrawColor(226, 232, 240);
-        doc.setLineWidth(0.3);
-        doc.line(margin, pageHeight - margin - 8, pageWidth - margin, pageHeight - margin - 8);
+        doc.setFontSize(6.5);
+        doc.setTextColor(148, 163, 184);
         
-        // Page numbers
-        if (pdfSettings.showPageNumbers) {
-          const pageCount = doc.internal.getNumberOfPages();
-          const pageNum = doc.internal.getPageInfo(doc.internal.getCurrentPageInfo().pageNumber).pageNumber;
-          doc.setFontSize(7);
-          doc.setTextColor(148, 163, 175);
-          doc.text(`Page ${pageNum} of ${pageCount}`, pageWidth / 2, pageHeight - 4, { align: 'center' });
-        }
+        // Footer line
+        doc.setDrawColor(241, 245, 249);
+        doc.line(margin, pageHeight - 11, pageWidth - margin, pageHeight - 11);
         
-        // Website footer
-        if (pdfSettings.showFooter) {
-          doc.setFontSize(7);
-          doc.setTextColor(148, 163, 175);
-          doc.text(instituteInfo.website || 'www.thecloudsacademy.com', pageWidth / 2, pageHeight - margin - 1, { align: 'center' });
-        }
-      },
+        doc.text(`Page ${currPage} of ${pageCount}`, margin, pageHeight - 7);
+        
+        const brandText = `${instituteInfo.website}  |  Generated by The Clouds Academy ERP`;
+        const brandW = doc.getTextWidth(brandText);
+        doc.text(brandText, pageWidth - margin - brandW, pageHeight - 7);
+      }
     });
     
     return doc;
@@ -561,10 +520,12 @@ export default function ExportModal({
     const margin = 15;
     let yPos = 15;
 
-    // A4 Border
+    // A4 Border - Double line for premium feel
     doc.setDrawColor(30, 41, 59); // Slate-800
     doc.setLineWidth(0.5);
     doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
+    doc.setLineWidth(0.1);
+    doc.rect(6, 6, pageWidth - 12, pageHeight - 12);
 
     // 1. Official Header
     if (pdfSettings.showLogo && instituteInfo.logo) {
@@ -583,9 +544,9 @@ export default function ExportModal({
     }
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(24);
+    doc.setFontSize(22);
     doc.setTextColor(30, 41, 59);
-    doc.text(instituteInfo.name, 42, yPos + 10);
+    doc.text(instituteInfo.name?.toUpperCase(), 42, yPos + 10);
     
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
@@ -596,12 +557,12 @@ export default function ExportModal({
     // Student Photo Box (Top Right)
     const photoX = pageWidth - margin - 35;
     const photoY = yPos;
-    doc.setDrawColor(203, 213, 225); // Slate-200
-    doc.setFillColor(248, 250, 252); // Slate-50
-    doc.rect(photoX, photoY, 35, 40, 'FD');
+    doc.setDrawColor(71, 85, 105);
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(photoX, photoY, 35, 40, 1, 1, 'FD');
     
     // Attempt to load student image
-    const studentImageUrl = student.image || student.profile_image || student.profile_photo;
+    const studentImageUrl = student.image || student.profile_image || student.profile_photo || student.details?.studentDetails?.image;
     if (studentImageUrl) {
       try {
         const simg = new Image();
@@ -609,7 +570,7 @@ export default function ExportModal({
         simg.src = studentImageUrl;
         await new Promise((resolve) => {
           simg.onload = () => {
-            doc.addImage(simg, 'JPEG', photoX + 1, photoY + 1, 33, 38);
+            doc.addImage(simg, 'JPEG', photoX + 1.5, photoY + 1.5, 32, 37);
             resolve();
           };
           simg.onerror = resolve;
@@ -640,7 +601,7 @@ export default function ExportModal({
 
     // Helper to draw boxed entries
     const drawFormSection = (title, items) => {
-      if (yPos > pageHeight - 40) {
+      if (yPos > pageHeight - 45) {
         doc.addPage();
         doc.setDrawColor(30, 41, 59);
         doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
@@ -648,19 +609,19 @@ export default function ExportModal({
       }
 
       // Section Header
-      doc.setFillColor(241, 245, 249); // Slate-100
-      doc.rect(margin, yPos, pageWidth - (margin * 2), 8, 'F');
+      doc.setFillColor(79, 70, 229); // Indigo-600
+      doc.rect(margin, yPos, pageWidth - (margin * 2), 7, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(51, 65, 85); // Slate-700
-      doc.text(title.toUpperCase(), margin + 3, yPos + 5.5);
-      yPos += 8;
+      doc.setFontSize(8.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text(title.toUpperCase(), margin + 3, yPos + 5);
+      yPos += 7;
 
       // Draw Grid
-      const rowHeight = 10;
+      const rowHeight = 9;
       const colWidth = (pageWidth - (margin * 2)) / 3;
       
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       items.forEach((item, idx) => {
         const colIdx = idx % 3;
         const rowIdx = Math.floor(idx / 3);
@@ -674,12 +635,12 @@ export default function ExportModal({
         // Label
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(100, 116, 139);
-        doc.text(item.label, x + 2, y + 4);
+        doc.text(String(item.label || '').toUpperCase(), x + 2, y + 3.5);
         
         // Value
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(30, 41, 59);
-        doc.text(String(item.value || '—'), x + 2, y + 8);
+        doc.text(String(item.value || '—'), x + 2, y + 7.5);
 
         if (idx === items.length - 1) {
           yPos = y + rowHeight + 5;
@@ -689,7 +650,7 @@ export default function ExportModal({
 
     const getVal = (id) => {
       const col = colDefs.find(c => c.key === id);
-      const val = student[id] ?? (student.details?.[id]) ?? '—';
+      const val = student[id] ?? (student.details?.[id]) ?? (student.details?.studentDetails?.[id]) ?? '—';
       return { label: col?.label || id, value: val };
     };
 
@@ -711,12 +672,15 @@ export default function ExportModal({
     
     yPos += 5;
     doc.setDrawColor(203, 213, 225);
-    doc.rect(margin, yPos, pageWidth - (margin * 2), 25);
+    doc.setFillColor(252, 253, 255);
+    doc.roundedRect(margin, yPos, pageWidth - (margin * 2), 25, 1, 1, 'FD');
     doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8);
-    doc.text("Declaration: I hereby certify that the information provided above is correct to the best of my knowledge and system records.", margin + 5, yPos + 8);
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text("Declaration: I hereby certify that the information provided above is correct and matches the official system records.", margin + 5, yPos + 8);
     
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 41, 59);
     doc.text("System Administrator Signature:", margin + 5, yPos + 20);
     doc.line(margin + 58, yPos + 20, margin + 110, yPos + 20);
     
@@ -727,7 +691,7 @@ export default function ExportModal({
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(148, 163, 184);
-    doc.text(`Officially Document ID: STU-${student?.id || 'N/A'}-${Date.now()}`, margin, pageHeight - 12);
+    doc.text(`Official Document ID: STU-${student?.id || 'N/A'}-${Date.now().toString().slice(-6)}`, margin, pageHeight - 12);
     doc.text(`Printed By: The Clouds Academy ERP System`, pageWidth / 2, pageHeight - 12, { align: 'center' });
     doc.text(`www.thecloudsacademy.com`, pageWidth - margin, pageHeight - 12, { align: 'right' });
   }
@@ -757,24 +721,21 @@ export default function ExportModal({
     const status = (result?.status || 'ABSENT').toUpperCase();
     const isPass = status === 'PASS';
 
-    // A4 Border
+    // A4 Border - Double line for premium feel
     doc.setDrawColor(26, 41, 66); // Dark Navy
-    doc.setLineWidth(0.5);
+    doc.setLineWidth(0.6);
     doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
+    doc.setLineWidth(0.1);
+    doc.rect(6.5, 6.5, pageWidth - 13, pageHeight - 13);
 
-    // ─── Background Status Watermark (Ghost Light) ───
+    // ─── Status Watermark ───
     doc.saveGraphicsState();
-    doc.setFontSize(100);
+    doc.setFontSize(80);
     doc.setFont('helvetica', 'bold');
-    // Ultra light colors (barely visible to prevent obscuring text)
-    if (status === 'PASS') {
-      doc.setTextColor(250, 253, 251); 
-    } else {
-      doc.setTextColor(253, 250, 250); 
-    }
-    doc.text(status, pageWidth / 2, pageHeight / 2 + 20, {
+    doc.setTextColor(isPass ? 240 : 253, isPass ? 249 : 240, isPass ? 245 : 240); 
+    doc.text(status, pageWidth / 2, pageHeight / 2 + 10, {
       align: 'center',
-      angle: 45,
+      angle: 35,
     });
     doc.restoreGraphicsState();
 
@@ -797,25 +758,21 @@ export default function ExportModal({
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
     doc.setTextColor(26, 41, 66);
-    doc.text(instituteInfo.name, 42, yPos + 10);
+    doc.text(instituteInfo.name?.toUpperCase(), 42, yPos + 10);
     
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 116, 139);
     doc.text(`${instituteInfo.address}, ${instituteInfo.city}`, 42, yPos + 16);
-    doc.text(`Website: ${instituteInfo.website} | Email: ${instituteInfo.email}`, 42, yPos + 21);
+    doc.text(`Phone: ${instituteInfo.phone} | Email: ${instituteInfo.email}`, 42, yPos + 21);
 
-    doc.setFillColor(isPass ? 230 : 253, isPass ? 247 : 236, isPass ? 238 : 234);
-    // Use standard rect if roundedRect is not available
-    if (typeof doc.roundedRect === 'function') {
-      doc.roundedRect(pageWidth - margin - 30, yPos + 5, 30, 8, 2, 2, 'F');
-    } else {
-      doc.rect(pageWidth - margin - 30, yPos + 5, 30, 8, 'F');
-    }
-    doc.setFontSize(10);
+    // Outcome Badge
+    doc.setFillColor(isPass ? 230 : 254, isPass ? 245 : 242, isPass ? 241 : 242);
+    doc.roundedRect(pageWidth - margin - 35, yPos + 5, 35, 10, 1.5, 1.5, 'F');
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(isPass ? 26 : 179, isPass ? 122 : 43, isPass ? 74 : 26);
-    doc.text(status, pageWidth - margin - 15, yPos + 10.5, { align: 'center' });
+    doc.setTextColor(isPass ? 22 : 190, isPass ? 101 : 18, isPass ? 52 : 18);
+    doc.text(status, pageWidth - margin - 17.5, yPos + 11.5, { align: 'center' });
 
     yPos += 35;
 
@@ -825,14 +782,14 @@ export default function ExportModal({
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.setTextColor(255, 255, 255);
-    doc.text("EXAMINATION RESULT CARD / GRADE SHEET", pageWidth / 2, yPos + 7, { align: 'center' });
+    doc.text("OFFICIAL PERFORMANCE GRADE SHEET", pageWidth / 2, yPos + 7, { align: 'center' });
     
     yPos += 18;
 
     // 3. Info Grid
     const drawGrid = (items) => {
       const colWidth = (pageWidth - (margin * 2)) / 2;
-      const rowHeight = 10;
+      const rowHeight = 9;
       doc.setFontSize(8);
       items.forEach((item, idx) => {
         const colIdx = idx % 2;
@@ -845,67 +802,61 @@ export default function ExportModal({
         
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(100, 116, 139);
-        doc.text(item.label, x + 3, y + 4);
+        doc.text(item.label, x + 3, y + 3.5);
         
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(26, 41, 66);
-        doc.text(String(item.value || '—'), x + 3, y + 8);
+        doc.text(String(item.value || '—'), x + 3, y + 7.5);
 
         if (idx === items.length - 1) yPos = y + rowHeight + 10;
       });
     };
 
     const info = [
-      { label: "STUDENT NAME", value: `${student?.first_name || ''} ${student?.last_name || ''}`.trim() || student?.name || '—' },
-      { label: "ROLL NUMBER", value: student?.roll_number || student?.roll_no || '—' },
-      { label: "REGISTRATION ID", value: student?.registration_no || '—' },
-      { label: "CLASS / SECTION", value: `${exam?.class_name || '—'} (${exam?.section_name || '—'})` },
-      { label: "EXAMINATION", value: exam?.name || exam?.title || '—' },
-      { label: "DATE GENERATED", value: new Date().toLocaleDateString() },
+      { label: "CANDIDATE NAME", value: `${student?.first_name || ''} ${student?.last_name || ''}`.trim() || student?.name || '—' },
+      { label: "ROLL NUMBER", value: student?.roll_number || student?.roll_no || student?.details?.studentDetails?.roll_no || '—' },
+      { label: "REGISTRATION ID", value: student?.registration_no || student?.details?.studentDetails?.registration_no || '—' },
+      { label: "ACADEMIC CLASS", value: `${exam?.class_name || '—'} (${exam?.section_name || '—'})` },
+      { label: "EXAM TITLE", value: exam?.name || exam?.title || '—' },
     ];
     drawGrid(info);
 
-    // 5. Stats Summary Cards
+    // 4. Statistics
     const cardWidth = (pageWidth - (margin * 2) - 10) / 3;
     const cards = [
-      { label: "TOTAL MARKS", value: exam?.total_marks || result?.total_marks || '0', color: [45, 106, 159] },
-      { label: "MARKS OBTAINED", value: result?.total_marks_obtained || '0', color: [26, 122, 74] },
-      { label: "PERCENTAGE", value: `${parseFloat(result?.percentage || 0).toFixed(1)}%`, color: [179, 106, 0] },
+      { label: "TOTAL MARKS", value: exam?.total_marks || result?.total_marks || '0', color: [26, 41, 66] },
+      { label: "OBTAINED", value: result?.total_marks_obtained || result?.marks_obtained || '0', color: [21, 128, 61] },
+      { label: "PERCENTAGE", value: `${parseFloat(result?.percentage || 0).toFixed(1)}%`, color: [194, 65, 12] },
     ];
 
     cards.forEach((card, i) => {
       const x = margin + (i * (cardWidth + 5));
       doc.setFillColor(248, 250, 252);
       doc.setDrawColor(226, 232, 240);
-      if (typeof doc.roundedRect === 'function') {
-        doc.roundedRect(x, yPos, cardWidth, 18, 2, 2, 'FD');
-      } else {
-        doc.rect(x, yPos, cardWidth, 18, 'FD');
-      }
+      doc.roundedRect(x, yPos, cardWidth, 18, 1, 1, 'FD');
       
       doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(148, 163, 184);
       doc.text(card.label, x + (cardWidth / 2), yPos + 6, { align: 'center' });
       
-      doc.setFontSize(16);
-      doc.setTextColor(card.color?.[0] || 0, card.color?.[1] || 0, card.color?.[2] || 0);
+      doc.setFontSize(14);
+      doc.setTextColor(card.color?.[0], card.color?.[1], card.color?.[2]);
       doc.text(String(card.value ?? '0'), x + (cardWidth / 2), yPos + 14, { align: 'center' });
     });
 
     yPos += 28;
 
     // 5. Subject Table
-    doc.setFontSize(9);
+    doc.setFontSize(9.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(26, 41, 66);
-    doc.text("SUBJECT-WISE PERFORMANCE", margin, yPos);
+    doc.text("DETAILED SUBJECT ANALYSIS", margin, yPos);
     yPos += 4;
 
     const subjectMarks = Array.isArray(result?.subject_marks) ? result.subject_marks : [];
     let examSubjects = Array.isArray(exam?.subject_schedules) ? exam.subject_schedules : [];
 
-    // Fallback: If exam schedule is not found, use subjects directly from the results
     if (examSubjects.length === 0 && subjectMarks.length > 0) {
       examSubjects = subjectMarks.map(m => ({
         subject_id: m.subject_id || m.id,
@@ -914,13 +865,13 @@ export default function ExportModal({
       }));
     }
 
-    const tableRows = examSubjects.map((subj, idx) => {
+    const tableRows = examSubjects.map((subj) => {
       const mark = subjectMarks.find(m => m.subject_id === subj.subject_id) || {};
       const total = subj?.total_marks || 0;
       const obtained = mark?.marks_obtained || 0;
       const pct = total > 0 ? ((obtained / total) * 100).toFixed(1) : '0.0';
       return [
-        subj?.subject_name || '—',
+        (subj?.subject_name || '—').toUpperCase(),
         total,
         obtained,
         `${pct}%`,
@@ -928,78 +879,167 @@ export default function ExportModal({
       ];
     });
 
-    try {
-      autoTable(doc, {
-        head: [['SUBJECT', 'TOTAL', 'OBTAINED', 'PERCENTAGE', 'GRADE']],
-        body: tableRows,
-        startY: yPos,
-        margin: { left: margin, right: margin },
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [26, 41, 66], halign: 'center' },
-        columnStyles: {
-          0: { halign: 'left', fontStyle: 'bold' },
-          1: { halign: 'center' },
-          2: { halign: 'center' },
-          3: { halign: 'center' },
-          4: { halign: 'center' },
-        }
-      });
-      yPos = doc.lastAutoTable.finalY + 15;
-    } catch (err) {
-      console.warn("AutoTable failed", err);
-      yPos += 20;
-    }
-
-    // 6. Summary Strip
-    doc.setFillColor(26, 41, 66);
-    if (typeof doc.roundedRect === 'function') {
-      doc.roundedRect(margin, yPos, pageWidth - (margin * 2), 15, 2, 2, 'F');
-    } else {
-      doc.rect(margin, yPos, pageWidth - (margin * 2), 15, 'F');
-    }
-    
-    const sumWidth = (pageWidth - (margin * 2)) / 3;
-    const summary = [
-      { label: "GRADE", value: result?.grade || '—' },
-      { label: "OVERALL SCORE", value: `${parseFloat(result?.percentage || 0).toFixed(1)}%` },
-      { label: "OUTCOME", value: status }
-    ];
-
-    summary.forEach((s, i) => {
-      const x = margin + (i * sumWidth);
-      doc.setFontSize(7);
-      doc.setTextColor(148, 163, 184);
-      doc.text(s.label, x + (sumWidth / 2), yPos + 5, { align: 'center' });
-      doc.setFontSize(12);
-      doc.setTextColor(255, 255, 255);
-      doc.text(s.value, x + (sumWidth / 2), yPos + 11, { align: 'center' });
+    autoTable(doc, {
+      head: [['SUBJECT TITLE', 'MAX', 'OBT', 'PERC', 'GRADE']],
+      body: tableRows,
+      startY: yPos,
+      margin: { left: margin, right: margin },
+      styles: { fontSize: 8.5, cellPadding: 3.5, halign: 'center' },
+      headStyles: { fillColor: [26, 41, 66], halign: 'center', fontStyle: 'bold' },
+      columnStyles: { 0: { halign: 'left', fontStyle: 'bold', cellWidth: 70 } },
+      alternateRowStyles: { fillColor: [249, 250, 251] }
     });
-
-    yPos += 30;
-
-    // 7. Signatures
-    const sigWidth = (pageWidth - (margin * 2) - 40) / 2;
-    doc.setDrawColor(148, 163, 184);
-    if (typeof doc.setLineDashPattern === 'function') {
-      doc.setLineDashPattern([1, 1], 0);
-    }
-    doc.line(margin + 10, yPos + 10, margin + 10 + sigWidth, yPos + 10);
-    doc.line(pageWidth - margin - 10 - sigWidth, yPos + 10, pageWidth - margin - 10, yPos + 10);
     
-    if (typeof doc.setLineDashPattern === 'function') {
-      doc.setLineDashPattern([], 0);
+    yPos = doc.lastAutoTable.finalY + 12;
+
+    // 6. Signature Area
+    const footerY = pageHeight - 35;
+    if (yPos > footerY - 10) { 
+      doc.addPage(); 
+      yPos = 30; 
+      doc.rect(5, 5, pageWidth - 10, pageHeight - 10); // Standard border if new page
     }
-    doc.setFontSize(8);
+
+    const sigLineY = pageHeight - 25;
+    const sigLineW = (pageWidth - (margin * 2) - 40) / 2;
+    
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.3);
+    
+    // Left Line
+    doc.line(margin + 10, sigLineY, margin + 10 + sigLineW, sigLineY);
+    // Right Line
+    doc.line(pageWidth - margin - 10 - sigLineW, sigLineY, pageWidth - margin - 10, sigLineY);
+    
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(71, 85, 105);
-    doc.text("CLASS TEACHER", margin + 10 + (sigWidth / 2), yPos + 15, { align: 'center' });
-    doc.text("HEAD OF INSTITUTE", pageWidth - margin - 10 - (sigWidth / 2), yPos + 15, { align: 'center' });
+    
+    // Centered labels under lines
+    doc.text("CLASS TEACHER", margin + 10 + (sigLineW / 2), sigLineY + 5, { align: 'center' });
+    doc.text("CONTROLLER OF EXAMINATIONS", pageWidth - margin - 10 - (sigLineW / 2), sigLineY + 5, { align: 'center' });
 
     // Footer
     doc.setFontSize(7);
     doc.setTextColor(148, 163, 184);
-    doc.text(`Officially issued document by ${instituteInfo.name} Management System`, pageWidth / 2, pageHeight - 12, { align: 'center' });
+    doc.text(`This is a computer generated grade sheet and does not require a physical signature for system validation.`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    doc.text(`${instituteInfo.website}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
   }
   
+
+  // --- FEE HISTORY PDF ---
+  async function generateFeeHistoryPDF(data) {
+    const { default: jsPDF } = await import('jspdf');
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    await appendFeeHistoryToDoc(doc, data);
+    return doc;
+  }
+
+  async function appendFeeHistoryToDoc(doc, data) {
+    const { default: autoTable } = await import('jspdf-autotable');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    let yPos = 15;
+
+    // Branding
+    if (pdfSettings.showLogo && instituteInfo.logo) {
+      try {
+        const img = new Image(); img.src = instituteInfo.logo;
+        await new Promise(r => { img.onload = () => { doc.addImage(img, 'PNG', margin, yPos, 20, 20); r(); }; img.onerror = r; if(img.complete) img.onload(); });
+      } catch(e) {}
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(30, 41, 59);
+    doc.text(instituteInfo.name?.toUpperCase(), 40, yPos + 8);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`STUDENT FEE STATEMENT & HISTORY`, 40, yPos + 14);
+
+    yPos += 30;
+
+    // Student Box
+    doc.setFillColor(248, 250, 252);
+    doc.rect(margin, yPos, pageWidth - (margin * 2), 22, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(margin, yPos, pageWidth - (margin * 2), 22);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${data.first_name || ''} ${data.last_name || ''}`.trim() || data.name || 'Student Name', margin + 5, yPos + 7);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Reg No: ${data.registration_no || '—'}`, margin + 5, yPos + 13);
+    doc.text(`Class: ${data.class_name || '—'} (${data.section_name || '—'})`, margin + 5, yPos + 18);
+
+    // Right side of student box
+    doc.text(`Roll No: ${data.roll_no || '—'}`, pageWidth - margin - 5, yPos + 7, { align: 'right' });
+    doc.text(`Father: ${data.father_name || '—'}`, pageWidth - margin - 5, yPos + 13, { align: 'right' });
+    doc.text(`Phone: ${data.phone || '—'}`, pageWidth - margin - 5, yPos + 18, { align: 'right' });
+
+    yPos += 30;
+
+    // Summary Cards
+    const summary = data.fee_summary || {};
+    const cardW = (pageWidth - (margin * 2)) / 3;
+    const cards = [
+      { label: "TOTAL PAYABLE", value: summary.total_net_amount || '0.00', color: [30, 41, 59] },
+      { label: "TOTAL PAID", value: (summary.status_breakdown_formatted?.paid?.split('(')[1]?.replace(')', '') || '0.00'), color: [16, 185, 129] },
+      { label: "BALANCE DUE", value: (parseFloat(summary.total_net_amount_raw || 0) - parseFloat(summary.paid_amount_raw || 0)).toFixed(2), color: [239, 68, 68] }
+    ];
+
+    cards.forEach((c, i) => {
+      const x = margin + (i * cardW);
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(x + 1, yPos, cardW - 2, 18, 1, 1, 'FD');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 116, 139);
+      doc.text(c.label, x + (cardW / 2), yPos + 6, { align: 'center' });
+      doc.setFontSize(11);
+      doc.setTextColor(c.color[0], c.color[1], c.color[2]);
+      doc.setFont('helvetica', 'bold');
+      doc.text(String(c.value), x + (cardW / 2), yPos + 13, { align: 'center' });
+    });
+
+    yPos += 28;
+
+    // Table
+    const records = data.fee_records || [];
+    autoTable(doc, {
+      startY: yPos,
+      head: [['VOUCHER', 'MONTH/YEAR', 'AMOUNT', 'DISCOUNT', 'NET', 'STATUS', 'DUE DATE']],
+      body: records.map(r => [
+        r.voucher_number || '—',
+        `${r.month}/${r.year}`,
+        r.amount || '—',
+        r.discount || '—',
+        r.net_amount || '—',
+        (r.status || '—').toUpperCase(),
+        r.due_date || '—'
+      ]),
+      theme: 'striped',
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255] },
+      columnStyles: {
+        2: { halign: 'right' },
+        3: { halign: 'right' },
+        4: { halign: 'right', fontStyle: 'bold' },
+        5: { halign: 'center' }
+      }
+    });
+
+    // Footer
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Statement generated by The Clouds Academy ERP. For any queries, contact administration.`, margin, pageHeight - 12);
+  }
+
   async function handleExport() {
     if (!selectedCols.length) return;
     
@@ -1040,9 +1080,9 @@ export default function ExportModal({
       else if (format === 'pdf') {
         setExportProgress(70);
         let doc;
-        // Detect Individual Export Mode OR Multi-Profile Mode
-        if (fileName.includes('Profile')) {
-          // IMPORTANT: Profiles need ALL data fields, not just the selected columns
+
+        // 1. Individual Student Profile (flag-based detection)
+        if (rows[0]?._isProfile) {
           const fullHydratedData = rows.map(row => {
             const out = {};
             columns.forEach(col => {
@@ -1067,7 +1107,9 @@ export default function ExportModal({
             }
             setExportProgress(70 + Math.floor((i / fullHydratedData.length) * 25));
           }
-        } else if (fileName.includes('GradeSheet')) {
+
+        // 2. Grade Sheet
+        } else if (rows[0]?._isGradeSheet) {
           for (let i = 0; i < rows.length; i++) {
             if (i === 0) {
               doc = await generateGradeSheetPDF(rows[i]);
@@ -1077,8 +1119,24 @@ export default function ExportModal({
             }
             setExportProgress(70 + Math.floor((i / rows.length) * 25));
           }
+
+        // 3. Fee History Statement
+        } else if (rows[0]?._isFeeHistory) {
+          for (let i = 0; i < rows.length; i++) {
+            if (i === 0) {
+              doc = await generateFeeHistoryPDF(rows[i]);
+            } else {
+              doc.addPage();
+              await appendFeeHistoryToDoc(doc, rows[i]);
+            }
+            setExportProgress(70 + Math.floor((i / rows.length) * 25));
+          }
+
+        // 4. Tabular report — auto landscape for many columns
         } else {
-          doc = await generateProfessionalPDF(filtered, headers, orderedCols);
+          // Smart orientation: force landscape when 7+ columns
+          const smartOrientation = orderedCols.length >= 7 ? 'landscape' : pdfSettings.orientation;
+          doc = await generateProfessionalPDF(filtered, headers, orderedCols, smartOrientation);
         }
         doc.save(`${fileName}.pdf`);
       }

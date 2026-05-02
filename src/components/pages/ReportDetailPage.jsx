@@ -413,6 +413,11 @@ const REPORT_CONFIGS = {
       {
         id: "ids",
         header: "Roll / Reg No",
+        accessorFn: (s) => {
+          const roll = s.roll_no || s.roll_number || s.Student?.roll_no || s.Student?.roll_number || s.student?.roll_no || s.student?.roll_number || s.details?.studentDetails?.roll_no || "—";
+          const reg = s.registration_no || s.reg_no || s.Student?.registration_no || s.student?.registration_no || s.details?.studentDetails?.registration_no || "—";
+          return `${roll} / ${reg}`;
+        },
         cell: ({ row }) => {
           const s = row.original;
           const roll =
@@ -597,6 +602,24 @@ const REPORT_CONFIGS = {
         id: "archived",
         header: "Archived",
         accessorFn: (s) => s.archived ? "Yes" : "No",
+      },
+      {
+        id: "actions",
+        header: "Action",
+        size: 80,
+        cell: ({ row }) => (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2.5 gap-1.5 text-[10px] font-bold border-emerald-100 text-emerald-600 hover:bg-emerald-50 rounded-lg shadow-sm bg-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              window.__handleIndividualDownload?.(row.original);
+            }}
+          >
+            <FileDown size={11} /> VOUCHER
+          </Button>
+        ),
       },
     ],
     permission: "reports.fee",
@@ -1399,7 +1422,10 @@ export default function ReportDetailPage() {
   };
 
   const handleExamDownload = async (record) => {
-    if (!filters.exam_id) {
+    // Get examId from filters OR from the record itself if available
+    const examId = filters.exam_id || record?.exam_id || record?.exam?.id;
+    
+    if (!examId) {
       toast.error("Please select an exam first");
       return;
     }
@@ -1413,7 +1439,7 @@ export default function ReportDetailPage() {
     try {
       let data = null;
       try {
-        const res = await examService.generateGradeSheet(filters.exam_id, {
+        const res = await examService.generateGradeSheet(examId, {
           student_id: studentId,
           class_id: filters.class_id,
           section_id: filters.section_id,
@@ -1437,8 +1463,21 @@ export default function ReportDetailPage() {
 
       const student = data.student || record.student || record.Student || {};
       const result = data.result || record || {};
-      const exam =
-        data.exam || currentExamDetails?.data || currentExamDetails || {};
+      let exam = data.exam || currentExamDetails?.data || currentExamDetails || {};
+
+      // Ensure academic info is present for the PDF
+      const resolvedClass = classList.find(c => String(c.id) === String(filters.class_id));
+      const resolvedSection = sectionList.find(s => String(s.id) === String(filters.section_id));
+      const resolvedYear = yearsData?.data?.find(y => String(y.value || y.id) === String(filters.academic_year_id));
+
+      exam = {
+        ...exam,
+        class_name: exam.class_name || resolvedClass?.name || "—",
+        section_name: exam.section_name || resolvedSection?.name || "—",
+        academic_year: exam.academic_year || resolvedYear?.label || "—",
+        academic_year_id: exam.academic_year_id || filters.academic_year_id,
+        title: exam.title || exam.name || record._injectedExamTitle || "Exam Result"
+      };
 
       const flattened = {
         ...student,
@@ -1525,8 +1564,20 @@ export default function ReportDetailPage() {
 
             const student = data.student || data || {};
             const result = data.result || r || {};
-            const exam =
-              data.exam || currentExamDetails?.data || currentExamDetails || {};
+            let exam = data.exam || currentExamDetails?.data || currentExamDetails || {};
+
+            // Ensure academic info is present for the PDF
+            const resolvedClass = classList.find(c => String(c.id) === String(filters.class_id));
+            const resolvedSection = sectionList.find(s => String(s.id) === String(filters.section_id));
+            const resolvedYear = yearsData?.data?.find(y => String(y.value || y.id) === String(filters.academic_year_id));
+
+            exam = {
+              ...exam,
+              class_name: exam.class_name || resolvedClass?.name || "—",
+              section_name: exam.section_name || resolvedSection?.name || "—",
+              academic_year: exam.academic_year || resolvedYear?.label || "—",
+              academic_year_id: exam.academic_year_id || filters.academic_year_id
+            };
 
             return {
               ...student,
@@ -1567,31 +1618,65 @@ export default function ReportDetailPage() {
         return;
       }
 
-      const student = record; // record is treated as student in other reports
-      if (!student?.id) return;
+      // Determine studentId: if fee report, record is a voucher, so use student_id
+      const studentId = reportType === "fee" 
+        ? (record.student_id || record.Student?.id || record.student?.id)
+        : record.id;
 
-      const loadingToast = toast.loading("Fetching full student profile...");
+      if (!studentId) {
+        toast.error("Student information not found");
+        return;
+      }
+
+      const loadingToast = toast.loading(
+        reportType === "fee" ? "Fetching student fee history..." : "Fetching full student profile..."
+      );
+      
       try {
-        const res = await studentService.getById(student.id);
-        const fullData = res.data || student;
+        let fullData;
+        if (reportType === "fee") {
+          // Fetch student profile AND fee history
+          const [profileRes, historyRes] = await Promise.all([
+            studentService.getById(studentId),
+            reportService.getFeeReport({ 
+              student_id: studentId,
+              institute_id: currentInstitute?.id,
+              limit: 1000 
+            })
+          ]);
+          
+          const profile = profileRes.data || profileRes;
+          fullData = {
+            ...profile,
+            _isFeeHistory: true,
+            fee_records: historyRes.data?.records || [],
+            fee_summary: historyRes.data?.summary || {}
+          };
+        } else {
+          const res = await studentService.getById(studentId);
+          fullData = res.data || res;
+        }
 
-        // Ensure flattening matches ExportModal expectations
-        const details = fullData.details?.studentDetails || {};
+        const details = fullData.details?.studentDetails || fullData.details || {};
+        const resolvedYear = yearsData?.data?.find(y => String(y.value || y.id) === String(filters.academic_year_id));
+
         const flattened = {
           ...fullData,
           ...details,
+          _isProfile: reportType === "student",
+          academic_year: resolvedYear?.label || "—",
+          first_name: fullData.first_name || details.first_name || "Student",
         };
 
         setIndividualExportData([flattened]);
         toast.dismiss(loadingToast);
       } catch (error) {
-        console.error("Profile fetch error:", error);
-        toast.error("Using basic data as fetch failed", { id: loadingToast });
-        setIndividualExportData([student]);
+        console.error("Individual fetch error:", error);
+        toast.error("Failed to fetch details", { id: loadingToast });
       }
     };
     return () => delete window.__handleIndividualDownload;
-  }, [reportType, filters.exam_id]);
+  }, [reportType, currentInstitute]);
 
   // Handlers
   const handleFilterChange = (key, value) => {
@@ -1917,9 +2002,7 @@ export default function ReportDetailPage() {
             columns={
               reportType === "exam"
                 ? EXAM_REPORT_COLUMNS
-                : reportType === "fee"
-                  ? config.columns
-                  : STUDENT_REPORT_COLUMNS
+                : config.columns || STUDENT_REPORT_COLUMNS
             }
             rows={
               hydratedBulkData.length > 0
@@ -1929,9 +2012,7 @@ export default function ReportDetailPage() {
             fileName={
               reportType === "exam"
                 ? `${config.title}-GradeSheets`
-                : reportType === "fee"
-                  ? `${config.title}-${new Date().toISOString().split('T')[0]}`
-                  : `${config.title}-Profiles-Class`
+                : `${config.title}-${new Date().toISOString().split('T')[0]}`
             }
           />
 
@@ -1941,13 +2022,17 @@ export default function ReportDetailPage() {
             columns={
               reportType === "exam"
                 ? EXAM_REPORT_COLUMNS
-                : STUDENT_REPORT_COLUMNS
+                : reportType === "fee"
+                  ? config.columns
+                  : STUDENT_REPORT_COLUMNS
             }
             rows={individualExportData || []}
             fileName={
               reportType === "exam"
                 ? `GradeSheet-${individualExportData?.[0]?.first_name || "Student"}`
-                : `Full-Profile-${individualExportData?.[0]?.first_name || "Student"}`
+                : reportType === "fee"
+                  ? `Fee-Statement-${individualExportData?.[0]?.first_name || "Student"}`
+                  : `Student-Profile-${individualExportData?.[0]?.first_name || "Student"}`
             }
           />
         </>

@@ -50,6 +50,12 @@ const academicYearSchema = z.object({
     .optional(),
   
   institute_id: z.string().optional(),
+}).refine((data) => {
+  if (!data.start_date || !data.end_date) return true;
+  return new Date(data.end_date) > new Date(data.start_date);
+}, {
+  message: "End date must be after start date",
+  path: ["end_date"],
 });
 
 export default function AcademicYearForm({
@@ -152,7 +158,9 @@ export default function AcademicYearForm({
           control={control}
           error={errors.start_date}
           required
-          maxDate={endDate ? new Date(endDate) : undefined}
+          maxDate={endDate}
+          fromYear={2010}
+          toYear={new Date().getFullYear() + 5}
         />
         <DatePickerField
           label="End Date"
@@ -160,7 +168,9 @@ export default function AcademicYearForm({
           control={control}
           error={errors.end_date}
           required
-          minDate={startDate ? new Date(startDate) : undefined}
+          minDate={startDate}
+          fromYear={2010}
+          toYear={new Date().getFullYear() + 5}
         />
       </div>
 

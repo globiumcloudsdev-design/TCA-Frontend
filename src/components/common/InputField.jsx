@@ -40,6 +40,7 @@ export default function InputField({
   disabled,
   className,
   hint,
+  rules,
   ...props
 }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -64,7 +65,7 @@ export default function InputField({
           disabled={disabled}
           aria-invalid={!!error}
           className={cn(isPassword && "pr-10")}
-          {...(register ? register(name) : props)}
+          {...(register ? register(name, rules) : props)}
         />
         {isPassword && (
           <button

@@ -278,11 +278,11 @@ export default function AcademicYearsPage({ type }) {
             });
           }
           
-          extraActions.push({
-            label: 'Copy Year',
-            icon: <Copy className="h-4 w-4" />,
-            onClick: () => handleCopyYear(year)
-          });
+          // extraActions.push({
+          //   label: 'Copy Year',
+          //   icon: <Copy className="h-4 w-4" />,
+          //   onClick: () => handleCopyYear(year)
+          // });
           
           extraActions.push({
             label: year.is_active ? 'Deactivate' : 'Activate',
@@ -382,10 +382,10 @@ export default function AcademicYearsPage({ type }) {
         onSearch={setSearch}
         searchPlaceholder={`Search ${pageTitle.toLowerCase()}...`}
         enableColumnVisibility
-        exportConfig={{
-          fileName: pageTitle.toLowerCase().replace(/\s+/g, '-'),
-          dateField: 'created_at'
-        }}
+        // exportConfig={{
+        //   fileName: pageTitle.toLowerCase().replace(/\s+/g, '-'),
+        //   dateField: 'created_at'
+        // }}
         pagination={{
           page,
           totalPages: data?.pagination?.totalPages || 1,

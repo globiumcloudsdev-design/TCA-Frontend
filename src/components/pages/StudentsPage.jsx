@@ -19,10 +19,12 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import * as XLSX from 'xlsx';
 import { 
   Plus, Eye, Pencil, Trash2, Loader2, IdCard, Power, Filter,
   GraduationCap, Users, BookOpen, School, Building2, Layers,
-  Calendar, Mail, Phone, MapPin, Shield
+  Calendar, Mail, Phone, MapPin, Shield,
+  AlertCircle, FileSpreadsheet
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -32,6 +34,7 @@ import useInstituteStore from '@/store/instituteStore';
 import { studentService, academicYearService, classService } from '@/services';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
+import StatsCard from '@/components/common/StatsCard';
 import AppModal from '@/components/common/AppModal';
 import StudentForm from '@/components/forms/StudentForm';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
@@ -338,15 +341,59 @@ export default function StudentsPage({ type }) {
   const { data, isLoading } = useQuery({
     queryKey: ['students', type, filters],
     queryFn: async () => {
-      const res = await studentService.getAll(filters, type);
-      if (res.data && Array.isArray(res.data)) {
-        res.data = res.data.map(flattenStudent);
+      let res;
+      const searchQuery = filters.search?.trim();
+      
+      if (searchQuery && searchQuery.length > 0) {
+        // Use global search API when searching
+        res = await studentService.search(searchQuery, filters.limit);
+        
+        // Robust normalization for search API response
+        // Handling nested structure: { success: true, data: { data: [...], total: 8 } }
+        if (res?.data?.data && Array.isArray(res.data.data)) {
+          const actualData = res.data.data;
+          const total = res.data.total || actualData.length;
+          res = { 
+            data: actualData,
+            pagination: { total, totalPages: Math.ceil(total / (filters.limit || 20)) }
+          };
+        } else if (Array.isArray(res?.data)) {
+          res = { data: res.data };
+        } else if (Array.isArray(res)) {
+          res = { data: res };
+        }
+      } else {
+        // Regular paginated/filtered list
+        res = await studentService.getAll(filters, type);
       }
-      return res;
+
+      // Final mapping and ensuring data is an array
+      const rawList = Array.isArray(res?.data) ? res.data : [];
+      const mappedList = rawList.map(flattenStudent);
+      
+      return {
+        ...res,
+        data: mappedList
+      };
     },
-    enabled: !!classId,
+    enabled: !!classId || (!!filters.search && filters.search.trim().length > 0),
     placeholderData: (prev) => prev,
   });
+
+  // Fetch Stats using Report Service
+  const { data: statsData, isLoading: isLoadingStats } = useQuery({
+    queryKey: ['student-stats', type, academicYearId, classId, sectionId],
+    queryFn: () => reportService.getStudentReport({
+      academic_year_id: academicYearId,
+      class_id: classId,
+      section_id: sectionId,
+      institute_type: type,
+      limit: 1 // We only need summary
+    }),
+    enabled: !!academicYearId,
+  });
+
+  const stats = statsData?.data?.summary || { total_records: 0, active_students: 0, inactive_students: 0 };
 
   const { data: studentToEditData, isLoading: isLoadingEdit } = useQuery({
     queryKey: ['student', editingId],
@@ -358,8 +405,8 @@ export default function StudentsPage({ type }) {
     return flattenStudent(studentToEditData?.data || studentToEditData);
   }, [studentToEditData]);
 
-  const students = data?.data ?? [];
-  const total = data?.pagination?.total ?? 0;
+  const students = Array.isArray(data?.data) ? data.data : [];
+  const total = data?.pagination?.total ?? (Array.isArray(data?.data) ? data.data.length : 0);
   const totalPages = data?.pagination?.totalPages ?? 1;
 
   const handleGenerateIdCard = async (student) => {
@@ -400,7 +447,7 @@ export default function StudentsPage({ type }) {
     // Actions column
     cols.push({
       id: 'actions',
-      header: '',
+      header: 'Actions',
       cell: ({ row }) => {
         const stu = row.original;
         return (
@@ -515,12 +562,41 @@ export default function StudentsPage({ type }) {
     <SimpleTooltip content={`Add new ${terms.student.toLowerCase()}`} side="bottom">
       <button
         onClick={() => setIsAddModalOpen(true)}
-        className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-colors"
+        className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-colors shadow-sm"
       >
         <Plus size={14} /> Add {terms.student}
       </button>
     </SimpleTooltip>
   ) : null;
+
+  const handleDownloadTemplate = () => {
+    try {
+      const headers = IMPORT_COLUMNS.map(col => col.label);
+      const ws = XLSX.utils.aoa_to_sheet([headers]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Template");
+      XLSX.writeFile(wb, `${type}_bulk_import_template.xlsx`);
+      toast.success('Template downloaded successfully');
+    } catch (error) {
+      toast.error('Failed to download template');
+    }
+  };
+
+  const headerActions = (
+    <div className="flex items-center gap-2">
+      <SimpleTooltip content="Download Bulk Import Template" side="bottom">
+        <button
+          onClick={handleDownloadTemplate}
+          className="flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-semibold hover:bg-accent hover:text-accent-foreground transition-colors shadow-sm"
+        >
+          <FileSpreadsheet size={14} className="text-emerald-600" />
+          <span className="hidden sm:inline">Bulk Template</span>
+          <span className="sm:hidden">Template</span>
+        </button>
+      </SimpleTooltip>
+      {addButton}
+    </div>
+  );
 
   // Export rows
   const studentExportRows = useMemo(() => {
@@ -537,22 +613,8 @@ export default function StudentsPage({ type }) {
       };
     });
   }, [students]);
-
-  // // Import columns
-  // const ALL_STUDENT_COLUMNS = [
-  //   { key: 'first_name', label: 'First Name', required: true },
-  //   { key: 'last_name', label: 'Last Name', required: true },
-  //   { key: 'email', label: 'Email', required: false },
-  //   { key: 'phone', label: 'Phone', required: false },
-  //   { key: 'academic_year_name', label: 'Academic Year', required: true },
-  //   { key: 'class_name', label: terms.primaryUnit, required: true },
-  //   { key: 'section_name', label: terms.groupingUnit, required: false },
-  //   { key: 'roll_no', label: terms.rollNumber, required: false },
-  //   { key: 'guardian_name', label: 'Guardian Name', required: false },
-  //   { key: 'guardian_phone', label: 'Guardian Phone', required: false },
-  // ];
-
   
+  // All possible columns from StudentForm
   // All possible columns from StudentForm
   const ALL_STUDENT_COLUMNS = [
     // Personal Information
@@ -570,40 +632,37 @@ export default function StudentsPage({ type }) {
 
     // Academic Information (Institute Type Specific)
     { key: 'class_name', label: 'Class/Course/Program', required: true, validation: 'text' },
-    { key: 'section_name', label: 'Section/Batch', required: false, validation: 'text' },
-    { key: 'roll_no', label: 'Roll Number', required: false, validation: 'text' },
+    { key: 'section_name', label: 'Section/Batch/Semester', required: false, validation: 'text' },
+    { key: 'roll_no', label: 'Roll Number', required: false, validation: 'text', types: ['school', 'coaching'] },
     { key: 'academic_year_name', label: 'Academic Year', required: true, validation: 'text' },
     { key: 'admission_date', label: 'Admission Date', required: false, validation: 'date' },
 
     // Coaching Specific
-    { key: 'course_name', label: 'Course Name', required: false, validation: 'text' },
-    { key: 'batch_name', label: 'Batch Name', required: false, validation: 'text' },
-    { key: 'target_exam', label: 'Target Exam', required: false, validation: 'text' },
-    { key: 'current_module', label: 'Current Module', required: false, validation: 'text' },
-    { key: 'candidate_id', label: 'Candidate ID', required: false, validation: 'text' },
+    { key: 'course_name', label: 'Course Name', required: false, validation: 'text', types: ['coaching'] },
+    { key: 'batch_name', label: 'Batch Name', required: false, validation: 'text', types: ['coaching'] },
+    { key: 'target_exam', label: 'Target Exam', required: false, validation: 'text', types: ['coaching'] },
+    { key: 'current_module', label: 'Current Module', required: false, validation: 'text', types: ['coaching'] },
+    { key: 'candidate_id', label: 'Candidate ID', required: false, validation: 'text', types: ['coaching'] },
 
     // College/University Specific
-    { key: 'department_name', label: 'Department', required: false, validation: 'text' },
-    { key: 'program_name', label: 'Program', required: false, validation: 'text' },
-    { key: 'semester_name', label: 'Semester', required: false, validation: 'text' },
-    { key: 'cgpa', label: 'CGPA', required: false, validation: 'number' },
-    { key: 'faculty_name', label: 'Faculty', required: false, validation: 'text' },
+    { key: 'department_name', label: 'Department', required: false, validation: 'text', types: ['college', 'university'] },
+    { key: 'program_name', label: 'Program Name', required: false, validation: 'text', types: ['college', 'university'] },
+    { key: 'semester_name', label: 'Semester Name', required: false, validation: 'text', types: ['college', 'university'] },
+    { key: 'cgpa', label: 'CGPA', required: false, validation: 'number', types: ['college', 'university'] },
+    { key: 'faculty_name', label: 'Faculty', required: false, validation: 'text', types: ['university'] },
 
     // Academy Specific
-    { key: 'academy_program_name', label: 'Program', required: false, validation: 'text' },
-    { key: 'module_name', label: 'Module', required: false, validation: 'text' },
-    { key: 'trainee_id', label: 'Trainee ID', required: false, validation: 'text' },
+    { key: 'academy_program_name', label: 'Academy Program', required: false, validation: 'text', types: ['academy'] },
+    { key: 'module_name', label: 'Module Name', required: false, validation: 'text', types: ['academy'] },
+    { key: 'trainee_id', label: 'Trainee ID', required: false, validation: 'text', types: ['academy'] },
 
-    // Guardian Information (Primary Guardian)
+    // Guardian Information
     { key: 'guardian_name', label: 'Guardian Name', required: false, validation: 'text' },
     { key: 'guardian_phone', label: 'Guardian Phone', required: false, validation: 'phone' },
     { key: 'guardian_cnic', label: 'Guardian CNIC', required: false, validation: 'cnic' },
     { key: 'guardian_email', label: 'Guardian Email', required: false, validation: 'email' },
     { key: 'guardian_relation', label: 'Guardian Relation', required: false, validation: 'text' },
     { key: 'guardian_type', label: 'Guardian Type', required: false, validation: 'select', options: ['father', 'mother', 'guardian'] },
-
-    // Multiple Guardians (JSON format)
-    { key: 'guardians', label: 'Guardians (JSON)', required: false, validation: 'json' },
 
     // Contact Information
     { key: 'present_address', label: 'Present Address', required: false, validation: 'text' },
@@ -621,7 +680,6 @@ export default function StudentsPage({ type }) {
     { key: 'concession_type', label: 'Concession Type', required: false, validation: 'select', options: ['none', 'merit', 'need', 'staff', 'sibling'] },
     { key: 'concession_percentage', label: 'Concession Percentage', required: false, validation: 'number' },
     { key: 'concession_reason', label: 'Concession Reason', required: false, validation: 'text' },
-    { key: 'fee_status', label: 'Fee Status', required: false, validation: 'select', options: ['pending', 'overdue', 'partial'] },
 
     // Medical Information
     { key: 'medical_conditions', label: 'Medical Conditions', required: false, validation: 'text' },
@@ -634,7 +692,7 @@ export default function StudentsPage({ type }) {
     // Status
     { key: 'is_active', label: 'Active Status', required: false, validation: 'boolean' },
     { key: 'status', label: 'Status', required: false, validation: 'select', options: ['active', 'inactive', 'graduated', 'transferred'] },
-
+    
     // Additional Fields
     { key: 'father_name', label: 'Father Name', required: false, validation: 'text' },
     { key: 'father_cnic', label: 'Father CNIC', required: false, validation: 'cnic' },
@@ -643,8 +701,14 @@ export default function StudentsPage({ type }) {
     { key: 'mother_name', label: 'Mother Name', required: false, validation: 'text' },
     { key: 'mother_cnic', label: 'Mother CNIC', required: false, validation: 'cnic' },
     { key: 'mother_phone', label: 'Mother Phone', required: false, validation: 'phone' },
-    { key: 'address', label: 'Address', required: false, validation: 'text' },
   ];
+
+  const IMPORT_COLUMNS = useMemo(() => {
+    return ALL_STUDENT_COLUMNS.filter(col => {
+      if (!col.types) return true;
+      return col.types.includes(type);
+    });
+  }, [type]);
 
   const handleBulkImport = async (importedData) => {
     if (!importedData || importedData.length === 0) {
@@ -678,7 +742,37 @@ export default function StudentsPage({ type }) {
       <PageHeader
         title={terms.students}
         description={`${total} ${total === 1 ? terms.student : terms.students} total`}
+        action={headerActions}
       />
+
+      {/* Stats Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <StatsCard
+          label={`Total ${terms.students}`}
+          value={stats.total_records}
+          icon={<Users size={20} />}
+          loading={isLoadingStats}
+        />
+        <StatsCard
+          label={`Active ${terms.students}`}
+          value={stats.active_students}
+          icon={<GraduationCap size={20} className="text-emerald-500" />}
+          loading={isLoadingStats}
+        />
+        <StatsCard
+          label={`Inactive ${terms.students}`}
+          value={stats.inactive_students}
+          icon={<AlertCircle size={20} className="text-rose-500" />}
+          loading={isLoadingStats}
+        />
+        {/* <StatsCard
+          label="Attendance Rate"
+          value="85%"
+          icon={<Layers size={20} className="text-blue-500" />}
+          description="Average this month"
+          loading={isLoadingStats}
+        /> */}
+      </div>
 
       {/* Filters Card */}
       <Card className="border">
@@ -740,10 +834,9 @@ export default function StudentsPage({ type }) {
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1); }}
         searchPlaceholder={terms.searchPlaceholder}
-        action={addButton}
         enableColumnVisibility
         importConfig={{
-          columns: ALL_STUDENT_COLUMNS,
+          columns: IMPORT_COLUMNS,
           onImport: handleBulkImport,
           fileName: `${type}-${terms.students.toLowerCase()}-import`,
         }}
@@ -843,6 +936,11 @@ function StudentCell({ student: s, columnKey, type, terms }) {
           </div>
         </div>
       );
+    
+    case 'guardian':
+      const guardians = Array.isArray(s.guardians) ? s.guardians : [];
+      const primaryG = guardians.find(g => g.type === 'father' || g.type === 'mother') || guardians[0];
+      return <span className="text-sm">{primaryG?.name || '—'}</span>;
     
     case 'roll_number':
       return (
