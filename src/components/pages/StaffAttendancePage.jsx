@@ -416,20 +416,20 @@ export default function StaffAttendancePage({ type }) {
           { name: 'staff_type', label: 'Staff Type', value: staffTypeFilter, onChange: (v) => { setStaffTypeFilter(v); setPage(1); }, options: STAFF_TYPE_OPTS },
         ]}
         enableColumnVisibility
-        importConfig={{
-          columns: [
-            { key: 'staff_id', label: 'Staff ID', required: true, validation: 'text' },
-            { key: 'date', label: 'Date', required: false, validation: 'date' },
-            { key: 'status', label: 'Status', required: false, validation: 'select', options: ['present', 'absent', 'late', 'leave'] },
-            { key: 'check_in', label: 'Check In', required: false, validation: 'text' },
-            { key: 'check_out', label: 'Check Out', required: false, validation: 'text' },
-            { key: 'remarks', label: 'Remarks', required: false, validation: 'text' },
-            { key: 'branch_id', label: 'Branch ID', required: false, validation: 'text' },
-          ],
-          onImport: handleBulkImport,
-          fileName: 'staff-attendance-import',
-        }}
-        exportConfig={{ fileName: 'staff-attendance' }}
+        // importConfig={{
+        //   columns: [
+        //     { key: 'staff_id', label: 'Staff ID', required: true, validation: 'text' },
+        //     { key: 'date', label: 'Date', required: false, validation: 'date' },
+        //     { key: 'status', label: 'Status', required: false, validation: 'select', options: ['present', 'absent', 'late', 'leave'] },
+        //     { key: 'check_in', label: 'Check In', required: false, validation: 'text' },
+        //     { key: 'check_out', label: 'Check Out', required: false, validation: 'text' },
+        //     { key: 'remarks', label: 'Remarks', required: false, validation: 'text' },
+        //     { key: 'branch_id', label: 'Branch ID', required: false, validation: 'text' },
+        //   ],
+        //   onImport: handleBulkImport,
+        //   fileName: 'staff-attendance-import',
+        // }}
+        // exportConfig={{ fileName: 'staff-attendance' }}
         pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }}
       />
 

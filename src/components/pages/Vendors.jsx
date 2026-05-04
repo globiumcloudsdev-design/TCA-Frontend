@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Eye, EyeOff, Pencil, Plus, Trash2, RefreshCw, Users, Search, X, Zap } from 'lucide-react';
 import { toast } from 'sonner';
@@ -66,6 +66,11 @@ export default function Vendors() {
   const canDo = useAuthStore((s) => s.canDo);
   const user = useAuthStore((s) => s.user);
   const type = user?.institute?.institute_type || null;
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const queryClient = useQueryClient();
 
@@ -412,15 +417,27 @@ export default function Vendors() {
       <PageHeader
         title="Vendor Management"
         description={`Total ${total} vendors`}
-        actions={
-          <button
-            onClick={() => refetchVendors()}
-            disabled={vendorsFetching}
-            className="rounded-md border px-3 py-2 text-sm hover:bg-accent flex items-center gap-1"
-          >
-            <RefreshCw size={14} className={vendorsFetching ? 'animate-spin' : ''} />
-            Refresh
-          </button>
+        action={
+          mounted && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => refetchVendors()}
+                disabled={vendorsFetching}
+                className="rounded-md border px-3 py-2 text-sm hover:bg-accent flex items-center gap-1"
+              >
+                <RefreshCw size={14} className={vendorsFetching ? 'animate-spin' : ''} />
+                Refresh
+              </button>
+              {canDo('vendors.create') && (
+                <button
+                  onClick={openAdd}
+                  className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
+                >
+                  <Plus size={14} /> Add Vendor
+                </button>
+              )}
+            </div>
+          )
         }
       />
 
@@ -457,14 +474,7 @@ export default function Vendors() {
             options: STATUS_OPTIONS,
           },
         ]}
-        action={canDo('vendors.create') ? (
-          <button
-            onClick={openAdd}
-            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-          >
-            <Plus size={14} /> Add Vendor
-          </button>
-        ) : null}
+        action={null}
         enableColumnVisibility
         pagination={{
           page,

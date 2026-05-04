@@ -783,9 +783,10 @@ export default function ClassesPage({ type }) {
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <p className="text-sm">
-                      {viewingClass.academic_year?.name ||
-                        viewingClass.academic_year ||
-                        '—'}
+                      {viewingClass.academic_year?.name || 
+                       (typeof viewingClass.academic_year === 'string' && viewingClass.academic_year) ||
+                       normalizedAcademicYearOptions.find(y => String(y.value) === String(viewingClass.academic_year_id))?.label ||
+                       '—'}
                     </p>
                   </div>
                 </div>
@@ -809,15 +810,15 @@ export default function ClassesPage({ type }) {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Sections</p>
+                  <p className="text-sm text-muted-foreground">Total {sectionTerm}s</p>
                   <p className="text-2xl font-bold">{viewingClass.sections?.length || 0}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Courses</p>
+                  <p className="text-sm text-muted-foreground">Total {courseTerm}s</p>
                   <p className="text-2xl font-bold">{viewingClass.courses?.length || 0}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Materials</p>
+                  <p className="text-sm text-muted-foreground">Total Syllabus</p>
                   <p className="text-2xl font-bold">
                     {viewingClass.courses?.reduce((acc, c) => acc + (c.materials?.length || 0), 0) || 0}
                   </p>
@@ -839,8 +840,8 @@ export default function ClassesPage({ type }) {
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <span className="font-medium">{section.name}</span>
-                          <Badge variant={section.is_active ? 'success' : 'secondary'} size="sm">
-                            {section.is_active ? 'Active' : 'Inactive'}
+                          <Badge variant={(section.active ?? section.is_active) ? 'success' : 'secondary'} size="sm">
+                            {(section.active ?? section.is_active) ? 'Active' : 'Inactive'}
                           </Badge>
                         </div>
                         {(section.room_no || section.capacity) && (
@@ -909,7 +910,7 @@ export default function ClassesPage({ type }) {
 
                         {course.materials && course.materials.length > 0 && (
                           <div className="mt-3">
-                            <SectionHeader title="Materials" />
+                            <SectionHeader title="Subjects" />
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                               {course.materials.map((material, midx) => (
                                 <div

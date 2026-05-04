@@ -25,6 +25,7 @@ import {
   Wallet,
   Printer,
   FileDown,
+  Clock,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -302,6 +303,11 @@ const REPORT_CONFIGS = {
       {
         id: "ids",
         header: "Roll / Reg No",
+        accessorFn: (s) => {
+          const roll = s.roll_no || s.roll_number || s.Student?.roll_no || s.Student?.roll_number || s.student?.roll_no || s.student?.roll_number || s.details?.studentDetails?.roll_no || "—";
+          const reg = s.registration_no || s.reg_no || s.Student?.registration_no || s.student?.registration_no || s.details?.studentDetails?.registration_no || "—";
+          return `${roll} / ${reg}`;
+        },
         cell: ({ row }) => {
           const s = row.original;
           const roll =
@@ -513,7 +519,7 @@ const REPORT_CONFIGS = {
   },
   fee: {
     title: "Fee Collection Report",
-    filters: ["search", "class", "section", "status", "dateRange"],
+    filters: ["search", "class", "section", "status", "dateRange", "month", "year"],
     columns: [
       {
         id: "voucher_number",
@@ -822,7 +828,7 @@ const REPORT_CONFIGS = {
   },
   payroll: {
     title: "Payroll Report",
-    filters: ["search", "dateRange", "status"],
+    filters: ["search", "month", "year", "status"],
     columns: [
       {
         id: "name",
@@ -830,34 +836,111 @@ const REPORT_CONFIGS = {
         accessorFn: (s) => s.staff_name || s.name || s.user?.name || "—",
       },
       {
-        id: "role",
-        header: "Role",
-        accessorFn: (s) => s.role || s.user?.role || "—",
-      },
-      {
         id: "month",
         header: "Month",
-        accessorFn: (s) => s.month || "—",
+        accessorFn: (s) => {
+          const months = [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+          ];
+          return months[s.month - 1] || s.month || "—";
+        },
+      },
+      {
+        id: "year",
+        header: "Year",
+        accessorFn: (s) => s.year || "—",
       },
       {
         id: "basic",
-        header: "Basic",
-        accessorFn: (s) => (s.basic_salary ? `$${s.basic_salary}` : "—"),
+        header: "Basic Salary",
+        accessorFn: (s) => (s.basic_salary ? `PKR ${s.basic_salary}` : "—"),
+      },
+      {
+        id: "allowances",
+        header: "Allowances",
+        accessorFn: (s) => (s.total_allowances ? `PKR ${s.total_allowances}` : "—"),
+      },
+      {
+        id: "deductions",
+        header: "Deductions",
+        accessorFn: (s) => (s.total_deductions ? `PKR ${s.total_deductions}` : "—"),
       },
       {
         id: "net",
         header: "Net Salary",
-        accessorFn: (s) => (s.net_salary ? `$${s.net_salary}` : "—"),
+        accessorFn: (s) => (s.net_salary ? `PKR ${s.net_salary}` : "—"),
       },
       {
         id: "status",
         header: "Status",
         accessorFn: (s) => (s.status || "—").toUpperCase(),
       },
+      {
+        id: "paid_on",
+        header: "Paid On",
+        accessorFn: (s) => s.paid_on || "—",
+      },
     ],
     permission: "reports.payroll",
-    theme: "rose",
-    icon: Wallet,
+    theme: "pink",
+    icon: Clock,
+  },
+  fee_defaulters: {
+    title: "Fee Defaulters Report",
+    filters: ["search", "class", "section", "month", "year"],
+    columns: [
+      {
+        id: "student_name",
+        header: "Student Name",
+        accessorFn: (s) => s.student?.name || s.student?.student_name || s.student_name || "—",
+      },
+      {
+        id: "roll_no",
+        header: "Roll No",
+        accessorFn: (s) => s.student?.roll_number || s.student?.roll_no || s.roll_no || "—",
+      },
+      {
+        id: "class_section",
+        header: "Class/Section",
+        accessorFn: (s) => {
+          const cls = s.student?.class_name || s.class_name || "";
+          const sec = s.student?.section_name || s.section_name || "";
+          return `${cls} ${sec}`.trim() || "—";
+        },
+      },
+      {
+        id: "month_year",
+        header: "Due For",
+        accessorFn: (s) => {
+          const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+          return `${months[s.month - 1] || s.month} ${s.year}` || "—";
+        },
+      },
+      {
+        id: "net_amount",
+        header: "Payable",
+        accessorFn: (s) => s.net_amount || "0",
+      },
+      {
+        id: "fine",
+        header: "Fine",
+        accessorFn: (s) => s.fine || "0",
+      },
+      {
+        id: "total_due",
+        header: "Total Due",
+        accessorFn: (s) => s.total_due || s.net_amount || "0",
+      },
+      {
+        id: "parent_phone",
+        header: "Contact",
+        accessorFn: (s) => s.student?.phone || s.student?.father_phone || s.parent_phone || "—",
+      }
+    ],
+    permission: "reports.fee",
+    theme: "red",
+    icon: AlertCircle,
   },
 };
 
@@ -1073,7 +1156,7 @@ function ReportFilters({
           </div>
         )}
 
-        {showFilter("search") && reportType === "fee" && (
+        {showFilter("month") && (
           <SelectField
             label="Month"
             placeholder="Select Month"
@@ -1094,6 +1177,23 @@ function ReportFilters({
               { value: "11", label: "November" },
               { value: "12", label: "December" },
             ]}
+            className="w-full"
+          />
+        )}
+
+        {showFilter("year") && (
+          <SelectField
+            label="Year"
+            placeholder="Select Year"
+            value={filters.year}
+            onChange={(v) => onFilterChange("year", v)}
+            options={Array.from(
+              { length: new Date().getFullYear() - 2023 },
+              (_, i) => {
+                const y = (2024 + i).toString();
+                return { value: y, label: y };
+              }
+            )}
             className="w-full"
           />
         )}
@@ -1331,7 +1431,19 @@ export default function ReportDetailPage() {
         res = await reportService.getFeeReport(apiParams);
       else if (reportType === "exam")
         res = await reportService.getExamReport(apiParams);
-      else return null;
+      else if (reportType === "payroll") {
+        if (!apiParams.institute_id) return null;
+        res = await reportService.getPayrollReport(apiParams);
+      } 
+      else if (reportType === "fee_defaulters") {
+        if (!apiParams.institute_id) return null;
+        // Re-use fee report but filter for pending/overdue if backend doesn't have a specific endpoint
+        // Or call a specialized endpoint if available
+        res = await reportService.getFeeReport({ ...apiParams, status: 'pending' });
+      }
+      else {
+        return null;
+      }
 
       // ─── Inject Mapping and Metadata for Exam Reports ───
       if (reportType === "exam" && res?.data?.records) {
@@ -1837,27 +1949,26 @@ export default function ReportDetailPage() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-700 max-w-[1600px] mx-auto pb-10 px-2 sm:px-0">
       {/* HEADER OVERHAUL */}
-      {reportType !== "payroll" && (
-        <div className="relative rounded-2xl p-7 flex flex-col sm:flex-row items-center justify-between gap-6 bg-white border border-slate-200 shadow-xl shadow-slate-200/40">
-          <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-slate-50/50 pointer-events-none" />
-          <div className="flex items-center gap-5 relative z-10 w-full sm:w-auto">
-            <button
-              onClick={() => router.back()}
-              className="h-11 w-11 flex items-center justify-center rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition-all shadow-sm active:scale-95"
-            >
-              <ChevronLeft size={22} className="text-slate-600" />
-            </button>
-            <div className="space-y-1">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-full border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest shadow-sm">
-                <Icon size={12} /> Detailed Insights System
-              </div>
-              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-                {config.title}
-              </h1>
+      {/* HEADER OVERHAUL — Always show consistent header with back button */}
+      <div className="relative rounded-2xl p-7 flex flex-col sm:flex-row items-center justify-between gap-6 bg-white border border-slate-200 shadow-xl shadow-slate-200/40">
+        <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-slate-50/50 pointer-events-none" />
+        <div className="flex items-center gap-5 relative z-10 w-full sm:w-auto">
+          <button
+            onClick={() => router.back()}
+            className="h-11 w-11 flex items-center justify-center rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+          >
+            <ChevronLeft size={22} className="text-slate-600" />
+          </button>
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-full border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest shadow-sm">
+              <Icon size={12} /> Detailed Insights System
             </div>
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+              {config.title}
+            </h1>
           </div>
         </div>
-      )}
+      </div>
 
       {true ? (
         <>
@@ -1887,6 +1998,29 @@ export default function ReportDetailPage() {
                       <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", "from-rose-50 to-rose-100")} />
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">Total Discount</p>
                       <h3 className="text-2xl font-bold text-rose-700 tabular-nums relative z-10 mt-1">{reportData.data.summary.total_discount}</h3>
+                    </div>
+                  </>
+                ) : reportType === "payroll" ? (
+                  <>
+                    <div className={cn("rounded-2xl border bg-white p-5 transition-all hover:shadow-xl relative overflow-hidden group border-slate-200")}>
+                      <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", theme.grad)} />
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">Total Staff</p>
+                      <h3 className="text-2xl font-bold text-slate-900 tabular-nums relative z-10 mt-1">{reportData.data.summary.total_staff}</h3>
+                    </div>
+                    <div className={cn("rounded-2xl border bg-white p-5 transition-all hover:shadow-xl relative overflow-hidden group border-pink-200")}>
+                      <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", theme.grad)} />
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">Total Payroll</p>
+                      <h3 className="text-2xl font-bold text-pink-700 tabular-nums relative z-10 mt-1">{reportData.data.summary.total_payroll}</h3>
+                    </div>
+                    <div className={cn("rounded-2xl border bg-white p-5 transition-all hover:shadow-xl relative overflow-hidden group border-emerald-200")}>
+                      <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", "from-emerald-50 to-emerald-100")} />
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">Processed</p>
+                      <h3 className="text-2xl font-bold text-emerald-700 tabular-nums relative z-10 mt-1">{reportData.data.summary.processed}</h3>
+                    </div>
+                    <div className={cn("rounded-2xl border bg-white p-5 transition-all hover:shadow-xl relative overflow-hidden group border-amber-200")}>
+                      <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", "from-amber-50 to-amber-100")} />
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">Pending</p>
+                      <h3 className="text-2xl font-bold text-amber-700 tabular-nums relative z-10 mt-1">{reportData.data.summary.pending}</h3>
                     </div>
                   </>
                 ) : (
@@ -1993,12 +2127,15 @@ export default function ReportDetailPage() {
           </div>
 
           {/* Export Modals Overlay */}
+          {/* Export Modal — Handled with autoStart for direct download */}
           <ExportModal
             open={exporting}
             onClose={() => {
               setExporting(false);
               setHydratedBulkData([]); // Clear after use
             }}
+            autoStart={true} // Trigger direct download
+            defaultFormat="pdf" // Default format for direct download
             columns={
               reportType === "exam"
                 ? EXAM_REPORT_COLUMNS

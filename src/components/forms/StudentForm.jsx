@@ -289,6 +289,19 @@ export default function StudentForm({
   const watchConcessionType = watch('concession_type');
   const isConcessionNone = watchConcessionType === 'none' || !watchConcessionType;
 
+  // Auto-set percentages for Full/Half concession
+  useEffect(() => {
+    if (watchConcessionType === 'full') {
+      setValue('discount_type', 'percentage', { shouldDirty: true });
+      setValue('concession_percentage', 100, { shouldDirty: true });
+      setValue('concession_reason', 'Full Concession Scholarship', { shouldDirty: true });
+    } else if (watchConcessionType === 'half') {
+      setValue('discount_type', 'percentage', { shouldDirty: true });
+      setValue('concession_percentage', 50, { shouldDirty: true });
+      setValue('concession_reason', 'Half Concession Scholarship', { shouldDirty: true });
+    }
+  }, [watchConcessionType, setValue]);
+
 
   // ─────────────────────────────────────────────────────────────────
   // AVATAR HANDLING

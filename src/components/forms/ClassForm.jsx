@@ -54,7 +54,7 @@ const MAX_PDF_BYTES = MAX_PDF_MB * 1024 * 1024;
 // Validation Schemas
 const materialSchema = z.object({
   id: z.string().optional(),
-  name: z.string().min(1, 'Material name is required'),
+  name: z.string().min(1, 'Syllabus name is required'),
   description: z.string().optional().default(''),
   file: z.any().optional(),
   pdf_url: z.string().optional(),
@@ -218,7 +218,8 @@ export default function ClassForm({
 
   // Get term based on institute type
   const getTerm = (key) => {
-    const terms = {
+    if (key === 'material') return 'Syllabus';
+    const termsMap = {
       school: { class: 'Class', section: 'Section', course: 'Subject' },
       college: { class: 'Program', section: 'Batch', course: 'Course' },
       university: { class: 'Department', section: 'Semester', course: 'Course' },
@@ -226,7 +227,7 @@ export default function ClassForm({
       academy: { class: 'Program', section: 'Batch', course: 'Module' },
       tuition_center: { class: 'Grade', section: 'Group', course: 'Subject' },
     };
-    return terms[instituteType]?.[key] || key;
+    return termsMap[instituteType]?.[key] || key;
   };
 
   // Handle file selection
@@ -671,7 +672,7 @@ export default function ClassForm({
                           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 gap-2">
                             <h5 className="text-xs sm:text-sm font-medium flex items-center">
                               <FileText className="h-4 w-4 mr-2" />
-                              Course Materials
+                              {getTerm('course')} {getTerm('material')}
                             </h5>
                             <Button
                               type="button"
@@ -681,14 +682,14 @@ export default function ClassForm({
                               className="w-full sm:w-auto"
                             >
                               <Plus className="h-4 w-4 mr-2" />
-                              Add Material
+                              Add {getTerm('material')}
                             </Button>
                           </div>
 
                           {(!watch(`courses.${courseIndex}.materials`) || 
                             watch(`courses.${courseIndex}.materials`).length === 0) ? (
                             <p className="text-xs sm:text-sm text-muted-foreground text-center py-4">
-                              No materials added yet
+                              No {getTerm('material').toLowerCase()} added yet
                             </p>
                           ) : (
                             <div className="space-y-3">
@@ -698,12 +699,12 @@ export default function ClassForm({
                                   <div className="flex flex-col sm:flex-row items-start justify-between mb-2 gap-2">
                                     <div className="w-full sm:flex-1">
                                       <InputField
-                                        label="Material Name"
+                                        label={`${getTerm('material')} Name`}
                                         name={`courses.${courseIndex}.materials.${materialIndex}.name`}
                                         register={register}
                                         error={errors.courses?.[courseIndex]?.materials?.[materialIndex]?.name}
                                         required
-                                        placeholder="e.g. Chapter 1 Notes"
+                                        placeholder={`e.g. ${getTerm('material')} 1`}
                                       />
                                     </div>
                                     <Button
@@ -798,10 +799,10 @@ export default function ClassForm({
                                     </div>
                                   </div>
 
-                                  {/* Material Status */}
+                                   {/* Status */}
                                   <div className="flex items-center justify-between">
                                     <Label htmlFor={`material-${courseIndex}-${materialIndex}-active`}>
-                                      Active
+                                      {getTerm('material')} Status
                                     </Label>
                                     <Controller
                                       name={`courses.${courseIndex}.materials.${materialIndex}.active`}

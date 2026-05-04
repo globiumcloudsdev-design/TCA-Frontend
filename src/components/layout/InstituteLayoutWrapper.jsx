@@ -26,19 +26,13 @@ import NotificationBell from "@/components/common/NotificationBell";
 import ThemeToggle from "@/components/common/ThemeToggle";
 import AvatarWithInitials from "@/components/common/AvatarWithInitials";
 import { UserMenu } from "../common";
+import useUIStore from "@/store/uiStore";
 
 /* ─────────────────────────────────────────────
    useBreadcrumbs
    Builds AppBreadcrumb items[] from pathname + navItems map.
-
-   Example:
-     /institute/students/123  →
-       [ { label:'Dashboard', href:'/institute' },
-         { label:'Students',  href:'/institute/students' },
-         { label:'123' }   ← last segment capitalised if no nav match
-       ]
 ───────────────────────────────────────────── */
-function useBreadcrumbs(navItems, pathname, dashboardPath) {
+function useBreadcrumbs(navItems, pathname, dashboardPath, breadcrumbLabel) {
   return useMemo(() => {
     if (!pathname) return [];
 
@@ -62,19 +56,20 @@ function useBreadcrumbs(navItems, pathname, dashboardPath) {
       if (label) {
         items.push(isLast ? { label } : { label, href: accumulated });
       } else if (isLast) {
-        // Readable fallback for dynamic segments (IDs, slugs, etc.)
-        const readable = seg
+        // Use dynamic label override if available for the last segment
+        const displayLabel = breadcrumbLabel || seg
           .replace(/[-_]/g, " ")
           .replace(/\b\w/g, (c) => c.toUpperCase());
+          
         // Avoid duplicate with previous item
-        if (readable !== items[items.length - 1]?.label) {
-          items.push({ label: readable });
+        if (displayLabel !== items[items.length - 1]?.label) {
+          items.push({ label: displayLabel });
         }
       }
     });
 
     return items;
-  }, [navItems, pathname, dashboardPath]);
+  }, [navItems, pathname, dashboardPath, breadcrumbLabel]);
 }
 
 /* ─────────────────────────────────────────────
@@ -355,8 +350,11 @@ export default function InstituteLayoutWrapper({ children }) {
     [navItems],
   );
 
+  // Dynamic breadcrumb label from UI store
+  const breadcrumbLabel = useUIStore((s) => s.breadcrumbLabel);
+
   // Auto-build breadcrumb from current pathname
-  const breadcrumbItems = useBreadcrumbs(navItems, pathname, dashboardPath);
+  const breadcrumbItems = useBreadcrumbs(navItems, pathname, dashboardPath, breadcrumbLabel);
 
   const handleLogout = useCallback(async () => {
     try {

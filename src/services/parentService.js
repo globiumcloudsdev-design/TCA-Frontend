@@ -12,6 +12,7 @@ import { buildQuery } from '@/lib/utils';
 
 export const parentService = {
   getAll: (filters = {}) => api.get(`/parents${buildQuery(filters)}`).then((r) => r.data),
+  search: (filters = {}) => api.get(`/parents/search${buildQuery(filters)}`).then((r) => r.data),
 
   getById: (id) => api.get(`/parents/${id}`).then((r) => r.data),
 

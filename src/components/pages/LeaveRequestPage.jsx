@@ -1,7 +1,7 @@
 // src/components/pages/LeaveRequestPage.jsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Calendar, CheckCircle, Clock, Search, Loader2, RefreshCw, Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -24,6 +24,7 @@ import SelectField from '@/components/common/SelectField';
 import TextareaField from '@/components/common/TextareaField';
 import DatePickerField from '@/components/common/DatePickerField';
 import CheckboxField from '@/components/common/CheckboxField';
+import FormSubmitButton from '@/components/common/FormSubmitButton';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -348,6 +349,13 @@ export default function LeaveRequestPage({ type = 'school' }) {
   const toDate = manualForm.watch('to_date');
   const numberOfDays = calculateNumberOfDays(fromDate, toDate);
   
+  // Auto-adjust To Date if it's before From Date
+  useEffect(() => {
+    if (fromDate && toDate && new Date(toDate) < new Date(fromDate)) {
+      manualForm.setValue('to_date', fromDate);
+    }
+  }, [fromDate, toDate, manualForm]);
+  
   // ─────────────────────────────────────────────────────────────────────────
   // QUERIES
   // ─────────────────────────────────────────────────────────────────────────
@@ -626,7 +634,7 @@ export default function LeaveRequestPage({ type = 'school' }) {
         description="Mark leave for staff, teachers, or students"
         size="lg"
       >
-        <form onSubmit={onSubmitManual} className="space-y-4 max-h-96 overflow-y-auto">
+        <form onSubmit={onSubmitManual} className="space-y-4">
           <SelectField
             label="User Type"
             name="user_type"
@@ -667,6 +675,7 @@ export default function LeaveRequestPage({ type = 'school' }) {
               label="To Date"
               name="to_date"
               control={manualForm.control}
+              minDate={fromDate}
               required
               rules={{ required: 'To date is required' }}
             />
@@ -688,19 +697,15 @@ export default function LeaveRequestPage({ type = 'school' }) {
             rows={3}
           />
           
-          {/* <CheckboxField
-            label="Approve immediately (mark attendance automatically)"
-            name="approve_immediately"
-            control={manualForm.control}
-          /> */}
-          
-          {/* <div className="flex gap-3 justify-end pt-4 border-t">
+          <div className="flex gap-3 justify-end pt-4 border-t">
             <Button variant="outline" type="button" onClick={() => toggleModal('manual', false)}>Cancel</Button>
-            <Button type="submit" disabled={manualCreateMutation.isPending || numberOfDays < 1}>
-              {manualCreateMutation.isPending ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
-              Mark Leave
-            </Button>
-          </div> */}
+            <FormSubmitButton 
+              loading={manualCreateMutation.isPending} 
+              label="Mark Leave" 
+              loadingLabel="Marking..." 
+              disabled={numberOfDays < 1}
+            />
+          </div>
         </form>
       </AppModal>
       
@@ -731,10 +736,12 @@ export default function LeaveRequestPage({ type = 'school' }) {
           
           <div className="flex gap-3 justify-end pt-4 border-t">
             <Button variant="outline" type="button" onClick={() => toggleModal('reject', false)}>Cancel</Button>
-            <Button variant="destructive" type="submit" disabled={rejectMutation.isPending}>
-              {rejectMutation.isPending ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
-              Reject Request
-            </Button>
+            <FormSubmitButton 
+              variant="destructive" 
+              loading={rejectMutation.isPending} 
+              label="Reject Request" 
+              loadingLabel="Rejecting..." 
+            />
           </div>
         </form>
       </AppModal>

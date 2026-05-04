@@ -17,6 +17,7 @@ const REPORTS_BY_TYPE = {
     { key: 'attendance',  icon: CheckSquare,    label: 'Attendance Report',   description: 'Class-wise daily & monthly attendance',         color: 'text-emerald-500', bg: 'bg-emerald-50',   permission: 'reports.attendance' },
     { key: 'exam',        icon: GraduationCap,  label: 'Exam Results',        description: 'Class-wise exam performance report',            color: 'text-violet-500',  bg: 'bg-violet-50',    permission: 'reports.exam' },
     { key: 'fee',         icon: DollarSign,     label: 'Fee Collection',      description: 'Fee payments, dues & outstanding amounts',      color: 'text-amber-500',   bg: 'bg-amber-50',     permission: 'reports.fee' },
+    { key: 'fee_defaulters', icon: AlertCircle, label: 'Fee Defaulters',      description: 'List of students with overdue fee payments',   color: 'text-rose-500',    bg: 'bg-rose-50',      permission: 'reports.fee' },
     { key: 'payroll',     icon: Clock,          label: 'Payroll Report',      description: 'Staff salary disbursement report',              color: 'text-pink-500',    bg: 'bg-pink-50',      permission: 'reports.payroll' },
   ],
   coaching: [

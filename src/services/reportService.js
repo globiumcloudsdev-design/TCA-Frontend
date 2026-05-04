@@ -415,15 +415,37 @@ export const reportService = {
    */
   getPayrollReport: async (filters = {}) => {
     try {
-      // TODO: Integrate with staffService when available
+      const queryParams = {
+        institute_id: filters.institute_id,
+        month: filters.month,
+        year: filters.year,
+        staff_id: filters.staff_id,
+        status: filters.status,
+        search: filters.search,
+        page: filters.page || 1,
+        limit: filters.limit || 50,
+      };
+
+      Object.keys(queryParams).forEach((key) => {
+        if (
+          queryParams[key] === undefined ||
+          queryParams[key] === null ||
+          queryParams[key] === ""
+        ) {
+          delete queryParams[key];
+        }
+      });
+
+      const response = await api.get("/reports/payroll", {
+        params: queryParams,
+        timeout: 15000,
+      });
+
+      const reportData = response.data?.data || response.data || {};
       return {
         status: 200,
-        message: "Payroll report (framework ready)",
-        data: {
-          summary: { total_records: 0 },
-          records: [],
-          pagination: {},
-        },
+        message: "Payroll report retrieved successfully",
+        data: reportData,
       };
     } catch (error) {
       console.error("❌ Error fetching payroll report:", error);

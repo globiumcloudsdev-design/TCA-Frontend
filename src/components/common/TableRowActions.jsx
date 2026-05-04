@@ -35,7 +35,7 @@ export default function TableRowActions({ onView, onEdit, onDelete, extra = [], 
   const renderIcon = (icon) => {
     if (!icon) return null;
     if (isValidElement(icon)) return icon;
-    if (typeof icon === 'function') {
+    if (typeof icon === 'function' || (typeof icon === 'object' && icon.$$typeof)) {
       const Icon = icon;
       return <Icon size={14} className="h-3.5 w-3.5 shrink-0" />;
     }

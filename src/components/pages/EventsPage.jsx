@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -150,6 +150,13 @@ export default function EventsPage({ type }) {
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
   const [deleting, setDeleting] = useState(null);
+
+  // Auto-adjust To Date filter if it's before From Date
+  useEffect(() => {
+    if (fromDate && toDate && new Date(toDate) < new Date(fromDate)) {
+      setToDate(fromDate);
+    }
+  }, [fromDate, toDate]);
 
   const { control, register, watch, setValue, reset, handleSubmit, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
@@ -477,7 +484,12 @@ export default function EventsPage({ type }) {
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date Range Filter</p>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <DatePickerField label="From" value={fromDate} onChange={(v) => { setFromDate(v || ''); setPage(1); }} />
-          <DatePickerField label="To" value={toDate} onChange={(v) => { setToDate(v || ''); setPage(1); }} />
+          <DatePickerField 
+            label="To" 
+            value={toDate} 
+            onChange={(v) => { setToDate(v || ''); setPage(1); }} 
+            minDate={fromDate}
+          />
           <div className="flex items-end">
             <Button
               type="button"
@@ -504,23 +516,23 @@ export default function EventsPage({ type }) {
         searchPlaceholder="Search events..."
         filters={filters}
         enableColumnVisibility
-        importConfig={{
-          columns: importColumns,
-          fileName: 'events',
-          onImport: async (batch) => {
-            await importMutation.mutateAsync(batch);
-            toast.success(`Imported ${batch.length} records`);
-          },
-          sampleData: [{
-            event_name: 'Annual Day',
-            event_type: 'Cultural',
-            date: '2026-05-20',
-            time: '10:00',
-            location: 'Auditorium',
-            audience: 'all_students',
-            status: 'scheduled',
-          }],
-        }}
+        // importConfig={{
+        //   columns: importColumns,
+        //   fileName: 'events',
+        //   onImport: async (batch) => {
+        //     await importMutation.mutateAsync(batch);
+        //     toast.success(`Imported ${batch.length} records`);
+        //   },
+        //   sampleData: [{
+        //     event_name: 'Annual Day',
+        //     event_type: 'Cultural',
+        //     date: '2026-05-20',
+        //     time: '10:00',
+        //     location: 'Auditorium',
+        //     audience: 'all_students',
+        //     status: 'scheduled',
+        //   }],
+        // }}
         exportConfig={{ fileName: 'events', dateField: 'date' }}
         pagination={{
           page,

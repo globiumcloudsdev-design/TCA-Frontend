@@ -26,6 +26,7 @@ import {
   Calendar, Mail, Phone, MapPin, Shield,
   AlertCircle, FileSpreadsheet
 } from 'lucide-react';
+import { TableRowActions } from '@/components/common';
 import { toast } from 'sonner';
 
 import useInstituteConfig from '@/hooks/useInstituteConfig';
@@ -338,7 +339,7 @@ export default function StudentsPage({ type }) {
     return f;
   }, [page, pageSize, search, status, academicYearId, classId, sectionId, type]);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching } = useQuery({
     queryKey: ['students', type, filters],
     queryFn: async () => {
       let res;
@@ -451,75 +452,24 @@ export default function StudentsPage({ type }) {
       cell: ({ row }) => {
         const stu = row.original;
         return (
-          <div className="flex items-center justify-end gap-1">
-            {/* View */}
-            <SimpleTooltip content={`View ${terms.student} Details`} side="top">
-              <button
-                onClick={() => router.push(`/${type}/students/${stu.id}`)}
-                className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs hover:bg-accent transition-colors"
-              >
-                <Eye size={14} />
-              </button>
-            </SimpleTooltip>
-
-            {/* Edit */}
-            {canDo('students.update') && (
-              <SimpleTooltip content={`Edit ${terms.student}`} side="top">
-                <button
-                  onClick={() => setEditingId(stu.id)}
-                  className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs hover:bg-accent transition-colors"
-                >
-                  <Pencil size={14} />
-                </button>
-              </SimpleTooltip>
-            )}
-
-            {/* Activate/Deactivate - Uses same DELETE API with type */}
-            {canDo('students.update') && (
-              stu.is_active ? (
-                <SimpleTooltip content={`Deactivate ${terms.student}`} side="top">
-                  <button
-                    onClick={() => handleDeactivate(stu.id)}
-                    className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-amber-600 hover:bg-amber-50 transition-colors"
-                  >
-                    <Power size={14} />
-                  </button>
-                </SimpleTooltip>
-              ) : (
-                <SimpleTooltip content={`Activate ${terms.student}`} side="top">
-                  <button
-                    onClick={() => handleActivate(stu.id)}
-                    className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-emerald-600 hover:bg-emerald-50 transition-colors"
-                  >
-                    <Power size={14} />
-                  </button>
-                </SimpleTooltip>
-              )
-            )}
-
-            {/* Generate ID Card */}
-            {canDo('students.read') && (
-              <SimpleTooltip content="Generate ID Card" side="top">
-                <button
-                  onClick={() => handleGenerateIdCard(stu)}
-                  className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs hover:bg-accent transition-colors"
-                >
-                  <IdCard size={14} />
-                </button>
-              </SimpleTooltip>
-            )}
-
-            {/* Permanent Delete */}
-            {canDo('students.delete') && (
-              <SimpleTooltip content={`Permanently Delete ${terms.student}`} side="top">
-                <button
-                  onClick={() => handlePermanentDelete(stu)}
-                  className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 transition-colors"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </SimpleTooltip>
-            )}
+          <div className="flex justify-end">
+            <TableRowActions
+              onView={() => router.push(`/${type}/students/${stu.id}`)}
+              onEdit={canDo('students.update') ? () => setEditingId(stu.id) : undefined}
+              onDelete={canDo('students.delete') ? () => handlePermanentDelete(stu) : undefined}
+              extra={[
+                ...(canDo('students.update') ? [{
+                  label: stu.is_active ? 'Deactivate' : 'Activate',
+                  icon: Power,
+                  onClick: () => stu.is_active ? handleDeactivate(stu.id) : handleActivate(stu.id)
+                }] : []),
+                ...(canDo('students.read') ? [{
+                  label: 'ID Card',
+                  icon: IdCard,
+                  onClick: () => handleGenerateIdCard(stu)
+                }] : [])
+              ]}
+            />
           </div>
         );
       },
@@ -829,8 +779,8 @@ export default function StudentsPage({ type }) {
       <DataTable
         columns={columns}
         data={students}
-        loading={isLoading}
-        emptyMessage={!classId ? `Select a ${terms.primaryUnit.toLowerCase()} to view ${terms.students.toLowerCase()}` : `No ${terms.students.toLowerCase()} found`}
+        loading={isLoading || isFetching}
+        emptyMessage={!classId ? `Select a ${(terms?.primaryUnit || 'unit').toLowerCase()} to view ${(terms?.students || 'students').toLowerCase()}` : `No ${(terms?.students || 'students').toLowerCase()} found`}
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1); }}
         searchPlaceholder={terms.searchPlaceholder}

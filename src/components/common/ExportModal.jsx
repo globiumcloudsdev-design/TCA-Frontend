@@ -12,7 +12,7 @@
  * - Responsive and user-friendly UI
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
@@ -136,7 +136,14 @@ function formatDate(date) {
 }
 
 export default function ExportModal({
-  open, onClose, columns = [], rows = [], fileName = 'export', dateField = null,
+  open, 
+  onClose, 
+  columns = [], 
+  rows = [], 
+  fileName = 'export', 
+  dateField = null,
+  autoStart = false, // If true, starts export immediately on open
+  defaultFormat = 'excel', // Default format if autoStart is true
 }) {
   const { user, institute } = useAuthStore();
   const [activeTab, setActiveTab] = useState('format');
@@ -174,6 +181,20 @@ export default function ExportModal({
       toDate: '',
     }
   });
+
+  // Effect for Auto-start export
+  useEffect(() => {
+    if (open && autoStart) {
+      setFormat(defaultFormat);
+      // Give UI a moment to render before starting heavy export
+      const timer = setTimeout(() => {
+        handleExport();
+        // Close modal after small delay once export starts
+        setTimeout(onClose, 1000);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [open, autoStart]);
   
   const fromDate = watch('fromDate');
   const toDate = watch('toDate');

@@ -3,25 +3,31 @@
 /**
  * ParentsPage — Parent/Guardian management
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, UserCheck, Search, Eye, EyeOff } from 'lucide-react';
+import { Plus, Pencil, Trash2, UserCheck, Search, Eye, EyeOff, RefreshCw, Power, MoreHorizontal } from 'lucide-react';
+import { Controller } from 'react-hook-form';
+import { TableRowActions } from '@/components/common';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
 import { parentService } from '@/services';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
-import SelectField from '@/components/common/SelectField';
 import InputField from '@/components/common/InputField';
+import SelectField from '@/components/common/SelectField';
+import PhoneInputField from '@/components/common/PhoneInput';
+import CnicInput from '@/components/common/CnicInput';
+import PasswordInputField from '@/components/common/PasswordInputField';
 import StatsCard from '@/components/common/StatsCard';
+import PageLoader from '@/components/common/PageLoader';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 const RELATION_OPTS = [
   { value: 'father', label: 'Father' }, 
@@ -34,38 +40,6 @@ const STATUS_OPTS = [
   { value: 'active', label: 'Active' }, 
   { value: 'inactive', label: 'Inactive' }
 ];
-
-// Password Input Component with Eye Icon
-const PasswordInputField = ({ label, name, register, error, placeholder, required }) => {
-  const [showPassword, setShowPassword] = useState(false);
-  
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={name} className="text-sm font-medium">
-        {label} {required && <span className="text-red-500">*</span>}
-      </Label>
-      <div className="relative">
-        <input
-          id={name}
-          type={showPassword ? 'text' : 'password'}
-          {...register(name)}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${
-            error ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-          } dark:bg-gray-800 dark:text-white pr-10`}
-          placeholder={placeholder}
-        />
-        <button
-          type="button"
-          onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-        >
-          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-        </button>
-      </div>
-      {error && <p className="text-sm text-red-500">{error.message}</p>}
-    </div>
-  );
-};
 
 const schema = z.object({
   first_name: z.string().min(2, 'First name required'),
@@ -82,10 +56,16 @@ const schema = z.object({
 
 export default function ParentsPage({ type }) {
   const qc = useQueryClient();
-  const canDo = useAuthStore((s) => s.canDo);
+  const router = useRouter();
+  const { canDo } = useAuthStore();
+  const canCreate = canDo('parents.create');
+  const canUpdate = canDo('parents.update');
+  const canDelete = canDo('parents.delete');
   const { terms } = useInstituteConfig();
+  
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [mounted, setMounted] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [modal, setModal] = useState(false);
@@ -96,38 +76,38 @@ export default function ParentsPage({ type }) {
   const [findingStudents, setFindingStudents] = useState(false);
   const [showStudentWarning, setShowStudentWarning] = useState(false);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const { register, handleSubmit, control, reset, getValues, formState: { errors } } = useForm({ 
     resolver: zodResolver(schema), 
-    defaultValues: { 
-      status: 'active', 
-      relation: 'father',
-      password: ''
-    } 
+    defaultValues: { status: 'active', relation: 'father', password: '' } 
   });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['parents', type, page, pageSize, search, status],
-    queryFn: () => parentService.getAll({ page, limit: pageSize, search, status }),
-    placeholderData: (p) => p,
+  const { data, isLoading, isFetching, refetch } = useQuery({
+    queryKey: ['parents', page, pageSize, search, statusFilter],
+    queryFn: () => {
+      const fetchFn = search ? parentService.search : parentService.getAll;
+      return fetchFn({
+        page,
+        limit: pageSize,
+        search: search || undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined
+      });
+    },
   });
 
-  const rows = data?.data ?? [];
+  const parents = data?.data ?? [];
   const total = data?.pagination?.total ?? 0;
   const totalPages = data?.pagination?.totalPages ?? 1;
 
-  // Check if form can be submitted (at least one student selected)
   const canSubmit = editing || selectedStudentIds.length > 0;
 
   const save = useMutation({
     mutationFn: async (vals) => {
-      const payload = {
-        ...vals,
-        student_ids: selectedStudentIds,
-      };
-      // Remove empty password
-      if (!payload.password) {
-        delete payload.password;
-      }
+      const payload = { ...vals, student_ids: selectedStudentIds };
+      if (!payload.password) delete payload.password;
       return editing ? parentService.update(editing.id, payload) : parentService.create(payload);
     },
     onSuccess: () => { 
@@ -138,46 +118,41 @@ export default function ParentsPage({ type }) {
     onError: (error) => {
       const msg = error?.response?.data?.message || 'Save failed';
       toast.error(msg);
-      // Show student warning if error is about no students
-      if (msg.toLowerCase().includes('student')) {
-        setShowStudentWarning(true);
-      }
+      if (msg.toLowerCase().includes('student')) setShowStudentWarning(true);
     },
   });
 
   const remove = useMutation({
     mutationFn: (id) => parentService.delete(id),
-    onSuccess: () => { toast.success('Deleted successfully'); qc.invalidateQueries({ queryKey: ['parents'] }); setDeleting(null); },
-    onError: () => toast.error('Delete failed'),
+    onSuccess: () => { 
+      toast.success('Deleted successfully'); 
+      qc.invalidateQueries({ queryKey: ['parents'] }); 
+      setDeleting(null); 
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || 'Delete failed');
+    },
   });
 
-  const openAdd = () => {
+  const handleAdd = () => {
     setEditing(null);
     setFoundStudents([]);
     setSelectedStudentIds([]);
-    setShowStudentWarning(false);
     reset({ status: 'active', relation: 'father', password: '' });
     setModal(true);
   };
 
-  const openEdit = (row) => {
+  const handleEdit = (row) => {
     setEditing(row);
     setFoundStudents(Array.isArray(row.students) ? row.students : []);
     setSelectedStudentIds(Array.isArray(row.student_ids) ? row.student_ids : []);
-    setShowStudentWarning(false);
-    reset({ 
-      ...row,
-      password: '' // Don't populate password field for edit
-    });
+    reset({ ...row, password: '' });
     setModal(true);
   };
 
   const closeModal = () => {
     setModal(false);
     setEditing(null);
-    setFoundStudents([]);
-    setSelectedStudentIds([]);
-    setShowStudentWarning(false);
     reset();
   };
 
@@ -192,20 +167,9 @@ export default function ParentsPage({ type }) {
         phone: vals.phone,
         cnic: vals.cnic,
       });
-
       const list = Array.isArray(result?.data) ? result.data : [];
       setFoundStudents(list);
-      
-      // For edit mode, don't auto-select students
-      if (!editing) {
-        setSelectedStudentIds(list.map(s => s.id));
-      }
-
-      if (list.length === 0) {
-        toast.info('No matching students found for this parent info');
-      } else {
-        toast.success(`${list.length} student(s) found`);
-      }
+      if (!editing) setSelectedStudentIds(list.map(s => s.id));
     } catch (error) {
       toast.error(error?.message || 'Failed to find students');
     } finally {
@@ -219,10 +183,7 @@ export default function ParentsPage({ type }) {
         ? prev.filter((id) => id !== studentId)
         : [...prev, studentId]
     ));
-    // Hide warning when user selects a student
-    if (showStudentWarning) {
-      setShowStudentWarning(false);
-    }
+    if (showStudentWarning) setShowStudentWarning(false);
   };
 
   const selectAllStudents = () => {
@@ -245,66 +206,79 @@ export default function ParentsPage({ type }) {
         </div>
       )
     },
-    { accessorKey: 'phone', header: 'Phone', cell: ({ getValue }) => getValue() || '—' },
+    { accessorKey: 'phone', header: 'Phone' },
     { accessorKey: 'relation', header: 'Relation', cell: ({ getValue }) => <span className="capitalize">{getValue()}</span> },
-    { accessorKey: 'children', header: `${terms.students}`, cell: ({ getValue }) => getValue() ?? 0 },
+    { accessorKey: 'children', header: `${terms.students}` },
     { 
       accessorKey: 'status', 
       header: 'Status', 
       cell: ({ getValue }) => (
-        <span className={cn(
-          'rounded-full px-2 py-0.5 text-xs font-medium capitalize',
-          getValue() === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-        )}>
+        <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', getValue() === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700')}>
           {getValue()}
         </span>
       ) 
     },
     {
-      id: 'actions', 
-      header: 'Actions', 
-      enableHiding: false, 
-      cell: ({ row }) => (
-        <div className="flex items-center justify-end gap-1">
-          {canDo('parents.update') && (
-            <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit">
-              <Pencil size={13} />
-            </button>
-          )}
-          {canDo('parents.delete') && (
-            <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete">
-              <Trash2 size={13} />
-            </button>
-          )}
-        </div>
-      )
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => {
+        const p = row.original;
+        return (
+          <div className="flex justify-center">
+            <TableRowActions
+              onView={() => router.push(`/${type}/parents/${p.id}`)}
+              onEdit={canUpdate ? () => handleEdit(p) : undefined}
+              onDelete={canDelete ? () => setDeleting(p) : undefined}
+              extra={canUpdate ? [
+                {
+                  label: p.status === 'active' ? 'Deactivate' : 'Activate',
+                  icon: Power,
+                  onClick: () => save.mutate({ ...p, status: p.status === 'active' ? 'inactive' : 'active' })
+                }
+              ] : []}
+            />
+          </div>
+        );
+      },
     },
-  ], [canDo, terms]);
+  ], [canUpdate, canDelete, type, router, terms]);
+
+  if (!mounted) return null;
+
+  // Loading
+  if (isLoading && !data && !search) {
+    return <PageLoader message={`Loading ${terms.parents || 'parents'}...`} />;
+  }
 
   return (
     <div className="space-y-5">
-      <PageHeader 
-        title="Parents & Guardians" 
-        description={`${total} registered`}
+      <PageHeader
+        title="Parents & Guardians"
+        description={`${total} parents registered`}
         action={
-          canDo('parents.create') ? (
-            <Button onClick={openAdd} className="gap-1.5">
-              <Plus size={14} /> Add Parent
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw size={13} className={cn('mr-1', isFetching && 'animate-spin')} /> Refresh
             </Button>
-          ) : null
+            {canCreate && (
+              <Button onClick={handleAdd} className="gap-1.5">
+                <Plus size={15} /> Add Parent
+              </Button>
+            )}
+          </div>
         }
       />
       
       <div className="grid gap-4 sm:grid-cols-3">
         <StatsCard label="Total Parents" value={total} icon={<UserCheck size={18} />} />
-        <StatsCard label="Active" value={rows.filter(r => r.status === 'active').length} icon={<UserCheck size={18} />} />
-        <StatsCard label="Linked Students" value={rows.reduce((s, r) => s + (r.children ?? 0), 0)} icon={<UserCheck size={18} />} />
+        <StatsCard label="Active" value={parents.filter(r => r.status === 'active').length} icon={<UserCheck size={18} />} />
+        <StatsCard label="Linked Students" value={parents.reduce((s, r) => s + (r.children ?? 0), 0)} icon={<UserCheck size={18} />} />
       </div>
       
-      <DataTable 
-        columns={columns} 
-        data={rows} 
-        loading={isLoading} 
+      <DataTable
+        columns={columns}
+        data={parents}
+        loading={isLoading || isFetching}
         emptyMessage="No parents found"
         search={search} 
         onSearch={(v) => { setSearch(v); setPage(1); }} 
@@ -313,8 +287,7 @@ export default function ParentsPage({ type }) {
           { 
             name: 'status', 
             label: 'Status', 
-            value: status, 
-            onChange: (v) => { setStatus(v); setPage(1); }, 
+            onChange: (v) => { setStatusFilter(v); setPage(1); }, 
             options: STATUS_OPTS 
           }
         ]}
@@ -353,39 +326,68 @@ export default function ParentsPage({ type }) {
       >
         <form id="parent-form" onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">First Name *</label>
-              <input {...register('first_name')} className="input-base" />
-              {errors.first_name && <p className="text-xs text-destructive">{errors.first_name.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Last Name *</label>
-              <input {...register('last_name')} className="input-base" />
-              {errors.last_name && <p className="text-xs text-destructive">{errors.last_name.message}</p>}
-            </div>
+            <InputField
+              label="First Name *"
+              name="first_name"
+              register={register}
+              error={errors.first_name}
+              placeholder="e.g. Hassan"
+              required
+            />
+            <InputField
+              label="Last Name *"
+              name="last_name"
+              register={register}
+              error={errors.last_name}
+              placeholder="e.g. Raza"
+              required
+            />
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Phone *</label>
-              <input {...register('phone')} className="input-base" />
-              {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Email</label>
-              <input type="email" {...register('email')} className="input-base" />
-            </div>
+            <Controller
+              name="phone"
+              control={control}
+              render={({ field }) => (
+                <PhoneInputField
+                  label="Phone *"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.phone}
+                  required
+                />
+              )}
+            />
+            <InputField
+              label="Email"
+              name="email"
+              type="email"
+              register={register}
+              error={errors.email}
+              placeholder="hassan.raza@example.com"
+            />
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">CNIC</label>
-              <input {...register('cnic')} className="input-base" placeholder="XXXXX-XXXXXXX-X" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Occupation</label>
-              <input {...register('occupation')} className="input-base" />
-            </div>
+            <Controller
+              name="cnic"
+              control={control}
+              render={({ field }) => (
+                <CnicInput
+                  label="CNIC"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.cnic}
+                />
+              )}
+            />
+            <InputField
+              label="Occupation"
+              name="occupation"
+              register={register}
+              error={errors.occupation}
+              placeholder="e.g. Software Engineer"
+            />
           </div>
           
           <div className="grid grid-cols-2 gap-4">
@@ -408,8 +410,13 @@ export default function ParentsPage({ type }) {
           </div>
           
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Address</label>
-            <input {...register('address')} className="input-base" />
+            <InputField
+              label="Address"
+              name="address"
+              register={register}
+              error={errors.address}
+              placeholder="e.g. House 123, Block A, North Nazimabad, Karachi"
+            />
           </div>
 
           {/* Password field for new parents */}

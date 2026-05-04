@@ -19,6 +19,20 @@ export const teacherService = {
   },
 
   /**
+   * Search teachers
+   */
+  search: async (params = {}) => {
+    try {
+      const queryString = buildQuery(params);
+      const response = await api.get(`/teachers/search${queryString}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error searching teachers:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Get teacher by ID
    */
   getById: async (id) => {

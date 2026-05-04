@@ -50,6 +50,8 @@ export default function AcademicYearsPage({ type }) {
   const [pageSize, setPageSize] = useState(10);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingYear, setEditingYear] = useState(null);
+  const [viewingYear, setViewingYear] = useState(null);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(null);
   const [statusDialog, setStatusDialog] = useState(null);
   const [currentDialog, setCurrentDialog] = useState(null);
@@ -198,10 +200,21 @@ export default function AcademicYearsPage({ type }) {
     setModalOpen(true);
   };
 
+  // Open view modal
+  const openViewModal = (year) => {
+    setViewingYear(year);
+    setViewModalOpen(true);
+  };
+
   // Close modal
   const closeModal = () => {
     setModalOpen(false);
     setEditingYear(null);
+  };
+
+  const closeViewModal = () => {
+    setViewModalOpen(false);
+    setViewingYear(null);
   };
 
   // Table columns
@@ -278,12 +291,6 @@ export default function AcademicYearsPage({ type }) {
             });
           }
           
-          // extraActions.push({
-          //   label: 'Copy Year',
-          //   icon: <Copy className="h-4 w-4" />,
-          //   onClick: () => handleCopyYear(year)
-          // });
-          
           extraActions.push({
             label: year.is_active ? 'Deactivate' : 'Activate',
             icon: <Power className="h-4 w-4" />,
@@ -294,7 +301,7 @@ export default function AcademicYearsPage({ type }) {
         
         return (
           <TableRowActions
-            onView={() => openEditModal(year)}
+            onView={() => openViewModal(year)}
             onEdit={canUpdate ? () => openEditModal(year) : undefined}
             onDelete={canDelete && !year.is_current ? () => setDeleteDialog(year) : undefined}
             extra={extraActions}
@@ -423,6 +430,81 @@ export default function AcademicYearsPage({ type }) {
           instituteId={currentInstitute?.id}
           isEdit={!!editingYear && !editingYear.isCopy}
         />
+      </AppModal>
+
+      {/* View Modal */}
+      <AppModal
+        open={viewModalOpen}
+        onClose={closeViewModal}
+        title={`${terms?.academic_year || 'Academic Year'} Details`}
+        size="lg"
+      >
+        {viewingYear && (
+          <div className="space-y-6 py-2">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Year Name</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-lg font-semibold">{viewingYear.name}</p>
+                  {viewingYear.is_current && (
+                    <Badge variant="default" className="bg-green-500">
+                      <Star className="h-3 w-3 mr-1 fill-current" />
+                      Current
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Status</p>
+                <div>
+                  <Badge variant={viewingYear.is_active ? 'success' : 'secondary'} className="text-sm px-3">
+                    {viewingYear.is_active ? 'Active' : 'Inactive'}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Start Date</p>
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-primary" />
+                  <p className="text-base font-medium">
+                    {viewingYear.start_date ? new Date(viewingYear.start_date).toLocaleDateString('en-PK', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    }) : '—'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">End Date</p>
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-primary" />
+                  <p className="text-base font-medium">
+                    {viewingYear.end_date ? new Date(viewingYear.end_date).toLocaleDateString('en-PK', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    }) : '—'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1 pt-4 border-t">
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Description</p>
+              <p className="text-base text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                {viewingYear.description || 'No description provided.'}
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-4">
+              <Button variant="outline" onClick={closeViewModal}>Close</Button>
+            </div>
+          </div>
+        )}
       </AppModal>
 
       {/* Delete Confirmation */}

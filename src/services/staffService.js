@@ -23,6 +23,16 @@ export const staffService = {
     return api.get(`/staff${query}`).then(r => r.data);
   },
 
+  // Search staff
+  search: (params = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') qs.append(k, v);
+    });
+    const query = qs.toString() ? `?${qs}` : '';
+    return api.get(`/staff/search${query}`).then(r => r.data);
+  },
+
   // Get single staff member by ID
   getById: (id) => 
     api.get(`/staff/${id}`).then(r => r.data),

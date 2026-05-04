@@ -510,10 +510,13 @@ export const STATUS_OPTS = [
 
 export const CONCESSION_OPTIONS = [
   { value: 'none', label: 'None' },
-  { value: 'merit', label: 'Merit' },
+  { value: 'full', label: 'Full Concession' },
+  { value: 'half', label: 'Half Concession' },
+  { value: 'merit', label: 'Merit Scholarship' },
   { value: 'need_based', label: 'Need Based' },
   { value: 'staff_child', label: 'Staff Child' },
-  { value: 'sibling', label: 'Sibling' }
+  { value: 'sibling', label: 'Sibling Concession' },
+  { value: 'other', label: 'Other' }
 ];
 
 export const GUARDIAN_TYPES = [

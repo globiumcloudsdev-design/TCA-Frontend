@@ -10,17 +10,18 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import {
-    Plus, Pencil, Trash2, Users, UserCog, Mail, Phone,
-    Loader2, RefreshCw, Upload, X, Calendar, Briefcase,
-    GraduationCap, Banknote, MapPin, FileText, Shield, IdCard,
-    Eye, EyeOff
+    Plus, Search, MoreHorizontal, Pencil, Trash2, UserCog, RefreshCw,
+    Download, Upload, Eye, EyeOff, FileText, User, Briefcase, Shield, Power, Loader2,
+    Users, Mail, Phone, Calendar, Banknote, MapPin, IdCard, GraduationCap
 } from 'lucide-react';
+import { TableRowActions } from '@/components/common';
 import useAuthStore from '@/store/authStore';
 import { staffService } from '@/services/staffService';
 import DataTable from '@/components/common/DataTable';
@@ -30,6 +31,7 @@ import SelectField from '@/components/common/SelectField';
 import InputField from '@/components/common/InputField';
 import PhoneInputField from '@/components/common/PhoneInput';
 import CnicInput from '@/components/common/CnicInput';
+import PasswordInputField from '@/components/common/PasswordInputField';
 import SwitchField from '@/components/common/SwitchField';
 import StatsCard from '@/components/common/StatsCard';
 import { FileUpload } from '@/components/forms/FileUpload';
@@ -60,38 +62,6 @@ const CONTRACT_TYPE_OPTIONS = [
 const STATUS_COLORS = {
     active: 'bg-emerald-100 text-emerald-700 border-emerald-200',
     inactive: 'bg-gray-100 text-gray-600 border-gray-200'
-};
-
-// Password Input Component with Eye Icon
-const PasswordInputField = ({ label, name, register, error, placeholder, required }) => {
-    const [showPassword, setShowPassword] = useState(false);
-    
-    return (
-        <div className="space-y-2">
-            <Label htmlFor={name} className="text-sm font-medium">
-                {label} {required && <span className="text-red-500">*</span>}
-            </Label>
-            <div className="relative">
-                <input
-                    id={name}
-                    type={showPassword ? 'text' : 'password'}
-                    {...register(name)}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${
-                        error ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-                    } dark:bg-gray-800 dark:text-white pr-10`}
-                    placeholder={placeholder}
-                />
-                <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-            </div>
-            {error && <p className="text-sm text-red-500">{error.message}</p>}
-        </div>
-    );
 };
 
 // Validation schema (same as Teacher with staff_type)
@@ -198,6 +168,7 @@ function PermissionCheckbox({ label, code, checked, onChange, disabled }) {
 }
 
 export default function StaffManagementPage({ instituteType }) {
+    const router = useRouter();
     const qc = useQueryClient();
     const canDo = useAuthStore((s) => s.canDo);
     const user = useAuthStore((s) => s.user);
@@ -217,6 +188,15 @@ export default function StaffManagementPage({ instituteType }) {
     const [uploadingFiles, setUploadingFiles] = useState({});
     const [showCustomType, setShowCustomType] = useState({});
     const [isMobile, setIsMobile] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     // Permissions state
     const [selectedPermissions, setSelectedPermissions] = useState([]);
@@ -236,13 +216,16 @@ export default function StaffManagementPage({ instituteType }) {
     // Fetch staff members
     const { data, isLoading, refetch, isFetching } = useQuery({
         queryKey: ['staff', page, pageSize, search, statusFilter, typeFilter],
-        queryFn: () => staffService.getAll({
-            page,
-            limit: pageSize,
-            search: search || undefined,
-            is_active: statusFilter === 'active' ? true : statusFilter === 'inactive' ? false : undefined,
-            staff_type: typeFilter || undefined
-        }),
+        queryFn: () => {
+            const fetchFn = search ? staffService.search : staffService.getAll;
+            return fetchFn({
+                page,
+                limit: pageSize,
+                search: search || undefined,
+                is_active: statusFilter === 'active' ? true : statusFilter === 'inactive' ? false : undefined,
+                staff_type: typeFilter || undefined
+            });
+        },
     });
 
     const staffMembers = data?.data ?? [];
@@ -738,61 +721,36 @@ export default function StaffManagementPage({ instituteType }) {
             cell: ({ row }) => {
                 const s = row.original;
                 return (
-                    <div className="flex items-center justify-end gap-1">
-                        {canUpdate && (
-                            <button
-                                onClick={() => {
-                                    setEditingStaff(s);
-                                    setModalOpen(true);
-                                }}
-                                className="rounded p-1.5 hover:bg-accent"
-                                title="Edit"
-                            >
-                                <Pencil size={13} />
-                            </button>
-                        )}
-                        {canUpdate && (
-                            <button
-                                onClick={() => toggleStatusMutation.mutate({ id: s.id, is_active: !s.is_active })}
-                                className="rounded p-1.5 hover:bg-accent"
-                                title={s.is_active ? 'Deactivate' : 'Activate'}
-                            >
-                                <UserCog size={13} />
-                            </button>
-                        )}
-                        {canDelete && (
-                            <button
-                                onClick={() => setDeletingStaff(s)}
-                                className="rounded p-1.5 text-destructive hover:bg-destructive/10"
-                                title="Delete"
-                            >
-                                <Trash2 size={13} />
-                            </button>
-                        )}
-                        {(canDo('staff.read') || canDo('users.read')) && (
-                            <button
-                                onClick={() => generateAndDownloadIdCard({
-                                    role: resolveCardRole(s),
-                                    person: s,
-                                    institute: user?.institute || user?.school || {}
-                                })}
-                                className="rounded p-1.5 hover:bg-accent"
-                                title="Generate ID Card"
-                            >
-                                <IdCard size={13} />
-                            </button>
-                        )}
+                    <div className="flex justify-center">
+                        <TableRowActions
+                            onView={() => router.push(`/${instituteType}/staff/${s.id}`)}
+                            onEdit={canUpdate ? () => {
+                                setEditingStaff(s);
+                                reset(s);
+                                setModalOpen(true);
+                            } : undefined}
+                            onDelete={canDelete ? () => setDeletingStaff(s) : undefined}
+                            extra={canUpdate ? [
+                                {
+                                    label: s.is_active ? 'Deactivate' : 'Activate',
+                                    icon: Power,
+                                    onClick: () => toggleStatusMutation.mutate({ id: s.id, is_active: !s.is_active })
+                                }
+                            ] : []}
+                        />
                     </div>
                 );
             },
         },
-    ], [canUpdate, canDelete, canDo, user]);
+    ], [canUpdate, canDelete, canDo, user, instituteType]);
 
     // Stats
     const activeCount = staffMembers.filter(s => s.is_active).length;
 
     // Get available permissions
     const availablePermissions = availableRoles || [];
+
+    if (!mounted) return null;
 
     return (
         <div className="space-y-5">
@@ -804,7 +762,7 @@ export default function StaffManagementPage({ instituteType }) {
                         <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
                             <RefreshCw size={13} className={cn('mr-1', isFetching && 'animate-spin')} /> Refresh
                         </Button>
-                        {canCreate && (
+                        {mounted && canCreate && (
                             <Button onClick={() => {
                                 setEditingStaff(null);
                                 setModalOpen(true);
@@ -827,7 +785,7 @@ export default function StaffManagementPage({ instituteType }) {
             <DataTable
                 columns={columns}
                 data={staffMembers}
-                loading={isLoading}
+                loading={isLoading || isFetching}
                 emptyMessage="No staff members found"
                 search={search}
                 enableColumnVisibility

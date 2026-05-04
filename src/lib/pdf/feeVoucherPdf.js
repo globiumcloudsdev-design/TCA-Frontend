@@ -368,10 +368,18 @@ const buildFeeRows = (voucher = {}) => {
     merged.push({ label: primaryFeeLabel, amount: netAmount });
   }
 
-  const rows = merged.map((row) => [
-    row.label,
-    typeof row.amount === 'string' && row.amount.includes('%') ? row.amount : formatAmount(row.amount)
-  ]);
+  const rows = merged.map((row) => {
+    const isPercentage = row.label.toLowerCase().includes('percentage');
+    const discountType = breakdownSource?.discount_type;
+    const isConcessionField = row.label.toLowerCase().includes('concession') || row.label.toLowerCase().includes('discount');
+    
+    return [
+      row.label,
+      (isPercentage || (isConcessionField && discountType === 'percentage')) 
+        ? `${row.amount}%` 
+        : (typeof row.amount === 'string' && row.amount.includes('%') ? row.amount : formatAmount(row.amount))
+    ];
+  });
 
   return rows.length ? rows : [['No fee lines', '-']];
 };
@@ -467,7 +475,7 @@ const renderVoucherPage = (doc, voucher = {}, student = {}, instituteName = 'ABC
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text(`Generate Date: ${generatedOn}`, sectionX + sectionWidth - 10, sectionY + 14, { align: 'right' });
+    // doc.text(`Generate Date: ${generatedOn}`, sectionX + sectionWidth - 10, sectionY + 14, { align: 'right' });
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);

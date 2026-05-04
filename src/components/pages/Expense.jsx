@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, RefreshCw, Download, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
-
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
@@ -215,8 +214,7 @@ export default function Expense() {
       title: row.title,
       amount: String(row.amount),
       category: row.category,
-      vendor_id: row.vendor_id || '',
-      vendor_name: row.vendor_name || '',
+      vendor_id: row.vendor_id || row.vendor_name || '',
       date: row.date,
       description: row.description || '',
       status: row.status,
@@ -261,11 +259,14 @@ export default function Expense() {
       payment_reference: form.payment_reference?.trim() || null,
     };
 
-    // Handle vendor: either vendor_id or vendor_name
+    // Handle vendor: either vendor_id (UUID) or vendor_name (string)
     if (form.vendor_id) {
-      payload.vendor_id = form.vendor_id;
-    } else if (form.vendor_name?.trim()) {
-      payload.vendor_name = form.vendor_name.trim();
+      const isExistingVendor = vendorsData.some(v => v.value === form.vendor_id);
+      if (isExistingVendor) {
+        payload.vendor_id = form.vendor_id;
+      } else {
+        payload.vendor_name = form.vendor_id;
+      }
     }
 
     if (editingExpense) {
@@ -582,28 +583,11 @@ export default function Expense() {
             <CreatableSelectField
               label="Vendor"
               value={form.vendor_id}
-              onChange={(value) => setForm((prev) => ({
-                ...prev,
-                vendor_id: value,
-                vendor_name: ''
-              }))}
+              onChange={(value) => setForm((prev) => ({ ...prev, vendor_id: value }))}
               options={vendorsData}
               placeholder="Select vendor or type new name"
             />
           </div>
-
-          {/* Show manual vendor name input if no vendor selected */}
-          {!form.vendor_id && (
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Vendor Name</label>
-              <input
-                value={form.vendor_name}
-                onChange={(e) => setForm((prev) => ({ ...prev, vendor_name: e.target.value }))}
-                className="input-base"
-                placeholder="Enter vendor name"
-              />
-            </div>
-          )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">

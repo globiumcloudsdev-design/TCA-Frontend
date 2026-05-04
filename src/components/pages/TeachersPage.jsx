@@ -4,6 +4,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
@@ -58,10 +59,16 @@ const filterSchema = z.object({
 });
 
 export default function TeachersPage({ type }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { canDo, user } = useAuthStore();
   const { currentInstitute } = useInstituteStore();
   const { terms } = useInstituteConfig();
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // State
   const [search, setSearch] = useState('');
@@ -113,7 +120,8 @@ export default function TeachersPage({ type }) {
         status: selectedStatus || undefined
       });
 
-      const response = await teacherService.getAll({
+      const fetchFn = search ? teacherService.search : teacherService.getAll;
+      const response = await fetchFn({
         institute_id: currentInstitute?.id,
         page,
         limit: pageSize,
@@ -225,8 +233,7 @@ export default function TeachersPage({ type }) {
   };
 
   const openViewModal = (teacher) => {
-    console.log('👁️ Viewing teacher:', teacher);
-    setModalState({ isOpen: true, mode: 'view', data: teacher });
+    router.push(`/${type}/teachers/${teacher.id}`);
   };
 
   const closeModal = () => {
@@ -332,24 +339,24 @@ export default function TeachersPage({ type }) {
 
         const extraActions = [];
 
-        if (canDo('teachers.read')) {
-          extraActions.push({
-            label: 'Generate ID Card',
-            icon: <IdCard className="h-4 w-4" />,
-            onClick: () => generateAndDownloadIdCard({
-              role: 'teacher',
-              person: teacher,
-              institute: currentInstitute || user?.institute || user?.school || {}
-            })
-          });
-        }
+        // if (canDo('teachers.read')) {
+        //   extraActions.push({
+        //     label: 'Generate ID Card',
+        //     icon: <IdCard className="h-4 w-4" />,
+        //     onClick: () => generateAndDownloadIdCard({
+        //       role: 'teacher',
+        //       person: teacher,
+        //       institute: currentInstitute || user?.institute || user?.school || {}
+        //     })
+        //   });
+        // }
 
         if (canUpdate) {
-          extraActions.push({
-            label: 'Regenerate QR Code',
-            icon: <QrCode className="h-4 w-4" />,
-            onClick: () => handleRegenerateQR(teacher.id)
-          });
+          // extraActions.push({
+          //   label: 'Regenerate QR Code',
+          //   icon: <QrCode className="h-4 w-4" />,
+          //   onClick: () => handleRegenerateQR(teacher.id)
+          // });
 
           // ✅ Add toggle status action
           extraActions.push({
@@ -361,16 +368,18 @@ export default function TeachersPage({ type }) {
         }
 
         return (
-          <TableRowActions
-            onView={() => openViewModal(teacher)}
-            onEdit={canUpdate ? () => openEditModal(teacher) : undefined}
-            onDelete={canDelete ? () => setDeleting(teacher) : undefined}
-            extra={extraActions}
-          />
+          <div className="flex justify-center">
+            <TableRowActions
+              onView={() => openViewModal(teacher)}
+              onEdit={canUpdate ? () => openEditModal(teacher) : undefined}
+              onDelete={canDelete ? () => setDeleting(teacher) : undefined}
+              extra={extraActions}
+            />
+          </div>
         );
       },
     },
-  ], [canDo, currentInstitute, user]);
+  ], [canDo, currentInstitute, user, type, router]);
 
   // Stats
   const teachers = data?.data || [];
@@ -378,8 +387,10 @@ export default function TeachersPage({ type }) {
   const active = teachers.filter(t => t.is_active).length;
   const inactive = teachers.filter(t => !t.is_active).length;
 
+  if (!mounted) return null;
+
   // Loading
-  if (isLoading && !data) {
+  if (isLoading && !data && !search) {
     return <PageLoader message={`Loading ${teachersLabel.toLowerCase()}...`} />;
   }
 
@@ -518,312 +529,7 @@ export default function TeachersPage({ type }) {
         />
       </AppModal>
 
-      {/* View Modal - REMOVED SUBJECTS */}
-      <AppModal
-        open={modalState.isOpen && modalState.mode === 'view'}
-        onClose={closeModal}
-        title={`${teacherLabel} Details`}
-        size="xl"
-      >
-        {modalState.data && (
-          <div className="space-y-6">
-            {/* Header with Avatar */}
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16">
-                  <AvatarFallback className="bg-primary/10 text-xl font-bold text-primary">
-                    {modalState.data.first_name?.[0]}{modalState.data.last_name?.[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="text-lg font-semibold">
-                    {modalState.data.first_name} {modalState.data.last_name}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {modalState.data.details?.teacherDetails?.designation || 'Teacher'} • {modalState.data.details?.teacherDetails?.department || 'No Department'}
-                  </p>
-                  <div className="flex gap-2 mt-1">
-                    <StatusBadge status={modalState.data.is_active ? 'active' : 'inactive'} />
-                    <Badge variant="outline">
-                      ID: {modalState.data.registration_no || 'N/A'}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-
-              {/* QR Code */}
-              {modalState.data.qr_code_url && (
-                <div className="text-center">
-                  <img
-                    src={modalState.data.qr_code_url}
-                    alt="QR Code"
-                    className="w-24 h-24 border rounded-lg p-1"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-1"
-                    onClick={() => window.open(modalState.data.qr_code_url, '_blank')}
-                  >
-                    <Download className="h-3 w-3 mr-1" />
-                    Download
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            <Tabs defaultValue="personal" className="w-full">
-              <TabsList className="grid grid-cols-4 mb-4">
-                <TabsTrigger value="personal">Personal</TabsTrigger>
-                <TabsTrigger value="professional">Professional</TabsTrigger>
-                <TabsTrigger value="employment">Employment</TabsTrigger>
-                <TabsTrigger value="documents">Documents</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="personal">
-                <Card>
-                  <CardContent className="p-4">
-                    <dl className="grid grid-cols-2 gap-4">
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Full Name</dt>
-                        <dd className="font-medium">
-                          {modalState.data.first_name} {modalState.data.last_name}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Gender</dt>
-                        <dd className="font-medium capitalize">
-                          {modalState.data.details?.teacherDetails?.gender || '—'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Email</dt>
-                        <dd className="font-medium">{modalState.data.email}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Phone</dt>
-                        <dd className="font-medium">{modalState.data.phone}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm text-muted-foreground">CNIC</dt>
-                        <dd className="font-medium">
-                          {modalState.data.details?.teacherDetails?.cnic || '—'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Date of Birth</dt>
-                        <dd className="font-medium">
-                          {modalState.data.details?.teacherDetails?.date_of_birth
-                            ? new Date(modalState.data.details.teacherDetails.date_of_birth).toLocaleDateString()
-                            : '—'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Blood Group</dt>
-                        <dd className="font-medium">
-                          {modalState.data.details?.teacherDetails?.blood_group || '—'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Religion</dt>
-                        <dd className="font-medium">
-                          {modalState.data.details?.teacherDetails?.religion || '—'}
-                        </dd>
-                      </div>
-                    </dl>
-
-                    <Separator className="my-4" />
-
-                    <h4 className="text-sm font-semibold mb-2">Address</h4>
-                    <p className="text-sm">
-                      {modalState.data.details?.teacherDetails?.present_address || 'No address provided'}
-                    </p>
-
-                    {modalState.data.details?.teacherDetails?.emergency_contact_name && (
-                      <>
-                        <Separator className="my-4" />
-                        <h4 className="text-sm font-semibold mb-2">Emergency Contact</h4>
-                        <dl className="grid grid-cols-2 gap-2">
-                          <div>
-                            <dt className="text-xs text-muted-foreground">Name</dt>
-                            <dd className="text-sm">
-                              {modalState.data.details.teacherDetails.emergency_contact_name}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-xs text-muted-foreground">Relation</dt>
-                            <dd className="text-sm">
-                              {modalState.data.details.teacherDetails.emergency_contact_relation}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-xs text-muted-foreground">Phone</dt>
-                            <dd className="text-sm">
-                              {modalState.data.details.teacherDetails.emergency_contact_phone}
-                            </dd>
-                          </div>
-                        </dl>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="professional">
-                <Card>
-                  <CardContent className="p-4">
-                    <dl className="grid grid-cols-2 gap-4">
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Qualification</dt>
-                        <dd className="font-medium">
-                          {modalState.data.details?.teacherDetails?.qualification || '—'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Specialization</dt>
-                        <dd className="font-medium">
-                          {modalState.data.details?.teacherDetails?.specialization || '—'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Experience</dt>
-                        <dd className="font-medium">
-                          {modalState.data.details?.teacherDetails?.experience_years
-                            ? `${modalState.data.details.teacherDetails.experience_years} years`
-                            : '—'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Previous Institution</dt>
-                        <dd className="font-medium">
-                          {modalState.data.details?.teacherDetails?.previous_institution || '—'}
-                        </dd>
-                      </div>
-                    </dl>
-
-                    {/* ✅ REMOVED SUBJECTS SECTION */}
-
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="employment">
-                <Card>
-                  <CardContent className="p-4">
-                    <dl className="grid grid-cols-2 gap-4">
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Designation</dt>
-                        <dd className="font-medium">
-                          {modalState.data.details?.teacherDetails?.designation || '—'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Department</dt>
-                        <dd className="font-medium">
-                          {modalState.data.details?.teacherDetails?.department || '—'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Employment Type</dt>
-                        <dd className="font-medium capitalize">
-                          {modalState.data.details?.teacherDetails?.employment_type || '—'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Joining Date</dt>
-                        <dd className="font-medium">
-                          {modalState.data.details?.teacherDetails?.joining_date
-                            ? new Date(modalState.data.details.teacherDetails.joining_date).toLocaleDateString()
-                            : '—'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Salary</dt>
-                        <dd className="font-medium">
-                          {modalState.data.details?.teacherDetails?.salary
-                            ? `PKR ${Number(modalState.data.details.teacherDetails.salary).toLocaleString()}`
-                            : '—'}
-                        </dd>
-                      </div>
-                    </dl>
-
-                    <Separator className="my-4" />
-
-                    <h4 className="text-sm font-semibold mb-2">Bank Details</h4>
-                    <dl className="grid grid-cols-2 gap-4">
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Bank Name</dt>
-                        <dd className="font-medium">
-                          {modalState.data.details?.teacherDetails?.bank_name || '—'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm text-muted-foreground">Account No</dt>
-                        <dd className="font-medium">
-                          {modalState.data.details?.teacherDetails?.bank_account_no || '—'}
-                        </dd>
-                      </div>
-                    </dl>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="documents">
-                <Card>
-                  <CardContent className="p-4">
-                    {modalState.data.documents?.length > 0 ? (
-                      <div className="space-y-3">
-                        {modalState.data.documents.map((doc, idx) => (
-                          <div key={doc.id || idx} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div>
-                              <p className="font-medium">{doc.title}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Type: {doc.type} • {new Date(doc.uploaded_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {doc.verified && (
-                                <StatusBadge status="verified" label="Verified" />
-                              )}
-                              {doc.file_url && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => window.open(doc.file_url, '_blank')}
-                                >
-                                  View
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-center text-muted-foreground py-8">
-                        No documents uploaded
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <Button variant="outline" onClick={closeModal}>
-                Close
-              </Button>
-              {canDo('teachers.update') && (
-                <Button onClick={() => {
-                  closeModal();
-                  openEditModal(modalState.data);
-                }}>
-                  Edit {teacherLabel}
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-      </AppModal>
+      {/* View Modal - REMOVED (Navigating to detail page instead) */}
 
       {/* Delete Confirmation */}
       <ConfirmDialog

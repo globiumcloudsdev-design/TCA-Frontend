@@ -42,6 +42,10 @@ export const useUIStore = create(
       setUnreadCount: (count) => set({ unreadCount: count }),
       incrementUnread: () => set((s) => ({ unreadCount: s.unreadCount + 1 })),
       clearUnread: () => set({ unreadCount: 0 }),
+
+      // Dynamic Breadcrumb Overrides (e.g. show student name instead of ID)
+      breadcrumbLabel: null,
+      setBreadcrumbLabel: (label) => set({ breadcrumbLabel: label }),
     }),
     {
       name: 'clouds-ui',
