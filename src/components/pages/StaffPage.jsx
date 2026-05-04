@@ -76,7 +76,9 @@ const staffSchema = z.object({
     // Identity
     employee_id: z.string().optional(),
     cnic: z.string().optional(),
-    dob: z.string().optional(),
+    dob: z.string()
+        .optional()
+        .refine(val => !val || new Date(val) <= new Date(), 'Date of birth cannot be in the future'),
     gender: z.string().optional(),
     blood_group: z.string().optional(),
     religion: z.string().optional(),
@@ -90,21 +92,26 @@ const staffSchema = z.object({
     // Professional
     qualification: z.string().optional(),
     specialization: z.string().optional(),
-    experience_years: z.string().optional(),
+    experience_years: z.string()
+        .optional()
+        .refine(val => !val || (val.length <= 3 && /^\d+$/.test(val)), 'Max 3 digits allowed'),
     previous_institution: z.string().optional(),
 
-    // Employment - REMOVED DEPARTMENT, ADDED CONTRACT_TYPE
+    // Employment
     staff_type: z.string().min(1, 'Staff type required'),
     designation: z.string().optional(),
     employment_type: z.string().optional(),
-    contract_type: z.string().optional(),
     joining_date: z.string().optional(),
     contract_start_date: z.string().optional(),
     contract_end_date: z.string().optional(),
-    salary: z.string().optional(),
+    salary: z.string()
+        .optional()
+        .refine(val => !val || (val.length <= 7 && /^\d+$/.test(val)), 'Max 7 digits allowed'),
 
     // Bank
-    bank_name: z.string().optional(),
+    bank_name: z.string()
+        .optional()
+        .refine(val => !val || /^[A-Za-z\s]+$/.test(val), 'Only alphabets allowed'),
     bank_account_no: z.string().optional(),
     bank_branch: z.string().optional(),
 
@@ -133,6 +140,14 @@ const staffSchema = z.object({
         file_name: z.string().optional(),
         verified: z.boolean().default(false),
     })).default([]),
+}).refine(data => {
+    if (data.employment_type === 'contract' && data.contract_start_date && data.contract_end_date) {
+        return new Date(data.contract_end_date) > new Date(data.contract_start_date);
+    }
+    return true;
+}, {
+    message: "End date must be after start date",
+    path: ["contract_end_date"],
 });
 
 // Status Badge Component
@@ -285,24 +300,52 @@ export default function StaffManagementPage({ instituteType }) {
     };
 
     // Form setup
-    const { register, handleSubmit, control, reset, watch, setValue, getValues, formState: { errors } } = useForm({
+    const { register, handleSubmit, control, reset, watch, setValue, getValues, trigger, formState: { errors } } = useForm({
         resolver: zodResolver(staffSchema),
         defaultValues: {
-            is_active: true,
-            staff_type: '',
-            contract_type: 'permanent',
             nationality: 'Pakistani',
+            is_active: true,
             permissions: [],
             documents: [],
+            employment_type: 'permanent'
         }
     });
 
+    const watchEmploymentType = watch('employment_type');
+    const watchJoiningDate = watch('joining_date');
+    const showContractDates = watchEmploymentType === 'contract';
+
+    // Sync Contract Start Date with Joining Date
+    useEffect(() => {
+        if (showContractDates && watchJoiningDate) {
+            setValue('contract_start_date', watchJoiningDate);
+        }
+    }, [watchJoiningDate, showContractDates, setValue]);
+
     const selectedStaffType = watch('staff_type');
     const watchDocuments = watch('documents');
-    const watchContractType = watch('contract_type');
 
-    // Check if contract end date should be shown
-    const showContractEndDate = watchContractType === 'contract' || watchContractType === 'probation';
+    // Auto-navigate to first error tab
+    useEffect(() => {
+        const errorFields = Object.keys(errors);
+        if (errorFields.length > 0) {
+            console.log('⚠️ Staff Form errors:', errorFields);
+            const personalFields = ['first_name', 'last_name', 'email', 'phone', 'dob', 'cnic', 'gender', 'religion', 'blood_group', 'nationality', 'city', 'present_address', 'permanent_address', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relation'];
+            const employmentFields = ['staff_type', 'designation', 'employment_type', 'joining_date', 'contract_start_date', 'contract_end_date', 'salary', 'bank_name', 'bank_account_no', 'bank_branch', 'password', 'qualification', 'experience_years', 'specialization', 'previous_institution'];
+            const permissionFields = ['permissions'];
+            const documentFields = ['documents'];
+
+            if (errorFields.some(f => personalFields.includes(f))) {
+                if (activeTab !== 'personal') setActiveTab('personal');
+            } else if (errorFields.some(f => employmentFields.includes(f))) {
+                if (activeTab !== 'employment') setActiveTab('employment');
+            } else if (errorFields.some(f => permissionFields.includes(f))) {
+                if (activeTab !== 'permissions') setActiveTab('permissions');
+            } else if (errorFields.some(f => documentFields.includes(f)) || errorFields.some(f => f.startsWith('documents.'))) {
+                if (activeTab !== 'documents') setActiveTab('documents');
+            }
+        }
+    }, [errors, activeTab]);
 
     // Update permissions when staff type changes (if not using custom)
     useEffect(() => {
@@ -328,43 +371,11 @@ export default function StaffManagementPage({ instituteType }) {
                 setUseCustomPermissions(isCustom);
             } else {
                 reset({
-                    first_name: '',
-                    last_name: '',
-                    email: '',
-                    phone: '',
-                    alternate_phone: '',
-                    employee_id: '',
-                    cnic: '',
-                    dob: '',
-                    gender: '',
-                    blood_group: '',
-                    religion: '',
                     nationality: 'Pakistani',
-                    present_address: '',
-                    permanent_address: '',
-                    city: '',
-                    qualification: '',
-                    specialization: '',
-                    experience_years: '',
-                    previous_institution: '',
-                    staff_type: '',
-                    designation: '',
-                    employment_type: '',
-                    contract_type: 'permanent',
-                    joining_date: '',
-                    contract_start_date: '',
-                    contract_end_date: '',
-                    salary: '',
-                    bank_name: '',
-                    bank_account_no: '',
-                    bank_branch: '',
-                    emergency_contact_name: '',
-                    emergency_contact_relation: '',
-                    emergency_contact_phone: '',
                     is_active: true,
-                    password: '',
                     permissions: [],
                     documents: [],
+                    employment_type: 'permanent'
                 });
                 setSelectedPermissions([]);
                 setAvatarPreview('');
@@ -375,17 +386,7 @@ export default function StaffManagementPage({ instituteType }) {
             setUploadingFiles({});
             setShowCustomType({});
         }
-    }, [modalOpen, editingStaff]);
-
-    // Check mobile on mount
-    useEffect(() => {
-        const checkMobile = () => {
-            setIsMobile(window.innerWidth < 768);
-        };
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, []);
+    }, [modalOpen, editingStaff, reset]);
 
     // Handle permission toggle
     const handlePermissionToggle = (code, checked) => {
@@ -467,17 +468,17 @@ export default function StaffManagementPage({ instituteType }) {
         setShowCustomType(prev => ({ ...prev, [index]: value === 'other' }));
     };
 
-    // Navigation for mobile
-    const nextTab = () => {
+    const handleTabChange = async (value) => {
         const tabs = ['personal', 'employment', 'permissions', 'documents'];
-        const currentIndex = tabs.indexOf(activeTab);
-        if (currentIndex < tabs.length - 1) setActiveTab(tabs[currentIndex + 1]);
-    };
+        const currentIdx = tabs.indexOf(activeTab);
+        const targetIdx = tabs.indexOf(value);
 
-    const prevTab = () => {
-        const tabs = ['personal', 'employment', 'permissions', 'documents'];
-        const currentIndex = tabs.indexOf(activeTab);
-        if (currentIndex > 0) setActiveTab(tabs[currentIndex - 1]);
+        if (targetIdx > currentIdx) {
+            const fields = currentIdx === 0 ? ['first_name', 'last_name', 'email', 'phone', 'dob'] : [];
+            const isValid = await trigger(fields);
+            if (!isValid) return;
+        }
+        setActiveTab(value);
     };
 
     // Mutations
@@ -501,9 +502,11 @@ export default function StaffManagementPage({ instituteType }) {
             setModalOpen(false);
         },
         onError: (error) => {
-            toast.error(error?.response?.data?.message || 'Failed to update staff');
+            toast.error(error.message || 'Failed to update staff member');
         }
     });
+
+    const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
     const deleteMutation = useMutation({
         mutationFn: (id) => staffService.delete(id),
@@ -549,10 +552,9 @@ export default function StaffManagementPage({ instituteType }) {
             previous_institution: formData.previous_institution,
             designation: formData.designation,
             employment_type: formData.employment_type,
-            contract_type: formData.contract_type,
             joining_date: formData.joining_date,
-            contract_start_date: formData.contract_start_date,
-            contract_end_date: formData.contract_end_date,
+            contract_start_date: formData.employment_type === 'contract' ? (formData.joining_date || formData.contract_start_date) : null,
+            contract_end_date: formData.employment_type === 'contract' ? formData.contract_end_date : null,
             salary: formData.salary ? Number(formData.salary) : null,
             bank_name: formData.bank_name,
             bank_account_no: formData.bank_account_no,
@@ -753,7 +755,20 @@ export default function StaffManagementPage({ instituteType }) {
     if (!mounted) return null;
 
     return (
-        <div className="space-y-5">
+        <div className="space-y-5 relative">
+            {/* Full Page Loader Overlay */}
+            {isSubmitting && (
+                <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-900/60 backdrop-blur-[2px] transition-all">
+                    <div className="relative flex items-center justify-center">
+                        <div className="h-20 w-20 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
+                        <div className="absolute h-12 w-12 rounded-full border-4 border-white/10 border-b-white animate-spin-slow"></div>
+                    </div>
+                    <div className="mt-6 flex flex-col items-center gap-2 text-center">
+                        <h2 className="text-xl font-bold text-white tracking-tight">{editingStaff ? 'Updating Staff Profile...' : 'Creating Staff Account...'}</h2>
+                        <p className="text-indigo-200 text-sm font-medium animate-pulse px-4">Synchronizing employee data with the central records</p>
+                    </div>
+                </div>
+            )}
             <PageHeader
                 title={`${instituteType ? instituteType.charAt(0).toUpperCase() + instituteType.slice(1) : ''} Staff Management`}
                 description={`${total} staff members`}
@@ -834,21 +849,32 @@ export default function StaffManagementPage({ instituteType }) {
                             Cancel
                         </Button>
                         {activeTab !== 'personal' && (
-                            <Button type="button" variant="outline" onClick={prevTab}>
+                            <Button type="button" variant="outline" onClick={() => {
+                                const tabs = ['personal', 'employment', 'permissions', 'documents'];
+                                const currentIndex = tabs.indexOf(activeTab);
+                                if (currentIndex > 0) setActiveTab(tabs[currentIndex - 1]);
+                            }}>
                                 Previous
                             </Button>
                         )}
                         {activeTab !== 'documents' ? (
-                            <Button type="button" onClick={nextTab}>
+                            <Button type="button" onClick={async () => {
+                                const isValid = await trigger();
+                                if (isValid) {
+                                    const tabs = ['personal', 'employment', 'permissions', 'documents'];
+                                    const currentIndex = tabs.indexOf(activeTab);
+                                    if (currentIndex < tabs.length - 1) setActiveTab(tabs[currentIndex + 1]);
+                                }
+                            }}>
                                 Next
                             </Button>
                         ) : (
                             <Button
                                 type="submit"
                                 form="staff-form"
-                                disabled={createMutation.isPending || updateMutation.isPending}
+                                disabled={isSubmitting}
                             >
-                                {createMutation.isPending || updateMutation.isPending ? (
+                                {isSubmitting ? (
                                     <Loader2 size={14} className="animate-spin mr-1" />
                                 ) : null}
                                 {editingStaff ? 'Update' : 'Add Staff'}
@@ -858,17 +884,17 @@ export default function StaffManagementPage({ instituteType }) {
                 }
             >
                 <form id="staff-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
                         {/* Tabs List */}
                         <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
                             <TabsList className={`inline-flex w-auto sm:grid ${isMobile ? 'flex-nowrap' : 'grid-cols-4'} mb-4 sm:mb-6`}>
-                                <TabsTrigger value="personal" className="gap-2">
-                                    <UserCog size={14} />
-                                    <span className="hidden sm:inline">Personal</span>
+                                <TabsTrigger value="personal" className="gap-2" disabled={activeTab === 'personal' && Object.keys(errors).length > 0}>
+                                    <User size={14} />
+                                    <span>Personal</span>
                                 </TabsTrigger>
-                                <TabsTrigger value="employment" className="gap-2">
+                                <TabsTrigger value="employment" className="gap-2" disabled={activeTab === 'personal'}>
                                     <Briefcase size={14} />
-                                    <span className="hidden sm:inline">Employment</span>
+                                    <span>Employment</span>
                                 </TabsTrigger>
                                 <TabsTrigger value="permissions" className="gap-2">
                                     <Shield size={14} />
@@ -890,19 +916,6 @@ export default function StaffManagementPage({ instituteType }) {
                                 </TabsTrigger>
                             </TabsList>
                         </div>
-
-                        {/* Mobile Navigation */}
-                        {isMobile && (
-                            <div className="flex items-center justify-between mb-4">
-                                <Button type="button" variant="outline" size="sm" onClick={prevTab} disabled={activeTab === 'personal'}>
-                                    Previous
-                                </Button>
-                                <span className="text-sm font-medium capitalize">{activeTab}</span>
-                                <Button type="button" variant="outline" size="sm" onClick={nextTab} disabled={activeTab === 'documents'}>
-                                    Next
-                                </Button>
-                            </div>
-                        )}
 
                         {/* Tab 1: Personal Information */}
                         <TabsContent value="personal">
@@ -940,6 +953,7 @@ export default function StaffManagementPage({ instituteType }) {
                                                 name="dob"
                                                 control={control}
                                                 error={errors.dob}
+                                                maxDate={new Date()}
                                             />
                                             <SelectField
                                                 label="Gender"
@@ -1005,6 +1019,16 @@ export default function StaffManagementPage({ instituteType }) {
                                                 error={errors.city}
                                                 placeholder="Karachi"
                                             />
+                                            <InputField
+                                                label="Experience (Years)"
+                                                name="experience_years"
+                                                register={register}
+                                                error={errors.experience_years}
+                                                placeholder="5"
+                                                onInput={(e) => {
+                                                    e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+                                                }}
+                                            />
                                         </div>
 
                                         <TextareaField
@@ -1057,7 +1081,7 @@ export default function StaffManagementPage({ instituteType }) {
                             </Card>
                         </TabsContent>
 
-                        {/* Tab 2: Employment Information - REMOVED DEPARTMENT, ADDED CONTRACT TYPE */}
+                        {/* Tab 2: Employment Information */}
                         <TabsContent value="employment">
                             <Card>
                                 <CardContent className="p-4 sm:p-6">
@@ -1092,15 +1116,6 @@ export default function StaffManagementPage({ instituteType }) {
                                                 placeholder="Select type"
                                             />
 
-                                            <SelectField
-                                                label="Contract Type"
-                                                name="contract_type"
-                                                control={control}
-                                                error={errors.contract_type}
-                                                options={CONTRACT_TYPE_OPTIONS}
-                                                placeholder="Select contract type"
-                                            />
-
                                             <DatePickerField
                                                 label="Joining Date"
                                                 name="joining_date"
@@ -1108,22 +1123,23 @@ export default function StaffManagementPage({ instituteType }) {
                                                 error={errors.joining_date}
                                             />
 
-                                            <DatePickerField
-                                                label="Contract Start Date"
-                                                name="contract_start_date"
-                                                control={control}
-                                                error={errors.contract_start_date}
-                                            />
-
-                                            {/* Conditional Contract End Date */}
-                                            {showContractEndDate && (
-                                                <DatePickerField
-                                                    label="Contract End Date"
-                                                    name="contract_end_date"
-                                                    control={control}
-                                                    error={errors.contract_end_date}
-                                                    description={watchContractType === 'contract' ? 'End date of contract' : 'End of probation period'}
-                                                />
+                                            {showContractDates && (
+                                                <>
+                                                    <DatePickerField
+                                                        label="Contract Start Date"
+                                                        name="contract_start_date"
+                                                        control={control}
+                                                        error={errors.contract_start_date}
+                                                        disabled
+                                                    />
+                                                    <DatePickerField
+                                                        label="Contract End Date"
+                                                        name="contract_end_date"
+                                                        control={control}
+                                                        error={errors.contract_end_date}
+                                                        minDate={watchJoiningDate ? new Date(new Date(watchJoiningDate).setDate(new Date(watchJoiningDate).getDate() + 1)) : null}
+                                                    />
+                                                </>
                                             )}
 
                                             <InputField
@@ -1131,8 +1147,10 @@ export default function StaffManagementPage({ instituteType }) {
                                                 name="salary"
                                                 register={register}
                                                 error={errors.salary}
-                                                type="number"
                                                 placeholder="50000"
+                                                onInput={(e) => {
+                                                    e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 7);
+                                                }}
                                             />
                                         </div>
 
@@ -1147,6 +1165,9 @@ export default function StaffManagementPage({ instituteType }) {
                                                 register={register}
                                                 error={errors.bank_name}
                                                 placeholder="e.g. HBL"
+                                                onInput={(e) => {
+                                                    e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '');
+                                                }}
                                             />
                                             <InputField
                                                 label="Account Number"
@@ -1154,6 +1175,9 @@ export default function StaffManagementPage({ instituteType }) {
                                                 register={register}
                                                 error={errors.bank_account_no}
                                                 placeholder="1234567890"
+                                                onInput={(e) => {
+                                                    e.target.value = e.target.value.replace(/[^0-9]/g, '');
+                                                }}
                                             />
                                             <InputField
                                                 label="Branch"
@@ -1398,14 +1422,16 @@ export default function StaffManagementPage({ instituteType }) {
                                                             {doc.file_url && !uploadingFiles[index] && (
                                                                 <div className="flex items-center gap-2 text-sm bg-accent/30 rounded px-3 py-2 mb-2">
                                                                     <span className="truncate">{doc.file_name || 'Current file'}</span>
-                                                                    <a
-                                                                        href={doc.file_url}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="text-blue-600 hover:underline ml-auto"
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="text-blue-500 hover:text-blue-600 h-8 gap-1 px-2 ml-auto"
+                                                                        onClick={() => window.open(doc.file_url, '_blank')}
                                                                     >
-                                                                        View
-                                                                    </a>
+                                                                        <Eye className="h-4 w-4" />
+                                                                        <span className="text-xs">View</span>
+                                                                    </Button>
                                                                 </div>
                                                             )}
 

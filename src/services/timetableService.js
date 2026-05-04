@@ -239,6 +239,14 @@ export const timetableService = {
   },
 
   /**
+   * Toggle timetable active/inactive status
+   * @param {string} id - Timetable ID
+   * @param {boolean} isActive - New status
+   */
+  toggleStatus: (id, isActive) =>
+    api.patch(`/timetable/${id}/toggle-status`, { is_active: isActive }).then((r) => r.data),
+
+  /**
    * Get entities for dropdowns (academic years, classes, sections, teachers, subjects)
    * @param {string} academicYearId - Academic Year ID (optional)
    */

@@ -137,9 +137,7 @@ export default function StudentsPage({ type }) {
   const qc = useQueryClient();
   const canDo = useAuthStore((s) => s.canDo);
   const { currentInstitute } = useInstituteStore();
-  const { studentColumns } = useInstituteConfig();
-  
-  const terms = getTerminology(type);
+  const { terms, studentColumns } = useInstituteConfig();
 
   // State
   const [search, setSearch] = useState('');
@@ -341,6 +339,7 @@ export default function StudentsPage({ type }) {
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['students', type, filters],
+    enabled: !!academicYearId,
     queryFn: async () => {
       let res;
       const searchQuery = filters.search?.trim();
@@ -377,7 +376,6 @@ export default function StudentsPage({ type }) {
         data: mappedList
       };
     },
-    enabled: !!classId || (!!filters.search && filters.search.trim().length > 0),
     placeholderData: (prev) => prev,
   });
 
@@ -522,12 +520,39 @@ export default function StudentsPage({ type }) {
   const handleDownloadTemplate = () => {
     try {
       const headers = IMPORT_COLUMNS.map(col => col.label);
-      const ws = XLSX.utils.aoa_to_sheet([headers]);
+      
+      // Sample Data Row
+      const sampleRow = IMPORT_COLUMNS.map(col => {
+        if (col.key === 'first_name') return 'John';
+        if (col.key === 'last_name') return 'Doe';
+        if (col.key === 'email') return 'john.doe@example.com';
+        if (col.key === 'phone') return '03001234567';
+        if (col.key === 'registration_no') return 'REG-1001';
+        if (col.key === 'cnic') return '42101-1234567-1';
+        if (col.key === 'dob') return '2010-01-01';
+        if (col.key === 'gender') return 'male';
+        if (col.key === 'blood_group') return 'A+';
+        if (col.key === 'religion') return 'Islam';
+        if (col.key === 'nationality') return 'Pakistani';
+        if (col.key === 'class_name') return 'Class 1'; // Should match existing class name
+        if (col.key === 'section_name') return 'A';
+        if (col.key === 'academic_year_name') return '2024-2025';
+        if (col.key === 'admission_date') return '2024-05-01';
+        if (col.key === 'roll_no' || col.key === 'candidate_id' || col.key === 'roll_number') return '101';
+        if (col.key === 'father_name') return 'Father Name';
+        if (col.key === 'father_phone') return '03009876543';
+        if (col.key === 'monthly_fee') return '5000';
+        if (col.key === 'admission_fee') return '2000';
+        return '';
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Template");
       XLSX.writeFile(wb, `${type}_bulk_import_template.xlsx`);
-      toast.success('Template downloaded successfully');
+      toast.success('Template with sample data downloaded successfully');
     } catch (error) {
+      console.error('Template download error:', error);
       toast.error('Failed to download template');
     }
   };
@@ -581,30 +606,30 @@ export default function StudentsPage({ type }) {
     { key: 'nationality', label: 'Nationality', required: false, validation: 'text' },
 
     // Academic Information (Institute Type Specific)
-    { key: 'class_name', label: 'Class/Course/Program', required: true, validation: 'text' },
-    { key: 'section_name', label: 'Section/Batch/Semester', required: false, validation: 'text' },
-    { key: 'roll_no', label: 'Roll Number', required: false, validation: 'text', types: ['school', 'coaching'] },
-    { key: 'academic_year_name', label: 'Academic Year', required: true, validation: 'text' },
+    { key: 'class_name', label: terms.primary_unit || 'Class', required: true, validation: 'text' },
+    { key: 'section_name', label: terms.grouping_unit || 'Section', required: false, validation: 'text' },
+    { key: 'roll_no', label: terms.roll_number || 'Roll Number', required: false, validation: 'text', types: ['school', 'coaching'] },
+    { key: 'academic_year_name', label: terms.academic_period || 'Academic Year', required: true, validation: 'text' },
     { key: 'admission_date', label: 'Admission Date', required: false, validation: 'date' },
 
     // Coaching Specific
-    { key: 'course_name', label: 'Course Name', required: false, validation: 'text', types: ['coaching'] },
-    { key: 'batch_name', label: 'Batch Name', required: false, validation: 'text', types: ['coaching'] },
+    { key: 'course_name', label: terms.primary_unit || 'Course Name', required: false, validation: 'text', types: ['coaching'] },
+    { key: 'batch_name', label: terms.grouping_unit || 'Batch Name', required: false, validation: 'text', types: ['coaching'] },
     { key: 'target_exam', label: 'Target Exam', required: false, validation: 'text', types: ['coaching'] },
     { key: 'current_module', label: 'Current Module', required: false, validation: 'text', types: ['coaching'] },
-    { key: 'candidate_id', label: 'Candidate ID', required: false, validation: 'text', types: ['coaching'] },
+    { key: 'candidate_id', label: terms.roll_number || 'Candidate ID', required: false, validation: 'text', types: ['coaching'] },
 
     // College/University Specific
-    { key: 'department_name', label: 'Department', required: false, validation: 'text', types: ['college', 'university'] },
+    { key: 'department_name', label: type === 'college' ? terms.primary_unit : terms.grouping_unit, required: false, validation: 'text', types: ['college', 'university'] },
     { key: 'program_name', label: 'Program Name', required: false, validation: 'text', types: ['college', 'university'] },
-    { key: 'semester_name', label: 'Semester Name', required: false, validation: 'text', types: ['college', 'university'] },
-    { key: 'cgpa', label: 'CGPA', required: false, validation: 'number', types: ['college', 'university'] },
-    { key: 'faculty_name', label: 'Faculty', required: false, validation: 'text', types: ['university'] },
+    { key: 'semester_name', label: type === 'college' ? terms.grouping_unit : 'Semester Name', required: false, validation: 'text', types: ['college', 'university'] },
+    { key: 'cgpa', label: terms.grade_term || 'CGPA', required: false, validation: 'number', types: ['college', 'university'] },
+    { key: 'faculty_name', label: terms.primary_unit || 'Faculty', required: false, validation: 'text', types: ['university'] },
 
     // Academy Specific
-    { key: 'academy_program_name', label: 'Academy Program', required: false, validation: 'text', types: ['academy'] },
-    { key: 'module_name', label: 'Module Name', required: false, validation: 'text', types: ['academy'] },
-    { key: 'trainee_id', label: 'Trainee ID', required: false, validation: 'text', types: ['academy'] },
+    { key: 'academy_program_name', label: terms.primary_unit || 'Academy Program', required: false, validation: 'text', types: ['academy'] },
+    { key: 'module_name', label: terms.tertiary_unit || 'Module Name', required: false, validation: 'text', types: ['academy'] },
+    { key: 'trainee_id', label: terms.roll_number || 'Trainee ID', required: false, validation: 'text', types: ['academy'] },
 
     // Guardian Information
     { key: 'guardian_name', label: 'Guardian Name', required: false, validation: 'text' },
@@ -745,21 +770,21 @@ export default function StudentsPage({ type }) {
 
             {/* Primary Unit Filter */}
             <SelectField
-              label={terms.primaryUnit}
+              label={terms.primary_unit || 'Class'}
               value={classId}
               onChange={setClassId}
               options={classOptions}
-              placeholder={terms.selectClass}
+              placeholder={`Select ${terms.primary_unit || 'Class'}`}
               disabled={!academicYearId}
             />
 
             {/* Grouping Unit Filter */}
             <SelectField
-              label={terms.groupingUnit}
+              label={terms.grouping_unit || 'Section'}
               value={sectionId}
               onChange={setSectionId}
               options={sectionOptions}
-              placeholder={terms.selectSection}
+              placeholder={`Select ${terms.grouping_unit || 'Section'}`}
               disabled={!classId || sections.length === 0}
             />
 
@@ -780,10 +805,10 @@ export default function StudentsPage({ type }) {
         columns={columns}
         data={students}
         loading={isLoading || isFetching}
-        emptyMessage={!classId ? `Select a ${(terms?.primaryUnit || 'unit').toLowerCase()} to view ${(terms?.students || 'students').toLowerCase()}` : `No ${(terms?.students || 'students').toLowerCase()} found`}
+        emptyMessage={isLoading ? `Loading ${terms.students.toLowerCase()}...` : `No ${terms.students.toLowerCase()} found for the selected ${terms.academic_period || 'year'}`}
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1); }}
-        searchPlaceholder={terms.searchPlaceholder}
+        searchPlaceholder={`Search ${terms.students.toLowerCase()}...`}
         enableColumnVisibility
         importConfig={{
           columns: IMPORT_COLUMNS,

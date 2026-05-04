@@ -140,6 +140,16 @@ export default function ClassForm({
       active: s.active ?? true,
     }));
 
+    // ✅ Ensure at least one section exists by default if not editing
+    if (!isEdit && initial.sections.length === 0) {
+      initial.sections.push({
+        name: 'A',
+        room_no: '01',
+        capacity: 30,
+        active: true,
+      });
+    }
+
     // Ensure courses have all fields
     initial.courses = (initial.courses || []).map(c => ({
       id: c.id,
@@ -512,15 +522,17 @@ export default function ClassForm({
                   <div className="space-y-3 sm:space-y-4">
                     {sectionFields.map((field, index) => (
                       <div key={field.id} className="border rounded-lg p-3 sm:p-4 relative">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute top-2 right-2 text-destructive hover:bg-destructive/10"
-                          onClick={() => removeSection(index)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          {sectionFields.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute top-2 right-2 text-destructive hover:bg-destructive/10"
+                              onClick={() => removeSection(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
 
                         <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-3 pr-8">
                           <InputField
@@ -550,7 +562,7 @@ export default function ClassForm({
                           />
                         </div>
 
-                        <div className="mt-3 flex items-center justify-between">
+                        {/* <div className="mt-3 flex items-center justify-between">
                           <Label htmlFor={`section-${index}-active`}>Status</Label>
                           <Controller
                             name={`sections.${index}.active`}
@@ -563,7 +575,7 @@ export default function ClassForm({
                               />
                             )}
                           />
-                        </div>
+                        </div> */}
                       </div>
                     ))}
                   </div>

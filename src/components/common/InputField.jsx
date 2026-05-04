@@ -65,7 +65,8 @@ export default function InputField({
           disabled={disabled}
           aria-invalid={!!error}
           className={cn(isPassword && "pr-10")}
-          {...(register ? register(name, rules) : props)}
+          {...(register ? register(name, rules) : {})}
+          {...props}
         />
         {isPassword && (
           <button

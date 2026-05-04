@@ -20,6 +20,7 @@
  */
 'use client';
 
+import { useState } from 'react';
 import { Controller } from 'react-hook-form';
 import { format, parseISO, isValid, isBefore, isAfter, startOfDay, endOfDay } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
@@ -49,6 +50,8 @@ export default function DatePickerField({
   maxDate,
   rules,
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+
   const content = (fieldValue, fieldChange) => {
     let dateValue = null;
     if (fieldValue) {
@@ -75,7 +78,7 @@ export default function DatePickerField({
     };
 
     return (
-      <Popover>
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button
             id={name}
@@ -94,7 +97,10 @@ export default function DatePickerField({
           <Calendar
             mode="single"
             selected={dateValue}
-            onSelect={(d) => fieldChange(d ? format(d, 'yyyy-MM-dd') : null)}
+            onSelect={(d) => {
+              fieldChange(d ? format(d, 'yyyy-MM-dd') : null);
+              setIsOpen(false);
+            }}
             fromYear={fromYear}
             toYear={toYear}
             captionLayout="dropdown"

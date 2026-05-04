@@ -110,6 +110,18 @@ export default function ClassesPage({ type }) {
     }));
   }, [academicYears?.data]);
 
+  // ✅ Set current academic year as default
+  useEffect(() => {
+    if (normalizedAcademicYearOptions.length > 0 && !selectedAcademicYear) {
+      const currentYear = normalizedAcademicYearOptions.find(y => y.is_current);
+      if (currentYear) {
+        setFilterValue('academic_year', String(currentYear.value));
+      } else {
+        setFilterValue('academic_year', String(normalizedAcademicYearOptions[0].value));
+      }
+    }
+  }, [normalizedAcademicYearOptions, selectedAcademicYear, setFilterValue]);
+
   const selectedAcademicYearMeta = useMemo(
     () => normalizedAcademicYearOptions.find((year) => String(year.value) === String(selectedAcademicYear)),
     [normalizedAcademicYearOptions, selectedAcademicYear]
@@ -137,7 +149,7 @@ export default function ClassesPage({ type }) {
         page,
         limit: pageSize,
         search: search || undefined,
-        status: statusFilterValue,
+        is_active: statusFilterValue === 'active' ? 'true' : statusFilterValue === 'inactive' ? 'false' : undefined,
         academic_year_id: academicYearFilterValue,
       });
 
@@ -146,7 +158,7 @@ export default function ClassesPage({ type }) {
         page,
         limit: pageSize,
         search: search || undefined,
-        status: statusFilterValue,
+        is_active: statusFilterValue === 'active' ? 'true' : statusFilterValue === 'inactive' ? 'false' : undefined,
         academic_year_id: academicYearFilterValue,
       });
 
@@ -327,7 +339,6 @@ export default function ClassesPage({ type }) {
     setViewingClass(null);
     setActiveTab('overview');
   };
-
 
   // Handle toggle status
   const handleToggleStatus = (classItem) => {
@@ -641,11 +652,11 @@ export default function ClassesPage({ type }) {
                 ]}
                 placeholder="Select Academic Year"
               />
-              {selectedAcademicYearMeta?.is_current ? (
+              {/* {selectedAcademicYearMeta?.is_current ? (
                 <div className="mt-2">
                   <StatusBadge status="current" label="Current Academic Year" />
                 </div>
-              ) : null}
+              ) : null} */}
             </div>
 
             {/* Status Filter - WITH control from filter form */}
@@ -688,10 +699,10 @@ export default function ClassesPage({ type }) {
         // onSearch={setSearch}
         // searchPlaceholder={`Search ${classTermPlural.toLowerCase()}...`}
         enableColumnVisibility
-        exportConfig={{
-          fileName: classTermPlural.toLowerCase().replace(/\s+/g, '-'),
-          dateField: 'created_at'
-        }}
+        // exportConfig={{
+        //   fileName: classTermPlural.toLowerCase().replace(/\s+/g, '-'),
+        //   dateField: 'created_at'
+        // }}
         pagination={{
           page,
           totalPages: data?.pagination?.totalPages || 1,
