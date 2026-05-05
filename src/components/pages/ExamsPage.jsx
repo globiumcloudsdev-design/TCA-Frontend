@@ -177,8 +177,8 @@ export default function ExamsPage({ type }) {
         const schedules = getValue() || [];
         return (
           <div className="flex flex-wrap gap-1 max-w-[200px]">
-            {schedules.slice(0, 3).map(s => (
-              <Badge key={s.subject_id} variant="outline" className="text-xs">
+            {schedules.slice(0, 3).map((s, idx) => (
+              <Badge key={`${s.subject_id || 'sub'}-${idx}`} variant="outline" className="text-xs">
                 {s.subject_name}
               </Badge>
             ))}

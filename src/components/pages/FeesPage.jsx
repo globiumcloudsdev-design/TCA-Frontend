@@ -69,6 +69,15 @@ const FEE_TYPE_OPTS = [
   { value: 'fee_template', label: 'Fee Template' },
 ];
 
+const PAYMENT_METHOD_OPTS = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'cheque', label: 'Cheque' },
+  { value: 'bank_transfer', label: 'Bank Transfer' },
+  { value: 'jazzcash', label: 'JazzCash' },
+  { value: 'easypaisa', label: 'Easypaisa' },
+  { value: 'other', label: 'Other' },
+];
+
 function SearchableSingleSelect({ label, value, onChange, options = [], placeholder = 'Search...', disabled = false }) {
   const [open, setOpen] = useState(false);
   const selectedOption = options.find((option) => String(option.value) === String(value)) || null;
@@ -437,15 +446,14 @@ const { data: bulkClasses = [] } = useQuery({
       total: vouchers.length,
       pending: pending.length,
       paid: paid.length,
-      totalAmount: vouchers.reduce((sum, v) => sum + (parseFloat(v.net_amount) || parseFloat(v.amount) || 0), 0),
-      pendingAmount: pending.reduce((sum, v) => sum + (parseFloat(v.net_amount) || parseFloat(v.amount) || 0), 0),
+      totalAmount: vouchers.reduce((sum, v) => sum + (Number(v.net_amount || v.netAmount || v.amount || 0)), 0),
+      pendingAmount: pending.reduce((sum, v) => sum + (Number(v.pending_amount ?? (v.net_amount || v.netAmount || v.amount || 0))), 0),
     };
   }, [vouchers]);
 
   // Only paid vouchers amount
   const collectedAmount = useMemo(() => {
-    return vouchers.filter((v) => v.status === 'paid')
-      .reduce((sum, v) => sum + (parseFloat(v.netAmount) || parseFloat(v.amount) || 0), 0);
+    return vouchers.reduce((sum, v) => sum + (Number(v.paid_amount || 0)), 0);
   }, [vouchers]);
 
   // Delete (archive) voucher
@@ -494,12 +502,13 @@ const { data: bulkClasses = [] } = useQuery({
       referenceNo: paymentData.referenceNo || null,
       remarks: paymentData.remarks || null
     }),
-    onSuccess: (result) => {
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
       toast.success('Payment recorded successfully');
       setPaymentForm({ amount: '', method: 'cash', referenceNo: '', remarks: '' });
       setRecordingPayment(null);
+      if (viewingVoucher) setViewingVoucher(null);
       refetchVouchers();
-      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
     },
     onError: (err) => {
       if (err.response?.status === 403) {
@@ -1045,14 +1054,32 @@ const handleDownloadVoucher = async (voucher) => {
       },
       { accessorKey: 'month', header: 'Month', cell: ({ getValue }) => MONTH_OPTS.find(m => m.value === String(getValue()))?.label || getValue() },
       {
-        accessorKey: 'amount',
-        header: 'Amount',
-        cell: ({ row: { original: r } }) => (
-          <div>
-            <p className="font-medium">{r.amount || 'N/A'}</p>
-            <p className="text-xs text-muted-foreground">{r.currency || 'N/A'}</p>
-          </div>
-        ),
+        accessorKey: 'net_amount',
+        header: 'Amount / Balance',
+        cell: ({ row: { original: r } }) => {
+          const total = Number(r.net_amount || r.netAmount || r.amount || 0);
+          const paid = Number(r.paid_amount || 0);
+          const remaining = Number(r.pending_amount ?? (total - paid));
+          
+          return (
+            <div className="space-y-0.5">
+              <div className="flex items-baseline gap-1.5">
+                <span className={cn("text-sm font-bold", remaining > 0 ? "text-orange-600" : "text-emerald-600")}>
+                  PKR {remaining.toLocaleString('en-PK')}
+                </span>
+                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">Left</span>
+              </div>
+              <div className="text-[11px] text-slate-500 font-medium">
+                Total: PKR {total.toLocaleString('en-PK')}
+              </div>
+              {paid > 0 && (
+                <div className="text-[10px] text-emerald-600 font-semibold italic">
+                  Paid: PKR {paid.toLocaleString('en-PK')}
+                </div>
+              )}
+            </div>
+          );
+        },
       },
       {
         accessorKey: 'status',
@@ -1074,7 +1101,16 @@ const handleDownloadVoucher = async (voucher) => {
             {row.original.status !== 'paid' && hasPermission('fees.update') && (
               <>
                 <button
-                  onClick={() => { setRecordingPayment(row.original); setPaymentForm({ amount: '', method: 'cash', referenceNo: '', remarks: '' }); }}
+                  onClick={() => { 
+                    setRecordingPayment(row.original); 
+                    const initialAmount = row.original.pending_amount ?? (row.original.net_amount || row.original.netAmount || 0);
+                    setPaymentForm({ 
+                      amount: String(Number(initialAmount).toFixed(2)), 
+                      method: 'cash', 
+                      referenceNo: '', 
+                      remarks: '' 
+                    }); 
+                  }}
                   disabled={recordingPayment?.id === row.original.id}
                   className="rounded p-1 hover:bg-blue-100 text-blue-700 hover:text-blue-800 disabled:opacity-50"
                   title="Record Payment"
@@ -1407,48 +1443,52 @@ const handleDownloadVoucher = async (voucher) => {
         {recordingPayment && (
           <div className="space-y-4">
             {/* Amount Info */}
-            <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg">
+            <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
               <div>
-                <p className="text-xs text-muted-foreground font-semibold">Total Amount</p>
-                <p className="font-bold text-lg text-blue-600">PKR {(recordingPayment.netAmount || recordingPayment.amount || 0).toLocaleString('en-PK')}</p>
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Total Net Amount</p>
+                <p className="font-bold text-lg text-blue-600">PKR {(Number(recordingPayment.net_amount || recordingPayment.netAmount || 0)).toLocaleString('en-PK')}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground font-semibold">Outstanding</p>
-                <p className="font-bold text-lg text-orange-600">PKR {(recordingPayment.netAmount || recordingPayment.amount || 0).toLocaleString('en-PK')}</p>
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider text-orange-600">Pending Outstanding</p>
+                <p className="font-bold text-lg text-orange-600">PKR {(Number(recordingPayment.pending_amount ?? (recordingPayment.net_amount || recordingPayment.netAmount || 0))).toLocaleString('en-PK')}</p>
               </div>
             </div>
 
             {/* Payment Form */}
             <div className="space-y-3">
               <div>
-                <label className="text-sm font-semibold">Payment Amount *</label>
+                <label className="text-sm font-semibold flex justify-between">
+                  <span>Payment Amount *</span>
+                  <span className="text-xs text-muted-foreground">Max: PKR {(Number(recordingPayment.pending_amount ?? (recordingPayment.net_amount || recordingPayment.netAmount || 0))).toLocaleString('en-PK')}</span>
+                </label>
                 <input
                   type="number"
                   min="0"
+                  max={Number(recordingPayment.pending_amount ?? (recordingPayment.net_amount || recordingPayment.netAmount || 0))}
                   step="0.01"
                   value={paymentForm.amount}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const max = Number(recordingPayment.pending_amount ?? (recordingPayment.net_amount || recordingPayment.netAmount || 0));
+                    if (parseFloat(val) > max) {
+                      setPaymentForm({ ...paymentForm, amount: String(max.toFixed(2)) });
+                      toast.warning(`Amount capped at outstanding balance: PKR ${max.toFixed(2)}`);
+                    } else {
+                      setPaymentForm({ ...paymentForm, amount: val });
+                    }
+                  }}
                   placeholder="Enter payment amount"
-                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                 />
               </div>
 
-              <div>
-                <label className="text-sm font-semibold">Payment Method *</label>
-                <select
-                  value={paymentForm.method}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="cash">Cash</option>
-                  <option value="cheque">Cheque</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="jazzcash">JazzCash</option>
-                  <option value="easypaisa">Easypaisa</option>
-                  <option value="stripe">Card (Stripe)</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
+              <SelectField
+                label="Payment Method"
+                required
+                options={PAYMENT_METHOD_OPTS}
+                value={paymentForm.method}
+                onChange={(val) => setPaymentForm({ ...paymentForm, method: val })}
+              />
 
               <div>
                 <label className="text-sm font-semibold">Reference No. (Optional)</label>
@@ -1494,60 +1534,113 @@ const handleDownloadVoucher = async (voucher) => {
       <AppModal open={!!viewingVoucher} onClose={() => setViewingVoucher(null)} title="Voucher Details" size="lg">
         {viewingVoucher && (
           <div className="space-y-6">
-            {/* Header Info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground">VOUCHER #</p>
-                <p className="text-lg font-bold font-mono">{viewingVoucher.voucherNumber || viewingVoucher.voucher_number}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground">STATUS</p>
-                <p className={cn('inline-block px-2 py-1 rounded-full text-xs font-semibold capitalize', STATUS_COLORS[viewingVoucher.status])}>{viewingVoucher.status}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground">ISSUED DATE</p>
-                <p className="text-sm">{viewingVoucher.issuedDate ? new Date(viewingVoucher.issuedDate).toLocaleDateString('en-PK') : '—'}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground">MONTH/YEAR</p>
-                <p className="text-sm">{MONTH_OPTS.find(m => m.value === String(viewingVoucher.month))?.label} {viewingVoucher.year}</p>
-              </div>
-            </div>
+            {/* Find the freshest version of this voucher from the query data if available */}
+            {(() => {
+              // Try to find the latest data in our current list
+              const freshVoucher = vouchers.find(v => String(v.id) === String(viewingVoucher.id));
+              const v = freshVoucher || viewingVoucher;
+              
+              // Robust field extraction with explicit string/number handling
+              const total = Number(v.net_amount ?? v.netAmount ?? v.amount ?? 0);
+              const paid = Number(v.paid_amount ?? v.paidAmount ?? 0);
+              const remaining = Number(v.pending_amount ?? (total - paid));
+              const paymentsList = v.payments || v.FeePayments || [];
+              const voucherNo = v.voucher_number || v.voucherNumber || 'N/A';
+              const studentName = v.Student ? `${v.Student.first_name} ${v.Student.last_name}` : (v.studentName || 'Unknown Student');
+              const regNo = v.Student?.registration_no || v.registrationNo || 'N/A';
+              const status = v.status || 'pending';
 
-            {/* Student Info */}
-            <div className="rounded-lg bg-slate-50 p-4 space-y-3">
-              <h4 className="font-semibold text-sm">Student Information</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-xs text-muted-foreground">Name</p>
-                  <p className="font-medium">{viewingVoucher.studentName}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Registration #</p>
-                  <p className="font-medium">{viewingVoucher.registrationNo}</p>
-                </div>
-              </div>
-            </div>
+              // Detailed Debug logs
+              console.log('🔍 Modal Logic Check:', { 
+                foundInList: !!freshVoucher,
+                extractedPaid: paid,
+                extractedRemaining: remaining,
+                rawPaidAmount: v.paid_amount,
+                rawPendingAmount: v.pending_amount,
+                id: v.id
+              });
 
-            {/* Amount Details */}
-            <div className="rounded-lg bg-emerald-50 p-4 space-y-3">
-              <h4 className="font-semibold text-sm">Amount Details</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Amount:</span>
-                  <span className="font-medium">PKR {(viewingVoucher.amount || 0).toLocaleString('en-PK')}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Discount:</span>
-                  <span className="font-medium">PKR {(viewingVoucher.discount || 0).toLocaleString('en-PK')}</span>
-                </div>
-                <div className="border-t border-emerald-200 my-2" />
-                <div className="flex justify-between font-semibold text-emerald-700">
-                  <span>Net Amount:</span>
-                  <span>PKR {(viewingVoucher.netAmount || 0).toLocaleString('en-PK')}</span>
-                </div>
-              </div>
-            </div>
+              return (
+                <>
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Voucher #</p>
+                      <h3 className="text-2xl font-black text-slate-900">{voucherNo}</h3>
+                    </div>
+                    <div className="text-right space-y-1">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest text-right">Status</p>
+                      <span className={cn("px-3 py-1 rounded-full text-xs font-black uppercase tracking-tighter shadow-sm border", STATUS_COLORS[status])}>
+                        {status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Student Information</p>
+                      <p className="font-bold text-slate-900 text-lg">{studentName}</p>
+                      <p className="text-xs text-slate-500 font-medium">Reg #: {regNo}</p>
+                    </div>
+                    <div className="bg-slate-900 p-4 rounded-xl shadow-lg border border-slate-800">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase mb-2">Financial Summary</p>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs text-slate-400">
+                          <span>Net Bill:</span>
+                          <span className="font-bold text-slate-300">PKR {total.toLocaleString('en-PK')}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-emerald-400 font-bold">
+                          <span>Total Paid:</span>
+                          <span>PKR {paid.toLocaleString('en-PK')}</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-orange-400 font-black border-t border-slate-700 pt-1.5 mt-1">
+                          <span>Outstanding:</span>
+                          <span>PKR {remaining.toLocaleString('en-PK')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment History */}
+                  {paymentsList.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <div className="h-4 w-1 bg-primary rounded-full"></div>
+                        Payment History
+                      </h4>
+                      <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
+                        {paymentsList.map((payment, idx) => (
+                          <div key={payment.id || idx} className="flex justify-between items-center p-3 rounded-xl bg-white border border-slate-100 shadow-sm hover:border-primary/20 transition-all">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
+                                <Check size={18} />
+                              </div>
+                              <div className="space-y-0.5">
+                                <p className="font-bold text-slate-900">PKR {Number(payment.amount_paid).toLocaleString('en-PK')}</p>
+                                <p className="text-[10px] text-slate-500 font-medium">{new Date(payment.payment_date).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })} • {payment.payment_method.toUpperCase()}</p>
+                              </div>
+                            </div>
+                            <div className="text-right space-y-1.5">
+                              {payment.receipt_number && (
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                                  #{payment.receipt_number}
+                                </p>
+                              )}
+                              {payment.transaction_id ? (
+                                <span className="text-[9px] font-mono bg-slate-100 px-2 py-1 rounded text-slate-500 border border-slate-200 block shadow-sm">
+                                  {payment.transaction_id}
+                                </span>
+                              ) : (
+                                <span className="text-[9px] text-slate-400 italic block">No Ref ID</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
             {/* Currency & Dates */}
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1562,7 +1655,7 @@ const handleDownloadVoucher = async (voucher) => {
             </div>
 
             {/* Fee Breakdown */}
-            {viewingVoucher.feeBreakdown && Object.keys(viewingVoucher.feeBreakdown).length > 0 && (
+            {/* {viewingVoucher.feeBreakdown && Object.keys(viewingVoucher.feeBreakdown).length > 0 && (
               <div className="rounded-lg border p-4 space-y-3">
                 <h4 className="font-semibold text-sm">Fee Breakdown</h4>
                 <div className="space-y-2 text-sm">
@@ -1584,7 +1677,7 @@ const handleDownloadVoucher = async (voucher) => {
                   })}
                 </div>
               </div>
-            )}
+            )} */}
 
             {/* Notes */}
             {viewingVoucher.notes && (

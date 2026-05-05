@@ -19,18 +19,36 @@ function generateTimeSlots(interval = 20) {
   return slots;
 }
 
+function formatTo12H(time24) {
+  if (!time24) return "";
+  const [hours, minutes] = time24.split(":");
+  let h = parseInt(hours, 10);
+  const m = minutes;
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  h = h ? h : 12; // the hour '0' should be '12'
+  return `${String(h).padStart(2, "0")}:${m} ${ampm}`;
+}
+
 export default function TimePickerField({
   value,
   onChange,
   mode = "simple", // simple | google
   interval = 20,
   placeholder = "Select Time",
+  min,
+  max,
   className
 }) {
 
   const [open, setOpen] = useState(false);
-
-  const timeSlots = generateTimeSlots(interval);
+  
+  const allTimeSlots = generateTimeSlots(interval);
+  const timeSlots = allTimeSlots.filter(slot => {
+    if (min && slot < min) return false;
+    if (max && slot > max) return false;
+    return true;
+  });
 
   // SIMPLE MODE (native browser)
   if (mode === "simple") {
@@ -45,6 +63,8 @@ export default function TimePickerField({
           type="time"
           value={value || ""}
           onChange={(e) => onChange(e.target.value)}
+          min={min}
+          max={max}
           className={cn(
             "flex h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring",
             className
@@ -66,7 +86,7 @@ export default function TimePickerField({
           className="absolute left-3 text-muted-foreground"
         />
 
-        {value || placeholder}
+        {value ? formatTo12H(value) : placeholder}
       </div>
 
       {open && (
@@ -83,7 +103,7 @@ export default function TimePickerField({
                 value === time && "bg-primary/10 font-medium"
               )}
             >
-              {time}
+              {formatTo12H(time)}
             </div>
           ))}
         </div>

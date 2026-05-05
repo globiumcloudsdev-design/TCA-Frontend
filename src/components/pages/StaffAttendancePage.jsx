@@ -288,6 +288,15 @@ export default function StaffAttendancePage({ type }) {
       toast.error('Please select date');
       return;
     }
+    
+    // Check-out must be after check-in
+    if (manualForm.check_in && manualForm.check_out) {
+      if (manualForm.check_out <= manualForm.check_in) {
+        toast.error('Check-out time must be after check-in time');
+        return;
+      }
+    }
+
     const payload = {
       status: manualForm.status,
       check_in: manualForm.check_in ? toISODateTime(manualForm.date, manualForm.check_in) : null,
@@ -503,7 +512,7 @@ export default function StaffAttendancePage({ type }) {
               <TimePickerField
                 value={manualForm.check_in}
                 onChange={(value) => setManualForm((p) => ({ ...p, check_in: value }))}
-                mode="simple"
+                mode="google"
                 interval={5}
               />
             </div>
@@ -513,7 +522,8 @@ export default function StaffAttendancePage({ type }) {
               <TimePickerField
                 value={manualForm.check_out}
                 onChange={(value) => setManualForm((p) => ({ ...p, check_out: value }))}
-                mode="simple"
+                min={manualForm.check_in}
+                mode="google"
                 interval={5}
               />
             </div>

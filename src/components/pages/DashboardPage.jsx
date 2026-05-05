@@ -64,22 +64,45 @@ export default function DashboardPage({ type }) {
   });
 
   const dashboard = data?.data || {};
-  const stats = Array.isArray(dashboard.stats) ? dashboard.stats : [];
+  const rawStats = Array.isArray(dashboard.stats) ? dashboard.stats : [];
   const charts = dashboard.charts || {};
   const recentActivity = Array.isArray(dashboard.recentActivity) ? dashboard.recentActivity : [];
 
+  // Permission Checks
+  const canViewFees = user?.role_code === 'MASTER_ADMIN' || user?.permissions?.includes('fees.read') || user?.permissions?.includes('feevoucher.view');
+  const canViewExpenses = user?.role_code === 'MASTER_ADMIN' || user?.permissions?.includes('expenses.read');
+  const canViewStudents = user?.role_code === 'MASTER_ADMIN' || user?.permissions?.includes('students.read');
+  const canViewAttendance = user?.role_code === 'MASTER_ADMIN' || user?.permissions?.includes('attendance.view');
+
+  const canCollectFee = user?.role_code === 'MASTER_ADMIN' || user?.permissions?.includes('fees.create') || user?.permissions?.includes('feevoucher.create');
+  const canAddExpense = user?.role_code === 'MASTER_ADMIN' || user?.permissions?.includes('expenses.create');
+  const canAddStudent = user?.role_code === 'MASTER_ADMIN' || user?.permissions?.includes('students.create');
+  const canMarkAttendance = user?.role_code === 'MASTER_ADMIN' || user?.permissions?.includes('attendance.mark') || user?.permissions?.includes('attendance.manage');
+
+  // Filter Stats based on permissions
+  const stats = rawStats.filter(stat => {
+    const label = stat.label.toLowerCase();
+    if (label.includes('fee') || label.includes('collected')) return canViewFees;
+    if (label.includes('expense')) return canViewExpenses;
+    if (label.includes('student') || label.includes('enrollment')) return canViewStudents;
+    if (label.includes('attendance')) return canViewAttendance;
+    if (label.includes('leave')) return user?.role_code === 'MASTER_ADMIN' || user?.permissions?.includes('leaves.view');
+    return true; // Show others
+  });
+
   const quickActions = useMemo(() => {
-    const base = [
-      { href: `/${type}/students`, label: `Add ${terms.student}`, icon: <Plus size={14} /> },
-      { href: `/${type}/attendance`, label: 'Mark Attendance', icon: <ClipboardCheck size={14} /> },
-      { href: `/${type}/fees`, label: 'Collect Fee', icon: <DollarSign size={14} /> },
-      { href: `/${type}/expenses`, label: 'Add Expense', icon: <ArrowUpRight size={14} /> },
-    ];
+    const actions = [];
+    if (canAddStudent) actions.push({ href: `/${type}/students`, label: `Add ${terms.student}`, icon: <Plus size={14} /> });
+    if (canMarkAttendance) actions.push({ href: `/${type}/attendance`, label: 'Mark Attendance', icon: <ClipboardCheck size={14} /> });
+    if (canCollectFee) actions.push({ href: `/${type}/fees`, label: 'Collect Fee', icon: <DollarSign size={14} /> });
+    if (canAddExpense) actions.push({ href: `/${type}/expenses`, label: 'Add Expense', icon: <ArrowUpRight size={14} /> });
 
-    if (type === 'school') base.push({ href: `/${type}/timetable`, label: 'Timetable', icon: <Calendar size={14} /> });
+    if (type === 'school' && (user?.role_code === 'MASTER_ADMIN' || user?.permissions?.includes('timetable.view'))) {
+      actions.push({ href: `/${type}/timetable`, label: 'Timetable', icon: <Calendar size={14} /> });
+    }
 
-    return base;
-  }, [type, terms.student]);
+    return actions;
+  }, [type, terms.student, canAddStudent, canMarkAttendance, canCollectFee, canAddExpense, user]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -142,50 +165,58 @@ export default function DashboardPage({ type }) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Charts: Financial Performance */}
         <div className="lg:col-span-8 space-y-6">
-          <ChartCard
-            title="Financial Performance"
-            subtitle="Monthly Income vs Expenses"
-            loading={isLoading}
-          >
-            <FinancialChart data={charts.incomeExpense || []} />
-          </ChartCard>
+          {(canViewFees || canViewExpenses) && (
+            <ChartCard
+              title="Financial Performance"
+              subtitle="Monthly Income vs Expenses"
+              loading={isLoading}
+            >
+              <FinancialChart data={charts.incomeExpense || []} />
+            </ChartCard>
+          )}
 
-          <ChartCard title="Fee Collection Status" loading={isLoading}>
-            <FeesChart data={charts.fees || []} />
-          </ChartCard>
+          {canViewFees && (
+            <ChartCard title="Fee Collection Status" loading={isLoading}>
+              <FeesChart data={charts.fees || []} />
+            </ChartCard>
+          )}
 
-          <ChartCard title="Attendance Trends (last 6 months)" loading={isLoading}>
-            <AttendanceChart data={charts.attendance || []} />
-          </ChartCard>
+          {canViewAttendance && (
+            <ChartCard title="Attendance Trends (last 6 months)" loading={isLoading}>
+              <AttendanceChart data={charts.attendance || []} />
+            </ChartCard>
+          )}
         </div>
 
         {/* Right Sidebar: Actions & Activity */}
         <div className="lg:col-span-4 space-y-6">
-          <Card className="border-slate-200 shadow-sm overflow-hidden rounded-2xl">
-            <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-5">
-              <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-800">
-                <BrainCircuit className="h-4 w-4 text-indigo-500" />
-                Quick Intelligence
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 space-y-2">
-              {quickActions.map((action) => (
-                <Link
-                  key={action.href}
-                  href={action.href}
-                  className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-white shadow-sm border border-slate-100 text-slate-600 group-hover:text-indigo-600 transition-colors">
-                      {action.icon}
+          {quickActions.length > 0 && (
+            <Card className="border-slate-200 shadow-sm overflow-hidden rounded-2xl">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-5">
+                <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-800">
+                  <BrainCircuit className="h-4 w-4 text-indigo-500" />
+                  Quick Intelligence
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-2">
+                {quickActions.map((action) => (
+                  <Link
+                    key={action.href}
+                    href={action.href}
+                    className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-white shadow-sm border border-slate-100 text-slate-600 group-hover:text-indigo-600 transition-colors">
+                        {action.icon}
+                      </div>
+                      <span className="text-sm font-bold text-slate-700">{action.label}</span>
                     </div>
-                    <span className="text-sm font-bold text-slate-700">{action.label}</span>
-                  </div>
-                  <ArrowUpRight size={14} className="text-slate-300 group-hover:text-indigo-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
-                </Link>
-              ))}
-            </CardContent>
-          </Card>
+                    <ArrowUpRight size={14} className="text-slate-300 group-hover:text-indigo-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="border-slate-200 shadow-sm rounded-2xl">
             <CardHeader className="pb-2 pt-5 px-6">
@@ -239,18 +270,24 @@ export default function DashboardPage({ type }) {
 
       {/* LOWER GRIDS: Enrollment & Demographic Breakdown */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-2">
-          <ChartCard title={`${terms.students} Enrollment Snapshot`} loading={isLoading}>
-            <EnrollmentChart data={charts.enrollment || []} />
-          </ChartCard>
-        </div>
+        {canViewStudents && (
+          <div className="xl:col-span-2">
+            <ChartCard title={`${terms.students} Enrollment Snapshot`} loading={isLoading}>
+              <EnrollmentChart data={charts.enrollment || []} />
+            </ChartCard>
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-6">
-          <ChartCard title="Gender Distribution" loading={isLoading}>
-            <DonutChart data={charts.gender || []} />
-          </ChartCard>
-          <ChartCard title="Fee Payment Health" loading={isLoading}>
-            <DonutChart data={charts.feeStatus || []} />
-          </ChartCard>
+          {canViewStudents && (
+            <ChartCard title="Gender Distribution" loading={isLoading}>
+              <DonutChart data={charts.gender || []} />
+            </ChartCard>
+          )}
+          {canViewFees && (
+            <ChartCard title="Fee Payment Health" loading={isLoading}>
+              <DonutChart data={charts.feeStatus || []} />
+            </ChartCard>
+          )}
         </div>
       </div>
 

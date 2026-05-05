@@ -1443,7 +1443,12 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
     createdAt: data.created_at || data.createdAt,
     updatedAt: data.updated_at || data.updatedAt,
     archived: data.archived || false,
-    student: studentRaw
+    student: studentRaw,
+    
+    // Partial payment fields
+    paid_amount: parseFloat(data.paid_amount || 0),
+    pending_amount: parseFloat(data.pending_amount ?? (data.net_amount || data.amount || 0)),
+    FeePayments: data.FeePayments || data.payments || []
   };
 };
 
