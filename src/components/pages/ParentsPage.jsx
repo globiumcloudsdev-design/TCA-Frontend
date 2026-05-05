@@ -9,9 +9,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, UserCheck, Search, Eye, EyeOff, RefreshCw, Power, MoreHorizontal } from 'lucide-react';
+import { Plus, Pencil, Trash2, UserCheck, Search, Eye, EyeOff, RefreshCw, Power, MoreHorizontal, KeyRound } from 'lucide-react';
 import { Controller } from 'react-hook-form';
 import { TableRowActions } from '@/components/common';
+import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
 import { parentService } from '@/services';
@@ -75,6 +76,7 @@ export default function ParentsPage({ type }) {
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [findingStudents, setFindingStudents] = useState(false);
   const [showStudentWarning, setShowStudentWarning] = useState(false);
+  const [changePasswordUser, setChangePasswordUser] = useState(null);
 
   useEffect(() => {
     setMounted(true);
@@ -234,8 +236,19 @@ export default function ParentsPage({ type }) {
                   label: p.status === 'active' ? 'Deactivate' : 'Activate',
                   icon: Power,
                   onClick: () => save.mutate({ ...p, status: p.status === 'active' ? 'inactive' : 'active' })
+                },
+                {
+                  label: 'Change Password',
+                  icon: KeyRound,
+                  onClick: () => setChangePasswordUser(p)
                 }
-              ] : []}
+              ] : [
+                {
+                  label: 'Change Password',
+                  icon: KeyRound,
+                  onClick: () => setChangePasswordUser(p)
+                }
+              ]}
             />
           </div>
         );
@@ -562,6 +575,15 @@ export default function ParentsPage({ type }) {
           Delete <strong>{deleting?.first_name} {deleting?.last_name}</strong>? This cannot be undone.
         </p>
       </AppModal>
+
+      {/* Change Password Modal */}
+      {changePasswordUser && (
+        <ChangePasswordModal
+          open={!!changePasswordUser}
+          onClose={() => setChangePasswordUser(null)}
+          user={changePasswordUser}
+        />
+      )}
     </div>
   );
 }

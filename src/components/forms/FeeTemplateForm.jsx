@@ -30,7 +30,14 @@ import {
     Tag,
     Calendar,
     Clock,
-    Loader2
+    Loader2,
+    FileText,
+    Layers,
+    BadgePercent,
+    CheckCircle2,
+    Coins,
+    Receipt,
+    Info
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
@@ -41,26 +48,26 @@ import { Label } from '../ui/label';
 
 // Constants
 const FEE_BASIS_OPTIONS = [
-    { value: 'monthly', label: '📅 Monthly' },
-    { value: 'quarterly', label: '📊 Quarterly' },
-    { value: 'half_yearly', label: '📈 Half Yearly' },
-    { value: 'annually', label: '🎯 Annually' },
-    { value: 'one_time', label: '⭐ One Time' }
+    { value: 'monthly', label: 'Monthly' },
+    { value: 'quarterly', label: 'Quarterly' },
+    { value: 'half_yearly', label: 'Half Yearly' },
+    { value: 'annually', label: 'Annually' },
+    { value: 'one_time', label: 'One Time' }
 ];
 
 const LATE_FINE_TYPE_OPTIONS = [
-    { value: 'fixed', label: '💰 Fixed Amount' },
-    { value: 'percentage', label: '📊 Percentage' }
+    { value: 'fixed', label: 'Fixed Amount' },
+    { value: 'percentage', label: 'Percentage' }
 ];
 
 const COMPONENT_TYPE_OPTIONS = [
-    { value: 'fee', label: '💰 Fee Component' },
-    { value: 'discount', label: '🏷️ Discount Component' }
+    { value: 'fee', label: 'Fee Component' },
+    { value: 'discount', label: 'Discount Component' }
 ];
 
 const AMOUNT_TYPE_OPTIONS = [
-    { value: 'fixed', label: '💰 Fixed' },
-    { value: 'percentage', label: '📊 Percentage' }
+    { value: 'fixed', label: 'Fixed' },
+    { value: 'percentage', label: 'Percentage' }
 ];
 
 const APPLICABLE_ON_OPTIONS = [
@@ -72,61 +79,70 @@ const APPLICABLE_ON_OPTIONS = [
 // ✅ FIXED: Zod Schema with proper optional fields
 const componentSchema = z.object({
     id: z.string().optional(),
-    name: z.string().min(1, 'Component name zaroori hai'),
+    name: z.string().min(1, 'Component name is required'),
     type: z.enum(['fee', 'discount']),
     amount_type: z.enum(['fixed', 'percentage']),
     amount_value: z.coerce.number()
-        .min(0, 'Amount positive hona chahiye')
-        .max(9999999, 'Amount bohot zyada hai'),
+        .min(0, 'Amount must be positive')
+        .max(9999999, 'Amount is too high'),
     discount_type: z.enum(['fixed', 'percentage']).optional(),
     discount_value: z.coerce.number()
-        .min(0, 'Discount positive hona chahiye')
-        .max(100, 'Percentage discount 100% se zyada nahi ho sakta')
+        .min(0, 'Discount must be positive')
+        .max(100, 'Percentage discount cannot exceed 100%')
         .optional(),
-    is_optional: z.boolean().default(false),
     description: z.string().optional(),
     applicable_on: z.enum(['base', 'subtotal', 'total']).default('base')
 }).refine((data) => {
-    if (data.discount_type === 'percentage' && data.discount_value > 100) {
+    // 1. Check percentage discount on fee component
+    if (data.type === 'fee' && data.discount_type === 'percentage' && data.discount_value > 100) {
         return false;
     }
     return true;
 }, {
-    message: 'Percentage discount 100% se zyada nahi ho sakta',
+    message: 'Percentage discount cannot exceed 100%',
     path: ['discount_value']
+}).refine((data) => {
+    // 2. Check fixed discount on fee component
+    if (data.type === 'fee' && data.discount_type === 'fixed' && data.discount_value > data.amount_value) {
+        return false;
+    }
+    return true;
+}, {
+    message: 'Fixed discount cannot exceed the fee amount',
+    path: ['discount_value']
+}).refine((data) => {
+    // 3. Check percentage on discount component
+    if (data.type === 'discount' && data.amount_type === 'percentage' && data.amount_value > 100) {
+        return false;
+    }
+    return true;
+}, {
+    message: 'Percentage cannot exceed 100%',
+    path: ['amount_value']
 });
 
 const feeTemplateSchema = z.object({
-    name: z.string().min(3, 'Name kam se kam 3 characters ka hona chahiye'),
+    name: z.string().min(3, 'Name must be at least 3 characters'),
     code: z.string().optional(),
     description: z.string().optional(),
 
     // ✅ FIX: branch_id properly optional and nullable
     branch_id: z.string().optional().nullable(),
 
-    academic_year_id: z.string().min(1, 'Academic year select karna zaroori hai'),
+    academic_year_id: z.string().min(1, 'Academic year is required'),
     fee_basis: z.enum(['monthly', 'quarterly', 'half_yearly', 'annually', 'one_time']),
     due_day: z.coerce.number()
-        .min(1, 'Day 1-31 ke darmiyan hona chahiye')
-        .max(31, 'Day 1-31 ke darmiyan hona chahiye'),
+        .min(1, 'Day must be between 1-31')
+        .max(31, 'Day must be between 1-31'),
     late_fine_config: z.object({
         enabled: z.boolean(),
         type: z.enum(['fixed', 'percentage']),
         amount: z.coerce.number().min(0),
-        grace_days: z.coerce.number().min(0).max(30, 'Grace days 30 se zyada nahi ho sakte'),
+        grace_days: z.coerce.number().min(0).max(30, 'Grace days cannot exceed 30'),
         max_fine: z.coerce.number().min(0).optional().nullable()
     }),
     components: z.array(componentSchema).default([]),
-    applicable_to: z.object({
-        all_classes: z.boolean(),
-        class_ids: z.array(z.string()),
-        section_ids: z.array(z.string()),
-        student_ids: z.array(z.string()),
-        all_branches: z.boolean(),
-        branch_ids: z.array(z.string())
-    }),
-    is_active: z.boolean().default(true),
-    is_default: z.boolean().default(false)
+    is_active: z.boolean().default(true)
 });
 
 // Component Card Component
@@ -135,7 +151,6 @@ const ComponentCard = ({
     control,
     errors,
     onRemove,
-    onCopy,
     isRemovable,
     watch,
     setValue
@@ -167,30 +182,32 @@ const ComponentCard = ({
                 {/* Header */}
                 <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
-                        <Badge variant={type === 'fee' ? 'default' : 'success'}>
-                            {type === 'fee' ? '💰 Fee' : '🏷️ Discount'}
+                        <Badge variant={type === 'fee' ? 'default' : 'success'} className="flex items-center gap-1">
+                            {type === 'fee' ? <Coins className="h-3 w-3" /> : <BadgePercent className="h-3 w-3" />}
+                            {type === 'fee' ? 'Fee' : 'Discount'}
                         </Badge>
-                        {watch(`components.${index}.is_optional`) && (
-                            <Badge variant="outline">Optional</Badge>
-                        )}
                     </div>
                     <div className="flex items-center gap-1">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowDetails(!showDetails)}
-                            type="button"
-                        >
-                            {showDetails ? 'Simple' : 'Details'}
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onCopy(index)}
-                            type="button"
-                        >
-                            <Copy className="h-4 w-4" />
-                        </Button>
+                        <div className="flex bg-gray-100 p-1 rounded-md mr-2">
+                            <Button
+                                variant={!showDetails ? "secondary" : "ghost"}
+                                size="xs"
+                                onClick={() => setShowDetails(false)}
+                                type="button"
+                                className={cn("h-7 px-2 text-[10px]", !showDetails && "bg-white shadow-sm")}
+                            >
+                                Quick Edit
+                            </Button>
+                            <Button
+                                variant={showDetails ? "secondary" : "ghost"}
+                                size="xs"
+                                onClick={() => setShowDetails(true)}
+                                type="button"
+                                className={cn("h-7 px-2 text-[10px]", showDetails && "bg-white shadow-sm")}
+                            >
+                                Advanced
+                            </Button>
+                        </div>
                         {isRemovable && (
                             <Button
                                 variant="ghost"
@@ -204,168 +221,158 @@ const ComponentCard = ({
                     </div>
                 </div>
 
-                {/* Simple View */}
                 {!showDetails ? (
-                    <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
-                            {/* Component Name - ✅ Using InputField */}
-                            <InputField
-                                label="Component Name"
-                                name={`components.${index}.name`}
-                                control={control}
-                                error={errors?.components?.[index]?.name}
-                                required
-                                placeholder="e.g. Tuition Fee"
-                            />
+                    <div className="space-y-4">
+                        <div className="flex flex-col sm:flex-row gap-4 items-start">
+                            {/* Component Name */}
+                            <div className="flex-1 min-w-[200px]">
+                                <InputField
+                                    label="Component Name"
+                                    name={`components.${index}.name`}
+                                    control={control}
+                                    error={errors?.components?.[index]?.name}
+                                    required
+                                    placeholder="e.g. Tuition Fee"
+                                />
+                            </div>
 
-                            <div className="space-y-1">
-                                <Label>Amount</Label>
-                                <div className="flex gap-2">
-                                    {/* Amount Type - ✅ Using SelectField */}
-                                    <div className="w-32">
+                            {/* Amount Section */}
+                            <div className="w-full sm:w-auto flex-none">
+                                <Label className="text-sm font-medium mb-2 block">Amount Configuration</Label>
+                                <div className="flex gap-2 items-start">
+                                    <div className="w-28">
                                         <SelectField
                                             label=""
                                             name={`components.${index}.amount_type`}
                                             control={control}
                                             options={AMOUNT_TYPE_OPTIONS}
-                                            placeholder="Type"
                                         />
                                     </div>
-
-                                    {/* Amount Value - ✅ Using InputField with number type */}
-                                    <InputField
-                                        label=""
-                                        name={`components.${index}.amount_value`}
-                                        control={control}
-                                        type="number"
-                                        error={errors?.components?.[index]?.amount_value}
-                                        placeholder="Amount"
-                                    />
+                                    <div className="w-32">
+                                        <InputField
+                                            label=""
+                                            name={`components.${index}.amount_value`}
+                                            control={control}
+                                            type="number"
+                                            error={errors?.components?.[index]?.amount_value}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Discount Section (only for fee type) */}
+                        {/* Quick Discount & Options (Fee Only) */}
                         {type === 'fee' && (
-                            <div className="grid grid-cols-2 gap-3 pt-2 border-t">
-                                {/* Discount Type - ✅ Using SelectField */}
-                                <SelectField
-                                    label="Discount Type"
-                                    name={`components.${index}.discount_type`}
-                                    control={control}
-                                    options={[
-                                        { value: 'fixed', label: 'Fixed' },
-                                        { value: 'percentage', label: 'Percentage' }
-                                    ]}
-                                    placeholder="Select"
-                                />
-
-                                {/* Discount Value - ✅ Using InputField */}
-                                <InputField
-                                    label="Discount Value"
-                                    name={`components.${index}.discount_value`}
-                                    control={control}
-                                    type="number"
-                                    error={errors?.components?.[index]?.discount_value}
-                                    placeholder={discountType === 'percentage' ? 'e.g. 10' : 'e.g. 500'}
-                                />
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-slate-50/80 rounded-xl border border-slate-100 transition-colors hover:bg-slate-50">
+                                <div className="flex-1">
+                                    <div className="flex gap-3 items-center">
+                                        <div className="w-28">
+                                            <SelectField
+                                                label="Discount"
+                                                name={`components.${index}.discount_type`}
+                                                control={control}
+                                                options={[
+                                                    { value: 'fixed', label: 'Fixed' },
+                                                    { value: 'percentage', label: '%' }
+                                                ]}
+                                            />
+                                        </div>
+                                        <div className="w-32">
+                                            <InputField
+                                                label="Value"
+                                                name={`components.${index}.discount_value`}
+                                                control={control}
+                                                type="number"
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
                 ) : (
                     /* Detailed View */
-                    <div className="space-y-3">
-                        {/* Component Name - ✅ Using InputField */}
-                        <InputField
-                            label="Component Name"
-                            name={`components.${index}.name`}
-                            control={control}
-                            error={errors?.components?.[index]?.name}
-                            required
-                            placeholder="e.g. Tuition Fee"
-                        />
-
-                        <div className="grid grid-cols-2 gap-3">
-                            {/* Component Type - ✅ Using SelectField */}
-                            <SelectField
-                                label="Component Type"
-                                name={`components.${index}.type`}
-                                control={control}
-                                options={COMPONENT_TYPE_OPTIONS}
-                            />
-
-                            {/* Apply On - ✅ Using SelectField */}
-                            <SelectField
-                                label="Apply On"
-                                name={`components.${index}.applicable_on`}
-                                control={control}
-                                options={APPLICABLE_ON_OPTIONS}
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            {/* Amount Type - ✅ Using SelectField */}
-                            <SelectField
-                                label="Amount Type"
-                                name={`components.${index}.amount_type`}
-                                control={control}
-                                options={AMOUNT_TYPE_OPTIONS}
-                            />
-
-                            {/* Amount - ✅ Using InputField */}
-                            <InputField
-                                label="Amount"
-                                name={`components.${index}.amount_value`}
-                                control={control}
-                                type="number"
-                                error={errors?.components?.[index]?.amount_value}
-                                placeholder="Amount"
-                            />
-                        </div>
-
-                        {type === 'fee' && (
-                            <>
-                                <Separator />
+                    <div className="space-y-5 animate-in fade-in duration-300">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="space-y-4">
+                                <h5 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">General Setup</h5>
+                                <InputField
+                                    label="Component Name"
+                                    name={`components.${index}.name`}
+                                    control={control}
+                                    error={errors?.components?.[index]?.name}
+                                    required
+                                    placeholder="e.g. Tuition Fee"
+                                />
                                 <div className="grid grid-cols-2 gap-3">
-                                    {/* Discount Type - ✅ Using SelectField */}
                                     <SelectField
-                                        label="Discount Type"
-                                        name={`components.${index}.discount_type`}
+                                        label="Component Type"
+                                        name={`components.${index}.type`}
                                         control={control}
-                                        options={[
-                                            { value: 'fixed', label: 'Fixed Discount' },
-                                            { value: 'percentage', label: 'Percentage Discount' }
-                                        ]}
+                                        options={COMPONENT_TYPE_OPTIONS}
                                     />
-
-                                    {/* Discount Value - ✅ Using InputField */}
-                                    <InputField
-                                        label="Discount Value"
-                                        name={`components.${index}.discount_value`}
+                                    <SelectField
+                                        label="Apply On"
+                                        name={`components.${index}.applicable_on`}
                                         control={control}
-                                        type="number"
-                                        error={errors?.components?.[index]?.discount_value}
-                                        placeholder="Discount value"
+                                        options={APPLICABLE_ON_OPTIONS}
                                     />
                                 </div>
-                            </>
-                        )}
+                            </div>
 
-                        {/* Description - ✅ Using TextareaField */}
-                        <TextareaField
-                            label="Description (Optional)"
-                            name={`components.${index}.description`}
-                            control={control}
-                            rows={2}
-                            placeholder="Component ki detail..."
-                        />
+                            <div className="space-y-4">
+                                <h5 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Financial Setup</h5>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <SelectField
+                                        label="Amount Type"
+                                        name={`components.${index}.amount_type`}
+                                        control={control}
+                                        options={AMOUNT_TYPE_OPTIONS}
+                                    />
+                                    <InputField
+                                        label="Amount"
+                                        name={`components.${index}.amount_value`}
+                                        control={control}
+                                        type="number"
+                                        error={errors?.components?.[index]?.amount_value}
+                                        placeholder="0.00"
+                                    />
+                                </div>
 
-                        {/* Optional Checkbox - ✅ Using CheckboxField */}
-                        <CheckboxField
-                            label="Optional Component"
-                            name={`components.${index}.is_optional`}
-                            control={control}
-                        />
+                                {type === 'fee' && (
+                                    <div className="grid grid-cols-2 gap-3 p-3 bg-green-50/30 rounded-lg border border-green-100">
+                                        <SelectField
+                                            label="Discount Type"
+                                            name={`components.${index}.discount_type`}
+                                            control={control}
+                                            options={[
+                                                { value: 'fixed', label: 'Fixed' },
+                                                { value: 'percentage', label: 'Percentage' }
+                                            ]}
+                                        />
+                                        <InputField
+                                            label="Discount Value"
+                                            name={`components.${index}.discount_value`}
+                                            control={control}
+                                            type="number"
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="pt-4 border-t">
+                            <TextareaField
+                                label="Internal Description"
+                                name={`components.${index}.description`}
+                                control={control}
+                                rows={2}
+                                placeholder="Add notes for this component..."
+                            />
+                        </div>
                     </div>
                 )}
 
@@ -493,16 +500,7 @@ export default function FeeTemplateForm({
                 max_fine: null
             },
             components: [],
-            applicable_to: {
-                all_classes: false,
-                class_ids: [],
-                section_ids: [],
-                student_ids: [],
-                all_branches: true,
-                branch_ids: []
-            },
             is_active: true,
-            is_default: false,
             ...defaultValues,
         };
 
@@ -521,7 +519,6 @@ export default function FeeTemplateForm({
                 amount_value: c.amount_value || 0,
                 discount_type: c.discount_type || (c.type === 'fee' ? 'fixed' : undefined),
                 discount_value: c.discount_value || 0,
-                is_optional: c.is_optional || false,
                 description: c.description || '',
                 applicable_on: c.applicable_on || 'base',
             }));
@@ -541,15 +538,28 @@ export default function FeeTemplateForm({
     } = useForm({
         resolver: zodResolver(feeTemplateSchema),
         defaultValues: getInitialValues(),
+        mode: 'onChange', // Enable real-time validation and value watching
     });
 
-    // Reset when defaultValues change
+    // Reset when defaultValues change (only if ID changes and is not null)
     useEffect(() => {
-        if (defaultValues && Object.keys(defaultValues).length > 0) {
-            console.log('🔄 Resetting form with new values:', defaultValues);
+        if (defaultValues?.id) {
+            console.log('🔄 Resetting form with new template data:', defaultValues.id);
             reset(getInitialValues());
         }
     }, [defaultValues?.id]);
+
+    // ✅ AUTO-SELECT CURRENT ACADEMIC YEAR
+    useEffect(() => {
+        const currentYearId = watch('academic_year_id');
+        if (academicYears.length > 0 && !currentYearId && !isEdit) {
+            const current = academicYears.find(y => y.is_current) || academicYears[0];
+            if (current && current.value) {
+                console.log('📅 Auto-selecting current academic year:', current.label);
+                setValue('academic_year_id', current.value);
+            }
+        }
+    }, [academicYears, isEdit, setValue]);
 
     // Field arrays
     const { fields, append, remove, insert } = useFieldArray({
@@ -560,8 +570,6 @@ export default function FeeTemplateForm({
     // Watch values
     const components = watch('components') || [];
     const lateFineEnabled = watch('late_fine_config.enabled');
-    const allClasses = watch('applicable_to.all_classes');
-    const allBranches = watch('applicable_to.all_branches');
     const lateFineType = watch('late_fine_config.type');
     const lateFineAmount = watch('late_fine_config.amount') || 0;
     const graceDays = watch('late_fine_config.grace_days') || 0;
@@ -570,19 +578,36 @@ export default function FeeTemplateForm({
     const totals = useMemo(() => {
         let baseTotal = 0;
         let totalDiscount = 0;
-        let discountComponents = 0;
+        let discountComponentsCount = 0;
+        let feeComponentsCount = 0;
 
+        // Pass 1: Calculate Base Total and internal component discounts
         (components || []).forEach(comp => {
             if (comp?.type === 'fee') {
-                baseTotal += comp?.amount_value || 0;
+                feeComponentsCount++;
+                const amount = Number(comp?.amount_value) || 0;
+                baseTotal += amount;
 
                 if (comp?.discount_value && comp.discount_value > 0) {
-                    discountComponents++;
+                    discountComponentsCount++;
                     if (comp.discount_type === 'percentage') {
-                        totalDiscount += (comp.amount_value * comp.discount_value / 100);
+                        totalDiscount += (amount * Number(comp.discount_value) / 100);
                     } else {
-                        totalDiscount += comp.discount_value;
+                        totalDiscount += Number(comp.discount_value);
                     }
+                }
+            }
+        });
+
+        // Pass 2: Calculate Global Discount components
+        (components || []).forEach(comp => {
+            if (comp?.type === 'discount') {
+                discountComponentsCount++;
+                const value = Number(comp?.amount_value) || 0;
+                if (comp.amount_type === 'percentage') {
+                    totalDiscount += (baseTotal * value / 100);
+                } else {
+                    totalDiscount += value;
                 }
             }
         });
@@ -593,14 +618,14 @@ export default function FeeTemplateForm({
             baseTotal,
             totalDiscount,
             finalTotal,
-            componentCount: components?.length || 0,
-            discountComponents
+            componentCount: feeComponentsCount,
+            discountComponents: discountComponentsCount
         };
     }, [components]);
 
     // Navigation
     const nextTab = () => {
-        const tabs = ['basic', 'components', 'applicability'];
+        const tabs = ['basic', 'components'];
         const currentIndex = tabs.indexOf(activeTab);
         if (currentIndex < tabs.length - 1) {
             setActiveTab(tabs[currentIndex + 1]);
@@ -625,28 +650,19 @@ export default function FeeTemplateForm({
             amount_value: 0,
             discount_type: type === 'fee' ? 'fixed' : undefined,
             discount_value: type === 'fee' ? 0 : undefined,
-            is_optional: false,
             description: '',
             applicable_on: 'base'
         });
     }, [append]);
 
-    // Copy component
-    const copyComponent = useCallback((index) => {
-        const component = getValues(`components.${index}`);
-        insert(index + 1, {
-            ...component,
-            id: Date.now().toString(),
-            name: `${component.name} (Copy)`
-        });
-    }, [getValues, insert]);
+    const copyComponent = null; // Removed
 
     // Quick add templates
     const quickAddTemplates = [
         { name: 'Tuition Fee', amount: 5000, type: 'fee' },
         { name: 'Admission Fee', amount: 10000, type: 'fee' },
         { name: 'Transport Fee', amount: 2000, type: 'fee' },
-        { name: 'Sports Fee', amount: 1000, type: 'fee', optional: true },
+        { name: 'Sports Fee', amount: 1000, type: 'fee' },
         { name: 'Library Fee', amount: 500, type: 'fee' },
         { name: 'Scholarship', amount: 10, type: 'discount', amount_type: 'percentage' },
         { name: 'Sibling Concession', amount: 5, type: 'discount', amount_type: 'percentage' }
@@ -661,7 +677,6 @@ export default function FeeTemplateForm({
             amount_value: template.amount,
             discount_type: template.type === 'fee' ? 'fixed' : undefined,
             discount_value: 0,
-            is_optional: template.optional || false,
             description: '',
             applicable_on: 'base'
         });
@@ -726,23 +741,22 @@ export default function FeeTemplateForm({
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
-                    <TabsList className={`inline-flex w-auto sm:grid ${isMobile ? 'flex-nowrap' : 'grid-cols-3'} mb-4 sm:mb-6`}>
-                        <TabsTrigger value="basic" className="px-3 sm:px-4">
-                            Basic Info
+                    <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
+                        <TabsTrigger value="basic" className="px-3 sm:px-4 flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            General Info
                             {(errors.name || errors.academic_year_id || errors.fee_basis || errors.due_day) && (
                                 <span className="ml-1 h-2 w-2 rounded-full bg-destructive inline-block" />
                             )}
                         </TabsTrigger>
-                        <TabsTrigger value="components" className="px-3 sm:px-4">
+                        <TabsTrigger value="components" className="px-3 sm:px-4 flex items-center gap-2">
+                            <Layers className="h-4 w-4" />
                             Components
                             {components.length > 0 && (
                                 <Badge variant="secondary" className="ml-1 sm:ml-2 text-[10px] sm:text-xs">
                                     {components.length}
                                 </Badge>
                             )}
-                        </TabsTrigger>
-                        <TabsTrigger value="applicability" className="px-3 sm:px-4">
-                            Applicability
                         </TabsTrigger>
                     </TabsList>
                 </div>
@@ -798,7 +812,7 @@ export default function FeeTemplateForm({
                                     name="description"
                                     control={control}
                                     rows={3}
-                                    placeholder="Template ki details likhen..."
+                                    placeholder="Enter Template Details..."
                                 />
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -884,6 +898,7 @@ export default function FeeTemplateForm({
                                     
                                     {/* ✅ Using SwitchField */}
                                     <SwitchField
+                                        className="w-[55%]"
                                         label="Enable Late Fine"
                                         name="late_fine_config.enabled"
                                         control={control}
@@ -949,6 +964,7 @@ export default function FeeTemplateForm({
                             </div>
                         </CardContent>
                     </Card>
+
                 </TabsContent>
 
                 {/* Tab 2: Components */}
@@ -968,15 +984,39 @@ export default function FeeTemplateForm({
                                             size="sm"
                                             onClick={() => handleQuickAdd(template)}
                                             className={cn(
-                                                "text-xs",
+                                                "text-xs flex items-center gap-2",
                                                 template.type === 'fee'
-                                                    ? 'border-blue-200 hover:bg-blue-50'
-                                                    : 'border-green-200 hover:bg-green-50'
+                                                    ? 'border-blue-200 hover:bg-blue-50 text-blue-700'
+                                                    : 'border-green-200 hover:bg-green-50 text-green-700'
                                             )}
                                         >
-                                            {template.type === 'fee' ? '💰' : '🏷️'} {template.name}
+                                            {template.type === 'fee' ? <Coins className="h-3 w-3" /> : <BadgePercent className="h-3 w-3" />}
+                                            {template.name}
                                         </Button>
                                     ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="bg-blue-50/50 border-blue-100 md:col-span-2">
+                            <CardContent className="p-4 sm:p-5">
+                                <h4 className="font-semibold text-blue-800 flex items-center gap-2 mb-3">
+                                    <Info className="h-4 w-4" />
+                                    Fee Template Guide
+                                </h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-blue-700">
+                                    <p className="flex gap-2">
+                                        <Coins className="h-4 w-4 flex-none mt-0.5" />
+                                        <span><span className="font-bold">Fee Components:</span> Regular charges like Tuition or Admission.</span>
+                                    </p>
+                                    <p className="flex gap-2">
+                                        <BadgePercent className="h-4 w-4 flex-none mt-0.5" />
+                                        <span><span className="font-bold">Discounts:</span> Deductions that reduce the amount (e.g. Scholarship).</span>
+                                    </p>
+                                    <p className="flex gap-2">
+                                        <Layers className="h-4 w-4 flex-none mt-0.5" />
+                                        <span><span className="font-bold">Types:</span> Use <strong>Fixed</strong> amounts or <strong>Percentage</strong> values.</span>
+                                    </p>
                                 </div>
                             </CardContent>
                         </Card>
@@ -1026,7 +1066,6 @@ export default function FeeTemplateForm({
                                                 control={control}
                                                 errors={errors}
                                                 onRemove={remove}
-                                                onCopy={copyComponent}
                                                 isRemovable={fields.length > 1}
                                                 watch={watch}
                                                 setValue={setValue}
@@ -1045,110 +1084,6 @@ export default function FeeTemplateForm({
                             For conditional discounts, you can mark components as optional.
                         </AlertDescription>
                     </Alert>
-                </TabsContent>
-
-                {/* Tab 3: Applicability */}
-                <TabsContent value="applicability" className="space-y-4">
-                    <Card>
-                        <CardContent className="p-4 sm:p-6 space-y-4">
-                            <h3 className="font-semibold">Class & Section Applicability</h3>
-
-                            {/* ✅ Using CheckboxField */}
-                            <CheckboxField
-                                label="Apply to all classes"
-                                name="applicable_to.all_classes"
-                                control={control}
-                            />
-
-                            {!allClasses && (
-                                <div className="pl-6 space-y-4">
-                                    <div>
-                                        <MultiSelectField
-                                            label="Select Classes"
-                                            name="applicable_to.class_ids"
-                                            control={control}
-                                            options={classes}
-                                            placeholder="Select classes..."
-                                            error={errors.applicable_to?.class_ids?.message}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* ✅ Branch Card - Sirf tab show hoga jab hasBranches true ho */}
-                    {hasBranches() && (
-                        <Card>
-                            <CardContent className="p-4 sm:p-6 space-y-4">
-                                <h3 className="font-semibold">Branch Applicability</h3>
-
-                                {/* ✅ Using CheckboxField */}
-                                <CheckboxField
-                                    label="Apply to all branches"
-                                    name="applicable_to.all_branches"
-                                    control={control}
-                                />
-
-                                {!allBranches && (
-                                    <div className="pl-6">
-                                        <MultiSelectField
-                                            label="Select Branches"
-                                            name="applicable_to.branch_ids"
-                                            control={control}
-                                            options={branches}
-                                            placeholder="Select branches..."
-                                        />
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    <Card>
-                        <CardContent className="p-4 sm:p-6 space-y-4">
-                            <h3 className="font-semibold">Student Applicability</h3>
-
-                            <MultiSelectField
-                                label="Specific Students (Optional)"
-                                name="applicable_to.student_ids"
-                                control={control}
-                                options={students}
-                                placeholder="Select students..."
-                            />
-
-                            <Alert>
-                                <AlertCircle className="h-4 w-4" />
-                                <AlertDescription>
-                                    If no students are selected, template will apply based on class/branch rules above.
-                                </AlertDescription>
-                            </Alert>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardContent className="p-4 sm:p-6 space-y-4">
-                            <h3 className="font-semibold">Default Setting</h3>
-
-                            <div className="flex flex-col sm:flex-row gap-4">
-                                {/* ✅ Using CheckboxField */}
-                                <CheckboxField
-                                    label="Set as Default Template"
-                                    name="is_default"
-                                    control={control}
-                                />
-                            </div>
-
-                            {watch('is_default') && (
-                                <Alert>
-                                    <AlertCircle className="h-4 w-4" />
-                                    <AlertDescription>
-                                        This will be the default template for new students/classes.
-                                    </AlertDescription>
-                                </Alert>
-                            )}
-                        </CardContent>
-                    </Card>
                 </TabsContent>
             </Tabs>
 

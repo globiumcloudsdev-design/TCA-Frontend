@@ -24,6 +24,7 @@ import DataTable from '@/components/common/DataTable';
 import StatsCard from '@/components/common/StatsCard';
 import SelectField from '@/components/common/SelectField';
 import { staffService } from '@/services/staffService';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
 
 // ─── Helpers ─────────────────────────────────────────────
@@ -63,6 +64,16 @@ function formatTime(t) {
 
 const TABS = ['Overview', 'Attendance', 'Payroll', 'Documents'];
 
+// ─── No Data Component ──────────────────────────────────
+function NoDataPlaceholder({ message = 'Data Not Found' }) {
+  return (
+    <div className="p-8 text-center flex flex-col items-center justify-center gap-2">
+      <AlertCircle size={20} className="text-muted-foreground/30" />
+      <p className="text-xs text-muted-foreground italic font-medium">{message}</p>
+    </div>
+  );
+}
+
 // ─── Info Row ────────────────────────────────────────────
 function InfoRow({ icon: Icon, label, value, color }) {
   if (!value || value === '—') return null;
@@ -91,20 +102,30 @@ function OverviewTab({ staff }) {
           <User size={16} className="text-primary" />
           <h3 className="text-sm font-bold uppercase tracking-wide">Personal Details</h3>
         </div>
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-          <InfoRow icon={Hash} label="Employee ID" value={staff.registration_no || sDetails.employee_id} />
-          <InfoRow icon={User} label="Full Name" value={`${staff.first_name || ''} ${staff.last_name || ''}`.trim()} />
-          <InfoRow icon={Users} label="Gender" value={sDetails.gender} />
-          <InfoRow icon={Calendar} label="Date of Birth" value={formatDate(sDetails.dob)} />
-          <InfoRow icon={ShieldCheck} label="CNIC" value={sDetails.cnic} />
-          <InfoRow icon={Mail} label="Email" value={staff.email} />
-          <InfoRow icon={Phone} label="Phone" value={staff.phone} />
-          <InfoRow icon={MapPin} label="Nationality" value={sDetails.nationality} />
-        </div>
-        <div className="px-4 pb-4">
-          <InfoRow icon={MapPin} label="Present Address" value={sDetails.present_address} />
-          <InfoRow icon={MapPin} label="Permanent Address" value={sDetails.permanent_address} />
-        </div>
+        {[
+          staff.registration_no, sDetails.employee_id, staff.first_name, staff.last_name,
+          sDetails.gender, sDetails.dob, sDetails.cnic, staff.email, staff.phone,
+          sDetails.nationality, sDetails.present_address, sDetails.permanent_address
+        ].some(v => v && v !== '—') ? (
+          <>
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+              <InfoRow icon={Hash} label="Employee ID" value={staff.registration_no || sDetails.employee_id} />
+              <InfoRow icon={User} label="Full Name" value={`${staff.first_name || ''} ${staff.last_name || ''}`.trim()} />
+              <InfoRow icon={Users} label="Gender" value={sDetails.gender} />
+              <InfoRow icon={Calendar} label="Date of Birth" value={formatDate(sDetails.dob)} />
+              <InfoRow icon={ShieldCheck} label="CNIC" value={sDetails.cnic} />
+              <InfoRow icon={Mail} label="Email" value={staff.email} />
+              <InfoRow icon={Phone} label="Phone" value={staff.phone} />
+              <InfoRow icon={MapPin} label="Nationality" value={sDetails.nationality} />
+            </div>
+            <div className="px-4 pb-4">
+              <InfoRow icon={MapPin} label="Present Address" value={sDetails.present_address} />
+              <InfoRow icon={MapPin} label="Permanent Address" value={sDetails.permanent_address} />
+            </div>
+          </>
+        ) : (
+          <NoDataPlaceholder />
+        )}
       </div>
 
       {/* Professional & Employment */}
@@ -113,16 +134,24 @@ function OverviewTab({ staff }) {
           <Briefcase size={16} className="text-primary" />
           <h3 className="text-sm font-bold uppercase tracking-wide">Professional Info</h3>
         </div>
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-          <InfoRow icon={GraduationCap} label="Qualification" value={sDetails.qualification} />
-          <InfoRow icon={BookOpen} label="Specialization" value={sDetails.specialization} />
-          <InfoRow icon={Clock} label="Experience" value={sDetails.experience_years ? `${sDetails.experience_years} Years` : null} />
-          <InfoRow icon={Building} label="Department" value={sDetails.department} />
-          <InfoRow icon={UserCheck} label="Designation" value={sDetails.designation} />
-          <InfoRow icon={Briefcase} label="Employment Type" value={sDetails.employment_type} />
-          <InfoRow icon={Calendar} label="Joining Date" value={formatDate(sDetails.joining_date)} />
-          <InfoRow icon={DollarSign} label="Salary" value={sDetails.salary ? `Rs. ${Number(sDetails.salary).toLocaleString()}` : null} />
-        </div>
+        {[
+          sDetails.qualification, sDetails.specialization, sDetails.experience_years,
+          sDetails.department, sDetails.designation, sDetails.employment_type,
+          sDetails.joining_date, sDetails.salary
+        ].some(v => v && v !== '—') ? (
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+            <InfoRow icon={GraduationCap} label="Qualification" value={sDetails.qualification} />
+            <InfoRow icon={BookOpen} label="Specialization" value={sDetails.specialization} />
+            <InfoRow icon={Clock} label="Experience" value={sDetails.experience_years ? `${sDetails.experience_years} Years` : null} />
+            <InfoRow icon={Building} label="Department" value={sDetails.department} />
+            <InfoRow icon={UserCheck} label="Designation" value={sDetails.designation} />
+            <InfoRow icon={Briefcase} label="Employment Type" value={sDetails.employment_type} />
+            <InfoRow icon={Calendar} label="Joining Date" value={formatDate(sDetails.joining_date)} />
+            <InfoRow icon={DollarSign} label="Salary" value={sDetails.salary ? `Rs. ${Number(sDetails.salary).toLocaleString()}` : null} />
+          </div>
+        ) : (
+          <NoDataPlaceholder />
+        )}
       </div>
 
       {/* Bank Details */}
@@ -131,11 +160,17 @@ function OverviewTab({ staff }) {
           <BankIcon size={16} className="text-primary" />
           <h3 className="text-sm font-bold uppercase tracking-wide">Bank Details</h3>
         </div>
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-          <InfoRow icon={Building} label="Bank Name" value={sDetails.bank_name} />
-          <InfoRow icon={Hash} label="Account No" value={sDetails.bank_account_no} />
-          <InfoRow icon={MapPin} label="Branch" value={sDetails.bank_branch} />
-        </div>
+        {[
+          sDetails.bank_name, sDetails.bank_account_no, sDetails.bank_branch
+        ].some(v => v && v !== '—') ? (
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+            <InfoRow icon={Building} label="Bank Name" value={sDetails.bank_name} />
+            <InfoRow icon={Hash} label="Account No" value={sDetails.bank_account_no} />
+            <InfoRow icon={MapPin} label="Branch" value={sDetails.bank_branch} />
+          </div>
+        ) : (
+          <NoDataPlaceholder />
+        )}
       </div>
 
       {/* Emergency Contact */}
@@ -144,11 +179,17 @@ function OverviewTab({ staff }) {
           <AlertCircle size={16} className="text-primary" />
           <h3 className="text-sm font-bold uppercase tracking-wide">Emergency Contact</h3>
         </div>
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-          <InfoRow icon={User} label="Name" value={sDetails.emergency_contact_name} />
-          <InfoRow icon={Users} label="Relation" value={sDetails.emergency_contact_relation} />
-          <InfoRow icon={Phone} label="Phone" value={sDetails.emergency_contact_phone} />
-        </div>
+        {[
+          sDetails.emergency_contact_name, sDetails.emergency_contact_relation, sDetails.emergency_contact_phone
+        ].some(v => v && v !== '—') ? (
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+            <InfoRow icon={User} label="Name" value={sDetails.emergency_contact_name} />
+            <InfoRow icon={Users} label="Relation" value={sDetails.emergency_contact_relation} />
+            <InfoRow icon={Phone} label="Phone" value={sDetails.emergency_contact_phone} />
+          </div>
+        ) : (
+          <NoDataPlaceholder />
+        )}
       </div>
     </div>
   );
@@ -487,9 +528,12 @@ export default function StaffDetailPage({ type, id }) {
       {/* ── Profile Header ── */}
       <div className="flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-sm sm:flex-row sm:items-start">
         {/* Avatar */}
-        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-3xl font-bold text-primary ring-4 ring-primary/20">
-          {initials(staff)}
-        </div>
+        <Avatar className="h-24 w-24 shrink-0 rounded-2xl ring-4 ring-primary/20">
+          <AvatarImage src={staff.avatar_url} alt={`${staff.first_name} ${staff.last_name}`} className="object-cover" />
+          <AvatarFallback className="bg-primary/10 text-3xl font-bold text-primary rounded-2xl">
+            {initials(staff)}
+          </AvatarFallback>
+        </Avatar>
 
         {/* Info */}
         <div className="flex-1 space-y-1.5">

@@ -25,6 +25,7 @@ import StatsCard from '@/components/common/StatsCard';
 import SelectField from '@/components/common/SelectField';
 import { teacherService } from '@/services/teacherService';
 import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 // ─── Helpers ─────────────────────────────────────────────
 function initials(s) {
@@ -64,6 +65,16 @@ function formatTime(t) {
 
 const TABS = ['Overview', 'Timetable', 'Attendance', 'Payroll', 'Documents'];
 
+// ─── No Data Component ──────────────────────────────────
+function NoDataPlaceholder({ message = 'Data Not Found' }) {
+  return (
+    <div className="p-8 text-center flex flex-col items-center justify-center gap-2">
+      <AlertCircle size={20} className="text-muted-foreground/30" />
+      <p className="text-xs text-muted-foreground italic font-medium">{message}</p>
+    </div>
+  );
+}
+
 // ─── Info Row ────────────────────────────────────────────
 function InfoRow({ icon: Icon, label, value, color }) {
   if (!value || value === '—') return null;
@@ -92,20 +103,30 @@ function OverviewTab({ teacher }) {
           <User size={16} className="text-primary" />
           <h3 className="text-sm font-bold uppercase tracking-wide">Personal Details</h3>
         </div>
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-          <InfoRow icon={Hash} label="Employee ID" value={teacher.registration_no || tDetails.employee_id} />
-          <InfoRow icon={User} label="Full Name" value={`${teacher.first_name || ''} ${teacher.last_name || ''}`.trim()} />
-          <InfoRow icon={Users} label="Gender" value={tDetails.gender} />
-          <InfoRow icon={Calendar} label="Date of Birth" value={formatDate(tDetails.date_of_birth)} />
-          <InfoRow icon={ShieldCheck} label="CNIC" value={tDetails.cnic} />
-          <InfoRow icon={Mail} label="Email" value={teacher.email} />
-          <InfoRow icon={Phone} label="Phone" value={teacher.phone} />
-          <InfoRow icon={MapPin} label="Nationality" value={tDetails.nationality} />
-        </div>
-        <div className="px-4 pb-4">
-          <InfoRow icon={MapPin} label="Present Address" value={tDetails.present_address} />
-          <InfoRow icon={MapPin} label="Permanent Address" value={tDetails.permanent_address} />
-        </div>
+        {[
+          teacher.registration_no, tDetails.employee_id, teacher.first_name, teacher.last_name,
+          tDetails.gender, tDetails.date_of_birth, tDetails.cnic, teacher.email, teacher.phone,
+          tDetails.nationality, tDetails.present_address, tDetails.permanent_address
+        ].some(v => v && v !== '—') ? (
+          <>
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+              <InfoRow icon={Hash} label="Employee ID" value={teacher.registration_no || tDetails.employee_id} />
+              <InfoRow icon={User} label="Full Name" value={`${teacher.first_name || ''} ${teacher.last_name || ''}`.trim()} />
+              <InfoRow icon={Users} label="Gender" value={tDetails.gender} />
+              <InfoRow icon={Calendar} label="Date of Birth" value={formatDate(tDetails.date_of_birth)} />
+              <InfoRow icon={ShieldCheck} label="CNIC" value={tDetails.cnic} />
+              <InfoRow icon={Mail} label="Email" value={teacher.email} />
+              <InfoRow icon={Phone} label="Phone" value={teacher.phone} />
+              <InfoRow icon={MapPin} label="Nationality" value={tDetails.nationality} />
+            </div>
+            <div className="px-4 pb-4">
+              <InfoRow icon={MapPin} label="Present Address" value={tDetails.present_address} />
+              <InfoRow icon={MapPin} label="Permanent Address" value={tDetails.permanent_address} />
+            </div>
+          </>
+        ) : (
+          <NoDataPlaceholder />
+        )}
       </div>
 
       {/* Professional & Employment */}
@@ -114,16 +135,24 @@ function OverviewTab({ teacher }) {
           <Briefcase size={16} className="text-primary" />
           <h3 className="text-sm font-bold uppercase tracking-wide">Professional Info</h3>
         </div>
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-          <InfoRow icon={GraduationCap} label="Qualification" value={tDetails.qualification} />
-          <InfoRow icon={BookOpen} label="Specialization" value={tDetails.specialization} />
-          <InfoRow icon={Clock} label="Experience" value={tDetails.experience_years ? `${tDetails.experience_years} Years` : null} />
-          <InfoRow icon={Building} label="Department" value={tDetails.department} />
-          <InfoRow icon={UserCheck} label="Designation" value={tDetails.designation} />
-          <InfoRow icon={Briefcase} label="Employment Type" value={tDetails.employment_type} />
-          <InfoRow icon={Calendar} label="Joining Date" value={formatDate(tDetails.joining_date)} />
-          <InfoRow icon={DollarSign} label="Salary" value={tDetails.salary ? `Rs. ${Number(tDetails.salary).toLocaleString()}` : null} />
-        </div>
+        {[
+          tDetails.qualification, tDetails.specialization, tDetails.experience_years,
+          tDetails.department, tDetails.designation, tDetails.employment_type,
+          tDetails.joining_date, tDetails.salary
+        ].some(v => v && v !== '—') ? (
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+            <InfoRow icon={GraduationCap} label="Qualification" value={tDetails.qualification} />
+            <InfoRow icon={BookOpen} label="Specialization" value={tDetails.specialization} />
+            <InfoRow icon={Clock} label="Experience" value={tDetails.experience_years ? `${tDetails.experience_years} Years` : null} />
+            <InfoRow icon={Building} label="Department" value={tDetails.department} />
+            <InfoRow icon={UserCheck} label="Designation" value={tDetails.designation} />
+            <InfoRow icon={Briefcase} label="Employment Type" value={tDetails.employment_type} />
+            <InfoRow icon={Calendar} label="Joining Date" value={formatDate(tDetails.joining_date)} />
+            <InfoRow icon={DollarSign} label="Salary" value={tDetails.salary ? `Rs. ${Number(tDetails.salary).toLocaleString()}` : null} />
+          </div>
+        ) : (
+          <NoDataPlaceholder />
+        )}
       </div>
 
       {/* Bank Details */}
@@ -132,11 +161,17 @@ function OverviewTab({ teacher }) {
           <BankIcon size={16} className="text-primary" />
           <h3 className="text-sm font-bold uppercase tracking-wide">Bank Details</h3>
         </div>
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-          <InfoRow icon={Building} label="Bank Name" value={tDetails.bank_name} />
-          <InfoRow icon={Hash} label="Account No" value={tDetails.bank_account_no} />
-          <InfoRow icon={MapPin} label="Branch" value={tDetails.bank_branch} />
-        </div>
+        {[
+          tDetails.bank_name, tDetails.bank_account_no, tDetails.bank_branch
+        ].some(v => v && v !== '—') ? (
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+            <InfoRow icon={Building} label="Bank Name" value={tDetails.bank_name} />
+            <InfoRow icon={Hash} label="Account No" value={tDetails.bank_account_no} />
+            <InfoRow icon={MapPin} label="Branch" value={tDetails.bank_branch} />
+          </div>
+        ) : (
+          <NoDataPlaceholder />
+        )}
       </div>
 
       {/* Emergency Contact */}
@@ -145,11 +180,17 @@ function OverviewTab({ teacher }) {
           <AlertCircle size={16} className="text-primary" />
           <h3 className="text-sm font-bold uppercase tracking-wide">Emergency Contact</h3>
         </div>
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-          <InfoRow icon={User} label="Name" value={tDetails.emergency_contact_name} />
-          <InfoRow icon={Users} label="Relation" value={tDetails.emergency_contact_relation} />
-          <InfoRow icon={Phone} label="Phone" value={tDetails.emergency_contact_phone} />
-        </div>
+        {[
+          tDetails.emergency_contact_name, tDetails.emergency_contact_relation, tDetails.emergency_contact_phone
+        ].some(v => v && v !== '—') ? (
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+            <InfoRow icon={User} label="Name" value={tDetails.emergency_contact_name} />
+            <InfoRow icon={Users} label="Relation" value={tDetails.emergency_contact_relation} />
+            <InfoRow icon={Phone} label="Phone" value={tDetails.emergency_contact_phone} />
+          </div>
+        ) : (
+          <NoDataPlaceholder />
+        )}
       </div>
     </div>
   );
@@ -544,9 +585,12 @@ export default function TeacherDetailPage({ type, id }) {
       {/* ── Profile Header ── */}
       <div className="flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-sm sm:flex-row sm:items-start">
         {/* Avatar */}
-        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-3xl font-bold text-primary ring-4 ring-primary/20">
-          {initials(teacher)}
-        </div>
+        <Avatar className="h-24 w-24 shrink-0 rounded-2xl ring-4 ring-primary/20">
+          <AvatarImage src={teacher.avatar_url} alt={`${teacher.first_name} ${teacher.last_name}`} className="object-cover" />
+          <AvatarFallback className="bg-primary/10 text-3xl font-bold text-primary rounded-2xl">
+            {initials(teacher)}
+          </AvatarFallback>
+        </Avatar>
 
         {/* Info */}
         <div className="flex-1 space-y-1.5">
@@ -594,17 +638,6 @@ export default function TeacherDetailPage({ type, id }) {
           >
             <ArrowLeft size={14} /> Back
           </button>
-
-          {/* <button
-            onClick={() => generateAndDownloadIdCard({
-              role: 'teacher',
-              person: teacher,
-              institute: currentInstitute || {}
-            })}
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm hover:bg-accent transition-colors"
-          >
-            <CreditCard size={14} /> ID Card
-          </button> */}
 
           {canDo('teachers.update') && (
             <button

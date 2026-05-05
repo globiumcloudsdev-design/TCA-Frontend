@@ -24,9 +24,10 @@ import {
   Plus, Eye, Pencil, Trash2, Loader2, IdCard, Power, Filter,
   GraduationCap, Users, BookOpen, School, Building2, Layers,
   Calendar, Mail, Phone, MapPin, Shield,
-  AlertCircle, FileSpreadsheet
+  AlertCircle, FileSpreadsheet, KeyRound
 } from 'lucide-react';
 import { TableRowActions } from '@/components/common';
+import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
 import { toast } from 'sonner';
 
 import useInstituteConfig from '@/hooks/useInstituteConfig';
@@ -44,6 +45,7 @@ import { SimpleTooltip } from '@/components/ui/SimpleTooltip';
 import { cn } from '@/lib/utils';
 import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 // Type-based terminology mapper
@@ -147,6 +149,8 @@ export default function StudentsPage({ type }) {
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [changePasswordUser, setChangePasswordUser] = useState(null);
   const [mounted, setMounted] = useState(false);
 
   // Filter state
@@ -465,7 +469,12 @@ export default function StudentsPage({ type }) {
                   label: 'ID Card',
                   icon: IdCard,
                   onClick: () => handleGenerateIdCard(stu)
-                }] : [])
+                }] : []),
+                {
+                  label: 'Change Password',
+                  icon: KeyRound,
+                  onClick: () => setChangePasswordUser(stu)
+                }
               ]}
             />
           </div>
@@ -885,6 +894,15 @@ export default function StudentsPage({ type }) {
           variant={confirmDialog.variant}
         />
       )}
+
+      {/* Change Password Modal */}
+      {changePasswordUser && (
+        <ChangePasswordModal
+          open={!!changePasswordUser}
+          onClose={() => setChangePasswordUser(null)}
+          user={changePasswordUser}
+        />
+      )}
     </div>
   );
 }
@@ -896,12 +914,15 @@ function StudentCell({ student: s, columnKey, type, terms }) {
   switch (columnKey) {
     case 'name':
       return (
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-            {s.first_name?.[0]}{s.last_name?.[0]}
-          </div>
+        <div className="flex items-center gap-3">
+          <Avatar className="h-8 w-8 shrink-0">
+            <AvatarImage src={s.avatar_url} alt={`${s.first_name} ${s.last_name}`} />
+            <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
+              {s.first_name?.[0]}{s.last_name?.[0]}
+            </AvatarFallback>
+          </Avatar>
           <div>
-            <p className="font-medium leading-tight">{s.first_name} {s.last_name}</p>
+            <p className="font-medium leading-tight text-sm">{s.first_name} {s.last_name}</p>
             {s.email && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Mail className="h-3 w-3" />

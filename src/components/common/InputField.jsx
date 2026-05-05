@@ -24,6 +24,7 @@
  *   />
  */
 import { useState } from 'react';
+import { Controller } from 'react-hook-form';
 import { Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,6 +33,7 @@ import { cn } from '@/lib/utils';
 export default function InputField({
   label,
   name,
+  control,
   register,
   error,
   type = 'text',
@@ -57,17 +59,42 @@ export default function InputField({
       )}
 
       <div className="relative">
-        <Input
-          id={name}
-          name={name}
-          type={inputType}
-          placeholder={placeholder}
-          disabled={disabled}
-          aria-invalid={!!error}
-          className={cn(isPassword && "pr-10")}
-          {...(register ? register(name, rules) : {})}
-          {...props}
-        />
+        {control ? (
+          <Controller
+            name={name}
+            control={control}
+            rules={rules}
+            render={({ field }) => (
+              <Input
+                {...field}
+                id={name}
+                type={inputType}
+                placeholder={placeholder}
+                disabled={disabled}
+                aria-invalid={!!error}
+                className={cn(isPassword && "pr-10")}
+                {...props}
+                value={field.value ?? ''}
+                onChange={(e) => {
+                  field.onChange(e);
+                  if (props.onChange) props.onChange(e);
+                }}
+              />
+            )}
+          />
+        ) : (
+          <Input
+            id={name}
+            name={name}
+            type={inputType}
+            placeholder={placeholder}
+            disabled={disabled}
+            aria-invalid={!!error}
+            className={cn(isPassword && "pr-10")}
+            {...(register ? register(name, rules) : {})}
+            {...props}
+          />
+        )}
         {isPassword && (
           <button
             type="button"

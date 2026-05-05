@@ -46,4 +46,7 @@ export const dashboardService = {
       type,
       ...(branchId ? { branch_id: branchId } : {}),
     }).then((data) => ({ data: data.charts || {} })),
+
+  changeUserPassword: (userId, password) =>
+    api.post('/dashboard/change-password', { userId, password }).then(unwrap),
 };

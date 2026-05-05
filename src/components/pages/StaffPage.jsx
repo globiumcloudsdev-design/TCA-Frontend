@@ -19,9 +19,10 @@ import { toast } from 'sonner';
 import {
     Plus, Search, MoreHorizontal, Pencil, Trash2, UserCog, RefreshCw,
     Download, Upload, Eye, EyeOff, FileText, User, Briefcase, Shield, Power, Loader2,
-    Users, Mail, Phone, Calendar, Banknote, MapPin, IdCard, GraduationCap
+    Users, Mail, Phone, Calendar, Banknote, MapPin, IdCard, GraduationCap, KeyRound
 } from 'lucide-react';
 import { TableRowActions } from '@/components/common';
+import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
 import useAuthStore from '@/store/authStore';
 import { staffService } from '@/services/staffService';
 import DataTable from '@/components/common/DataTable';
@@ -41,6 +42,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { DatePickerField, TextareaField } from '../common';
 import { GENDER_OPTIONS, RELATIONSHIP_OPTIONS, BLOOD_GROUP_OPTIONS, RELIGION_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DOCUMENT_TYPES, STAFF_TYPES, STATUS_OPTS } from '@/constants';
@@ -203,6 +205,7 @@ export default function StaffManagementPage({ instituteType }) {
     const [uploadingFiles, setUploadingFiles] = useState({});
     const [showCustomType, setShowCustomType] = useState({});
     const [isMobile, setIsMobile] = useState(false);
+    const [changePasswordUser, setChangePasswordUser] = useState(null);
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -221,12 +224,6 @@ export default function StaffManagementPage({ instituteType }) {
     const canCreate = canDo('staff.create') || canDo('users.create') || user?.user_type === 'MASTER_ADMIN';
     const canUpdate = canDo('staff.update') || canDo('users.update') || user?.user_type === 'MASTER_ADMIN';
     const canDelete = canDo('staff.delete') || canDo('users.delete') || user?.user_type === 'MASTER_ADMIN';
-
-    const resolveCardRole = (staffMember) => {
-        const typeValue = String(staffMember?.staff_type || '').toLowerCase();
-        if (typeValue.includes('admin')) return 'admin';
-        return 'staff';
-    };
 
     // Fetch staff members
     const { data, isLoading, refetch, isFetching } = useQuery({
@@ -670,13 +667,12 @@ export default function StaffManagementPage({ instituteType }) {
                 const s = row.original;
                 return (
                     <div className="flex items-center gap-2.5">
-                        {s.avatar_url ? (
-                            <img src={s.avatar_url} alt={s.first_name} className="h-8 w-8 rounded-full object-cover border border-slate-200" />
-                        ) : (
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold">
+                        <Avatar className="h-8 w-8 shrink-0">
+                            <AvatarImage src={s.avatar_url} alt={`${s.first_name} ${s.last_name}`} />
+                            <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
                                 {s.first_name?.[0]}{s.last_name?.[0]}
-                            </div>
-                        )}
+                            </AvatarFallback>
+                        </Avatar>
                         <div>
                             <p className="font-medium">{s.first_name} {s.last_name}</p>
                             <p className="text-xs text-muted-foreground">{s.staff_type}</p>
@@ -732,13 +728,18 @@ export default function StaffManagementPage({ instituteType }) {
                                 setModalOpen(true);
                             } : undefined}
                             onDelete={canDelete ? () => setDeletingStaff(s) : undefined}
-                            extra={canUpdate ? [
-                                {
+                            extra={[
+                                ...(canUpdate ? [{
                                     label: s.is_active ? 'Deactivate' : 'Activate',
                                     icon: Power,
                                     onClick: () => toggleStatusMutation.mutate({ id: s.id, is_active: !s.is_active })
+                                }] : []),
+                                {
+                                    label: 'Change Password',
+                                    icon: KeyRound,
+                                    onClick: () => setChangePasswordUser(s)
                                 }
-                            ] : []}
+                            ]}
                         />
                     </div>
                 );
@@ -1514,6 +1515,15 @@ export default function StaffManagementPage({ instituteType }) {
                     This action cannot be undone.
                 </p>
             </AppModal>
+
+            {/* Change Password Modal */}
+            {changePasswordUser && (
+                <ChangePasswordModal
+                    open={!!changePasswordUser}
+                    onClose={() => setChangePasswordUser(null)}
+                    user={changePasswordUser}
+                />
+            )}
         </div>
     );
 }

@@ -26,6 +26,7 @@ import { FileText, Download, Eye, CreditCard } from 'lucide-react';
 import useUIStore from '@/store/uiStore';
 import DataTable from '@/components/common/DataTable';
 import StatsCard from '@/components/common/StatsCard';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 // ─── Helpers ─────────────────────────────────────────────
 function initials(s) {
@@ -75,20 +76,30 @@ function OverviewTab({ student, terms }) {
           <User size={16} className="text-primary" />
           <h3 className="text-sm font-bold uppercase tracking-wide">Personal Details</h3>
         </div>
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-          <InfoRow icon={Hash} label="Registration No" value={student.registration_no} />
-          <InfoRow icon={User} label="Full Name" value={`${student.first_name || ''} ${student.last_name || ''}`.trim()} />
-          <InfoRow icon={Users} label="Gender" value={sDetails.gender || student.gender} />
-          <InfoRow icon={Calendar} label="Date of Birth" value={formatDate(sDetails.date_of_birth || student.date_of_birth)} />
-          <InfoRow icon={ShieldCheck} label="Blood Group" value={sDetails.blood_group} />
-          <InfoRow icon={Mail} label="Email" value={student.email} />
-          <InfoRow icon={Phone} label="Phone" value={student.phone} />
-          <InfoRow icon={MapPin} label="Nationality" value={sDetails.nationality} />
-        </div>
-        <div className="px-4 pb-4">
-          <InfoRow icon={MapPin} label="Present Address" value={sDetails.present_address || student.address} />
-          <InfoRow icon={MapPin} label="Permanent Address" value={sDetails.permanent_address} />
-        </div>
+        {[
+          student.registration_no, student.first_name, student.last_name, sDetails.gender, student.gender,
+          sDetails.date_of_birth, student.date_of_birth, sDetails.blood_group, student.email, student.phone,
+          sDetails.nationality, sDetails.present_address, student.address, sDetails.permanent_address
+        ].some(v => v && v !== '—') ? (
+          <>
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+              <InfoRow icon={Hash} label="Registration No" value={student.registration_no} />
+              <InfoRow icon={User} label="Full Name" value={`${student.first_name || ''} ${student.last_name || ''}`.trim()} />
+              <InfoRow icon={Users} label="Gender" value={sDetails.gender || student.gender} />
+              <InfoRow icon={Calendar} label="Date of Birth" value={formatDate(sDetails.date_of_birth || student.date_of_birth)} />
+              <InfoRow icon={ShieldCheck} label="Blood Group" value={sDetails.blood_group} />
+              <InfoRow icon={Mail} label="Email" value={student.email} />
+              <InfoRow icon={Phone} label="Phone" value={student.phone} />
+              <InfoRow icon={MapPin} label="Nationality" value={sDetails.nationality} />
+            </div>
+            <div className="px-4 pb-4">
+              <InfoRow icon={MapPin} label="Present Address" value={sDetails.present_address || student.address} />
+              <InfoRow icon={MapPin} label="Permanent Address" value={sDetails.permanent_address} />
+            </div>
+          </>
+        ) : (
+          <NoDataPlaceholder />
+        )}
       </div>
 
       {/* Academic Info */}
@@ -97,14 +108,20 @@ function OverviewTab({ student, terms }) {
           <GraduationCap size={16} className="text-primary" />
           <h3 className="text-sm font-bold uppercase tracking-wide">Academic Info</h3>
         </div>
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-          <InfoRow icon={BookOpen} label={idLabel[terms?.type] ?? 'Roll Number'} value={rollNo} />
-          <InfoRow icon={BookOpen} label={terms?.class ?? 'Class'} value={className} />
-          <InfoRow icon={BookOpen} label={terms?.section ?? 'Section'} value={section} />
-          <InfoRow icon={Calendar} label="Admission Date" value={formatDate(sDetails.admission_date)} />
-          <InfoRow icon={ShieldCheck} label="Current Status" value={student.is_active ? 'Active' : 'Inactive'} />
-          <InfoRow icon={TrendingUp} label="Previous School" value={sDetails.previous_school} />
-        </div>
+        {[
+          rollNo, className, section, sDetails.admission_date, sDetails.previous_school
+        ].some(v => v && v !== '—') ? (
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+            <InfoRow icon={BookOpen} label={idLabel[terms?.type] ?? 'Roll Number'} value={rollNo} />
+            <InfoRow icon={BookOpen} label={terms?.class ?? 'Class'} value={className} />
+            <InfoRow icon={BookOpen} label={terms?.section ?? 'Section'} value={section} />
+            <InfoRow icon={Calendar} label="Admission Date" value={formatDate(sDetails.admission_date)} />
+            <InfoRow icon={ShieldCheck} label="Current Status" value={student.is_active ? 'Active' : 'Inactive'} />
+            <InfoRow icon={TrendingUp} label="Previous School" value={sDetails.previous_school} />
+          </div>
+        ) : (
+          <NoDataPlaceholder />
+        )}
       </div>
 
       {/* Guardians Table */}
@@ -201,6 +218,16 @@ function OverviewTab({ student, terms }) {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── No Data Component ──────────────────────────────────
+function NoDataPlaceholder({ message = 'Data Not Found' }) {
+  return (
+    <div className="p-8 text-center flex flex-col items-center justify-center gap-2">
+      <AlertCircle size={20} className="text-muted-foreground/30" />
+      <p className="text-xs text-muted-foreground italic font-medium">{message}</p>
     </div>
   );
 }
@@ -511,9 +538,12 @@ export default function StudentDetailPage({ type, id }) {
 
       {/* Profile Header */}
       <div className="flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-sm sm:flex-row sm:items-start">
-        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-2xl font-bold text-primary ring-4 ring-primary/20">
-          {initials(student)}
-        </div>
+        <Avatar className="h-20 w-20 shrink-0 rounded-2xl ring-4 ring-primary/20">
+          <AvatarImage src={student.avatar_url} alt={`${student.first_name} ${student.last_name}`} className="object-cover" />
+          <AvatarFallback className="bg-primary/10 text-2xl font-bold text-primary rounded-2xl">
+            {initials(student)}
+          </AvatarFallback>
+        </Avatar>
         <div className="flex-1 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-bold">{student.first_name} {student.last_name}</h1>
@@ -592,13 +622,13 @@ export default function StudentDetailPage({ type, id }) {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'Overview'    && <OverviewTab    student={student} terms={{ ...terms, type }} />}
-      {activeTab === 'Attendance'  && <AttendanceTab  student={student} />}
-      {activeTab === 'Fees'        && <FeesTab        student={student} />}
-      {activeTab === 'Exams'       && <ExamsTab       student={student} />}
-      {activeTab === 'Documents'   && <DocumentsTab   student={student} />}
-      {activeTab === 'Documents'   && <DocumentsTab   student={student} />}
-      {activeTab === 'Documents'   && <DocumentsTab   student={student} />}
+      <div className="min-h-[300px]">
+        {activeTab === 'Overview'    && <OverviewTab    student={student} terms={{ ...terms, type }} />}
+        {activeTab === 'Attendance'  && <AttendanceTab  student={student} />}
+        {activeTab === 'Fees'        && <FeesTab        student={student} />}
+        {activeTab === 'Exams'       && <ExamsTab       student={student} />}
+        {activeTab === 'Documents'   && <DocumentsTab   student={student} />}
+      </div>
     </div>
   );
 }

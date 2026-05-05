@@ -146,7 +146,9 @@ export default function FeeTemplatesPage({ type }) {
       console.log('📥 Fetching classes for institute:', instituteId(), 'academicYear:', academicYearFilter);
       const response = await classService.getOptions(
         instituteId(),
-        academicYearFilter !== 'all' ? academicYearFilter : undefined
+        (academicYearFilter && academicYearFilter !== 'all' && academicYearFilter !== 'undefined') 
+          ? academicYearFilter 
+          : undefined
       );
       console.log('📥 Classes response:', response);
       return response;
@@ -346,9 +348,9 @@ export default function FeeTemplatesPage({ type }) {
 
   // Sanitize UUIDs (remove 'all' and empty strings)
   const sanitizeUuid = (value) => {
-    if (value === undefined || value === null) return undefined;
+    if (value === null || value === undefined || value === '' || String(value) === 'undefined') return undefined;
     const normalized = String(value).trim();
-    if (!normalized || normalized.toLowerCase() === 'all') return undefined;
+    if (normalized.toLowerCase() === 'all') return undefined;
     return normalized;
   };
 

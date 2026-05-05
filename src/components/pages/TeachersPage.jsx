@@ -23,7 +23,8 @@ import {
   Mail,
   Phone,
   Power,
-  IdCard
+  IdCard,
+  KeyRound
 } from 'lucide-react';
 
 import useAuthStore from '@/store/authStore';
@@ -42,12 +43,13 @@ import PageLoader from '@/components/common/PageLoader';
 import TeacherForm from '@/components/forms/TeacherForm';
 import SelectField from '@/components/common/SelectField';
 import StatusBadge from '@/components/common/StatusBadge';
+import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 
 import { teacherService } from '@/services/teacherService';
@@ -81,6 +83,7 @@ export default function TeachersPage({ type }) {
   });
   const [deleting, setDeleting] = useState(null);
   const [togglingStatus, setTogglingStatus] = useState(null); // ✅ For active/deactivate
+  const [changePasswordUser, setChangePasswordUser] = useState(null);
   const [regeneratingQR, setRegeneratingQR] = useState(null);
 
   // ✅ FILTER FORM with react-hook-form
@@ -262,7 +265,7 @@ export default function TeachersPage({ type }) {
   const columns = useMemo(() => [
     {
       accessorKey: 'name',
-      accessorFn: (row) =>                          // ← add karo
+      accessorFn: (row) =>
         `${row.first_name || ''} ${row.last_name || ''}`.trim(),
       header: 'Name',
       cell: ({ row }) => {
@@ -270,6 +273,7 @@ export default function TeachersPage({ type }) {
         return (
           <div className="flex items-center gap-3">
             <Avatar className="h-8 w-8">
+              <AvatarImage src={teacher.avatar_url} alt={`${teacher.first_name} ${teacher.last_name}`} />
               <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
                 {teacher.first_name?.[0]}{teacher.last_name?.[0]}
               </AvatarFallback>
@@ -289,7 +293,7 @@ export default function TeachersPage({ type }) {
     {
       accessorKey: 'contact',
       header: 'Contact',
-      accessorFn: (row) =>                          // ← add karo
+      accessorFn: (row) =>
         [row.email, row.phone].filter(Boolean).join(' | '),
       cell: ({ row }) => {
         const teacher = row.original;
@@ -307,14 +311,9 @@ export default function TeachersPage({ type }) {
         );
       },
     },
-    // {
-    //   accessorKey: 'department',
-    //   header: 'Department',
-    //   cell: ({ row }) => row.original.details?.teacherDetails?.department || '—',
-    // },
     {
       accessorKey: 'designation',
-      accessorFn: (row) =>                          // ← add karo
+      accessorFn: (row) =>
         row.details?.teacherDetails?.designation || '',
       header: 'Designation',
       cell: ({ row }) => row.original.details?.teacherDetails?.designation || '—',
@@ -339,26 +338,7 @@ export default function TeachersPage({ type }) {
 
         const extraActions = [];
 
-        // if (canDo('teachers.read')) {
-        //   extraActions.push({
-        //     label: 'Generate ID Card',
-        //     icon: <IdCard className="h-4 w-4" />,
-        //     onClick: () => generateAndDownloadIdCard({
-        //       role: 'teacher',
-        //       person: teacher,
-        //       institute: currentInstitute || user?.institute || user?.school || {}
-        //     })
-        //   });
-        // }
-
         if (canUpdate) {
-          // extraActions.push({
-          //   label: 'Regenerate QR Code',
-          //   icon: <QrCode className="h-4 w-4" />,
-          //   onClick: () => handleRegenerateQR(teacher.id)
-          // });
-
-          // ✅ Add toggle status action
           extraActions.push({
             label: teacher.is_active ? 'Deactivate' : 'Activate',
             icon: <Power className="h-4 w-4" />,
@@ -366,6 +346,12 @@ export default function TeachersPage({ type }) {
             variant: teacher.is_active ? 'destructive' : 'default'
           });
         }
+
+        extraActions.push({
+          label: 'Change Password',
+          icon: <KeyRound size={14} />,
+          onClick: () => setChangePasswordUser(teacher)
+        });
 
         return (
           <div className="flex justify-center">
@@ -578,6 +564,14 @@ export default function TeachersPage({ type }) {
         description="Are you sure you want to regenerate the QR code? The old QR code will stop working."
         confirmLabel="Regenerate"
       />
+      {/* Change Password Modal */}
+      {changePasswordUser && (
+        <ChangePasswordModal
+          open={!!changePasswordUser}
+          onClose={() => setChangePasswordUser(null)}
+          user={changePasswordUser}
+        />
+      )}
     </div>
   );
 }
