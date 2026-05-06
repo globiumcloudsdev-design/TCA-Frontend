@@ -1,565 +1,395 @@
-// import { format } from 'date-fns';
-// import { jsPDF } from 'jspdf';
-// import autoTable from 'jspdf-autotable';
-
-// const CURRENCY = 'PKR';
-// const PRIMARY_GREEN = [22, 101, 52];
-
-// const toNumber = (value) => {
-//   if (typeof value === 'number') return value;
-//   if (typeof value === 'string') {
-//     const normalized = Number(value.replace(/,/g, ''));
-//     return Number.isFinite(normalized) ? normalized : 0;
-//   }
-//   return 0;
-// };
-
-// const hasNonZeroAmount = (value) => {
-//   if (value === null || value === undefined || value === '') return false;
-//   if (typeof value === 'string' && value.includes('%')) {
-//     const parsed = Number(value.replace('%', '').trim());
-//     return Number.isFinite(parsed) && parsed !== 0;
-//   }
-//   return toNumber(value) !== 0;
-// };
-
-// const formatAmount = (value) => `${CURRENCY} ${toNumber(value).toLocaleString('en-PK')}`;
-
-// const formatDate = (value) => {
-//   if (!value) return '-';
-//   const date = new Date(value);
-//   if (Number.isNaN(date.getTime())) return '-';
-//   return format(date, 'dd/MM/yyyy');
-// };
-
-// const formatMonth = (voucher) => {
-//   if (voucher?.month_name) return voucher.month_name;
-//   if (voucher?.month && voucher?.year) {
-//     const date = new Date(voucher.year, Math.max(voucher.month - 1, 0), 1);
-//     if (!Number.isNaN(date.getTime())) {
-//       return format(date, 'MMMM');
-//     }
-//   }
-//   if (voucher?.due_date) {
-//     const date = new Date(voucher.due_date);
-//     if (!Number.isNaN(date.getTime())) {
-//       return format(date, 'MMMM');
-//     }
-//   }
-//   return '-';
-// };
-
-// const formatFeeType = (value) => {
-//   const normalized = String(value || '').trim().toLowerCase();
-//   if (!normalized) return 'Fee';
-//   if (normalized === 'fee_template') return 'Fee Template';
-//   return normalized
-//     .replace(/_/g, ' ')
-//     .replace(/\b\w/g, (char) => char.toUpperCase());
-// };
-
-// const renderVoucherPage = (doc, voucher = {}, student = {}, instituteName = 'ABC School', pageIndex = 0) => {
-//   const sectionX = 28;
-//   const sectionWidth = 540;
-//   const sectionHeight = 247;
-//   const sectionGap = 16;
-//   const tableStartX = sectionX + 8;
-//   const copyLabels = ['BANK COPY', 'SCHOOL COPY', 'PARENT COPY'];
-
-//   const generatedOn = formatDate(new Date());
-//   const studentName =
-//     student?.name ||
-//     voucher?.studentName ||
-//     voucher?.student?.name ||
-//     voucher?.student_name ||
-//     '-';
-//   const registrationNo =
-//     student?.registration_no ||
-//     student?.registrationNo ||
-//     voucher?.registrationNo ||
-//     voucher?.student?.registration_no ||
-//     voucher?.registration_no ||
-//     '-';
-//   const dueDate = formatDate(voucher?.due_date || voucher?.dueDate);
-//   const monthName = formatMonth(voucher);
-//   const normalizedStatus = String(voucher?.status || '').toLowerCase() === 'paid' ? 'Paid' : 'Pending';
-//   const feeTypeLabel = formatFeeType(voucher?.fee_type || voucher?.feeType);
-//   const className =
-//     student?.class ||
-//     student?.className ||
-//     voucher?.className ||
-//     voucher?.class_name ||
-//     voucher?.student?.class_name ||
-//     '-';
-//   const sectionName =
-//     student?.section ||
-//     student?.sectionName ||
-//     voucher?.sectionName ||
-//     voucher?.section_name ||
-//     voucher?.student?.section_name ||
-//     '-';
-//   const feeRows = buildFeeRows(voucher);
-
-//   copyLabels.forEach((copyLabel, index) => {
-//     const sectionY = 24 + index * (sectionHeight + sectionGap);
-
-//     if (index > 0 || pageIndex > 0) {
-//       doc.setDrawColor(90, 90, 90);
-//       doc.setLineDashPattern([4, 3], 0);
-//       doc.line(sectionX, sectionY - 8, sectionX + sectionWidth, sectionY - 8);
-//       doc.setLineDashPattern([], 0);
-//     }
-
-//     doc.setDrawColor(160, 160, 160);
-//     doc.rect(sectionX, sectionY, sectionWidth, sectionHeight);
-
-//     doc.setFont('helvetica', 'bold');
-//     doc.setFontSize(9);
-//     doc.text(copyLabel, sectionX + 10, sectionY + 14);
-
-//     doc.setFontSize(11);
-//     doc.text(instituteName, sectionX + sectionWidth / 2, sectionY + 14, { align: 'center' });
-
-//     doc.setFont('helvetica', 'normal');
-//     doc.setFontSize(9);
-//     doc.text(`Generate Date: ${generatedOn}`, sectionX + sectionWidth - 10, sectionY + 14, { align: 'right' });
-
-//     doc.setFont('helvetica', 'bold');
-//     doc.setFontSize(10);
-//     doc.text('Fee Voucher', sectionX + sectionWidth / 2, sectionY + 28, { align: 'center' });
-
-//     autoTable(doc, {
-//       startY: sectionY + 34,
-//       margin: { left: tableStartX, right: 28 },
-//       theme: 'grid',
-// body: [
-//         ['Voucher #', voucher?.voucher_number || voucher?.voucherNumber || '-', 'Due Date', dueDate],
-//         ['Student Name', studentName, 'Reg #', registrationNo],
-//         ['Class / Section', `${className} / ${sectionName}`, 'Issue Date', generatedOn],
-//         ['Month', `${monthName}`, 'Status', normalizedStatus]
-//       ],
-//       styles: {
-//         fontSize: 8,
-//         cellPadding: 2.2,
-//         textColor: [20, 20, 20],
-//         lineColor: [190, 190, 190],
-//         lineWidth: 0.5
-//       },
-//       columnStyles: {
-//         0: { cellWidth: 68, fontStyle: 'bold' },
-//         1: { cellWidth: 192 },
-//         2: { cellWidth: 60, fontStyle: 'bold' },
-//         3: { cellWidth: 180 }
-//       }
-//     });
-
-//     autoTable(doc, {
-//       startY: doc.lastAutoTable.finalY + 4,
-//       margin: { left: tableStartX, right: 28 },
-//       styles: {
-//         fontSize: 8,
-//         cellPadding: 2.2,
-//         textColor: [20, 20, 20],
-//         lineColor: [190, 190, 190],
-//         lineWidth: 0.5
-//       },
-//       headStyles: {
-//         fillColor: PRIMARY_GREEN,
-//         textColor: [255, 255, 255],
-//         fontStyle: 'bold'
-//       },
-//       columnStyles: {
-//         0: { cellWidth: 340 },
-//         1: { cellWidth: 160, halign: 'right' }
-//       },
-//       head: [['Fee Type', 'Amount']],
-//       body: feeRows
-//     });
-
-//     doc.setFont('helvetica', 'bold');
-//     doc.setFontSize(7);
-//     doc.text('Late fee policy applies after due date.', tableStartX, sectionY + sectionHeight - 8);
-//     doc.text('Authorized Signature: ____________________', sectionX + sectionWidth - 10, sectionY + sectionHeight - 8, { align: 'right' });
-//   });
-// };
-
-// const buildFeeRows = (voucher = {}) => {
-//   const breakdownSource = voucher?.fee_breakdown ?? voucher?.feeBreakdown;
-
-//   const objectBreakdown = breakdownSource && !Array.isArray(breakdownSource)
-//     ? Object.entries(breakdownSource).map(([label, amount]) => ({
-//       label: String(label)
-//         .replace(/_/g, ' ')
-//         .replace(/\b\w/g, (char) => char.toUpperCase()),
-//       amount
-//     }))
-//     : [];
-
-//   const arrayBreakdown = Array.isArray(breakdownSource)
-//     ? breakdownSource.map((item) => ({
-//       label: item?.feeType || item?.label || item?.title || item?.type || 'Fee Item',
-//       amount: item?.amount ?? item?.value ?? 0
-//     }))
-//     : [];
-
-//   const primaryFeeLabel = formatFeeType(voucher?.fee_type || voucher?.feeType);
-
-//   const knownRows = [
-//     { label: primaryFeeLabel, amount: voucher.net_amount ?? voucher.netAmount ?? voucher.amount },
-//     { label: 'Concession Percentage', amount: voucher.concession_percentage ? `${voucher.concession_percentage}%` : null },
-//     { label: 'Discount', amount: voucher.discount },
-//     { label: 'Total Amount', amount: voucher.amount ?? voucher.total_amount },
-//     { label: 'Remaining Amount', amount: voucher.remaining_amount ?? voucher.balance_due ?? voucher.net_amount }
-//   ].filter((row) => hasNonZeroAmount(row.amount));
-
-//   const merged = [...arrayBreakdown, ...objectBreakdown, ...knownRows].filter((row) => hasNonZeroAmount(row.amount));
-
-//   if (!merged.length && hasNonZeroAmount(voucher.net_amount ?? voucher.netAmount ?? voucher.amount)) {
-//     merged.push({ label: primaryFeeLabel, amount: voucher.net_amount ?? voucher.netAmount ?? voucher.amount });
-//   }
-
-//   const rows = merged.map((row) => [
-//     row.label,
-//     typeof row.amount === 'string' && row.amount.includes('%') ? row.amount : formatAmount(row.amount)
-//   ]);
-
-//   return rows.length ? rows : [['No fee lines', '-']];
-// };
-
-// export const generateFeeVoucherPdfBlob = ({ voucher = {}, student = {}, instituteName = 'ABC School' }) => {
-//   const doc = new jsPDF('p', 'pt', 'a4');
-
-//   renderVoucherPage(doc, voucher, student, instituteName, 0);
-
-//   return doc.output('blob');
-// };
-
-// export const generateBulkFeeVouchersPdfBlob = ({ vouchers = [], studentsByVoucherId = {}, instituteName = 'ABC School' }) => {
-//   const doc = new jsPDF('p', 'pt', 'a4');
-
-//   vouchers.forEach((voucher, index) => {
-//     if (index > 0) {
-//       doc.addPage();
-//     }
-
-//     renderVoucherPage(
-//       doc,
-//       voucher,
-//       studentsByVoucherId[voucher?.id] || studentsByVoucherId[voucher?.voucherNumber] || studentsByVoucherId[voucher?.voucher_number] || {},
-//       instituteName,
-//       index
-//     );
-//   });
-
-//   return doc.output('blob');
-// };
-
-
-
-
 import { format } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-const CURRENCY = 'PKR';
-const PRIMARY_GREEN = [22, 101, 52];
+// --------------------------------------------------------------------------------
+// UTILS
+// --------------------------------------------------------------------------------
 
-const toNumber = (value) => {
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') {
-    const normalized = Number(value.replace(/,/g, ''));
-    return Number.isFinite(normalized) ? normalized : 0;
+const formatDate = (date) => {
+  if (!date) return 'N/A';
+  try {
+    return format(new Date(date), 'dd MMM yyyy');
+  } catch (err) {
+    return 'N/A';
   }
-  return 0;
-};
-
-const hasNonZeroAmount = (value) => {
-  if (value === null || value === undefined || value === '') return false;
-  if (typeof value === 'string' && value.includes('%')) {
-    const parsed = Number(value.replace('%', '').trim());
-    return Number.isFinite(parsed) && parsed !== 0;
-  }
-  return toNumber(value) !== 0;
-};
-
-const formatAmount = (value) => `${CURRENCY} ${toNumber(value).toLocaleString('en-PK')}`;
-
-const formatDate = (value) => {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return format(date, 'dd/MM/yyyy');
 };
 
 const formatMonth = (voucher) => {
-  if (voucher?.month_name) return voucher.month_name;
-  if (voucher?.month && voucher?.year) {
-    const date = new Date(voucher.year, Math.max(voucher.month - 1, 0), 1);
-    if (!Number.isNaN(date.getTime())) {
-      return format(date, 'MMMM');
-    }
-  }
-  if (voucher?.due_date) {
-    const date = new Date(voucher.due_date);
-    if (!Number.isNaN(date.getTime())) {
-      return format(date, 'MMMM');
-    }
-  }
-  return '-';
+  if (!voucher) return 'N/A';
+  const month = voucher.month;
+  const year = voucher.year;
+  if (!month) return 'N/A';
+  
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  return `${monthNames[month - 1]} ${year || ''}`.trim();
 };
 
-const formatFeeType = (value) => {
-  const normalized = String(value || '').trim().toLowerCase();
-  if (!normalized) return 'Fee';
-  if (normalized === 'fee_template') return 'Fee Template';
-  return normalized
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+const formatFeeType = (type) => {
+  if (!type) return 'MONTHLY';
+  return String(type).toUpperCase();
 };
 
-const buildFeeRows = (voucher = {}) => {
-  const breakdownSource = voucher?.fee_breakdown ?? voucher?.feeBreakdown;
-
-  const objectBreakdown = breakdownSource && !Array.isArray(breakdownSource)
-    ? Object.entries(breakdownSource)
-        .filter(([_, amount]) => hasNonZeroAmount(amount))
-        .map(([label, amount]) => ({
-          label: String(label)
-            .replace(/_/g, ' ')
-            .replace(/\b\w/g, (char) => char.toUpperCase()),
-          amount
-        }))
-    : [];
-
-  const arrayBreakdown = Array.isArray(breakdownSource)
-    ? breakdownSource
-        .filter((item) => hasNonZeroAmount(item?.amount ?? item?.value ?? 0))
-        .map((item) => ({
-          label: item?.feeType || item?.label || item?.title || item?.type || 'Fee Item',
-          amount: item?.amount ?? item?.value ?? 0
-        }))
-    : [];
-
-  const primaryFeeLabel = formatFeeType(voucher?.fee_type || voucher?.feeType);
-  
-  // Get net amount from various possible fields
-  const netAmount = voucher.net_amount ?? voucher.netAmount ?? voucher.amount ?? 0;
-  
-  const knownRows = [
-    { label: primaryFeeLabel, amount: netAmount },
-    { label: 'Discount', amount: voucher.discount },
-    { label: 'Total Amount', amount: voucher.amount ?? voucher.total_amount },
-    { label: 'Remaining Amount', amount: voucher.remaining_amount ?? voucher.balance_due }
-  ].filter((row) => hasNonZeroAmount(row.amount));
-
-  // Merge all fee rows, removing duplicates by label
-  const mergedMap = new Map();
-  
-  [...arrayBreakdown, ...objectBreakdown, ...knownRows].forEach((row) => {
-    const key = row.label.toLowerCase().trim();
-    if (!mergedMap.has(key) && hasNonZeroAmount(row.amount)) {
-      mergedMap.set(key, row);
-    }
-  });
-  
-  const merged = Array.from(mergedMap.values());
-
-  if (!merged.length && hasNonZeroAmount(netAmount)) {
-    merged.push({ label: primaryFeeLabel, amount: netAmount });
-  }
-
-  const rows = merged.map((row) => {
-    const isPercentage = row.label.toLowerCase().includes('percentage');
-    const discountType = breakdownSource?.discount_type;
-    const isConcessionField = row.label.toLowerCase().includes('concession') || row.label.toLowerCase().includes('discount');
-    
-    return [
-      row.label,
-      (isPercentage || (isConcessionField && discountType === 'percentage')) 
-        ? `${row.amount}%` 
-        : (typeof row.amount === 'string' && row.amount.includes('%') ? row.amount : formatAmount(row.amount))
-    ];
-  });
-
-  return rows.length ? rows : [['No fee lines', '-']];
-};
-
-const renderVoucherPage = (doc, voucher = {}, student = {}, instituteName = 'ABC School', pageIndex = 0) => {
-  const sectionX = 28;
-  const sectionWidth = 540;
-  const sectionHeight = 247;
-  const sectionGap = 16;
-  const tableStartX = sectionX + 8;
-  const copyLabels = ['BANK COPY', 'SCHOOL COPY', 'PARENT COPY'];
-
-  const generatedOn = formatDate(new Date());
-  
-  // Enhanced student name extraction with multiple fallbacks
-  const studentName = 
-    student?.name ||
-    student?.full_name ||
-    voucher?.studentName ||
-    voucher?.student?.name ||
-    voucher?.student_name ||
-    voucher?.student?.full_name ||
-    'Student Name Not Found';
-    
-  // Enhanced registration number extraction
-  const registrationNo =
-    student?.registration_no ||
-    student?.registrationNo ||
-    voucher?.registrationNo ||
-    voucher?.student?.registration_no ||
-    voucher?.registration_no ||
-    'N/A';
-    
-  const dueDate = formatDate(voucher?.due_date || voucher?.dueDate);
-  const monthName = formatMonth(voucher);
-  const normalizedStatus = String(voucher?.status || '').toLowerCase() === 'paid' ? 'Paid' : 'Pending';
-  const feeTypeLabel = formatFeeType(voucher?.fee_type || voucher?.feeType);
-  
-// ENHANCED: Better class/section extraction with enrollment context
+/**
+ * Robust extraction of class and section names with multiple fallbacks
+ */
+const extractStudentMeta = (voucher, student) => {
+  // Try to find class name
   let className = 
     voucher?.class_name ||
     voucher?.className ||
-    student?.class ||
-    student?.className ||
     student?.class_name ||
+    student?.className ||
+    student?.details?.studentDetails?.class_name ||
+    student?.details?.class_name ||
+    student?.class ||
     voucher?.student?.class_name ||
     voucher?.student?.className ||
+    voucher?.student?.Class?.name ||
+    student?.Class?.name ||
     'N/A';
-    
+
+  // Try to find section name
   let sectionName =
     voucher?.section_name ||
     voucher?.sectionName ||
-    student?.section ||
-    student?.sectionName ||
     student?.section_name ||
+    student?.sectionName ||
+    student?.details?.studentDetails?.section_name ||
+    student?.details?.section_name ||
+    student?.section ||
     voucher?.student?.section_name ||
     voucher?.student?.sectionName ||
+    voucher?.student?.Section?.name ||
+    student?.Section?.name ||
     'N/A';
-    
-  // PDF-specific fallback: Clean N/A-like values
-  className = className && className.toLowerCase() !== 'n/a' && className.trim() !== '' ? className.trim() : 'N/A';
-  sectionName = sectionName && sectionName.toLowerCase() !== 'n/a' && sectionName.trim() !== '' ? sectionName.trim() : 'N/A';
-    
-  // Clean up the values
-  className = String(className).replace(/^Class\s+Class\s+/i, 'Class ').trim();
-  sectionName = String(sectionName).trim();
-  
-  // Ensure we don't have empty strings
-  if (!className || className === '' || className === 'undefined') className = 'N/A';
-  if (!sectionName || sectionName === '' || sectionName === 'undefined') sectionName = 'N/A';
 
-  const feeRows = buildFeeRows(voucher);
+  // Clean N/A and undefined strings
+  const clean = (val) => {
+    if (!val) return 'N/A';
+    const s = String(val).trim();
+    if (s.toLowerCase() === 'n/a' || s.toLowerCase() === 'undefined' || s === '') return 'N/A';
+    return s;
+  };
 
-  copyLabels.forEach((copyLabel, index) => {
-    const sectionY = 24 + index * (sectionHeight + sectionGap);
+  return {
+    className: clean(className),
+    sectionName: clean(sectionName)
+  };
+};
 
-    if (index > 0 || pageIndex > 0) {
-      doc.setDrawColor(90, 90, 90);
-      doc.setLineDashPattern([4, 3], 0);
-      doc.line(sectionX, sectionY - 8, sectionX + sectionWidth, sectionY - 8);
-      doc.setLineDashPattern([], 0);
-    }
+// --------------------------------------------------------------------------------
+// IMAGE LOADING
+// --------------------------------------------------------------------------------
 
-    doc.setDrawColor(160, 160, 160);
-    doc.rect(sectionX, sectionY, sectionWidth, sectionHeight);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text(copyLabel, sectionX + 10, sectionY + 14);
-
-    doc.setFontSize(11);
-    doc.text(instituteName, sectionX + sectionWidth / 2, sectionY + 14, { align: 'center' });
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    // doc.text(`Generate Date: ${generatedOn}`, sectionX + sectionWidth - 10, sectionY + 14, { align: 'right' });
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.text('Fee Voucher', sectionX + sectionWidth / 2, sectionY + 28, { align: 'center' });
-
-    autoTable(doc, {
-      startY: sectionY + 34,
-      margin: { left: tableStartX, right: 28 },
-      theme: 'grid',
-      body: [
-        ['Voucher #', voucher?.voucher_number || voucher?.voucherNumber || '-', 'Due Date', dueDate],
-        ['Student Name', studentName, 'Reg #', registrationNo],
-        ['Class / Section', `${className} / ${sectionName}`, 'Issue Date', generatedOn],
-        ['Month', `${monthName}`, 'Status', normalizedStatus]
-      ],
-      styles: {
-        fontSize: 8,
-        cellPadding: 2.2,
-        textColor: [20, 20, 20],
-        lineColor: [190, 190, 190],
-        lineWidth: 0.5
-      },
-      columnStyles: {
-        0: { cellWidth: 68, fontStyle: 'bold' },
-        1: { cellWidth: 192 },
-        2: { cellWidth: 60, fontStyle: 'bold' },
-        3: { cellWidth: 180 }
-      }
-    });
-
-    autoTable(doc, {
-      startY: doc.lastAutoTable.finalY + 4,
-      margin: { left: tableStartX, right: 28 },
-      styles: {
-        fontSize: 8,
-        cellPadding: 2.2,
-        textColor: [20, 20, 20],
-        lineColor: [190, 190, 190],
-        lineWidth: 0.5
-      },
-      headStyles: {
-        fillColor: PRIMARY_GREEN,
-        textColor: [255, 255, 255],
-        fontStyle: 'bold'
-      },
-      columnStyles: {
-        0: { cellWidth: 340 },
-        1: { cellWidth: 160, halign: 'right' }
-      },
-      head: [['Fee Type', 'Amount']],
-      body: feeRows
-    });
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.text('Late fee policy applies after due date.', tableStartX, sectionY + sectionHeight - 8);
-    doc.text('Authorized Signature: ____________________', sectionX + sectionWidth - 10, sectionY + sectionHeight - 8, { align: 'right' });
+const loadLogo = async (url) => {
+  if (!url) return null;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
   });
 };
 
-export const generateFeeVoucherPdfBlob = ({ voucher = {}, student = {}, instituteName = 'ABC School' }) => {
-  const doc = new jsPDF('p', 'pt', 'a4');
+// --------------------------------------------------------------------------------
+// RENDERERS
+// --------------------------------------------------------------------------------
 
-  renderVoucherPage(doc, voucher, student, instituteName, 0);
+const buildFeeRows = (voucher) => {
+  const feeType = formatFeeType(voucher?.fee_type || voucher?.feeType);
+  const netAmount = Number(voucher?.net_amount || voucher?.netAmount || voucher?.amount || 0);
+  const rows = [];
+
+  // User requested ONLY the Fee Type in the description and the Net Amount
+  // No breakdown for Admission, Lab, etc. in the description list
+  rows.push([feeType, netAmount.toFixed(2)]);
+
+  return rows;
+};
+
+const renderVoucherPage = (doc, { voucher, student, instituteName, logoImg }) => {
+  const sectionWidth = 190;
+  const sectionX = 10;
+  const sectionHeight = 90; 
+  const sectionGap = 3;
+  const copyLabels = ['BANK COPY', 'SCHOOL COPY', 'PARENT COPY'];
+
+  const { className, sectionName } = extractStudentMeta(voucher, student);
+  const studentName = voucher?.studentName || student?.name || student?.full_name || (student?.first_name ? `${student.first_name} ${student.last_name || ''}`.trim() : 'Student');
+  const registrationNo = voucher?.registration_no || voucher?.registrationNo || student?.registration_no || 'N/A';
+  const dueDate = formatDate(voucher?.due_date || voucher?.dueDate);
+  const monthName = formatMonth(voucher);
+  const voucherNo = voucher?.voucherNumber || voucher?.voucher_number || 'N/A';
+
+  copyLabels.forEach((copyLabel, index) => {
+    const sectionY = 8 + index * (sectionHeight + sectionGap);
+    
+    // Border Box
+    doc.setDrawColor(200);
+    doc.setLineWidth(0.1);
+    doc.rect(sectionX, sectionY, sectionWidth, sectionHeight);
+
+    // Vertical Divider for Logo section
+    doc.line(sectionX + 45, sectionY, sectionX + 45, sectionY + 18);
+
+    // Header Area
+    if (logoImg) {
+      try { doc.addImage(logoImg, 'PNG', sectionX + 2, sectionY + 2, 12, 12); } catch (e) {}
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(40);
+    doc.text(instituteName, sectionX + 16, sectionY + 8);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.text(copyLabel, sectionX + 16, sectionY + 12);
+
+    // Voucher Stats Row (Inside Header Area)
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Voucher #:', sectionX + 48, sectionY + 6);
+    doc.text('Month:', sectionX + 48, sectionY + 11);
+    doc.text('Due Date:', sectionX + 48, sectionY + 16);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(String(voucherNo), sectionX + 65, sectionY + 6);
+    doc.text(String(monthName), sectionX + 65, sectionY + 11);
+    doc.setTextColor(200, 0, 0);
+    doc.text(String(dueDate), sectionX + 65, sectionY + 16);
+    doc.setTextColor(0);
+
+    // Horizontal Divider
+    doc.line(sectionX, sectionY + 18, sectionX + sectionWidth, sectionY + 18);
+
+    // Student Info Grid
+    doc.setFillColor(252);
+    doc.rect(sectionX + 0.1, sectionY + 18.1, sectionWidth - 0.2, 12, 'F');
+    
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Student Name:', sectionX + 5, sectionY + 24);
+    doc.text('Registration #:', sectionX + 5, sectionY + 28);
+    doc.text('Class / Section:', sectionX + 100, sectionY + 24);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(String(studentName), sectionX + 30, sectionY + 24);
+    doc.text(String(registrationNo), sectionX + 30, sectionY + 28);
+    doc.text(`${className} - ${sectionName}`, sectionX + 125, sectionY + 24);
+
+    // Fee Table
+    const feeRows = buildFeeRows(voucher);
+    autoTable(doc, {
+      startY: sectionY + 31,
+      margin: { left: sectionX + 2, right: sectionX + 2 },
+      tableWidth: 120,
+      head: [['Description', 'Amount (PKR)']],
+      body: feeRows,
+      theme: 'grid',
+      styles: { fontSize: 7, cellPadding: 1 },
+      headStyles: { fillColor: [60, 60, 60], textColor: 255 },
+      columnStyles: { 1: { halign: 'right' } }
+    });
+
+    // Total and Signature area on the right
+    const rightSideX = sectionX + 128;
+    const rightSideY = sectionY + 40;
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOTAL PAYABLE', rightSideX, rightSideY);
+    
+    doc.setFontSize(12);
+    const netAmount = Number(voucher?.netAmount || voucher?.amount || 0);
+    doc.text(`${netAmount.toFixed(2)}`, rightSideX, rightSideY + 7);
+    
+    doc.setDrawColor(180);
+    doc.line(rightSideX, rightSideY + 9, rightSideX + 55, rightSideY + 9);
+
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Bank Stamp / Auth. Signature', rightSideX, sectionY + sectionHeight - 6);
+
+    // Footer Note
+    doc.setFontSize(6);
+    doc.text('* Late fee may apply after due date.', sectionX + 5, sectionY + sectionHeight - 3);
+
+    // Divider for cutting
+    if (index < 2) {
+      doc.setDrawColor(150);
+      doc.setLineDash([1, 1], 0);
+      doc.line(0, sectionY + sectionHeight + (sectionGap / 2), 210, sectionY + sectionHeight + (sectionGap / 2));
+      doc.setLineDash([], 0);
+    }
+  });
+};
+
+// --------------------------------------------------------------------------------
+// EXPORTS
+// --------------------------------------------------------------------------------
+
+export const generateBulkFeeVouchersPdfBlob = async ({ vouchers = [], instituteName = 'School System', logoUrl = null }) => {
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const logoImg = await loadLogo(logoUrl);
+
+  for (let i = 0; i < vouchers.length; i++) {
+    if (i > 0) doc.addPage();
+    renderVoucherPage(doc, { 
+      voucher: vouchers[i], 
+      student: vouchers[i].student || {}, 
+      instituteName,
+      logoImg
+    });
+  }
 
   return doc.output('blob');
 };
 
-export const generateBulkFeeVouchersPdfBlob = ({ vouchers = [], studentsByVoucherId = {}, instituteName = 'ABC School' }) => {
-  const doc = new jsPDF('p', 'pt', 'a4');
+export const generateFeeVoucherPdfBlob = async ({ voucher, student, instituteName = 'School System', logoUrl = null }) => {
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const logoImg = await loadLogo(logoUrl);
+  
+  renderVoucherPage(doc, { voucher, student, instituteName, logoImg });
+  return doc.output('blob');
+};
 
-  vouchers.forEach((voucher, index) => {
-    if (index > 0) {
-      doc.addPage();
-    }
+export const generateFeeReceiptPdfBlob = async ({ payment = {}, voucher = {}, student = {}, instituteName = 'School System', logoUrl = null }) => {
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const logoImg = await loadLogo(logoUrl);
+  
+  const { className, sectionName } = extractStudentMeta(voucher, student);
+  const studentName = voucher?.studentName || student?.name || student?.full_name || (student?.first_name ? `${student.first_name} ${student.last_name || ''}`.trim() : 'Student');
+  const registrationNo = voucher?.registrationNo || student?.registration_no || 'N/A';
 
-    renderVoucherPage(
-      doc,
-      voucher,
-      studentsByVoucherId[voucher?.id] || studentsByVoucherId[voucher?.voucherNumber] || studentsByVoucherId[voucher?.voucher_number] || {},
-      instituteName,
-      index
-    );
+  // Header Box
+  doc.setFillColor(60, 60, 60);
+  doc.rect(0, 0, 210, 40, 'F');
+  
+  if (logoImg) {
+    doc.addImage(logoImg, 'PNG', 15, 7, 25, 25);
+  }
+
+  doc.setTextColor(255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(22);
+  doc.text(instituteName, logoImg ? 45 : 15, 22);
+  doc.setFontSize(12);
+  doc.text('FEE PAYMENT RECEIPT', logoImg ? 45 : 15, 32);
+
+  doc.setTextColor(0);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+
+  // Receipt Details Info
+  let currentY = 55;
+  
+  // Left Column
+  doc.setFont('helvetica', 'bold');
+  doc.text('Receipt No:', 15, currentY);
+  doc.setFont('helvetica', 'normal');
+  doc.text(payment.receipt_number || payment.id || 'N/A', 45, currentY);
+  
+  doc.setFont('helvetica', 'bold');
+  doc.text('Date:', 15, currentY + 8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(formatDate(payment.payment_date || new Date()), 45, currentY + 8);
+
+  // Right Column
+  doc.setFont('helvetica', 'bold');
+  doc.text('Voucher No:', 130, currentY);
+  doc.setFont('helvetica', 'normal');
+  doc.text(voucher.voucherNumber || voucher.voucher_no || 'N/A', 160, currentY);
+
+  currentY += 25;
+
+  // Student Section
+  doc.setFillColor(245);
+  doc.rect(15, currentY - 5, 180, 25, 'F');
+  
+  doc.setFont('helvetica', 'bold');
+  doc.text('Student:', 20, currentY + 2);
+  doc.setFont('helvetica', 'normal');
+  doc.text(studentName, 45, currentY + 2);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Reg No:', 20, currentY + 10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(registrationNo, 45, currentY + 10);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Class:', 120, currentY + 2);
+  doc.setFont('helvetica', 'normal');
+  doc.text(className, 140, currentY + 2);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Section:', 120, currentY + 10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(sectionName, 140, currentY + 10);
+
+  currentY += 35;
+
+  // Payment Table
+  autoTable(doc, {
+    startY: currentY,
+    margin: { left: 15, right: 15 },
+    head: [['Description', 'Payment Method', 'Amount Paid']],
+    body: [
+      [
+        `Fee Payment for ${formatMonth(voucher)}`,
+        payment.payment_method?.toUpperCase() || 'CASH',
+        `PKR ${Number(payment.amount_paid || 0).toFixed(2)}`
+      ]
+    ],
+    theme: 'striped',
+    headStyles: { fillColor: [60, 60, 60], textColor: 255 },
+    columnStyles: { 2: { halign: 'right' } }
   });
+
+  currentY = doc.lastAutoTable.finalY + 15;
+
+  // Totals Summary
+  const netAmount = Number(voucher.net_amount || voucher.netAmount || voucher.amount || 0);
+  const currentPaid = Number(payment.amount_paid || 0);
+  const totalPaidSoFar = Number(voucher.paid_amount || 0);
+  const remainingBalance = Number(voucher.pending_amount || 0);
+  
+  doc.setFont('helvetica', 'bold');
+  doc.text('Financial Summary:', 130, currentY);
+  doc.line(130, currentY + 2, 195, currentY + 2);
+  
+  doc.setFont('helvetica', 'normal');
+  doc.text('Voucher Total:', 130, currentY + 10);
+  doc.text(`PKR ${netAmount.toFixed(2)}`, 195, currentY + 10, { align: 'right' });
+  
+  doc.text('Current Payment:', 130, currentY + 18);
+  doc.text(`PKR ${currentPaid.toFixed(2)}`, 195, currentY + 18, { align: 'right' });
+  
+  doc.text('Total Paid:', 130, currentY + 26);
+  doc.text(`PKR ${totalPaidSoFar.toFixed(2)}`, 195, currentY + 26, { align: 'right' });
+  
+  doc.setFont('helvetica', 'bold');
+  if (remainingBalance > 0) {
+    doc.setTextColor(200, 0, 0);
+  } else {
+    doc.setTextColor(0, 150, 0);
+  }
+  doc.text('Balance Due:', 130, currentY + 34);
+  doc.text(`PKR ${remainingBalance.toFixed(2)}`, 195, currentY + 34, { align: 'right' });
+  doc.setTextColor(0);
+
+  // Signatures
+  currentY += 60;
+  doc.setFont('helvetica', 'normal');
+  doc.line(15, currentY, 75, currentY);
+  doc.text('Student/Parent Signature', 15, currentY + 5);
+
+  doc.line(135, currentY, 195, currentY);
+  doc.text('Authorized Signature', 135, currentY + 5);
 
   return doc.output('blob');
 };

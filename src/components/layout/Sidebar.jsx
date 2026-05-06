@@ -18,6 +18,7 @@ import {
 import { SCHOOL_NAV } from '@/constants';
 import useAuthStore from '@/store/authStore';
 import useUiStore from '@/store/uiStore';
+import useInstituteStore from '@/store/instituteStore';
 import { cn } from '@/lib/utils';
 
 const ICON_MAP = {
@@ -34,6 +35,7 @@ export default function Sidebar() {
   const roleCode      = useAuthStore((s) => s.user?.role_code);
   const sidebarOpen   = useUiStore((s) => s.sidebarOpen);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
+  const currentInstitute = useInstituteStore((s) => s.currentInstitute);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
@@ -76,10 +78,23 @@ export default function Sidebar() {
       >
         {/* Logo + Close button (mobile only) */}
         <div className="flex h-16 items-center justify-between border-b border-white/10 px-5">
-          <span className="text-lg font-bold">☁ Clouds Academy</span>
+          <div className="flex items-center gap-2 overflow-hidden">
+            {currentInstitute?.logo_url ? (
+              <img 
+                src={currentInstitute.logo_url} 
+                alt="Logo" 
+                className="h-8 w-8 rounded-full object-cover shrink-0 border border-white/20" 
+              />
+            ) : (
+              <span className="text-xl shrink-0">☁</span>
+            )}
+            <span className="truncate text-sm font-bold leading-tight">
+              {currentInstitute?.name || 'Clouds Academy'}
+            </span>
+          </div>
           <button
             onClick={toggleSidebar}
-            className="rounded-md p-1.5 text-white/70 hover:bg-white/10 hover:text-white md:hidden"
+            className="rounded-md p-1.5 text-white/70 hover:bg-white/10 hover:text-white md:hidden shrink-0"
             aria-label="Close sidebar"
           >
             <X size={18} />

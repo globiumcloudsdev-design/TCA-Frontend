@@ -1,8 +1,5 @@
 
 
-/**
- * FeesPage — Student fee records with payment status + Bulk Voucher Generation
- */
 'use client';
 /**
  * FeesPage — Fee Vouchers (Single + Bulk Generation)
@@ -28,7 +25,7 @@ import StatsCard from '@/components/common/StatsCard';
 import BulkVoucherGenerator from '@/components/forms/BulkVoucherGenerator';
 import { cn } from '@/lib/utils';
 import { downloadBlob } from '@/lib/download';
-import { generateBulkFeeVouchersPdfBlob, generateFeeVoucherPdfBlob } from '@/lib/pdf/feeVoucherPdf';
+import { generateBulkFeeVouchersPdfBlob, generateFeeVoucherPdfBlob, generateFeeReceiptPdfBlob } from '@/lib/pdf/feeVoucherPdf';
 import { feeVoucherService, academicYearService, classService, sectionService, studentService } from '@/services';
 import { Check, ChevronDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -165,6 +162,7 @@ export default function FeesPage() {
   const [voucherMonth, setVoucherMonth] = useState(currentMonth);
   const [voucherAcademicYearId, setVoucherAcademicYearId] = useState('');
   const [voucherStatus, setVoucherStatus] = useState('');
+  const [voucherSearch, setVoucherSearch] = useState('');
   const [viewingVoucher, setViewingVoucher] = useState(null);
 const [bulkFilters, setBulkFilters] = useState({
     academicYearId: '',
@@ -339,6 +337,11 @@ const { data: bulkClasses = [] } = useQuery({
     }));
   }, [bulkDownloadMode]);
 
+  // Reset pagination when filters change
+  useEffect(() => {
+    setVoucherPage(1);
+  }, [voucherMonth, voucherAcademicYearId, voucherStatus, voucherSearch, voucherPageSize]);
+
   const modalClassOptions = useMemo(() => {
     if (bulkDownloadMode === 'institute') {
       return [{ value: '__all__', label: 'All Classes' }, ...bulkClassOptions];
@@ -404,7 +407,7 @@ const { data: bulkClasses = [] } = useQuery({
     isLoading: vouchersLoading,
     refetch: refetchVouchers,
   } = useQuery({
-    queryKey: ['fee-vouchers', currentInstitute?.id, voucherMonth, voucherAcademicYearId, voucherStatus, voucherPage, voucherPageSize],
+    queryKey: ['fee-vouchers', currentInstitute?.id, voucherMonth, voucherAcademicYearId, voucherStatus, voucherPage, voucherPageSize, voucherSearch],
     queryFn: async () => {
       // Check permission before making request - USING CORRECT PERMISSION
       if (!hasPermission('fees.read')) {
@@ -417,6 +420,7 @@ const { data: bulkClasses = [] } = useQuery({
         month: voucherMonth ? parseInt(voucherMonth) : undefined,
         academic_year_id: voucherAcademicYearId || undefined,
         status: voucherStatus || undefined,
+        search: voucherSearch || undefined,
       };
       try {
         const response = await feeVoucherService.getAll(filters, { page: voucherPage, limit: voucherPageSize });
@@ -856,9 +860,10 @@ const handleBulkDownload = async () => {
       return sortLabel(left.studentName).localeCompare(sortLabel(right.studentName));
     });
 
-    const blob = generateBulkFeeVouchersPdfBlob({
+    const blob = await generateBulkFeeVouchersPdfBlob({
       vouchers: vouchersForPdfSorted,
       instituteName: currentInstitute?.name || 'School Management System',
+      logoUrl: currentInstitute?.logo_url
     });
 
     const safeName = `class-fee-vouchers-${selectedClassLabel}-${selectedSectionLabel}-${bulkFilters.month || 'all'}-${enrolledStudentIds.length}students`
@@ -904,13 +909,16 @@ const handleDownloadVoucher = async (voucher) => {
     let sectionName = '';
     
     // METHOD 1: Try to get from student record with full details
-    if (voucher.studentId) {
+    const targetStudentId = voucher.studentId || voucher.student_id || voucher.Student?.id;
+    if (targetStudentId) {
       try {
         // Fetch student with all relations
-        const studentResponse = await studentService.getById(voucher.studentId, { params: { institute_type: currentInstitute?.type, include: 'class,section' } });
+        const studentResponse = await studentService.getById(targetStudentId, { 
+          params: { institute_type: currentInstitute?.type, include: 'class,section' } 
+        });
         const student = studentResponse?.data || studentResponse;
         
-        console.log('📚 Student data received:', student);
+        console.log('📚 Student data received for PDF:', student);
         
         // Extract class name - try all possible paths
         className = 
@@ -941,55 +949,24 @@ const handleDownloadVoucher = async (voucher) => {
       }
     }
     
-    // METHOD 2: If no class found, try direct class fetch from voucher's classId
-    if ((!className || className === '') && voucher.classId) {
-      try {
-        const classResponse = await classService.getById(voucher.classId, { params: { institute_type: currentInstitute?.type } });
-        const classData = classResponse?.data || classResponse;
-        className = classData.name || classData.class_name || '';
-        console.log(`📚 Direct class fetch: "${className}"`);
-      } catch (classErr) {
-        console.error('Failed to fetch class:', classErr);
-      }
+    // Use centralized mapping for consistency
+    const { classNameById, sectionNameById } = buildClassSectionMaps();
+    
+    // Final check for class
+    const cid = voucher.classId || voucher.class_id;
+    if (cid && (!className || className === '')) {
+      className = classNameById.get(String(cid)) || normalizeDisplayValue(voucher.className || voucher.class_name);
     }
     
-    // METHOD 3: Try from voucher's own data
-    if ((!className || className === '') && (voucher.className || voucher.class_name)) {
-      className = voucher.className || voucher.class_name;
-      console.log(`📚 From voucher data: "${className}"`);
+    // Final check for section
+    const sid = voucher.sectionId || voucher.section_id;
+    if (sid && (!sectionName || sectionName === '')) {
+      sectionName = sectionNameById.get(String(sid)) || normalizeDisplayValue(voucher.sectionName || voucher.section_name);
     }
     
-    // METHOD 4: Ultimate fallback
-    if (!className || className === '') {
-      className = 'Class Not Specified';
-    }
-    
-    // Similar for section
-    if ((!sectionName || sectionName === '') && voucher.sectionId) {
-      try {
-        // Try to fetch via student with include
-        if (voucher.studentId) {
-          const studentWithDetails = await studentService.getById(voucher.studentId, {
-            params: { institute_type: currentInstitute?.type, include: ['class','section'] }
-          });
-          const detailedStudent = studentWithDetails?.data || studentWithDetails;
-          sectionName = detailedStudent.section_name || 
-                       detailedStudent.Section?.name ||
-                       '';
-        }
-      } catch (sectionErr) {
-        console.error('Failed to fetch section:', sectionErr);
-      }
-    }
-    
-    if ((!sectionName || sectionName === '') && (voucher.sectionName || voucher.section_name)) {
-      sectionName = voucher.sectionName || voucher.section_name;
-      console.log(`📚 Section from voucher data: "${sectionName}"`);
-    }
-    
-    if (!sectionName || sectionName === '') {
-      sectionName = 'Section Not Specified';
-    }
+    // Clean and fallback
+    className = normalizeDisplayValue(className) || 'N/A';
+    sectionName = normalizeDisplayValue(sectionName) || 'N/A';
     
     console.log('📚 FINAL values for PDF:', { className, sectionName });
     
@@ -1019,10 +996,11 @@ const handleDownloadVoucher = async (voucher) => {
       sectionName: enrichedVoucher.sectionName
     });
     
-    const blob = generateFeeVoucherPdfBlob({
+    const blob = await generateFeeVoucherPdfBlob({
       voucher: enrichedVoucher,
       student: studentData,
       instituteName: currentInstitute?.name || 'School Management System',
+      logoUrl: currentInstitute?.logo_url
     });
     
     const safeName = `fee-voucher-${enrichedVoucher.voucherNumber || enrichedVoucher.voucher_number || 'unknown'}.pdf`;
@@ -1032,6 +1010,38 @@ const handleDownloadVoucher = async (voucher) => {
   } catch (error) {
     console.error('Failed to download voucher PDF:', error);
     toast.error('Failed to generate PDF: ' + (error.message || 'Unknown error'));
+  }
+};
+
+const openVoucherInNewTab = async (voucher) => {
+  if (!voucher?.id) return;
+  try {
+    const blob = await generateFeeVoucherPdfBlob({ 
+      voucher, 
+      instituteName: currentInstitute?.name || 'School Management System',
+      logoUrl: currentInstitute?.logo_url
+    });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  } catch (err) {
+    toast.error('Failed to generate PDF');
+  }
+};
+
+const downloadReceipt = async (payment, voucher) => {
+  if (!payment || !voucher) return;
+  try {
+    const blob = await generateFeeReceiptPdfBlob({
+      payment,
+      voucher,
+      instituteName: currentInstitute?.name || 'School Management System',
+      logoUrl: currentInstitute?.logo_url
+    });
+    downloadBlob(blob, `receipt_${payment.receipt_number || payment.id}.pdf`);
+    toast.success('Receipt downloaded');
+  } catch (err) {
+    console.error('Receipt download error:', err);
+    toast.error('Failed to download receipt');
   }
 };
 
@@ -1219,6 +1229,9 @@ const handleDownloadVoucher = async (voucher) => {
         columns={voucherColumns}
         data={vouchers}
         loading={vouchersLoading}
+        search={voucherSearch}
+        onSearch={setVoucherSearch}
+        searchPlaceholder="Search Name, Reg #, Email or Voucher #..."
         emptyMessage="No vouchers found for selected filters"
         enableColumnVisibility
         exportConfig={{ fileName: `fee-vouchers-${voucherMonth}` }}
@@ -1550,15 +1563,22 @@ const handleDownloadVoucher = async (voucher) => {
               const regNo = v.Student?.registration_no || v.registrationNo || 'N/A';
               const status = v.status || 'pending';
 
-              // Detailed Debug logs
-              console.log('🔍 Modal Logic Check:', { 
-                foundInList: !!freshVoucher,
-                extractedPaid: paid,
-                extractedRemaining: remaining,
-                rawPaidAmount: v.paid_amount,
-                rawPendingAmount: v.pending_amount,
-                id: v.id
-              });
+              const paymentColumns = [
+                { header: 'Date', accessor: (row) => row.payment_date ? new Date(row.payment_date).toLocaleDateString() : 'N/A' },
+                { header: 'Amount', accessor: (row) => `PKR ${Number(row.amount_paid || row.amount || 0).toLocaleString()}` },
+                { header: 'Method', accessor: (row) => <span className="capitalize">{row.payment_method || 'cash'}</span> },
+                { header: 'Reference', accessor: (row) => row.reference_no || row.transaction_id || '-' },
+                { header: 'Actions', accessor: (row) => (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    onClick={() => downloadReceipt(row, viewingVoucher)}
+                  >
+                    <Download size={14} className="mr-1" /> Receipt
+                  </Button>
+                )},
+              ];
 
               return (
                 <>
@@ -1600,38 +1620,82 @@ const handleDownloadVoucher = async (voucher) => {
                     </div>
                   </div>
 
+                  {/* Technical Breakdown Table */}
+                  <div className="bg-blue-50/30 p-5 rounded-2xl border border-blue-100/50">
+                    <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <FileText className="h-3 w-3" /> Notes & Details
+                    </h4>
+                    <div className="overflow-hidden rounded-xl border border-blue-100 bg-white shadow-sm">
+                      <table className="w-full text-sm">
+                        <tbody className="divide-y divide-blue-50">
+                          {[
+                            { label: 'Student', value: `${studentName} (${regNo})` },
+                            { label: 'Fee Category', value: v.fee_type || 'Monthly' },
+                            // { label: 'Structure Type', value: v.feeTemplate?.name || 'Standard' },
+                            { label: 'Base Amount', value: `PKR ${Number(v.amount || 0).toLocaleString()}` },
+                            { label: 'Concession Type', value: v.concession_type },
+                            { label: 'Concession', value: Number(v.concession_amount) > 0 ? `PKR ${Number(v.concession_amount).toLocaleString()}` : null },
+                            { label: 'Concession Detail', value: v.concession_reason },
+                            { label: 'Total Amount Due', value: `PKR ${total.toLocaleString()}` },
+                            { label: 'Billing Period', value: `${MONTH_OPTS.find(m => String(m.value) === String(v.month))?.label} ${v.year}` },
+                            { label: 'Due Date', value: v.dueDate ? new Date(v.dueDate).toLocaleDateString('en-PK') : (v.due_date ? new Date(v.due_date).toLocaleDateString('en-PK') : null) },
+                            { label: 'Issue Date', value: v.issuedDate ? new Date(v.issuedDate).toLocaleDateString('en-PK') : null }
+                          ].filter(item => {
+                            if (!item.value) return false;
+                            const val = String(item.value).toLowerCase().trim();
+                            return val !== 'none' && val !== 'null' && val !== '' && val !== 'n/a';
+                          }).map((item, idx) => (
+                            <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                              <td className="py-2 px-4 font-semibold text-slate-500 w-1/3 bg-slate-50/50">{item.label}</td>
+                              <td className="py-2 px-4 text-slate-900 font-bold uppercase">{item.value}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
                   {/* Payment History */}
                   {paymentsList.length > 0 && (
                     <div className="space-y-3">
                       <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                        <div className="h-4 w-1 bg-primary rounded-full"></div>
+                        <div className="h-4 w-1 bg-emerald-500 rounded-full"></div>
                         Payment History
                       </h4>
                       <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
                         {paymentsList.map((payment, idx) => (
-                          <div key={payment.id || idx} className="flex justify-between items-center p-3 rounded-xl bg-white border border-slate-100 shadow-sm hover:border-primary/20 transition-all">
+                          <div key={payment.id || idx} className="flex justify-between items-center p-3 rounded-xl bg-white border border-slate-100 shadow-sm hover:border-emerald-200 transition-all">
                             <div className="flex items-center gap-3">
                               <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
                                 <Check size={18} />
                               </div>
                               <div className="space-y-0.5">
-                                <p className="font-bold text-slate-900">PKR {Number(payment.amount_paid).toLocaleString('en-PK')}</p>
-                                <p className="text-[10px] text-slate-500 font-medium">{new Date(payment.payment_date).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })} • {payment.payment_method.toUpperCase()}</p>
+                                <p className="font-bold text-slate-900">PKR {Number(payment.amount_paid || payment.amount || 0).toLocaleString('en-PK')}</p>
+                                <p className="text-[10px] text-slate-500 font-medium">{new Date(payment.payment_date).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })} • {String(payment.payment_method || 'cash').toUpperCase()}</p>
                               </div>
                             </div>
-                            <div className="text-right space-y-1.5">
-                              {payment.receipt_number && (
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                                  #{payment.receipt_number}
-                                </p>
-                              )}
-                              {payment.transaction_id ? (
-                                <span className="text-[9px] font-mono bg-slate-100 px-2 py-1 rounded text-slate-500 border border-slate-200 block shadow-sm">
-                                  {payment.transaction_id}
-                                </span>
-                              ) : (
-                                <span className="text-[9px] text-slate-400 italic block">No Ref ID</span>
-                              )}
+                            <div className="flex items-center gap-2">
+                              <div className="text-right space-y-1 mr-2">
+                                {payment.receipt_number && (
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                                    #{payment.receipt_number}
+                                  </p>
+                                )}
+                                {(payment.transaction_id || payment.reference_no) && (
+                                  <span className="text-[9px] font-mono bg-slate-100 px-2 py-1 rounded text-slate-500 border border-slate-200 block shadow-sm">
+                                    {payment.transaction_id || payment.reference_no}
+                                  </span>
+                                )}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                onClick={() => downloadReceipt(payment, v)}
+                                title="Download Receipt"
+                              >
+                                <Download size={16} />
+                              </Button>
                             </div>
                           </div>
                         ))}
@@ -1642,57 +1706,15 @@ const handleDownloadVoucher = async (voucher) => {
               );
             })()}
 
-            {/* Currency & Dates */}
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-xs text-muted-foreground">Currency</p>
-                <p className="font-medium">{viewingVoucher.currency || 'PKR'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Due Date</p>
-                <p className="font-medium">{viewingVoucher.dueDate ? new Date(viewingVoucher.dueDate).toLocaleDateString('en-PK') : 'N/A'}</p>
-              </div>
-            </div>
-
-            {/* Fee Breakdown */}
-            {/* {viewingVoucher.feeBreakdown && Object.keys(viewingVoucher.feeBreakdown).length > 0 && (
-              <div className="rounded-lg border p-4 space-y-3">
-                <h4 className="font-semibold text-sm">Fee Breakdown</h4>
-                <div className="space-y-2 text-sm">
-                  {Object.entries(viewingVoucher.feeBreakdown).map(([key, value]) => {
-                    const isPercentage = key.toLowerCase().includes('percentage');
-                    const discountType = viewingVoucher.feeBreakdown.discount_type;
-                    const isConcessionField = key.toLowerCase().includes('concession') || key.toLowerCase().includes('discount');
-                    
-                    return (
-                      <div key={key} className="flex justify-between">
-                        <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span>
-                        <span className="font-medium">
-                          {typeof value === 'number' 
-                            ? (isPercentage || (isConcessionField && discountType === 'percentage') ? `${value}%` : `PKR ${value.toLocaleString('en-PK')}`) 
-                            : String(value)}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )} */}
-
-            {/* Notes */}
-            {viewingVoucher.notes && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <p className="text-xs font-semibold text-amber-700 mb-2">NOTES</p>
-                <p className="text-sm text-amber-900 whitespace-pre-wrap">{viewingVoucher.notes}</p>
-              </div>
-            )}
-
             {/* Action Buttons */}
-            <div className="flex gap-2 justify-end pt-4">
-              <button onClick={() => setViewingVoucher(null)} className="rounded-md border px-4 py-2 text-sm">Close</button>
-              <button onClick={() => { handleDownloadVoucher(viewingVoucher); setViewingVoucher(null); }} className="rounded-md bg-primary px-4 py-2 text-sm text-white flex items-center gap-1.5">
-                <Download size={14} /> Download PDF
-              </button>
+            <div className="flex gap-2 justify-end pt-4 border-t">
+              <Button variant="outline" onClick={() => setViewingVoucher(null)}>Close</Button>
+              <Button 
+                onClick={() => handleDownloadVoucher(viewingVoucher)} 
+                className="bg-primary text-white flex items-center gap-2 font-bold"
+              >
+                <Download size={16} /> Download Fee Voucher
+              </Button>
             </div>
           </div>
         )}

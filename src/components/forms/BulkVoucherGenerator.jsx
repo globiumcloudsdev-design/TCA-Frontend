@@ -91,7 +91,7 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
 
   const selectedTemplateId = watch('feeTemplateId');
   const selectedFeeType = watch('feeType');
-  const selectedTemplate = feeTemplates.find(t => t.value === selectedTemplateId);
+  const selectedTemplate = Array.isArray(feeTemplates) ? feeTemplates.find(t => t.value === selectedTemplateId) : null;
 
   // Auto-lock fee type to fee_template whenever a fee template is selected.
   useEffect(() => {
@@ -126,7 +126,7 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
 
   // Auto-select current academic year using useEffect (NOT during render)
   useEffect(() => {
-    if (academicYears.length > 0 && !watch('academicYearId')) {
+    if (Array.isArray(academicYears) && academicYears.length > 0 && !watch('academicYearId')) {
       const currentAcademicYear = academicYears.find(ay => ay.is_current) || academicYears[0];
       if (currentAcademicYear) {
         setValue('academicYearId', currentAcademicYear.id);
@@ -152,8 +152,8 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
     enabled: !!instituteId
   });
 
-  const classOptions = classes.map(c => ({ value: c.id, label: c.name }));
-  const academicYearOptions = academicYears.map(ay => ({ value: ay.id, label: ay.name }));
+  const classOptions = Array.isArray(classes) ? classes.map(c => ({ value: c.id, label: c.name })) : [];
+  const academicYearOptions = Array.isArray(academicYears) ? academicYears.map(ay => ({ value: ay.id, label: ay.name })) : [];
 
   // Get selected values
   const selectedClassId = watch('classId');
@@ -183,10 +183,10 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
     enabled: !!selectedClassId && !!instituteId
   });
 
-  const studentOptions = classStudents.map(s => ({
+  const studentOptions = Array.isArray(classStudents) ? classStudents.map(s => ({
     value: s.id,
     label: `${s.first_name || ''} ${s.last_name || ''} (${s.registration_no || 'N/A'})`
-  }));
+  })) : [];
 
   const handleGenerateClick = (data) => {
     // Validate based on mode
@@ -224,7 +224,7 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
 
     setSubmitting(true);
     try {
-      const academicYear = academicYears.find(ay => ay.id === confirmData.academicYearId);
+      const academicYear = Array.isArray(academicYears) ? academicYears.find(ay => ay.id === confirmData.academicYearId) : null;
       if (!academicYear) {
         throw new Error('Academic year not found');
       }
@@ -631,7 +631,7 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
         onConfirm={handleConfirmGenerate}
         loading={submitting}
         title="Confirm Voucher Generation"
-        description={`Generate vouchers for ${confirmData?.mode === 'single' ? 'single student' : confirmData?.mode === 'class' ? 'all students in class' : 'entire institute'} in ${MONTH_OPTIONS.find(m => m.value === parseInt(confirmData?.month))?.label}?`}
+        description={`Generate vouchers for ${confirmData?.mode === 'single' ? 'single student' : confirmData?.mode === 'class' ? 'all students in class' : 'entire institute'} in ${MONTH_OPTIONS.find(m => m.value === parseInt(confirmData?.month))?.label || 'selected month'}?`}
         confirmLabel="Generate"
       />
     </Card>

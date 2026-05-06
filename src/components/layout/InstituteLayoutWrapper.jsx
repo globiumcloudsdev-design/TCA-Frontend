@@ -149,7 +149,16 @@ function SidebarContent({
           isCollapsed && "justify-center px-0",
         )}
       >
-        {typeDefinition && (
+        {(user?.institute?.logo_url || user?.school?.logo_url) ? (
+          <img 
+            src={user?.institute?.logo_url || user?.school?.logo_url} 
+            alt="Logo" 
+            className={cn(
+              "rounded-md object-contain shrink-0",
+              isCollapsed ? "h-8 w-8" : "h-7 w-7"
+            )}
+          />
+        ) : typeDefinition && (
           <span className="text-xl leading-none select-none">
             {typeDefinition.icon}
           </span>
@@ -452,7 +461,13 @@ export default function InstituteLayoutWrapper({ children }) {
             href={dashboardPath}
             className="flex items-center gap-1.5 lg:hidden min-w-0 shrink-0"
           >
-            {typeDefinition && (
+            {(user?.institute?.logo_url || user?.school?.logo_url) ? (
+              <img 
+                src={user?.institute?.logo_url || user?.school?.logo_url} 
+                alt="Logo" 
+                className="h-7 w-7 rounded-md object-contain shrink-0"
+              />
+            ) : typeDefinition && (
               <span className="text-base leading-none">
                 {typeDefinition.icon}
               </span>

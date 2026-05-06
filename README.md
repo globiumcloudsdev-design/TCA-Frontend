@@ -91,7 +91,6 @@ src/
 │   ├── examService.js
 │   ├── feeService.js
 │   ├── roleService.js
-│   ├── schoolService.js
 │   ├── userService.js
 │   ├── academicYearService.js
 │   ├── dashboardService.js

@@ -24,7 +24,6 @@ export { studentAttendanceService } from './studentAttendanceService';
 export { examService }          from './examService';
 export { feeService }           from './feeService';
 export { roleService }          from './roleService';
-export { schoolService }        from './schoolService';
 export { userService }          from './userService';
 export { academicYearService }  from './academicYearService';
 export { dashboardService }     from './dashboardService';
