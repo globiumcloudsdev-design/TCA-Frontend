@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-// import { schoolService } from '@/services';
+import { schoolService } from '@/services';
 
 const schema = z.object({
   name:         z.string().min(2),
