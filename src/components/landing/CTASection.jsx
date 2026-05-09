@@ -16,18 +16,18 @@
 //   return (
 //     <section className="py-24 bg-white">
 //       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-//         <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-violet-950 px-8 py-16 lg:px-16 lg:py-20">
+//         <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-950 via-tca-primary to-tca-primary px-8 py-16 lg:px-16 lg:py-20">
 //           {/* Grid background */}
 //           <div className="absolute inset-0 bg-[linear-gradient(rgba(99,102,241,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.1)_1px,transparent_1px)] bg-[size:40px_40px]" />
 
 //           {/* Glow */}
-//           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-64 bg-indigo-600/25 blur-3xl rounded-full" />
-//           <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-violet-600/20 blur-3xl rounded-full" />
+//           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-64 bg-tca-primary/25 blur-3xl rounded-full" />
+//           <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-tca-primary/20 blur-3xl rounded-full" />
 
 //           <div className="relative text-center">
-//             <div className="inline-flex items-center gap-2 bg-indigo-500/20 border border-indigo-500/30 rounded-full px-5 py-2 mb-6">
+//             <div className="inline-flex items-center gap-2 bg-tca-primary/10 border border-tca-primary/10 rounded-full px-5 py-2 mb-6">
 //               <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-//               <span className="text-sm font-medium text-indigo-300">No hidden charges · Cancel anytime</span>
+//               <span className="text-sm font-medium text-tca-primary">No hidden charges · Cancel anytime</span>
 //             </div>
 
 //             <h2 className="text-3xl sm:text-5xl font-extrabold text-white leading-tight max-w-3xl mx-auto">
@@ -50,7 +50,7 @@
 //             {/* CTAs */}
 //             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-10">
 //               <Link href="/login">
-//                 <Button size="lg" className="bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white shadow-xl shadow-indigo-900/60 font-bold text-base px-10 py-6 gap-2 hover:scale-105 transition-all">
+//                 <Button size="lg" className="bg-gradient-to-r from-tca-dark to-tca-primary hover:from-tca-dark hover:to-tca-primary text-white shadow-xl shadow-tca-primary/60 font-bold text-base px-10 py-6 gap-2 hover:scale-105 transition-all">
 //                   Start Your Free Trial
 //                   <ArrowRight className="w-5 h-5" />
 //                 </Button>
@@ -102,7 +102,7 @@ const BULLETS = [
 
 export default function CTASection() {
   return (
-    <section className="py-24 bg-[#020617] relative overflow-hidden">
+    <section className="py-24 bg-tca-bg relative overflow-hidden">
       {/* Background elements to merge with previous sections */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
       
@@ -110,21 +110,21 @@ export default function CTASection() {
         <div className="relative rounded-[3rem] overflow-hidden bg-slate-900/40 border border-white/10 px-8 py-20 lg:px-20 lg:py-24 backdrop-blur-xl shadow-2xl">
           
           {/* Animated Background Orbs */}
-          <div className="absolute -top-24 -left-24 w-96 h-96 bg-indigo-600/20 rounded-full blur-[100px] animate-pulse" />
-          <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-violet-600/20 rounded-full blur-[100px]" />
+          <div className="absolute -top-24 -left-24 w-96 h-96 bg-tca-primary/20 rounded-full blur-[100px] animate-pulse" />
+          <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-tca-primary/20 rounded-full blur-[100px]" />
           
           {/* Grid Pattern Overlay */}
           <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay pointer-events-none" />
 
           <div className="relative z-10 text-center max-w-4xl mx-auto">
             {/* Trust Badge */}
-            <div className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full px-4 py-1.5 mb-8">
-              <ShieldCheck className="w-4 h-4 text-indigo-400" />
-              <span className="text-xs font-black text-indigo-300 uppercase tracking-widest">Enterprise-Grade Security Included</span>
+            <div className="inline-flex items-center gap-2 bg-tca-primary/10 border border-tca-primary/10 rounded-full px-4 py-1.5 mb-8">
+              <ShieldCheck className="w-4 h-4 text-tca-primary" />
+              <span className="text-xs font-black text-tca-primary uppercase tracking-widest">Enterprise-Grade Security Included</span>
             </div>
 
             <h2 className="text-4xl sm:text-6xl font-black text-white leading-[1.1] mb-8">
-              Ready to <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-violet-400 to-cyan-400">Revolutionize</span> Your School?
+              Ready to <span className="text-transparent bg-clip-text bg-gradient-to-r from-tca-primary via-tca-primary to-tca-primary">Revolutionize</span> Your School?
             </h2>
             
             <p className="text-lg md:text-xl text-slate-400 mb-12 leading-relaxed max-w-2xl mx-auto">
@@ -144,7 +144,7 @@ export default function CTASection() {
             {/* Massive CTAs */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
               <Link href="/login" className="w-full sm:w-auto">
-                <Button size="lg" className="w-full sm:w-auto h-16 px-12 bg-white text-slate-950 hover:bg-indigo-50 font-black text-lg rounded-2xl shadow-[0_20px_40px_rgba(255,255,255,0.1)] transition-all hover:scale-105 active:scale-95 gap-3">
+                <Button size="lg" className="w-full sm:w-auto h-16 px-12 bg-white text-slate-950 hover:bg-tca-primary font-black text-lg rounded-2xl shadow-[0_20px_40px_rgba(255,255,255,0.1)] transition-all hover:scale-105 active:scale-95 gap-3">
                   Start Your Free Journey
                   <ArrowRight className="w-6 h-6" />
                 </Button>
@@ -167,7 +167,7 @@ export default function CTASection() {
             <div className="mt-16 pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-center gap-8">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center">
-                   <Phone className="w-5 h-5 text-indigo-400" />
+                   <Phone className="w-5 h-5 text-tca-primary" />
                 </div>
                 <div className="text-left">
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Call our Support</p>
@@ -179,7 +179,7 @@ export default function CTASection() {
 
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center">
-                   <Sparkles className="w-5 h-5 text-violet-400" />
+                   <Sparkles className="w-5 h-5 text-tca-primary" />
                 </div>
                 <div className="text-left">
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Email Inquiries</p>

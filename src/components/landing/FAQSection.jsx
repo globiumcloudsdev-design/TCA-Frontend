@@ -53,7 +53,7 @@
 //       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
 //         {/* Header */}
 //         <div className="text-center mb-14">
-//           <p className="text-sm font-semibold text-indigo-600 uppercase tracking-widest mb-3">FAQ</p>
+//           <p className="text-sm font-semibold text-tca-primary uppercase tracking-widest mb-3">FAQ</p>
 //           <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 leading-tight">
 //             Frequently Asked Questions
 //           </h2>
@@ -70,18 +70,18 @@
 //               <div
 //                 key={i}
 //                 className={`bg-white rounded-2xl border transition-all duration-200 overflow-hidden ${
-//                   isOpen ? 'border-indigo-200 shadow-md' : 'border-slate-100 hover:border-slate-200 shadow-sm'
+//                   isOpen ? 'border-tca-primary shadow-md' : 'border-slate-100 hover:border-slate-200 shadow-sm'
 //                 }`}
 //               >
 //                 <button
 //                   className="w-full flex items-center justify-between gap-4 px-6 py-5 text-left"
 //                   onClick={() => setOpen(isOpen ? null : i)}
 //                 >
-//                   <span className={`text-base font-semibold ${isOpen ? 'text-indigo-600' : 'text-slate-800'}`}>
+//                   <span className={`text-base font-semibold ${isOpen ? 'text-tca-primary/10' : 'text-slate-800'}`}>
 //                     {faq.q}
 //                   </span>
 //                   <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 ${
-//                     isOpen ? 'bg-indigo-600 rotate-180' : 'bg-slate-100'
+//                     isOpen ? 'bg-tca-primary rotate-180' : 'bg-slate-100'
 //                   }`}>
 //                     <ChevronDown className={`w-3.5 h-3.5 ${isOpen ? 'text-white' : 'text-slate-500'}`} />
 //                   </span>
@@ -98,7 +98,7 @@
 
 //         <p className="text-center text-slate-500 text-sm mt-10">
 //           Still have questions?{' '}
-//           <a href="mailto:support@thecloudsacademy.pk" className="text-indigo-600 font-semibold hover:underline">
+//           <a href="mailto:support@thecloudsacademy.pk" className="text-tca-primary font-semibold hover:underline">
 //             Contact our support team
 //           </a>
 //         </p>
@@ -144,19 +144,19 @@ export default function FAQSection() {
   const [open, setOpen] = useState(null);
 
   return (
-    <section id="faq" className="py-24 bg-[#020617] relative overflow-hidden">
+    <section id="faq" className="py-24 bg-tca-bg relative overflow-hidden">
       {/* Glow effect behind the header */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-tca-primary/10 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Header */}
         <div className="text-center mb-16">
-          <Badge className="mb-4 bg-white/5 text-indigo-400 border-white/10 px-4 py-1">
+          <Badge className="mb-4 bg-white/5 text-tca-primary border-white/10 px-4 py-1">
             <HelpCircle className="w-3 h-3 mr-2" />
             Support Center
           </Badge>
           <h2 className="text-4xl md:text-5xl font-black text-white mb-6">
-            Common <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Questions</span>
+            Common <span className="text-transparent bg-clip-text bg-gradient-to-r from-tca-primary to-tca-primary">Questions</span>
           </h2>
           <p className="text-slate-400 text-lg">
             Find quick answers to help you get started with The Clouds Academy.
@@ -172,7 +172,7 @@ export default function FAQSection() {
                 key={i}
                 className={`group rounded-3xl transition-all duration-300 border ${
                   isOpen 
-                    ? 'bg-slate-900 border-indigo-500/40 shadow-[0_0_30px_rgba(79,70,229,0.1)]' 
+                    ? 'bg-slate-900 border-tca-primary/10 shadow-[0_0_30px_rgba(79,70,229,0.1)]' 
                     : 'bg-slate-900/40 border-white/5 hover:border-white/10'
                 }`}
               >
@@ -186,7 +186,7 @@ export default function FAQSection() {
                     {faq.q}
                   </span>
                   <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
-                    isOpen ? 'bg-indigo-500 rotate-180 shadow-[0_0_15px_rgba(79,70,229,0.5)]' : 'bg-slate-800'
+                    isOpen ? 'bg-tca-primary rotate-180 shadow-[0_0_15px_rgba(79,70,229,0.5)]' : 'bg-slate-800'
                   }`}>
                     <ChevronDown className={`w-4 h-4 ${isOpen ? 'text-white' : 'text-slate-500'}`} />
                   </div>
@@ -223,7 +223,7 @@ export default function FAQSection() {
             </a>
             <a 
               href="mailto:support@thecloudsacademy.pk" 
-              className="flex items-center gap-2 px-6 py-3 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-500/20 transition-all font-bold"
+              className="flex items-center gap-2 px-6 py-3 bg-tca-primary/10 hover:bg-tca-primary/20 text-tca-primary rounded-xl border border-tca-primary/10 transition-all font-bold"
             >
               Email Us
             </a>

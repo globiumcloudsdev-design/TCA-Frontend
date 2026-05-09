@@ -412,6 +412,8 @@ export default function Vendors() {
     return <div className="py-20 text-center text-muted-foreground">You don't have permission to view vendors.</div>;
   }
 
+  if (!mounted) return null;
+
   return (
     <div className="space-y-5">
       <PageHeader

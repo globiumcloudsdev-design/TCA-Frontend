@@ -1,4 +1,5 @@
 'use client';
+import { Inter } from 'next/font/google';
 import Navbar from './Navbar';
 import HeroSection from './HeroSection';
 import StatsSection from './StatsSection';
@@ -10,9 +11,11 @@ import FAQSection from './FAQSection';
 import CTASection from './CTASection';
 import Footer from './Footer';
 
+const inter = Inter({ subsets: ['latin'] });
+
 export default function LandingPage() {
   return (
-    <div className="min-h-screen">
+    <div className={`min-h-screen bg-tca-bg text-white ${inter.className}`}>
       <Navbar />
       <HeroSection />
       <StatsSection />

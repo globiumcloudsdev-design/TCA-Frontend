@@ -14,9 +14,9 @@
 //     title: 'Student Management',
 //     tagline: 'Complete student lifecycle management',
 //     color: 'indigo',
-//     gradient: 'from-indigo-500 to-indigo-600',
-//     bg: 'bg-indigo-50',
-//     ic: 'text-indigo-600',
+//     gradient: 'from-tca-dark to-tca-primary',
+//     bg: 'bg-tca-primary',
+//     ic: 'text-tca-primary/10',
 //     features: [
 //       'Student enrollment & admission forms',
 //       'Profile photo & document uploads',
@@ -35,9 +35,9 @@
 //     title: 'Teacher Management',
 //     tagline: 'Hire, manage & evaluate your faculty',
 //     color: 'violet',
-//     gradient: 'from-violet-500 to-violet-600',
-//     bg: 'bg-violet-50',
-//     ic: 'text-violet-600',
+//     gradient: 'from-tca-dark to-tca-primary/10',
+//     bg: 'bg-tca-primary',
+//     ic: 'text-tca-primary',
 //     features: [
 //       'Teacher profiles & qualifications',
 //       'Subject and class assignments',
@@ -77,9 +77,9 @@
 //     title: 'Attendance System',
 //     tagline: 'Track daily attendance with ease',
 //     color: 'cyan',
-//     gradient: 'from-cyan-500 to-cyan-600',
-//     bg: 'bg-cyan-50',
-//     ic: 'text-cyan-600',
+//     gradient: 'from-tca-dark to-tca-primary',
+//     bg: 'bg-tca-primary',
+//     ic: 'text-tca-primary',
 //     features: [
 //       'Daily student & teacher attendance',
 //       'Class-wise attendance sheets',
@@ -140,9 +140,9 @@
 //     title: 'User & Role Management',
 //     tagline: 'Control who sees what in your system',
 //     color: 'purple',
-//     gradient: 'from-purple-500 to-purple-600',
-//     bg: 'bg-purple-50',
-//     ic: 'text-purple-600',
+//     gradient: 'from-tca-dark to-tca-primary',
+//     bg: 'bg-tca-primary',
+//     ic: 'text-tca-primary',
 //     features: [
 //       '5 built-in role types',
 //       'Custom permission sets',
@@ -161,9 +161,9 @@
 //     title: 'Reports & Analytics',
 //     tagline: 'Data-driven decisions for school leaders',
 //     color: 'blue',
-//     gradient: 'from-blue-500 to-blue-600',
-//     bg: 'bg-blue-50',
-//     ic: 'text-blue-600',
+//     gradient: 'from-tca-dark to-tca-primary',
+//     bg: 'bg-tca-primary',
+//     ic: 'text-tca-primary',
 //     features: [
 //       'Interactive dashboard charts',
 //       'Attendance trend analysis',
@@ -182,9 +182,9 @@
 //     title: 'Parent Portal',
 //     tagline: 'Keep parents informed and engaged',
 //     color: 'indigo',
-//     gradient: 'from-indigo-500 to-violet-500',
-//     bg: 'bg-indigo-50',
-//     ic: 'text-indigo-600',
+//     gradient: 'from-tca-dark to-tca-primary',
+//     bg: 'bg-tca-primary',
+//     ic: 'text-tca-primary/10',
 //     features: [
 //       'Separate parent login',
 //       'Child attendance tracking',
@@ -224,9 +224,9 @@
 //     title: 'Teacher Portal',
 //     tagline: 'Empower teachers to manage their classes',
 //     color: 'blue',
-//     gradient: 'from-blue-500 to-sky-500',
-//     bg: 'bg-blue-50',
-//     ic: 'text-blue-600',
+//     gradient: 'from-tca-dark to-tca-primary',
+//     bg: 'bg-tca-primary',
+//     ic: 'text-tca-primary',
 //     features: [
 //       'Dedicated teacher login',
 //       'Manage assigned classes',
@@ -251,10 +251,10 @@
 //       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 //         {/* Header */}
 //         <div className="text-center mb-14 max-w-3xl mx-auto">
-//           <p className="text-sm font-semibold text-indigo-600 uppercase tracking-widest mb-3">Core Modules</p>
+//           <p className="text-sm font-semibold text-tca-primary uppercase tracking-widest mb-3">Core Modules</p>
 //           <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 leading-tight">
 //             A module for every{' '}
-//             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">
+//             <span className="text-transparent bg-clip-text bg-gradient-to-r from-tca-dark to-tca-primary">
 //               school need
 //             </span>
 //           </h2>
@@ -394,10 +394,10 @@ const MODULES = [
     icon: Users,
     title: 'Student Management',
     tagline: 'Life-cycle Tracking',
-    color: 'text-indigo-400',
-    border: 'border-indigo-500/30',
-    bg: 'bg-indigo-500/10',
-    gradient: 'from-indigo-500 to-blue-600',
+    color: 'text-tca-primary/10',
+    border: 'border-tca-primary/10',
+    bg: 'bg-tca-primary/10',
+    gradient: 'from-tca-dark to-tca-primary',
     features: ['Enrollment & Admission Forms', 'Document & Photo Uploads', 'Bulk Import via Excel', 'Student ID Card Generation', 'Parent/Guardian Linkage'],
     stats: { label: '1,240', sub: 'Active Students' }
   },
@@ -430,10 +430,10 @@ const MODULES = [
     icon: Layout,
     title: 'Stakeholder Portals',
     tagline: 'Connected Access',
-    color: 'text-cyan-400',
-    border: 'border-cyan-500/30',
-    bg: 'bg-cyan-500/10',
-    gradient: 'from-cyan-500 to-blue-600',
+    color: 'text-tca-primary',
+    border: 'border-tca-primary/30',
+    bg: 'bg-tca-primary/10',
+    gradient: 'from-tca-dark to-tca-primary',
     features: ['Dedicated Teacher Login', 'Mobile Student Dashboard', 'Parent Monitoring App', 'Homework & Assignments', 'Real-time Notices'],
     stats: { label: '3-Way', sub: 'Portal Sync' }
   }
@@ -445,20 +445,20 @@ export default function ModulesSection() {
   const Icon = mod.icon;
 
   return (
-    <section id="modules" className="py-24 bg-[#020617] relative overflow-hidden">
+    <section id="modules" className="py-24 bg-tca-bg relative overflow-hidden">
       {/* Background Decorative Blur */}
-      <div className="absolute top-1/2 left-0 w-96 h-96 bg-indigo-600/10 rounded-full blur-[120px]" />
+      <div className="absolute top-1/2 left-0 w-96 h-96 bg-tca-primary/10 rounded-full blur-[120px]" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Header */}
         <div className="text-center mb-16">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-slate-400 text-xs font-bold uppercase tracking-[0.2em] mb-4">
-            <Sparkles className="w-3 h-3 text-indigo-400" />
+            <Sparkles className="w-3 h-3 text-tca-primary" />
             Powerful Ecosystem
           </div>
           <h2 className="text-4xl md:text-5xl font-black text-white leading-tight">
             Integrated Modules for <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-tca-primary to-tca-primary">
               Complete Control
             </span>
           </h2>
@@ -500,7 +500,7 @@ export default function ModulesSection() {
 
           {/* Module Detailed View */}
           <div className="lg:col-span-8">
-            <div className="h-full rounded-3xl bg-slate-950/50 border border-white/5 overflow-hidden flex flex-col">
+            <div className="h-full rounded-3xl bg-tca-bg/50 border border-white/5 overflow-hidden flex flex-col">
               {/* Card Header */}
               <div className={`bg-gradient-to-br ${mod.gradient} p-8 text-white relative`}>
                 <div className="absolute top-0 right-0 p-8 opacity-10">

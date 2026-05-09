@@ -385,20 +385,14 @@ export function middleware(request) {
   const { pathname } = request.nextUrl;
 
   const accessToken = request.cookies.get('access_token')?.value;
+  const portalToken = request.cookies.get('portal_token')?.value;
   const userType = request.cookies.get('user_type')?.value;
+  const roleCode = request.cookies.get('role_code')?.value;
   const instituteType = request.cookies.get('institute_type')?.value;
 
-  const institutePrefixes = ['/school', '/college', '/academy', '/coaching'];
-
-  // =============================
-  // 1️⃣ PUBLIC ROUTES (skip middleware)
-  // =============================
   const PUBLIC_PATHS = ['/', '/login', '/portal-login', '/forgot-password', '/reset-password', '/contact', '/about', '/features', '/stats', '/faq', '/pricing'];
+  
   if (
-    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/')) ||
-    pathname.startsWith('/student') ||
-    pathname.startsWith('/parent') ||
-    pathname.startsWith('/teacher') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
     pathname.includes('.')
@@ -406,44 +400,80 @@ export function middleware(request) {
     return NextResponse.next();
   }
 
+  // Check if it's a public path
+  const isPublicPath = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
+
   // =============================
-  // 2️⃣ NOT LOGGED IN
+  // 2️⃣ REDIRECT AUTHENTICATED USERS AWAY FROM LOGIN
   // =============================
-  if (!accessToken) {
-    // Allow public routes only
+  if (isPublicPath && (accessToken || portalToken)) {
+    // Determine dashboard path from cookies
+    let redirectPath = '/dashboard';
+    const role = (userType || roleCode || '').toUpperCase();
+    const instType = (instituteType || 'school').toLowerCase();
+
+    const MASTER_ROLES = ['MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPPORT_STAFF', 'MASTER_STAFF', 'MASTER_SUPPORT', 'SUPER_ADMIN', 'ADMIN', 'MASTER'];
+
+    if (MASTER_ROLES.includes(role)) {
+      redirectPath = '/master-admin';
+    } else if (role === 'TEACHER') {
+      redirectPath = '/teacher';
+    } else if (role === 'STUDENT') {
+      redirectPath = '/student';
+    } else if (role === 'PARENT') {
+      redirectPath = '/parent';
+    } else if (role === 'INSTITUTE_ADMIN' || role === 'BRANCH_ADMIN' || role === 'STAFF') {
+      redirectPath = `/${instType}/dashboard`;
+    }
+
+    // Only redirect if they are trying to access login/portal-login
+    if (pathname === '/login' || pathname === '/portal-login') {
+      return NextResponse.redirect(new URL(redirectPath, request.url));
+    }
+  }
+
+  // =============================
+  // 3️⃣ NOT LOGGED IN
+  // =============================
+  if (!accessToken && !portalToken && !isPublicPath) {
+    // Allow portal sub-paths to redirect to portal-login? 
+    // Actually, following user's request: redirect to dashboard if logged in.
+    // For non-logged in, /login is the default.
+    if (pathname.startsWith('/student') || pathname.startsWith('/parent') || pathname.startsWith('/teacher')) {
+        return NextResponse.redirect(new URL('/portal-login', request.url));
+    }
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
   // =============================
-  // 3️⃣ MASTER ROLES (FREE)
+  // 4️⃣ LOGGED IN - PROTECTION
   // =============================
-  if (
-    userType === 'MASTER_ADMIN' ||
-    userType === 'MASTER_SUPPORT' ||
-    userType === 'MASTER_STAFF'
-  ) {
+  // Master Admin
+  const currentRole = (userType || roleCode || '').toUpperCase();
+  const MASTER_ROLES = ['MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPPORT_STAFF', 'MASTER_STAFF', 'MASTER_SUPPORT', 'SUPER_ADMIN', 'ADMIN', 'MASTER'];
+  if (MASTER_ROLES.includes(currentRole)) {
     return NextResponse.next();
   }
 
-  // =============================
-  // 4️⃣ STAFF / INSTITUTE USERS
-  // =============================
+  // Staff / Institute Admin
   if (userType === 'STAFF' || userType === 'INSTITUTE_ADMIN' || userType === 'BRANCH_ADMIN') {
-    // fallback instituteType
-    const instType = instituteType || 'school';
-    const instPrefix = `/${instType}`;
-
-    // If not on institute route, redirect to dashboard
-    if (!pathname.startsWith(instPrefix)) {
+    const instPrefix = `/${instituteType || 'school'}`;
+    if (!pathname.startsWith(instPrefix) && !isPublicPath) {
       return NextResponse.redirect(new URL(`${instPrefix}/dashboard`, request.url));
     }
-
-    return NextResponse.next();
   }
 
-  // =============================
-  // 5️⃣ DEFAULT: anything else
-  // =============================
+  // Portal users (Teacher, Student, Parent)
+  if (userType === 'TEACHER' && !pathname.startsWith('/teacher') && !isPublicPath) {
+      return NextResponse.redirect(new URL('/teacher', request.url));
+  }
+  if (userType === 'STUDENT' && !pathname.startsWith('/student') && !isPublicPath) {
+      return NextResponse.redirect(new URL('/student', request.url));
+  }
+  if (userType === 'PARENT' && !pathname.startsWith('/parent') && !isPublicPath) {
+      return NextResponse.redirect(new URL('/parent', request.url));
+  }
+
   return NextResponse.next();
 }
 
@@ -456,6 +486,6 @@ export const config = {
       Apply middleware to everything except public routes handled above
       _next, api, static files etc are excluded
     */
-    '/((?!_next|api|login|portal-login|.*\\..*).*)',
+    '/((?!_next|api|.*\\..*).*)',
   ],
 };

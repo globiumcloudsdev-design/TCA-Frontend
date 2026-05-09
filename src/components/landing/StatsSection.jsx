@@ -10,9 +10,9 @@ const STATS = [
     suffix: '+',
     label: 'Schools Onboarded',
     description: 'Trusted across Pakistan',
-    color: 'text-indigo-400',
-    border: 'group-hover:border-indigo-500/50',
-    bg: 'bg-indigo-500/10',
+    color: 'text-tca-primary/10',
+    border: 'group-hover:border-tca-primary/10',
+    bg: 'bg-tca-primary/10',
   },
   {
     icon: Users2,
@@ -20,9 +20,9 @@ const STATS = [
     suffix: 'K+',
     label: 'Students Managed',
     description: 'Active records in system',
-    color: 'text-violet-400',
-    border: 'group-hover:border-violet-500/50',
-    bg: 'bg-violet-500/10',
+    color: 'text-tca-primary',
+    border: 'group-hover:border-tca-primary/50',
+    bg: 'bg-tca-primary/10',
   },
   {
     icon: Award,
@@ -30,9 +30,9 @@ const STATS = [
     suffix: '%',
     label: 'Satisfaction Rate',
     description: 'Verified school reviews',
-    color: 'text-cyan-400',
-    border: 'group-hover:border-cyan-500/50',
-    bg: 'bg-cyan-500/10',
+    color: 'text-tca-primary',
+    border: 'group-hover:border-tca-primary/50',
+    bg: 'bg-tca-primary/10',
   },
   {
     icon: Clock,
@@ -107,20 +107,20 @@ export default function StatsSection() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="py-24 bg-[#020617] relative overflow-hidden">
+    <section ref={sectionRef} className="py-24 bg-tca-bg relative overflow-hidden">
       {/* Background radial glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-tca-primary/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
           <div className="max-w-2xl">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-[1px] bg-indigo-500" />
-              <span className="text-sm font-bold text-indigo-400 uppercase tracking-widest">Platform Impact</span>
+              <div className="w-10 h-[1px] bg-tca-primary" />
+              <span className="text-sm font-bold text-tca-primary uppercase tracking-widest">Platform Impact</span>
             </div>
             <h2 className="text-4xl md:text-5xl font-black text-white leading-tight">
               Real Results for <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-tca-primary to-tca-primary">
                 Forward-Thinking Schools
               </span>
             </h2>

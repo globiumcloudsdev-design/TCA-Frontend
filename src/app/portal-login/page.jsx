@@ -24,6 +24,7 @@ import usePortalStore from '@/store/portalStore';
 import useAuthStore from '@/store/authStore';
 import { authService } from '@/services';
 import AccountSelectionModal from '@/components/auth/AccountSelectionModal';
+import { getDashboardPath } from '@/utils/authUtils';
 
 // Role icons mapping for modal
 const ROLE_ICONS = {
@@ -32,7 +33,7 @@ const ROLE_ICONS = {
   BRANCH_ADMIN: { color: 'bg-cyan-100 text-cyan-600', label: 'Branch Admin' },
   TEACHER: { color: 'bg-blue-100 text-blue-600', label: 'Teacher' },
   STUDENT: { color: 'bg-emerald-100 text-emerald-600', label: 'Student' },
-  PARENT: { color: 'bg-indigo-100 text-indigo-600', label: 'Parent' },
+  PARENT: { color: 'bg-indigo-100 text-tca-primary', label: 'Parent' },
   STAFF: { color: 'bg-slate-100 text-slate-600', label: 'Staff' },
 };
 
@@ -47,7 +48,7 @@ const PORTAL_TYPES = [
     icon: Users,
     label: 'Parent Portal',
     tagline: 'Track your child\'s progress',
-    gradient: 'from-indigo-600 to-violet-600',
+    gradient: 'from-tca-dark to-tca-primary',
     redirectTo: '/parent',
     features: ['Child attendance', 'Fee status', 'Exam results', 'Announcements'],
   },
@@ -65,7 +66,7 @@ const PORTAL_TYPES = [
     icon: Briefcase,
     label: 'Teacher Portal',
     tagline: 'Manage your classes & students',
-    gradient: 'from-blue-600 to-sky-600',
+    gradient: 'from-tca-dark to-tca-primary',
     redirectTo: '/teacher',
     features: ['My classes & subjects', 'Upload notes', 'Assign homework', 'Mark attendance'],
   },
@@ -89,7 +90,7 @@ const INSTITUTE_TABS = [
 ];
 
 const ROLE_STYLES = {
-  PARENT: { icon: Users, bg: 'bg-indigo-100', ic: 'text-indigo-600' },
+  PARENT: { icon: Users, bg: 'bg-indigo-100', ic: 'text-tca-primary' },
   STUDENT: { icon: BookOpen, bg: 'bg-emerald-100', ic: 'text-emerald-600' },
   TEACHER: { icon: Briefcase, bg: 'bg-blue-100', ic: 'text-blue-600' },
 };
@@ -196,14 +197,7 @@ function PortalLoginContent() {
 
     toast.success(`Welcome, ${user.first_name}!`);
 
-    // Redirect based on user type
-    const redirectPaths = {
-      STUDENT: '/student',
-      PARENT: '/parent',
-      TEACHER: '/teacher'
-    };
-
-    const redirectPath = redirectPaths[user.user_type] || '/portal';
+    const redirectPath = getDashboardPath(user);
     console.log('✅ Portal login successful, redirecting to:', redirectPath);
     router.replace(redirectPath);
     return true;
@@ -342,9 +336,9 @@ function PortalLoginContent() {
       className="min-h-screen flex flex-col"
       style={{
         background: activeType === 'PARENT'
-          ? 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e40af 100%)'
+          ? 'linear-gradient(135deg, #0A0F27 0%, #3F3A93 50%, #655DED 100%)'
           : activeType === 'TEACHER'
-            ? 'linear-gradient(135deg, #0c1a2e 0%, #1e3a5f 50%, #1d4ed8 100%)'
+            ? 'linear-gradient(135deg, #0A0F27 0%, #3F3A93 50%, #655DED 100%)'
             : 'linear-gradient(135deg, #064e3b 0%, #065f46 50%, #0f766e 100%)',
         transition: 'background 0.5s ease',
       }}
@@ -362,15 +356,20 @@ function PortalLoginContent() {
         <div className="w-full max-w-4xl grid lg:grid-cols-5 gap-8 items-center">
           {/* LEFT Panel */}
           <div className="lg:col-span-2 text-white hidden lg:block">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                <GraduationCap className="w-5 h-5 text-white" />
+            <Link href="/" className="flex items-center gap-3 group mb-8 w-fit">
+              <div className="relative">
+                <div className="absolute inset-0 bg-white/20 blur-lg opacity-40 group-hover:opacity-100 transition-opacity rounded-full" />
+                <img 
+                src="/logos/TCA Logo png White.png" 
+                  alt="TCA Logo" 
+                  className="relative w-14 h-14 object-contain filter drop-shadow-md transition-transform duration-300 group-hover:scale-105" 
+                />
               </div>
-              <div>
-                <p className="font-bold text-sm leading-tight">The Clouds Academy</p>
-                <p className="text-white/60 text-xs">Student Information System</p>
+              <div className="flex flex-col">
+                <span className="text-2xl font-black text-white tracking-tight leading-none">THE CLOUDS</span>
+                <span className="text-[10px] font-bold text-white/80 tracking-[0.2em] uppercase leading-none mt-1">Academy</span>
               </div>
-            </div>
+            </Link>
 
             <h1 className="text-3xl font-extrabold mb-3 leading-tight">
               {activePt.label}
@@ -390,7 +389,7 @@ function PortalLoginContent() {
           {/* RIGHT Login Card */}
           <div className="lg:col-span-3 bg-white rounded-2xl shadow-2xl overflow-hidden">
             {/* Portal type switcher */}
-            <div className="grid grid-cols-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3">
               {PORTAL_TYPES.map((pt) => {
                 const Icon = pt.icon;
                 const isActive = pt.type === activeType;
@@ -398,12 +397,12 @@ function PortalLoginContent() {
                   <button
                     key={pt.type}
                     onClick={() => setActiveType(pt.type)}
-                    className={`flex items-center justify-center gap-2.5 py-4 text-sm font-semibold transition-all duration-200 ${isActive
+                    className={`flex items-center justify-center gap-2.5 py-4 text-xs sm:text-sm font-semibold transition-all duration-200 ${isActive
                       ? `bg-gradient-to-r ${pt.gradient} text-white`
                       : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
                       }`}
                   >
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-white' : ''}`} />
+                    <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isActive ? 'text-white' : ''}`} />
                     {pt.label}
                   </button>
                 );
@@ -561,7 +560,7 @@ function PortalLoginContent() {
               <div className="mt-6 pt-5 border-t border-slate-100 text-center">
                 <p className="text-sm text-slate-500">
                   Are you a school staff member?{' '}
-                  <Link href="/login" className="text-indigo-600 font-semibold hover:underline">
+                  <Link href="/login" className="text-tca-primary font-semibold hover:underline">
                     Staff Login
                   </Link>
                 </p>

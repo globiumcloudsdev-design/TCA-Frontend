@@ -59,10 +59,10 @@
 // ];
 
 // const COLORS = {
-//   indigo: 'bg-indigo-100 text-indigo-700',
-//   violet: 'bg-violet-100 text-violet-700',
+//   indigo: 'bg-tca-primary text-tca-primary',
+//   violet: 'bg-tca-primary text-tca-primary',
 //   emerald: 'bg-emerald-100 text-emerald-700',
-//   cyan: 'bg-cyan-100 text-cyan-700',
+//   cyan: 'bg-tca-primary text-tca-primary',
 //   amber: 'bg-amber-100 text-amber-700',
 //   rose: 'bg-rose-100 text-rose-700',
 // };
@@ -73,10 +73,10 @@
 //       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 //         {/* Header */}
 //         <div className="text-center mb-14 max-w-3xl mx-auto">
-//           <p className="text-sm font-semibold text-indigo-600 uppercase tracking-widest mb-3">Testimonials</p>
+//           <p className="text-sm font-semibold text-tca-primary uppercase tracking-widest mb-3">Testimonials</p>
 //           <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 leading-tight">
 //             Schools that{' '}
-//             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">
+//             <span className="text-transparent bg-clip-text bg-gradient-to-r from-tca-dark to-tca-primary">
 //               love The Clouds Academy
 //             </span>
 //           </h2>
@@ -90,11 +90,11 @@
 //           {TESTIMONIALS.map((t) => (
 //             <div
 //               key={t.name}
-//               className="group bg-white rounded-2xl p-6 border border-slate-100 hover:border-indigo-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden"
+//               className="group bg-white rounded-2xl p-6 border border-slate-100 hover:border-tca-primary shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden"
 //             >
 //               {/* Quote icon */}
 //               <div className="absolute top-4 right-4 opacity-10 group-hover:opacity-20 transition-opacity">
-//                 <Quote className="w-16 h-16 text-indigo-600" />
+//                 <Quote className="w-16 h-16 text-tca-primary" />
 //               </div>
 
 //               {/* Stars */}
@@ -115,7 +115,7 @@
 //                 <div>
 //                   <p className="text-sm font-bold text-slate-900">{t.name}</p>
 //                   <p className="text-xs text-slate-500">{t.role}</p>
-//                   <p className="text-xs text-indigo-600 font-medium">{t.school}</p>
+//                   <p className="text-xs text-tca-primary font-medium">{t.school}</p>
 //                 </div>
 //               </div>
 //             </div>
@@ -123,7 +123,7 @@
 //         </div>
 
 //         {/* Bottom trust bar */}
-//         <div className="mt-16 bg-gradient-to-r from-indigo-50 to-violet-50 rounded-2xl p-8 border border-indigo-100 text-center">
+//         <div className="mt-16 bg-gradient-to-r from-tca-dark to-tca-primary rounded-2xl p-8 border border-tca-primary text-center">
 //           <p className="text-2xl font-extrabold text-slate-900 mb-2">Join 500+ schools already using The Clouds Academy</p>
 //           <p className="text-slate-500 text-base">From single-campus schools to 10+ branch networks — we&apos;ve got you covered.</p>
 //         </div>
@@ -148,7 +148,7 @@ const TESTIMONIALS = [
     role: 'Principal',
     school: 'Al-Noor Public School, Lahore',
     avatar: 'AK',
-    color: 'from-indigo-500 to-blue-600',
+    color: 'from-tca-dark to-tca-primary',
     text: 'The Clouds Academy ne hamare school ki admin work bilkul badal di. Pehle fees track karne mein poora din lagta tha, ab ek click mein sab clear ho jata hai. Bohat Zabardast system hai!',
   },
   {
@@ -156,7 +156,7 @@ const TESTIMONIALS = [
     role: 'School Administrator',
     school: 'Pearls International Academy, Karachi',
     avatar: 'SM',
-    color: 'from-violet-500 to-purple-600',
+    color: 'from-tca-dark to-tca-primary',
     text: 'Multi-branch feature is absolutely amazing. We have 3 campuses and managing all from one dashboard is a dream come true. The fee collection module alone saved us 15 hours per month.',
   },
   {
@@ -172,7 +172,7 @@ const TESTIMONIALS = [
     role: 'Head of Administration',
     school: 'Scholars Hub, Faisalabad',
     avatar: 'RS',
-    color: 'from-cyan-500 to-blue-500',
+    color: 'from-tca-dark to-tca-primary',
     text: 'Report generation alone is worth the price. I can export attendance, fees, and results in PDF or Excel within seconds. Parents are also very happy with the transparency.',
   },
   {
@@ -195,20 +195,20 @@ const TESTIMONIALS = [
 
 export default function TestimonialsSection() {
   return (
-    <section id="testimonials" className="py-24 bg-[#020617] relative overflow-hidden">
+    <section id="testimonials" className="py-24 bg-tca-bg relative overflow-hidden">
       {/* Background Decorative Blur */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-tca-primary/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Header */}
         <div className="text-center mb-20">
-          <Badge className="mb-4 bg-indigo-500/10 text-indigo-400 border-indigo-500/20 px-4 py-1">
+          <Badge className="mb-4 bg-tca-primary/10 text-tca-primary border-tca-primary/10 px-4 py-1">
             <MessageSquare className="w-3 h-3 mr-2" />
             Success Stories
           </Badge>
           <h2 className="text-4xl md:text-5xl font-black text-white mb-6">
-            Loved by <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Educational Leaders</span>
+            Loved by <span className="text-transparent bg-clip-text bg-gradient-to-r from-tca-primary to-tca-primary">Educational Leaders</span>
           </h2>
           <p className="text-lg text-slate-400 max-w-2xl mx-auto">
             From Lahore to Karachi, school administrators are transforming their institutions with The Clouds Academy.
@@ -242,7 +242,7 @@ export default function TestimonialsSection() {
                 <div>
                   <h4 className="text-white font-bold text-sm leading-none mb-1">{t.name}</h4>
                   <p className="text-xs text-slate-500 font-medium mb-1">{t.role}</p>
-                  <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">{t.school}</p>
+                  <p className="text-[10px] text-tca-primary font-bold uppercase tracking-wider">{t.school}</p>
                 </div>
               </div>
             </div>
@@ -251,7 +251,7 @@ export default function TestimonialsSection() {
 
         {/* CTA Trust Box */}
         <div className="mt-20 relative group">
-          <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-[2.5rem] blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
+          <div className="absolute inset-0 bg-gradient-to-r from-tca-dark to-tca-primary rounded-[2.5rem] blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
           <div className="relative bg-slate-900/80 border border-white/10 rounded-[2.5rem] p-10 md:p-16 text-center backdrop-blur-xl">
             <Sparkles className="w-10 h-10 text-amber-400 mx-auto mb-6 animate-pulse" />
             <h3 className="text-3xl md:text-4xl font-black text-white mb-4">
@@ -262,7 +262,7 @@ export default function TestimonialsSection() {
               Our team will assist you with onboarding and data migration.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <button className="h-14 px-10 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl transition-all hover:scale-105 shadow-xl shadow-indigo-600/20">
+              <button className="h-14 px-10 bg-tca-primary hover:bg-tca-primary text-white font-black rounded-2xl transition-all hover:scale-105 shadow-xl shadow-tca-primary/10">
                 Get Started for Free
               </button>
               <button className="h-14 px-10 bg-white/5 hover:bg-white/10 text-white font-black rounded-2xl border border-white/10 transition-all">

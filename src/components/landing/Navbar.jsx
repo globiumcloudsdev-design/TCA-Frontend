@@ -26,7 +26,7 @@ export default function Navbar() {
     <header
       className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ${
         scrolled 
-          ? 'py-3 bg-slate-950/80 backdrop-blur-xl border-b border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]' 
+          ? 'py-3 bg-tca-bg/80 backdrop-blur-xl border-b border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]' 
           : 'py-5 bg-transparent'
       }`}
     >
@@ -36,14 +36,16 @@ export default function Navbar() {
           {/* Logo Section */}
           <Link href="/" className="flex items-center gap-3 group">
             <div className="relative">
-              <div className="absolute inset-0 bg-indigo-500 blur-lg opacity-40 group-hover:opacity-100 transition-opacity" />
-              <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-xl border border-white/20">
-                <GraduationCap className="w-6 h-6 text-white" />
-              </div>
+              <div className="absolute inset-0 bg-tca-primary blur-lg opacity-40 group-hover:opacity-100 transition-opacity rounded-full" />
+              <img 
+                src="/logos/TCA Logo png White.png" 
+                alt="TCA Logo" 
+                className="relative w-12 h-12 object-contain filter drop-shadow-md transition-transform duration-300 group-hover:scale-105" 
+              />
             </div>
             <div className="flex flex-col">
               <span className="text-lg font-black text-white tracking-tight leading-none">THE CLOUDS</span>
-              <span className="text-[10px] font-bold text-indigo-400 tracking-[0.2em] uppercase leading-none mt-1">Academy</span>
+              <span className="text-[10px] font-bold text-tca-primary tracking-[0.2em] uppercase leading-none mt-1">Academy</span>
             </div>
           </Link>
 
@@ -56,7 +58,7 @@ export default function Navbar() {
                 className="px-5 py-2 text-sm font-semibold text-slate-300 hover:text-white transition-all relative group"
               >
                 {link.label}
-                <span className="absolute bottom-1 left-5 right-5 h-px bg-indigo-500 scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
+                <span className="absolute bottom-1 left-5 right-5 h-px bg-tca-primary scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
               </Link>
             ))}
           </nav>
@@ -69,7 +71,7 @@ export default function Navbar() {
               </span>
             </Link>
             <Link href="/login">
-              <Button size="sm" className="bg-white text-slate-950 hover:bg-indigo-50 font-bold px-6 rounded-full transition-all hover:scale-105 active:scale-95 shadow-lg shadow-white/5">
+              <Button size="sm" className="bg-white text-slate-950 hover:bg-tca-primary font-bold px-6 rounded-full transition-all hover:scale-105 active:scale-95 shadow-lg shadow-white/5">
                 Join Now
                 <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
@@ -88,7 +90,7 @@ export default function Navbar() {
 
       {/* Mobile Sidebar Overlay */}
       <div 
-        className={`fixed inset-0 bg-slate-950/60 backdrop-blur-sm md:hidden transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-tca-bg/60 backdrop-blur-sm md:hidden transition-opacity duration-300 ${
           menuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={() => setMenuOpen(false)}
@@ -109,7 +111,7 @@ export default function Navbar() {
                 key={link.label}
                 href={link.href}
                 onClick={() => setMenuOpen(false)}
-                className="text-xl font-bold text-white p-2 hover:text-indigo-400 transition-colors"
+                className="text-xl font-bold text-white p-2 hover:text-tca-primary transition-colors"
               >
                 {link.label}
               </Link>
@@ -123,7 +125,7 @@ export default function Navbar() {
               </Button>
             </Link>
             <Link href="/login" className="block">
-              <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-12 rounded-xl shadow-lg shadow-indigo-600/20">
+              <Button className="w-full bg-tca-primary hover:bg-tca-primary text-white h-12 rounded-xl shadow-lg shadow-tca-primary/10">
                 Get Started
               </Button>
             </Link>

@@ -505,7 +505,7 @@ export default function InstituteLayoutWrapper({ children }) {
             )}
 
             {/* Theme toggle */}
-            <ThemeToggle />
+            {/* <ThemeToggle /> */}
 
             {/* Notification bell */}
             <NotificationBell />

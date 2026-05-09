@@ -10,6 +10,11 @@ module.exports = {
     container: { center: true, padding: '2rem', screens: { '2xl': '1400px' } },
     extend: {
       colors: {
+        tca: {
+          bg: '#0A0F27',
+          dark: '#3F3A93',
+          primary: '#655DED',
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

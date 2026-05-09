@@ -9,6 +9,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { setAccessToken, setSchoolCode, clearAuthData } from "@/lib/auth";
 import { settingService } from "@/services/settingService";
+import { getDashboardPath } from "@/utils/authUtils";
 
 export const useAuthStore = create(
   persist(
@@ -213,8 +214,10 @@ export const useAuthStore = create(
       // =========================================================
       
       isMasterAdmin: () => {
-        const user = get().user;
-        return user?.role_code === "MASTER_ADMIN" || user?.user_type === "MASTER_ADMIN";
+        const u = get().user;
+        const role = (u?.role_code || u?.user_type || u?.role?.code || '').toUpperCase();
+        const MASTER_ROLES = ['MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPPORT_STAFF', 'MASTER_STAFF', 'MASTER_SUPPORT', 'SUPER_ADMIN', 'ADMIN', 'MASTER'];
+        return MASTER_ROLES.includes(role);
       },
 
       permissions: () => {
@@ -225,7 +228,7 @@ export const useAuthStore = create(
       canDo: (permissionCode) => {
         const u = get().user;
         if (!u) return false;
-        if (u.role_code === "MASTER_ADMIN" || u.user_type === "MASTER_ADMIN") return true;
+        if (get().isMasterAdmin()) return true;
         const perms = u.permissions || [];
         if (!Array.isArray(perms)) return false;
         if (perms.includes("ALL")) return true;
@@ -235,7 +238,7 @@ export const useAuthStore = create(
       canDoAny: (codes = []) => {
         const u = get().user;
         if (!u) return false;
-        if (u.role_code === "MASTER_ADMIN" || u.user_type === "MASTER_ADMIN") return true;
+        if (get().isMasterAdmin()) return true;
         const perms = u.permissions || [];
         if (perms.includes("ALL")) return true;
         return codes.some((code) => perms.includes(code));
@@ -273,22 +276,8 @@ export const useAuthStore = create(
 
       dashboardPath: () => {
         const u = get().user;
-        if (!u) return "/login";
-        if (u.role_code === "MASTER_ADMIN" || u.user_type === "MASTER_ADMIN") {
-          return "/master-admin";
-        }
-        if (u.branch_id || u.branch) {
-          return `/branch/${u.branch_id || u.branch?.id}/dashboard`;
-        }
         const type = get().instituteType();
-        const PATHS = {
-          school: "/school/dashboard",
-          coaching: "/coaching/dashboard",
-          academy: "/academy/dashboard",
-          college: "/college/dashboard",
-          university: "/university/dashboard",
-        };
-        return PATHS[type] ?? "/dashboard";
+        return getDashboardPath(u, type);
       },
 
       settings: () => {
