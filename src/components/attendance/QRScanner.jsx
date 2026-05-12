@@ -834,12 +834,16 @@ export default function QRScanner({
   const getModeInstruction = () => {
     if (bulkMode) {
       return scannerMode === 'camera' 
-        ? '📸 QR scan karein — Student queue mein add hoga (attendance nahi mark hogi)'
-        : '🔌 USB scanner se QR scan karein — Queue mein add hoga';
+        // ? '📸 QR scan karein — Student queue mein add hoga (attendance nahi mark hogi)'
+                ? 'Camera Scan'
+        // : '🔌 USB scanner se QR scan karein — Queue mein add hoga';
+                : 'Scanner Mode';
     } else {
       return scannerMode === 'camera'
-        ? '📸 QR scan karein — Attendance turant mark hogi'
-        : '🔌 USB scanner se QR scan karein — Attendance turant mark hogi';
+        // ? '📸 QR scan karein — Attendance turant mark hogi'
+        ? 'Camera Scan'
+        // : '🔌 USB scanner se QR scan karein — Attendance turant mark hogi';
+        : 'Scanner Mode';
     }
   };
 

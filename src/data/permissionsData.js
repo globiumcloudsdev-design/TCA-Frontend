@@ -221,6 +221,29 @@ export const ALL_PERMISSIONS = [
   'institute_data.users',
   'institute_data.fees',
   'institute_data.attendance',
+
+  // ── Website CMS ──────────────────────────────────────────────────────────
+  'cms.update_hero',
+  'cms.manage_faq',
+  'cms.manage_testimonials',
+  'cms.manage_features',
+
+  // ── Blog Management ──────────────────────────────────────────────────────
+  'blog.create',
+  'blog.read',
+  'blog.update',
+  'blog.delete',
+  'blog.seo',
+
+  // ── Branding & Theming ───────────────────────────────────────────────────
+  'branding.update_colors',
+  'branding.update_logos',
+  'branding.update_typography',
+
+  // ── Support Desk ─────────────────────────────────────────────────────────
+  'support.view_tickets',
+  'support.reply_tickets',
+  'support.whatsapp_settings',
 ];
 
 

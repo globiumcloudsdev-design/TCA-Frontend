@@ -336,15 +336,15 @@ const VoucherCard = ({ voucher, onView, onDownload, onPay, isDownloading }) => {
           <Download className="w-3 h-3" />
           {isDownloading ? 'Downloading...' : 'Download PDF'}
         </button>
-        {voucher.status !== 'paid' ? (
+        {/* {voucher.status !== 'paid' ? (
           <button
             onClick={() => onPay(voucher)}
             className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 flex items-center justify-center gap-1"
           >
             <CreditCard className="w-3 h-3" />
-            Pay
+            Pay Now
           </button>
-        ) : null}
+        ) : null} */}
       </div>
 
     </div>

@@ -481,16 +481,16 @@ const AttendanceReport = ({ terms = {} }) => {
         );
       }
     },
-    {
-      id: 'actions',
-      header: 'Action',
-      cell: ({ row }) => (
-        <TableRowActions
-          onView={() => toast.info('View student details')}
-          onEdit={() => toast.info('Edit attendance record')}
-        />
-      )
-    }
+    // {
+    //   id: 'actions',
+    //   header: 'Action',
+    //   cell: ({ row }) => (
+    //     <TableRowActions
+    //       onView={() => toast.info('View student details')}
+    //       onEdit={() => toast.info('Edit attendance record')}
+    //     />
+    //   )
+    // }
   ], []);
 
   const allFilteredRows = useMemo(() => {
@@ -638,14 +638,14 @@ const AttendanceReport = ({ terms = {} }) => {
         <div className="flex justify-between items-center mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
           <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest">Report Management Engine 2.0</p>
           <div className="flex flex-wrap gap-3">
-            <Button
+            {/* <Button
               variant="outline"
               onClick={() => window.print()}
               className="flex items-center gap-2"
             >
               <Printer className="w-4 h-4" />
               Print Results
-            </Button>
+            </Button> */}
             <Button
               variant="outline"
               onClick={handleExportPDF}

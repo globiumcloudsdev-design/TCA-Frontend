@@ -27,6 +27,7 @@ import InputField from '@/components/common/InputField';
 import FormSubmitButton from '@/components/common/FormSubmitButton';
 import ErrorAlert from '@/components/common/ErrorAlert';
 import PageLoader from '@/components/common/PageLoader';
+import ButtonLoader from '@/components/common/ButtonLoader';
 import StatusBadge from '@/components/common/StatusBadge';
 import TimePickerField from '@/components/common/TimePickerField';
 import DatePickerField from '@/components/common/DatePickerField';
@@ -272,36 +273,51 @@ function TimetableConfigModal({ open, onClose, onSubmit, initialConfig = null, l
 
   // Update periods when totalPeriods changes
   const handleTotalPeriodsChange = (e) => {
-    const newTotal = parseInt(e.target.value) || 1;
+    const val = e.target.value;
+    if (val === '') {
+      setTotalPeriods('');
+      return;
+    }
+
+    let newTotal = parseInt(val) || 1;
+    
+    // Safety limit to prevent browser hang
+    if (newTotal > 15) {
+      toast.error('Maximum 15 periods allowed per day');
+      newTotal = 15;
+    }
+    
     setTotalPeriods(newTotal);
 
-    const newPeriods = [];
-    let currentTime = 8 * 60; // 8:00 AM
-    
-    for (let i = 1; i <= newTotal; i++) {
-      const existing = periods.find(p => p.period === i);
-      if (existing) {
-        newPeriods.push(existing);
-      } else {
-        const startHour = Math.floor(currentTime / 60);
-        const startMin = currentTime % 60;
-        const startTime = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`;
-        
-        currentTime += 40;
-        const endHour = Math.floor(currentTime / 60);
-        const endMin = currentTime % 60;
-        const endTime = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
-        
-        newPeriods.push({
-          period: i,
-          start_time: startTime,
-          end_time: endTime,
-          name: `Period ${i}`,
-          type: 'study'
-        });
+    setPeriods(prev => {
+      const newPeriods = [];
+      let currentTime = 8 * 60; // 8:00 AM
+      
+      for (let i = 1; i <= newTotal; i++) {
+        const existing = prev.find(p => p.period === i);
+        if (existing) {
+          newPeriods.push(existing);
+        } else {
+          const startHour = Math.floor(currentTime / 60);
+          const startMin = currentTime % 60;
+          const startTime = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`;
+          
+          currentTime += 40;
+          const endHour = Math.floor(currentTime / 60);
+          const endMin = currentTime % 60;
+          const endTime = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
+          
+          newPeriods.push({
+            period: i,
+            start_time: startTime,
+            end_time: endTime,
+            name: `Period ${i}`,
+            type: 'study'
+          });
+        }
       }
-    }
-    setPeriods(newPeriods);
+      return newPeriods;
+    });
   };
 
   // Toggle day selection
@@ -422,8 +438,9 @@ function TimetableConfigModal({ open, onClose, onSubmit, initialConfig = null, l
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Saving...' : initialConfig ? 'Update Timetable' : 'Create Timetable'}
+          <Button onClick={handleSubmit} disabled={loading} className="gap-2">
+            {loading && <ButtonLoader />}
+            {initialConfig ? 'Update Timetable' : 'Create Timetable'}
           </Button>
         </div>
       }
@@ -2151,7 +2168,7 @@ export default function TimetablePage({ type }) {
         open={printModalOpen}
         onClose={() => setPrintModalOpen(false)}
         title="Print / Export Timetable"
-        size="md"
+        size="lg"
       >
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">

@@ -44,14 +44,14 @@ export const PLATFORM_PERMISSIONS = {
   institute: {
     label: 'Institute Management',
     permissions: [
-      { code: 'institute.create',          label: 'Naya institute create karna'                    },
-      { code: 'institute.read',            label: 'Tamam institutes ki list dekhna'                },
-      { code: 'institute.update',          label: 'Institute ka profile / settings update karna'   },
-      { code: 'institute.delete',          label: 'Institute permanently delete karna'             },
-      { code: 'institute.activate',        label: 'Institute ko activate / deactivate karna'       },
-      { code: 'institute.assign_role',     label: 'Institute ko subscription role assign karna'    },
-      { code: 'institute.export',          label: 'Institutes ka data export (CSV/PDF)'            },
-      { code: 'institute.view_stats',      label: 'Per-institute stats dekhna (students, revenue)'  },
+      { code: 'institute.create', label: 'Naya institute create karna' },
+      { code: 'institute.read', label: 'Tamam institutes ki list dekhna' },
+      { code: 'institute.update', label: 'Institute ka profile / settings update karna' },
+      { code: 'institute.delete', label: 'Institute permanently delete karna' },
+      { code: 'institute.activate', label: 'Institute ko activate / deactivate karna' },
+      { code: 'institute.assign_role', label: 'Institute ko subscription role assign karna' },
+      { code: 'institute.export', label: 'Institutes ka data export (CSV/PDF)' },
+      { code: 'institute.view_stats', label: 'Per-institute stats dekhna (students, revenue)' },
     ],
   },
 
@@ -59,13 +59,13 @@ export const PLATFORM_PERMISSIONS = {
   subscription: {
     label: 'Subscription Management',
     permissions: [
-      { code: 'subscription.create',       label: 'Institute ke liye subscription create karna'    },
-      { code: 'subscription.read',         label: 'Tamam subscriptions ki list dekhna'             },
-      { code: 'subscription.update',       label: 'Subscription details update karna'              },
-      { code: 'subscription.delete',       label: 'Invoice / Subscription permanently delete karna'},
-      { code: 'subscription.cancel',       label: 'Subscription cancel karna'                      },
-      { code: 'subscription.renew',        label: 'Subscription manually renew karna'              },
-      { code: 'subscription.export',       label: 'Subscription data export karna'                 },
+      { code: 'subscription.create', label: 'Institute ke liye subscription create karna' },
+      { code: 'subscription.read', label: 'Tamam subscriptions ki list dekhna' },
+      { code: 'subscription.update', label: 'Subscription details update karna' },
+      { code: 'subscription.delete', label: 'Invoice / Subscription permanently delete karna' },
+      { code: 'subscription.cancel', label: 'Subscription cancel karna' },
+      { code: 'subscription.renew', label: 'Subscription manually renew karna' },
+      { code: 'subscription.export', label: 'Subscription data export karna' },
     ],
   },
 
@@ -73,10 +73,10 @@ export const PLATFORM_PERMISSIONS = {
   subscription_template: {
     label: 'Subscription Templates / Plans',
     permissions: [
-      { code: 'sub_template.create',       label: 'Naya subscription plan/template banana'         },
-      { code: 'sub_template.read',         label: 'Tamam templates dekhna'                        },
-      { code: 'sub_template.update',       label: 'Plan ki price / features update karna'          },
-      { code: 'sub_template.delete',       label: 'Template delete karna'                          },
+      { code: 'sub_template.create', label: 'Naya subscription plan/template banana' },
+      { code: 'sub_template.read', label: 'Tamam templates dekhna' },
+      { code: 'sub_template.update', label: 'Plan ki price / features update karna' },
+      { code: 'sub_template.delete', label: 'Template delete karna' },
     ],
   },
 
@@ -84,11 +84,11 @@ export const PLATFORM_PERMISSIONS = {
   platform_role: {
     label: 'Platform Roles',
     permissions: [
-      { code: 'platform_role.create',      label: 'Platform-level role banana (e.g. Support Admin)'  },
-      { code: 'platform_role.read',        label: 'Platform roles ki list dekhna'                   },
-      { code: 'platform_role.update',      label: 'Role ka naam / permissions update karna'           },
-      { code: 'platform_role.delete',      label: 'Role delete karna'                               },
-      { code: 'platform_role.assign',      label: 'User ko platform role assign karna'              },
+      { code: 'platform_role.create', label: 'Platform-level role banana (e.g. Support Admin)' },
+      { code: 'platform_role.read', label: 'Platform roles ki list dekhna' },
+      { code: 'platform_role.update', label: 'Role ka naam / permissions update karna' },
+      { code: 'platform_role.delete', label: 'Role delete karna' },
+      { code: 'platform_role.assign', label: 'User ko platform role assign karna' },
     ],
   },
 
@@ -96,11 +96,11 @@ export const PLATFORM_PERMISSIONS = {
   platform_user: {
     label: 'Platform Users (Admin Panel Users)',
     permissions: [
-      { code: 'platform_user.create',      label: 'Naya platform user banana (e.g. Support staff)'  },
-      { code: 'platform_user.read',        label: 'Tamam platform users ki list dekhna'            },
-      { code: 'platform_user.update',      label: 'User profile / role update karna'               },
-      { code: 'platform_user.delete',      label: 'User ka account delete karna'                   },
-      { code: 'platform_user.toggle',      label: 'User activate / deactivate karna'               },
+      { code: 'platform_user.create', label: 'Naya platform user banana (e.g. Support staff)' },
+      { code: 'platform_user.read', label: 'Tamam platform users ki list dekhna' },
+      { code: 'platform_user.update', label: 'User profile / role update karna' },
+      { code: 'platform_user.delete', label: 'User ka account delete karna' },
+      { code: 'platform_user.toggle', label: 'User activate / deactivate karna' },
     ],
   },
 
@@ -108,8 +108,8 @@ export const PLATFORM_PERMISSIONS = {
   email: {
     label: 'Bulk Email / Communication',
     permissions: [
-      { code: 'email.send_bulk',           label: 'Tamam ya specific institutes ko bulk email bhejna' },
-      { code: 'email.view_history',        label: 'Purani emails ka history dekhna'                },
+      { code: 'email.send_bulk', label: 'Tamam ya specific institutes ko bulk email bhejna' },
+      { code: 'email.view_history', label: 'Purani emails ka history dekhna' },
     ],
   },
 
@@ -117,11 +117,11 @@ export const PLATFORM_PERMISSIONS = {
   report: {
     label: 'Platform Reports',
     permissions: [
-      { code: 'report.platform_overview',  label: 'Overall platform stats report (revenue, institutes, users)' },
-      { code: 'report.revenue',            label: 'Revenue report (monthly/yearly breakdown)'     },
-      { code: 'report.institute_wise',     label: 'Institute-wise detailed report'                },
-      { code: 'report.subscription',       label: 'Subscription churn / renewal report'           },
-      { code: 'report.export',             label: 'Reports export karna (CSV / PDF)'              },
+      { code: 'report.platform_overview', label: 'Overall platform stats report (revenue, institutes, users)' },
+      { code: 'report.revenue', label: 'Revenue report (monthly/yearly breakdown)' },
+      { code: 'report.institute_wise', label: 'Institute-wise detailed report' },
+      { code: 'report.subscription', label: 'Subscription churn / renewal report' },
+      { code: 'report.export', label: 'Reports export karna (CSV / PDF)' },
     ],
   },
 
@@ -129,32 +129,98 @@ export const PLATFORM_PERMISSIONS = {
   notification: {
     label: 'Platform Notifications',
     permissions: [
-      { code: 'notification.broadcast',    label: 'Tamam institutes ko platform notification bhejna' },
-      { code: 'notification.targeted',     label: 'Specific institute ya user ko notification'    },
+      { code: 'notification.broadcast', label: 'Tamam institutes ko platform notification bhejna' },
+      { code: 'notification.targeted', label: 'Specific institute ya user ko notification' },
     ],
   },
 
-  // ── Platform Settings ────────────────────────────────────────────────────
-  platform_settings: {
-    label: 'Platform Settings',
-    permissions: [
-      { code: 'platform.settings',         label: 'Platform-wide settings update karna'           },
-      { code: 'platform.backup',           label: 'Database backup manage karna'                  },
-      { code: 'platform.audit_logs',       label: 'Audit logs dekhna (kaun kya kar raha hai)'     },
-      { code: 'platform.maintenance',      label: 'Maintenance mode toggle karna'                 },
-    ],
-  },
+  // // ── Platform Settings ────────────────────────────────────────────────────
+  // platform_settings: {
+  //   label: 'Platform Settings',
+  //   permissions: [
+  //     { code: 'platform.settings',         label: 'Platform-wide settings update karna'           },
+  //     { code: 'platform.backup',           label: 'Database backup manage karna'                  },
+  //     { code: 'platform.audit_logs',       label: 'Audit logs dekhna (kaun kya kar raha hai)'     },
+  //     { code: 'platform.maintenance',      label: 'Maintenance mode toggle karna'                 },
+  //   ],
+  // },
 
-  // ── Institute Data Access (Read-only for support) ─────────────────────────
-  institute_data: {
-    label: 'Institute Data Access (Support Level)',
-    permissions: [
-      { code: 'institute_data.students',   label: 'Kisi bhi institute ke students dekhna (support)'  },
-      { code: 'institute_data.users',      label: 'Kisi bhi institute ke users dekhna'             },
-      { code: 'institute_data.fees',       label: 'Kisi bhi institute ka fee data dekhna'          },
-      { code: 'institute_data.attendance', label: 'Kisi bhi institute ka attendance dekhna'        },
-    ],
-  },
+  // // ── Website CMS ──────────────────────────────────────────────────────────
+  // website_cms: {
+  //   label: 'Website CMS',
+  //   permissions: [
+  //     { code: 'cms.update_hero',           label: 'Hero section update karna'                      },
+  //     { code: 'cms.manage_faq',            label: 'FAQs manage karna'                             },
+  //     { code: 'cms.manage_testimonials',   label: 'Testimonials manage karna'                      },
+  //     { code: 'cms.manage_features',       label: 'Website features list manage karna'            },
+  //   ],
+  // },
+
+  // // ── Blog Management ──────────────────────────────────────────────────────
+  // blog: {
+  //   label: 'Blog Management',
+  //   permissions: [
+  //     { code: 'blog.create',               label: 'Naya blog post likhna'                          },
+  //     { code: 'blog.read',                 label: 'Blog posts ki list dekhna'                      },
+  //     { code: 'blog.update',               label: 'Blog post edit karna'                           },
+  //     { code: 'blog.delete',               label: 'Blog post delete karna'                         },
+  //     { code: 'blog.seo',                  label: 'Blog SEO settings manage karna'                 },
+  //   ],
+  // },
+
+  // // ── Branding & Theming ───────────────────────────────────────────────────
+  // branding: {
+  //   label: 'Branding & Theming',
+  //   permissions: [
+  //     { code: 'branding.update_colors',    label: 'Platform colors change karna'                   },
+  //     { code: 'branding.update_logos',     label: 'Logos aur icons update karna'                   },
+  //     { code: 'branding.update_typography', label: 'Fonts aur styling update karna'                 },
+  //   ],
+  // },
+
+  // // ── Support Desk ─────────────────────────────────────────────────────────
+  // support: {
+  //   label: 'Support Desk',
+  //   permissions: [
+  //     { code: 'support.view_tickets',      label: 'Support tickets dekhna'                         },
+  //     { code: 'support.reply_tickets',     label: 'Tickets ka reply dena'                          },
+  //     { code: 'support.whatsapp_settings', label: 'WhatsApp integration settings manage karna'     },
+  //   ],
+  // },
+
+  // // ── Institute Data Access (Read-only for support) ─────────────────────────
+  // institute_data: {
+  //   label: 'Institute Data Access (Support Level)',
+  //   permissions: [
+  //     { code: 'institute_data.students',   label: 'Kisi bhi institute ke students dekhna (support)'  },
+  //     { code: 'institute_data.users',      label: 'Kisi bhi institute ke users dekhna'             },
+  //     { code: 'institute_data.fees',       label: 'Kisi bhi institute ka fee data dekhna'          },
+  //     { code: 'institute_data.attendance', label: 'Kisi bhi institute ka attendance dekhna'        },
+  //   ],
+  // },
+
+  // // ── Global System Control ────────────────────────────────────────────────
+  // global_control: {
+  //   label: 'Global System Control',
+  //   permissions: [
+  //     { code: 'global.system_health',      label: 'System health aur performance dekhna'           },
+  //     { code: 'global.feature_toggles',    label: 'Platform features ko globally enable/disable karna' },
+  //     { code: 'global.impersonation',      label: 'Institute admin ke taur par login karna (Global Control Access)' },
+  //     { code: 'global.db_explorer',        label: 'Database record explorer (Read-only)'           },
+  //     { code: 'global.maintenance_mode',   label: 'Platform-wide maintenance mode toggle'          },
+  //     { code: 'global.asset_manager',      label: 'Global system assets aur scripts manage karna'  },
+  //   ],
+  // },
+
+  // // ── Platform Analytics ───────────────────────────────────────────────────
+  // analytics: {
+  //   label: 'Platform Analytics',
+  //   permissions: [
+  //     { code: 'analytics.view_traffic',    label: 'Website traffic aur visitor stats dekhna'       },
+  //     { code: 'analytics.view_heatmaps',   label: 'User click heatmaps aur interaction data dekhna' },
+  //     { code: 'analytics.view_page_stats', label: 'Page-wise popular content analytics dekhna'    },
+  //   ],
+  // },
 };
 
 
@@ -300,6 +366,26 @@ export const MASTER_ADMIN_PAGE_ACTIONS = {
       'Notification type select karna (info, warning, payment, subscription, etc.)',
       'Scheduled notifications (future feature)',
       'Sent notifications ka history dekhna',
+    ],
+  },
+
+  '/master-admin/global-control': {
+    label: 'Global Control Center',
+    actions: [
+      'Poore system ka "Global Mode" impersonation control karna',
+      'Modules aur features ko globally on/off karna',
+      'System-wide maintenance mode activate/deactivate karna',
+      'Institute status aur limits (e.g. Max Students) manage karna',
+      'Global analytics aur system health metrics dekhna',
+    ],
+  },
+
+  '/master-admin/analytics': {
+    label: 'Platform Analytics',
+    actions: [
+      'Google Analytics dummy traffic data dekhna',
+      'User interaction heatmaps track karna',
+      'Popular pages aur engagement metrics analyze karna',
     ],
   },
 };

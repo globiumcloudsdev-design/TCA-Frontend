@@ -610,7 +610,7 @@ export default function PortalShell({ children, type }) {
                   </Link>
                 </DropdownMenuItem>
 
-                <DropdownMenuItem asChild>
+                {/* <DropdownMenuItem asChild>
                   <Link
                     href={`/${type.toLowerCase()}/settings`}
                     className="flex items-center gap-2 cursor-pointer"
@@ -618,11 +618,11 @@ export default function PortalShell({ children, type }) {
                     <Settings className="w-4 h-4" />
                     <span>Settings</span>
                   </Link>
-                </DropdownMenuItem>
+                </DropdownMenuItem> */}
 
                 <DropdownMenuSeparator />
 
-                <DropdownMenuItem asChild>
+                {/* <DropdownMenuItem asChild>
                   <Link
                     href={`/${type.toLowerCase()}/help`}
                     className="flex items-center gap-2 cursor-pointer"
@@ -630,7 +630,7 @@ export default function PortalShell({ children, type }) {
                     <HelpCircle className="w-4 h-4" />
                     <span>Help & Support</span>
                   </Link>
-                </DropdownMenuItem>
+                </DropdownMenuItem> */}
 
                 <DropdownMenuItem asChild>
                   <a

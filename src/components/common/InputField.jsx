@@ -41,6 +41,7 @@ export default function InputField({
   required,
   disabled,
   className,
+  inputClassName,
   hint,
   rules,
   ...props
@@ -72,7 +73,7 @@ export default function InputField({
                 placeholder={placeholder}
                 disabled={disabled}
                 aria-invalid={!!error}
-                className={cn(isPassword && "pr-10")}
+                className={cn(isPassword && "pr-10", inputClassName)}
                 {...props}
                 value={field.value ?? ''}
                 onChange={(e) => {
@@ -90,7 +91,7 @@ export default function InputField({
             placeholder={placeholder}
             disabled={disabled}
             aria-invalid={!!error}
-            className={cn(isPassword && "pr-10")}
+            className={cn(isPassword && "pr-10", inputClassName)}
             {...(register ? register(name, rules) : {})}
             {...props}
           />

@@ -11,10 +11,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Building2, Users, CreditCard,
   LogOut, FileText, Menu, X, ShieldCheck, Mail, BarChart3, Bell, BellRing,
+  Globe, Newspaper, Palette, LifeBuoy, ShieldAlert, TrendingUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Cookies from 'js-cookie';
-
 import useAuthStore from '@/store/authStore';
 import { useQuery } from '@tanstack/react-query';
 import { masterAdminService } from '@/services';
@@ -24,39 +24,45 @@ import {
 import { cn } from '@/lib/utils';
 
 const NAV = [
-  { href: '/master-admin',                        label: 'Dashboard',       icon: LayoutDashboard, perm: null                    },
-  { href: '/master-admin/roles',                  label: 'Roles',           icon: ShieldCheck,     perm: 'platform_role.read'     },
-  { href: '/master-admin/subscription-templates', label: 'Sub. Templates',  icon: FileText,        perm: 'sub_template.read'      },
-  { href: '/master-admin/institutes',                label: 'Institutes',      icon: Building2,       perm: 'institute.read'         },
-  { href: '/master-admin/subscriptions',          label: 'Invoices',   icon: CreditCard,      perm: 'subscription.read'      },
-  { href: '/master-admin/users',                  label: 'Users',           icon: Users,           perm: 'platform_user.read'     },
-  { href: '/master-admin/reports',                label: 'Reports',         icon: BarChart3,       perm: 'report.platform_overview'},
-  { href: '/master-admin/emails',                 label: 'Bulk Emails',     icon: Mail,            perm: 'email.view_history'     },
-  { href: '/master-admin/notifications',          label: 'Notifications',   icon: BellRing,        perm: 'notification.broadcast' },
+  { href: '/master-admin', label: 'Dashboard', icon: LayoutDashboard, perm: null },
+  { href: '/master-admin/global-control', label: 'Global Control', icon: ShieldAlert, perm: 'global.system_health' },
+  { href: '/master-admin/analytics', label: 'Analytics', icon: TrendingUp, perm: 'analytics.view_traffic' },
+  { href: '/master-admin/roles', label: 'Roles', icon: ShieldCheck, perm: 'platform_role.read' },
+  { href: '/master-admin/subscription-templates', label: 'Sub. Templates', icon: FileText, perm: 'sub_template.read' },
+  { href: '/master-admin/institutes', label: 'Institutes', icon: Building2, perm: 'institute.read' },
+  { href: '/master-admin/subscriptions', label: 'Invoices', icon: CreditCard, perm: 'subscription.read' },
+  { href: '/master-admin/users', label: 'Users', icon: Users, perm: 'platform_user.read' },
+  { href: '/master-admin/reports', label: 'Reports', icon: BarChart3, perm: 'report.platform_overview' },
+  { href: '/master-admin/emails', label: 'Bulk Emails', icon: Mail, perm: 'email.view_history' },
+  { href: '/master-admin/notifications', label: 'Notifications', icon: BellRing, perm: 'notification.broadcast' },
+  { href: '/master-admin/website-cms', label: 'Website CMS', icon: Globe, perm: 'cms.update_hero' },
+  { href: '/master-admin/blog', label: 'Blog Management', icon: Newspaper, perm: 'blog.read' },
+  { href: '/master-admin/branding', label: 'Branding', icon: Palette, perm: 'branding.update_colors' },
+  { href: '/master-admin/support', label: 'Support Desk', icon: LifeBuoy, perm: 'support.view_tickets' },
 ];
 
 const NOTIF_TYPE_OPTIONS = [
-  { value: 'info',         label: 'Info / General'       },
-  { value: 'announcement', label: 'Announcement'         },
-  { value: 'warning',      label: 'Warning'              },
-  { value: 'alert',        label: 'Urgent Alert'         },
-  { value: 'reminder',     label: 'Reminder'             },
-  { value: 'payment',      label: 'Payment / Invoice'    },
-  { value: 'subscription', label: 'Subscription Notice'  },
+  { value: 'info', label: 'Info / General' },
+  { value: 'announcement', label: 'Announcement' },
+  { value: 'warning', label: 'Warning' },
+  { value: 'alert', label: 'Urgent Alert' },
+  { value: 'reminder', label: 'Reminder' },
+  { value: 'payment', label: 'Payment / Invoice' },
+  { value: 'subscription', label: 'Subscription Notice' },
 ];
 
 export default function MasterAdminLayout({ children }) {
-  const pathname     = usePathname();
-  const router       = useRouter();
-  const user         = useAuthStore((s) => s.user);
-  const canDo        = useAuthStore((s) => s.canDo);
-  const logout       = useAuthStore((s) => s.logout);
-  const [open,       setOpen]      = useState(false);
-  const [notifOpen,  setNotifOpen] = useState(false);
-  const [mounted,    setMounted]   = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+  const user = useAuthStore((s) => s.user);
+  const canDo = useAuthStore((s) => s.canDo);
+  const logout = useAuthStore((s) => s.logout);
+  const [open, setOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   console.log('Login User', user);
-  
+
   // Delay permission-filtering until after hydration so server HTML matches
   // first client render (Zustand reads localStorage only on client).
   useEffect(() => { setMounted(true); }, []);
@@ -64,10 +70,10 @@ export default function MasterAdminLayout({ children }) {
   // Route Protection: Prevent manual URL navigation to unauthorized pages
   useEffect(() => {
     if (!mounted) return;
-    
-    const currentNav = NAV.find((n) => 
-      n.href !== '/master-admin' 
-        ? pathname.startsWith(n.href) 
+
+    const currentNav = NAV.find((n) =>
+      n.href !== '/master-admin'
+        ? pathname.startsWith(n.href)
         : pathname === '/master-admin'
     );
 
@@ -82,7 +88,7 @@ export default function MasterAdminLayout({ children }) {
     : NAV.filter(({ perm }) => !perm);
 
   const handleLogout = async () => {
-    try { await authService.logout(); } catch (_) {}
+    try { await authService.logout(); } catch (_) { }
     logout();
     Cookies.remove('access_token');
     Cookies.remove('role_code');
@@ -112,7 +118,14 @@ export default function MasterAdminLayout({ children }) {
       >
         {/* Logo + close (mobile only) */}
         <div className="flex h-16 items-center justify-between border-b border-white/10 px-5">
-          <span className="font-bold text-sm">☁ Master Admin</span>
+          <div className="flex items-center justify-center gap-2 font-bold text-sm">
+            <img
+              src="/logos/TCA Logo png White.png"
+              alt="TCA Logo"
+              className="relative w-12 h-12 sm:w-16 sm:h-16 object-contain filter drop-shadow-md transition-transform duration-300 group-hover:scale-105"
+            />
+            <div>Master Admin</div>
+          </div>
           <button
             onClick={() => setOpen(false)}
             className="rounded-md p-1.5 text-white/70 hover:bg-white/10 hover:text-white md:hidden"
@@ -201,7 +214,7 @@ export default function MasterAdminLayout({ children }) {
 // ── SendNotificationModal ─────────────────────────────────────────────────────
 function SendNotificationModal({ open, onClose }) {
   const [sending, setSending] = useState(false);
-  
+
   // Fetch real institutes for dropdown
   const { data: schoolsData } = useQuery({
     queryKey: ['master-schools-all'],
@@ -223,11 +236,11 @@ function SendNotificationModal({ open, onClose }) {
     formState: { errors },
   } = useForm({
     defaultValues: {
-      recipients:   'all',
-      type:         'info',
-      subject:      '',
-      message:      '',
-      schedule_at:  null,
+      recipients: 'all',
+      type: 'info',
+      subject: '',
+      message: '',
+      schedule_at: null,
     },
   });
 

@@ -39,6 +39,7 @@ export default function AppModal({
   title,
   description,
   size = 'md',
+  className,
   children,
   footer,
 }) {
@@ -51,6 +52,7 @@ export default function AppModal({
           SIZE_CLASSES[size],
           // Height: never taller than 95vh; scroll inside
           'max-h-[95vh] flex flex-col',
+          className
         )}
       >
         {/* ── Sticky Header ── */}

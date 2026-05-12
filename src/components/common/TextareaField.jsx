@@ -31,6 +31,7 @@ export default function TextareaField({
   required,
   disabled,
   className,
+  textareaClassName,
   ...props
 }) {
   return (
@@ -54,6 +55,7 @@ export default function TextareaField({
               placeholder={placeholder}
               disabled={disabled}
               aria-invalid={!!error}
+              className={textareaClassName}
               value={field.value ?? ''}
               {...props}
             />
@@ -67,6 +69,7 @@ export default function TextareaField({
           placeholder={placeholder}
           disabled={disabled}
           aria-invalid={!!error}
+          className={textareaClassName}
           {...(register ? register(name) : props)}
         />
       )}

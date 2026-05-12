@@ -43,6 +43,7 @@ export default function SelectField({
   control,
   value,
   onChange,
+  defaultValue,
   error,
   options = [],
   placeholder = 'Select…',
@@ -59,8 +60,8 @@ export default function SelectField({
       : [];
 
   const normalizedOptions = (optionsArray || []).filter((opt) => {
-    const value = String(opt?.value ?? '').trim();
-    return value !== '';
+    const val = String(opt?.value ?? '').trim();
+    return val !== '';
   });
 
   return (

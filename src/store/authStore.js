@@ -228,7 +228,7 @@ export const useAuthStore = create(
       canDo: (permissionCode) => {
         const u = get().user;
         if (!u) return false;
-        if (get().isMasterAdmin()) return true;
+        // if (get().isMasterAdmin()) return true;
         const perms = u.permissions || [];
         if (!Array.isArray(perms)) return false;
         if (perms.includes("ALL")) return true;
@@ -238,7 +238,7 @@ export const useAuthStore = create(
       canDoAny: (codes = []) => {
         const u = get().user;
         if (!u) return false;
-        if (get().isMasterAdmin()) return true;
+        // if (get().isMasterAdmin()) return true;
         const perms = u.permissions || [];
         if (perms.includes("ALL")) return true;
         return codes.some((code) => perms.includes(code));

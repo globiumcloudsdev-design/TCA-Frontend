@@ -189,7 +189,7 @@ export default function LoginPage() {
       <div className="w-full max-w-lg relative z-10">
 
         {/* Logo Section */}
-        <div className="flex flex-col items-center mb-6 sm:mb-8">
+        {/* <div className="flex flex-col items-center mb-6 sm:mb-8">
           <Link href="/" className="flex items-center gap-3 group">
             <div className="relative">
               <div className="absolute inset-0 bg-tca-primary blur-lg opacity-40 group-hover:opacity-100 transition-opacity rounded-full" />
@@ -204,7 +204,7 @@ export default function LoginPage() {
               <span className="text-[10px] sm:text-xs font-bold text-tca-primary tracking-[0.2em] uppercase leading-none mt-1">Academy</span>
             </div>
           </Link>
-        </div>
+        </div> */}
 
         {/* Portal Shortcuts */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">

@@ -992,7 +992,7 @@ function StudentSearchTab({ terms, type, instituteId }) {
   const [scanType, setScanType] = useState('regular');
 
   useEffect(() => {
-    const handler = setTimeout(() => setDebouncedSearch(search), 500);
+    const handler = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(handler);
   }, [search]);
 
@@ -1079,8 +1079,16 @@ function StudentSearchTab({ terms, type, instituteId }) {
             placeholder="Search by name, registration number, or roll number..."
             value={search}
             onChange={(e) => {
-              setSearch(e.target.value);
-              if (e.target.value === '') setSelectedStudent(null);
+              const val = e.target.value;
+              setSearch(val);
+              if (selectedStudent) {
+                setSelectedStudent(null);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && students.length > 0 && !selectedStudent) {
+                setSelectedStudent(students[0]);
+              }
             }}
           />
         </div>

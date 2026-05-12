@@ -28,6 +28,7 @@ import FormSubmitButton from '@/components/common/FormSubmitButton';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import ButtonLoader from '@/components/common/ButtonLoader';
 import { cn } from '@/lib/utils';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -153,10 +154,36 @@ const getLeaveRequestColumns = (onApprove, onReject) => [
     header: 'Reason',
     accessorKey: 'reason',
     cell: (info) => (
-      <p className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-xs">
+      <p className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-xs" title={info.getValue()}>
         {info.getValue() || '—'}
       </p>
     )
+  },
+  {
+    header: 'Marked By',
+    cell: (info) => {
+      const req = info.row.original;
+      if (!req.markedBy) return '—';
+      return (
+        <div className="flex flex-col">
+          <span className="text-sm font-medium">{req.markedBy.first_name} {req.markedBy.last_name}</span>
+          <span className="text-[10px] text-gray-500 uppercase">{req.markedBy.role_code || 'ADMIN'}</span>
+        </div>
+      );
+    }
+  },
+  {
+    header: 'Approved By',
+    cell: (info) => {
+      const req = info.row.original;
+      if (!req.approver) return '—';
+      return (
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-primary">{req.approver.first_name} {req.approver.last_name}</span>
+          <span className="text-[10px] text-gray-500">{formatDate(req.approved_at)}</span>
+        </div>
+      );
+    }
   },
   {
     header: 'Status',
@@ -337,7 +364,7 @@ export default function LeaveRequestPage({ type = 'school' }) {
       from_date: '',
       to_date: '',
       reason: '',
-      approve_immediately: false
+      approve_immediately: true
     }
   });
   
@@ -564,14 +591,22 @@ export default function LeaveRequestPage({ type = 'school' }) {
         />
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-transparent border-b rounded-none p-0">
-            <TabsTrigger value="requests" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
-              Leave Requests
-            </TabsTrigger>
-            <TabsTrigger value="types" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
-              Leave Types
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between">
+            <TabsList className="bg-gray-100 dark:bg-gray-900/50 p-1 rounded-xl border border-gray-200 dark:border-gray-800">
+              <TabsTrigger 
+                value="requests" 
+                className="px-6 py-2 text-sm font-medium rounded-lg transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:text-primary data-[state=active]:shadow-sm"
+              >
+                Leave Requests
+              </TabsTrigger>
+              <TabsTrigger 
+                value="types" 
+                className="px-6 py-2 text-sm font-medium rounded-lg transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:text-primary data-[state=active]:shadow-sm"
+              >
+                Leave Types
+              </TabsTrigger>
+            </TabsList>
+          </div>
           
           <TabsContent value="requests" className="space-y-6">
             {/* Stats Cards */}
@@ -582,10 +617,54 @@ export default function LeaveRequestPage({ type = 'school' }) {
               <StatsCard icon={<RefreshCw size={20} />} label="Total" value={pagination.total || 0} />
             </div>
             
+            {/* Status Tabs */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center bg-gray-100 dark:bg-gray-900 p-1 rounded-xl border border-gray-200 dark:border-gray-800">
+                {[
+                  { label: 'All', value: '' },
+                  { label: 'Pending', value: 'PENDING' },
+                  { label: 'Approved', value: 'APPROVED' },
+                  { label: 'Rejected', value: 'REJECTED' }
+                ].map((tab) => (
+                  <button
+                    key={tab.label}
+                    onClick={() => {
+                      setFilters(prev => ({ ...prev, status: tab.value }));
+                      setPage(1);
+                    }}
+                    className={cn(
+                      "px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200",
+                      (filters.status || '') === tab.value
+                        ? "bg-white dark:bg-gray-800 text-primary shadow-sm ring-1 ring-black/5"
+                        : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => refetch()} 
+                  disabled={isLoading}
+                  className="h-9 gap-2 text-xs"
+                >
+                  <RefreshCw size={14} className={cn(isLoading && "animate-spin")} />
+                  Refresh
+                </Button>
+              </div>
+            </div>
+            
             {/* Filters */}
             <FilterBar
               filters={filters}
-              onFilterChange={handleFilterChange}
+              onFilterChange={(key, value) => {
+                setFilters(prev => ({ ...prev, [key]: value }));
+                setPage(1);
+              }}
               onRefresh={refetch}
               isRefreshing={isLoading}
             />
@@ -651,6 +730,7 @@ export default function LeaveRequestPage({ type = 'school' }) {
             placeholder={`Choose ${selectedUserType}...`}
             required
             rules={{ required: 'User is required' }}
+            error={manualForm.formState.errors.user_id}
           />
           
           <SelectField
@@ -661,6 +741,7 @@ export default function LeaveRequestPage({ type = 'school' }) {
             placeholder="Choose leave type..."
             required
             rules={{ required: 'Leave type is required' }}
+            error={manualForm.formState.errors.leave_type_id}
           />
           
           <div className="grid grid-cols-2 gap-4">
@@ -670,6 +751,7 @@ export default function LeaveRequestPage({ type = 'school' }) {
               control={manualForm.control}
               required
               rules={{ required: 'From date is required' }}
+              error={manualForm.formState.errors.from_date}
             />
             <DatePickerField
               label="To Date"
@@ -678,6 +760,7 @@ export default function LeaveRequestPage({ type = 'school' }) {
               minDate={fromDate}
               required
               rules={{ required: 'To date is required' }}
+              error={manualForm.formState.errors.to_date}
             />
           </div>
           
@@ -695,6 +778,13 @@ export default function LeaveRequestPage({ type = 'school' }) {
             register={manualForm.register}
             placeholder="Enter reason for leave..."
             rows={3}
+          />
+
+          <CheckboxField
+            label="Approve Automatically"
+            name="approve_immediately"
+            control={manualForm.control}
+            description="Mark this leave as approved and update attendance immediately."
           />
           
           <div className="flex gap-3 justify-end pt-4 border-t">
@@ -753,6 +843,7 @@ export default function LeaveRequestPage({ type = 'school' }) {
         title="Approve Leave Request"
         description={`Confirm approval for ${selectedRequest?.user?.first_name}? Attendance will be marked automatically.`}
         onConfirm={() => approveMutation.mutate(selectedRequest?.id)}
+        loading={approveMutation.isPending}
         confirmLabel="Approve"
         variant="default"
       />
@@ -804,10 +895,10 @@ export default function LeaveRequestPage({ type = 'school' }) {
           
           <div className="flex gap-3 justify-end pt-4 border-t">
             <Button variant="outline" type="button" onClick={() => toggleModal('addLeaveType', false)}>Cancel</Button>
-            <Button type="submit" disabled={addLeaveTypeMutation.isPending}>
-              {addLeaveTypeMutation.isPending ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
-              Add Leave Type
-            </Button>
+            <FormSubmitButton 
+              loading={addLeaveTypeMutation.isPending} 
+              label="Add Leave Type" 
+            />
           </div>
         </form>
       </AppModal>

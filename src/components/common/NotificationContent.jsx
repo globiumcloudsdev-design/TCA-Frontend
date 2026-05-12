@@ -1,261 +1,45 @@
-// // components/common/NotificationContent.jsx
-
-// 'use client';
-
-// import { useEffect, useState, useCallback } from 'react';
-// import { Bell, Trash2, Check, Filter, Loader, X } from 'lucide-react';
-// import { notificationService } from '@/services/notificationService';
-// import { useSocket } from '@/hooks/useSocket';
-// import clsx from 'clsx';
-
-// export function NotificationContent({ onClose }) {
-//   const [notifications, setNotifications] = useState([]);
-//   const [unreadCount, setUnreadCount] = useState(0);
-//   const [selectedType, setSelectedType] = useState('all');
-//   const [page, setPage] = useState(1);
-//   const [loading, setLoading] = useState(false);
-//   const [stats, setStats] = useState(null);
-//   const socket = useSocket();
-
-//   const NOTIFICATION_TYPES = [
-//     { value: 'all', label: 'All' },
-//     { value: 'fee', label: 'Fees' },
-//     { value: 'attendance', label: 'Attendance' },
-//     { value: 'exam', label: 'Exams' },
-//     { value: 'alert', label: 'Alerts' },
-//     { value: 'general', label: 'General' },
-//   ];
-
-//   const fetchNotifications = useCallback(async (pageNum = 1) => {
-//     setLoading(true);
-//     try {
-//       const filters = { page: pageNum, limit: 10, sort: 'DESC' };
-//       if (selectedType !== 'all') filters.type = selectedType;
-//       const { data } = await notificationService.getAll(filters);
-//       setNotifications(data || []);
-//       setPage(pageNum);
-//     } catch (error) {
-//       console.error('Failed to fetch notifications:', error);
-//     } finally {
-//       setLoading(false);
-//     }
-//   }, [selectedType]);
-
-//   const fetchUnreadCount = useCallback(async () => {
-//     try {
-//       const { data } = await notificationService.getUnreadCount();
-//       setUnreadCount(data?.count || 0);
-//     } catch (error) {
-//       console.error(error);
-//     }
-//   }, []);
-
-//   const fetchStats = useCallback(async () => {
-//     try {
-//       const { data } = await notificationService.getStats();
-//       setStats(data);
-//     } catch (error) {
-//       console.error(error);
-//     }
-//   }, []);
-
-//   useEffect(() => {
-//     fetchUnreadCount();
-//     fetchStats();
-//   }, [fetchUnreadCount, fetchStats]);
-
-//   useEffect(() => {
-//     fetchNotifications(1);
-//   }, [selectedType, fetchNotifications]);
-
-//   // Real-time via socket (custom event)
-//   useEffect(() => {
-//     const handleNewNotification = (event) => {
-//       const newNotif = event.detail;
-//       setNotifications(prev => [newNotif, ...prev]);
-//       setUnreadCount(prev => prev + 1);
-//       fetchStats(); // refresh stats
-//     };
-//     window.addEventListener('new-notification', handleNewNotification);
-//     return () => window.removeEventListener('new-notification', handleNewNotification);
-//   }, [fetchStats]);
-
-//   const handleMarkAsRead = async (id, isRead) => {
-//     try {
-//       await notificationService.markRead(id);
-//       setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-//       if (!isRead) setUnreadCount(prev => Math.max(0, prev - 1));
-//       fetchStats();
-//     } catch (error) {
-//       console.error(error);
-//     }
-//   };
-
-//   const handleDelete = async (id) => {
-//     try {
-//       await notificationService.deleteNotification(id);
-//       setNotifications(prev => prev.filter(n => n.id !== id));
-//       fetchUnreadCount();
-//       fetchStats();
-//     } catch (error) {
-//       console.error(error);
-//     }
-//   };
-
-//   const handleMarkAllAsRead = async () => {
-//     try {
-//       await notificationService.markAllRead();
-//       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-//       setUnreadCount(0);
-//       fetchStats();
-//     } catch (error) {
-//       console.error(error);
-//     }
-//   };
-
-//   return (
-//     <div className="flex flex-col h-full">
-//       {/* Header with close button for modal */}
-//       <div className="flex items-center justify-between border-b p-4">
-//         <h3 className="text-lg font-semibold">Notifications</h3>
-//         {onClose && (
-//           <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-100">
-//             <X size={18} />
-//           </button>
-//         )}
-//       </div>
-
-//       {/* Stats */}
-//       {stats && (
-//         <div className="grid grid-cols-3 gap-2 p-4 text-xs border-b">
-//           <div className="bg-gray-50 p-2 rounded text-center">
-//             <div className="font-semibold">{stats.totalCount}</div>
-//             <div>Total</div>
-//           </div>
-//           <div className="bg-blue-50 p-2 rounded text-center">
-//             <div className="font-semibold text-blue-600">{stats.unreadCount}</div>
-//             <div>Unread</div>
-//           </div>
-//           <div className="bg-green-50 p-2 rounded text-center">
-//             <div className="font-semibold text-green-600">{stats.totalCount - stats.unreadCount}</div>
-//             <div>Read</div>
-//           </div>
-//         </div>
-//       )}
-
-//       {/* Filters + Mark all read */}
-//       <div className="border-b p-4">
-//         <div className="flex items-center justify-between mb-3">
-//           <div className="flex items-center gap-2 overflow-x-auto">
-//             <Filter size={16} className="text-gray-500 shrink-0" />
-//             {NOTIFICATION_TYPES.map(type => (
-//               <button
-//                 key={type.value}
-//                 onClick={() => setSelectedType(type.value)}
-//                 className={clsx(
-//                   'px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors',
-//                   selectedType === type.value
-//                     ? 'bg-blue-600 text-white'
-//                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-//                 )}
-//               >
-//                 {type.label}
-//               </button>
-//             ))}
-//           </div>
-//           {unreadCount > 0 && (
-//             <button
-//               onClick={handleMarkAllAsRead}
-//               className="text-xs text-blue-600 hover:underline"
-//             >
-//               Mark all read
-//             </button>
-//           )}
-//         </div>
-//       </div>
-
-//       {/* Notifications list */}
-//       <div className="flex-1 overflow-y-auto">
-//         {loading && (
-//           <div className="flex justify-center py-12">
-//             <Loader className="animate-spin text-gray-400" size={24} />
-//           </div>
-//         )}
-//         {!loading && notifications.length === 0 && (
-//           <div className="flex flex-col items-center py-12 text-gray-400">
-//             <Bell size={40} className="mb-2 opacity-30" />
-//             <p className="text-sm">No notifications</p>
-//           </div>
-//         )}
-//         {notifications.map(notif => (
-//           <div
-//             key={notif.id}
-//             className={clsx(
-//               'px-4 py-3 border-b hover:bg-gray-50 transition-colors',
-//               !notif.is_read && 'bg-blue-50'
-//             )}
-//           >
-//             <div className="flex items-start gap-3">
-//               <span className={clsx(
-//                 'mt-0.5 px-2 py-0.5 rounded text-xs font-medium capitalize',
-//                 notif.type === 'fee' && 'bg-green-100 text-green-700',
-//                 notif.type === 'attendance' && 'bg-blue-100 text-blue-700',
-//                 notif.type === 'exam' && 'bg-purple-100 text-purple-700',
-//                 notif.type === 'alert' && 'bg-red-100 text-red-700',
-//                 'bg-gray-100 text-gray-700'
-//               )}>
-//                 {notif.type}
-//               </span>
-//               <div className="flex-1 min-w-0">
-//                 <div className="flex justify-between items-start gap-2">
-//                   <h4 className="font-semibold text-sm">{notif.title}</h4>
-//                   {!notif.is_read && <div className="w-2 h-2 bg-blue-600 rounded-full mt-1.5 shrink-0" />}
-//                 </div>
-//                 <p className="text-xs text-gray-600 mt-1 line-clamp-2">{notif.body}</p>
-//                 <div className="text-xs text-gray-400 mt-1">
-//                   {new Date(notif.createdAt || notif.created_at).toLocaleString()}
-//                 </div>
-//               </div>
-//               <div className="flex gap-1 shrink-0">
-//                 {!notif.is_read && (
-//                   <button
-//                     onClick={() => handleMarkAsRead(notif.id, notif.is_read)}
-//                     className="p-1 text-gray-500 hover:text-blue-600"
-//                     title="Mark as read"
-//                   >
-//                     <Check size={14} />
-//                   </button>
-//                 )}
-//                 <button
-//                   onClick={() => handleDelete(notif.id)}
-//                   className="p-1 text-gray-500 hover:text-red-600"
-//                   title="Delete"
-//                 >
-//                   <Trash2 size={14} />
-//                 </button>
-//               </div>
-//             </div>
-//           </div>
-//         ))}
-//       </div>
-
-//       {/* Pagination footer */}
-//       {notifications.length > 0 && (
-//         <div className="border-t p-3 text-center text-xs text-gray-500">
-//           Page {page} • {notifications.length} notifications
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Bell, Trash2, Check, Filter, Loader, ChevronDown } from 'lucide-react';
+import { 
+  Bell, Check, Loader, CreditCard, UserCheck, 
+  FileText, AlertTriangle, Info, Calendar, CheckCheck, X 
+} from 'lucide-react';
 import { notificationService } from '@/services/notificationService';
 import { useSocket } from '@/hooks/useSocket';
 import clsx from 'clsx';
 import { Button } from '@/components/ui/button';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { motion, AnimatePresence } from 'framer-motion';
+
+const PAGE_SIZE = 15;
+
+const NOTIFICATION_TYPES = [
+  { value: 'all', label: 'All' },
+  { value: 'fee', label: 'Fees' },
+  { value: 'attendance', label: 'Attendance' },
+  { value: 'exam', label: 'Exams' },
+  { value: 'alert', label: 'Alerts' },
+  { value: 'general', label: 'General' },
+];
+
+function StatCard({ label, value, valueClass = 'text-slate-800 dark:text-slate-100' }) {
+  return (
+    <div className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
+      <span className={clsx('text-2xl font-black tabular-nums tracking-tight', valueClass)}>
+        {value ?? '—'}
+      </span>
+      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+        {label}
+      </span>
+    </div>
+  );
+}
 
 export function NotificationContent({ onClose }) {
   const [notifications, setNotifications] = useState([]);
@@ -266,46 +50,25 @@ export function NotificationContent({ onClose }) {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [stats, setStats] = useState(null);
+  
   const socket = useSocket();
   const initialLoadDone = useRef(false);
+  const scrollRef = useRef(null);
+  const observerTarget = useRef(null);
 
-  const NOTIFICATION_TYPES = [
-    { value: 'all', label: 'All' },
-    { value: 'fee', label: 'Fees' },
-    { value: 'attendance', label: 'Attendance' },
-    { value: 'exam', label: 'Exams' },
-    { value: 'alert', label: 'Alerts' },
-    { value: 'general', label: 'General' },
-  ];
-
-  // Fetch notifications with pagination
   const fetchNotifications = useCallback(async (pageNum = 1, isLoadMore = false) => {
-    if (isLoadMore) {
-      setLoadingMore(true);
-    } else {
-      setLoading(true);
-    }
+    if (isLoadMore) setLoadingMore(true);
+    else setLoading(true);
 
     try {
-      const filters = {
-        page: pageNum,
-        limit: 100,
-        sort: 'DESC',
-      };
+      const filters = { page: pageNum, limit: PAGE_SIZE, sort: 'DESC' };
       if (selectedType !== 'all') filters.type = selectedType;
 
       const response = await notificationService.getAll(filters);
-      // API response structure:
-      // { success: true, data: [...], pagination: { page, limit, total, pages } }
       const newNotifications = response.data?.data || response.data || [];
       const pagination = response.data?.pagination || { pages: 1, page: 1 };
 
-      if (isLoadMore) {
-        setNotifications(prev => [...prev, ...newNotifications]);
-      } else {
-        setNotifications(newNotifications);
-      }
-
+      setNotifications(prev => isLoadMore ? [...prev, ...newNotifications] : newNotifications);
       setCurrentPage(pagination.page);
       setTotalPages(pagination.pages);
     } catch (error) {
@@ -320,21 +83,17 @@ export function NotificationContent({ onClose }) {
     try {
       const { data } = await notificationService.getUnreadCount();
       setUnreadCount(data?.count || 0);
-    } catch (error) {
-      console.error(error);
-    }
+    } catch {}
   }, []);
 
   const fetchStats = useCallback(async () => {
     try {
       const { data } = await notificationService.getStats();
       setStats(data);
-    } catch (error) {
-      console.error(error);
-    }
+    } catch {}
   }, []);
 
-  // Initial load
+  // Initial Data Load
   useEffect(() => {
     if (!initialLoadDone.current) {
       initialLoadDone.current = true;
@@ -344,7 +103,7 @@ export function NotificationContent({ onClose }) {
     }
   }, [fetchNotifications, fetchUnreadCount, fetchStats]);
 
-  // When filter changes, reset everything
+  // Reset when filter changes
   useEffect(() => {
     if (initialLoadDone.current) {
       setNotifications([]);
@@ -354,42 +113,48 @@ export function NotificationContent({ onClose }) {
     }
   }, [selectedType, fetchNotifications]);
 
-  // Real-time socket update
+  // Socket listener
   useEffect(() => {
     if (!socket) return;
-
-    const handleNewNotification = (newNotif) => {
-      setNotifications(prev => [newNotif, ...prev]);
+    const handle = (n) => {
+      setNotifications(prev => [n, ...prev]);
       setUnreadCount(prev => prev + 1);
       fetchStats();
     };
-
-    socket.on('notification', handleNewNotification);
-    return () => socket.off('notification', handleNewNotification);
+    socket.on('notification', handle);
+    return () => socket.off('notification', handle);
   }, [socket, fetchStats]);
+
+  const hasMore = currentPage < totalPages;
+
+  // Infinite Scroll Observer
+  useEffect(() => {
+    if (!observerTarget.current || loading || loadingMore || !hasMore) return;
+
+    const options = {
+      root: scrollRef.current,
+      rootMargin: '200px',
+      threshold: 0.01,
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        console.log('Sentinel intersected! Loading page:', currentPage + 1);
+        fetchNotifications(currentPage + 1, true);
+      }
+    }, options);
+
+    observer.observe(observerTarget.current);
+    return () => observer.disconnect();
+  }, [loading, loadingMore, currentPage, hasMore, fetchNotifications]);
 
   const handleMarkAsRead = async (id, isRead) => {
     try {
       await notificationService.markRead(id);
-      setNotifications(prev =>
-        prev.map(n => (n.id === id ? { ...n, is_read: true } : n))
-      );
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
       if (!isRead) setUnreadCount(prev => Math.max(0, prev - 1));
       fetchStats();
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    try {
-      await notificationService.deleteNotification(id);
-      setNotifications(prev => prev.filter(n => n.id !== id));
-      fetchUnreadCount();
-      fetchStats();
-    } catch (error) {
-      console.error(error);
-    }
+    } catch {}
   };
 
   const handleMarkAllAsRead = async () => {
@@ -398,157 +163,242 @@ export function NotificationContent({ onClose }) {
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadCount(0);
       fetchStats();
-    } catch (error) {
-      console.error(error);
+    } catch {}
+  };
+
+  const onAccordionChange = (id) => {
+    if (!id) return;
+    const notif = notifications.find(n => n.id === id);
+    if (notif && !notif.is_read) {
+      handleMarkAsRead(id, false);
     }
   };
 
-  const loadMore = () => {
-    if (currentPage >= totalPages || loadingMore) return;
-    fetchNotifications(currentPage + 1, true);
+  const getNotifIcon = (type) => {
+    switch (type) {
+      case 'fee': return <CreditCard size={18} className="text-emerald-500" />;
+      case 'attendance': return <UserCheck size={18} className="text-blue-500" />;
+      case 'exam': return <FileText size={18} className="text-purple-500" />;
+      case 'alert': return <AlertTriangle size={18} className="text-red-500" />;
+      default: return <Info size={18} className="text-slate-500" />;
+    }
   };
 
-  const hasMore = currentPage < totalPages;
-
   return (
-    <div className="flex flex-col h-full max-h-[85vh]">
-      {/* Header - already AppModal provides title, so we keep only close button? But user wants title, so we keep it simple */}
-      {/* Actually AppModal already shows title, so we don't need duplicate header. But we need close button? AppModal has its own close X. So we can remove internal header. */}
-      {/* However to be safe and consistent, we remove duplicate header and rely on AppModal's header. */}
+    <div className="flex flex-col h-full max-h-[85vh] bg-white dark:bg-slate-950">
       
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-3 gap-3 p-4 border-b bg-gray-50 dark:bg-gray-800/50">
-          <div className="bg-white dark:bg-gray-800 p-2 rounded-lg text-center shadow-sm">
-            <div className="text-xl font-bold">{stats.totalCount}</div>
-            <div className="text-xs text-muted-foreground">Total</div>
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between px-6 pt-6 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-slate-900 dark:bg-white flex items-center justify-center shadow-lg shadow-slate-200 dark:shadow-none">
+            <Bell size={20} className="text-white dark:text-slate-900" />
           </div>
-          <div className="bg-white dark:bg-gray-800 p-2 rounded-lg text-center shadow-sm">
-            <div className="text-xl font-bold text-blue-600">{stats.unreadCount}</div>
-            <div className="text-xs text-muted-foreground">Unread</div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 p-2 rounded-lg text-center shadow-sm">
-            <div className="text-xl font-bold text-green-600">{stats.totalCount - stats.unreadCount}</div>
-            <div className="text-xs text-muted-foreground">Read</div>
+          <div>
+            <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 tracking-tight leading-none">
+              Notifications
+            </h2>
+            {unreadCount > 0 && (
+              <p className="text-[11px] font-bold text-blue-500 mt-1 uppercase tracking-wider">
+                {unreadCount} New Messages
+              </p>
+            )}
           </div>
         </div>
-      )}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"
+          >
+            <X size={18} />
+          </button>
+        )}
+      </div>
 
-      {/* Filters */}
-      <div className="border-b px-4 py-3 bg-white dark:bg-gray-900">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            <Filter size={16} className="text-muted-foreground shrink-0" />
-            <div className="flex gap-1.5">
-              {NOTIFICATION_TYPES.map(type => (
-                <button
-                  key={type.value}
-                  onClick={() => setSelectedType(type.value)}
-                  className={clsx(
-                    'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all',
-                    selectedType === type.value
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                  )}
-                >
-                  {type.label}
-                </button>
-              ))}
-            </div>
+      {/* ── Stats ── */}
+      <AnimatePresence>
+        {stats && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid grid-cols-3 gap-3 px-6 pb-4"
+          >
+            <StatCard label="Total" value={stats.totalCount} />
+            <StatCard label="Unread" value={stats.unreadCount} valueClass="text-blue-600" />
+            <StatCard label="Read" value={(stats.totalCount ?? 0) - (stats.unreadCount ?? 0)} valueClass="text-emerald-600" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Filters ── */}
+      <div className="sticky top-0 z-10 border-y border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md">
+        <div className="flex items-center justify-between gap-3 px-6 py-3.5">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+            {NOTIFICATION_TYPES.map(type => (
+              <button
+                key={type.value}
+                onClick={() => setSelectedType(type.value)}
+                className={clsx(
+                  'px-4 py-1.5 rounded-full text-[11px] font-bold transition-all duration-200 whitespace-nowrap border',
+                  selectedType === type.value
+                    ? 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 shadow-md'
+                    : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-400'
+                )}
+              >
+                {type.label}
+              </button>
+            ))}
           </div>
           {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={handleMarkAllAsRead} className="text-xs h-7">
-              Mark all read
-            </Button>
+            <button
+              onClick={handleMarkAllAsRead}
+              className="shrink-0 flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-700 transition-colors uppercase tracking-wider"
+            >
+              <CheckCheck size={14} />
+              Mark All
+            </button>
           )}
         </div>
       </div>
 
-      {/* Notifications List */}
-      <div className="flex-1 overflow-y-auto">
+      {/* ── List with Infinite Scroll ── */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar" ref={scrollRef}>
         {loading && notifications.length === 0 ? (
-          <div className="flex justify-center py-12">
-            <Loader className="animate-spin text-muted-foreground" size={28} />
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Loader size={32} className="animate-spin text-slate-200 dark:text-slate-700" />
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Loading Notifications</p>
           </div>
         ) : notifications.length === 0 ? (
-          <div className="flex flex-col items-center py-16 text-muted-foreground">
-            <Bell size={48} className="mb-3 opacity-30" />
-            <p className="text-sm">No notifications</p>
+          <div className="flex flex-col items-center justify-center py-20 gap-4 opacity-40">
+            <div className="w-16 h-16 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+              <Bell size={32} className="text-slate-400" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">No Notifications</p>
+              <p className="text-xs text-slate-400 mt-1">You're all caught up!</p>
+            </div>
           </div>
         ) : (
-          <div className="divide-y">
-            {notifications.map(notif => (
-              <div
-                key={notif.id}
-                className={clsx(
-                  'px-5 py-4 transition-colors hover:bg-accent/50',
-                  !notif.is_read && 'bg-primary/5'
-                )}
-              >
-                <div className="flex items-start gap-3">
-                  <span
+          <>
+            <Accordion type="single" collapsible className="w-full" onValueChange={onAccordionChange}>
+              {notifications.map((notif, index) => (
+                <motion.div
+                  key={notif.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(index * 0.03, 0.3) }}
+                >
+                  <AccordionItem 
+                    value={notif.id}
                     className={clsx(
-                      'mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide',
-                      notif.type === 'fee' && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-                      notif.type === 'attendance' && 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-                      notif.type === 'exam' && 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-                      notif.type === 'alert' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                      'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                      "border-b border-slate-100 dark:border-slate-800 transition-all duration-300",
+                      !notif.is_read ? "bg-blue-50/30 dark:bg-blue-500/5" : "bg-transparent"
                     )}
                   >
-                    {notif.type}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-semibold text-sm">{notif.title}</h4>
+                    <div className="relative">
                       {!notif.is_read && (
-                        <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
+                        <div className="absolute left-0 top-0 h-full w-1 bg-blue-500 rounded-r-full shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
                       )}
+                      <AccordionTrigger className="hover:no-underline py-5 px-6 group w-full text-left">
+                        <div className="flex items-start gap-4 w-full">
+                          <div className={clsx(
+                            "w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-sm border transition-all group-hover:scale-105",
+                            notif.type === 'fee' && "bg-emerald-50 border-emerald-100",
+                            notif.type === 'attendance' && "bg-blue-50 border-blue-100",
+                            notif.type === 'exam' && "bg-purple-50 border-purple-100",
+                            notif.type === 'alert' && "bg-red-50 border-red-100",
+                            "bg-slate-50 border-slate-100 dark:bg-slate-800 dark:border-white/5"
+                          )}>
+                            {getNotifIcon(notif.type)}
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <h4 className={clsx(
+                                "font-bold text-[14px] tracking-tight transition-all",
+                                !notif.is_read ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"
+                              )}>
+                                {notif.title}
+                              </h4>
+                              {!notif.is_read && (
+                                <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 shadow-[0_0_8px_rgba(59,130,246,0.5)] group-data-[state=open]:hidden" />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <span className={clsx(
+                                "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg border",
+                                notif.type === 'fee' && "text-emerald-600 bg-emerald-50 border-emerald-100",
+                                notif.type === 'attendance' && "text-blue-600 bg-blue-50 border-blue-100",
+                                notif.type === 'exam' && "text-purple-600 bg-purple-50 border-purple-100",
+                                notif.type === 'alert' && "text-red-600 bg-red-50 border-red-100",
+                                "text-slate-500 bg-slate-50 border-slate-100 dark:bg-slate-800"
+                              )}>
+                                {notif.type}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1 tabular-nums">
+                                <Calendar size={10} />
+                                {new Date(notif.createdAt || notif.created_at).toLocaleString('en-US', { 
+                                  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </AccordionTrigger>
+                      
+                      <AccordionContent className="px-6 pb-6 pt-0">
+                        <div className="pl-[3.75rem]">
+                          <div className="p-5 bg-slate-50 dark:bg-slate-900/80 rounded-2xl border border-slate-200/50 dark:border-white/5 shadow-inner relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-1.5 h-full opacity-50" style={{ 
+                              backgroundColor: notif.type === 'fee' ? '#10b981' : 
+                                             notif.type === 'attendance' ? '#3b82f6' : 
+                                             notif.type === 'exam' ? '#a855f7' : 
+                                             notif.type === 'alert' ? '#ef4444' : '#94a3b8' 
+                            }} />
+                            
+                            <p className="text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                              {notif.body}
+                            </p>
+                            
+                            <div className="mt-5 flex items-center justify-between border-t border-slate-200/50 dark:border-white/5 pt-4">
+                              <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-100/50 dark:bg-emerald-900/20 px-3 py-1 rounded-full">
+                                <Check size={12} strokeWidth={3} />
+                                Seen
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-300 tabular-nums uppercase">
+                                ID: {notif.id.toString().slice(-8)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </AccordionContent>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{notif.body}</p>
-                    <div className="text-xs text-muted-foreground/70 mt-1.5">
-                      {new Date(notif.createdAt || notif.created_at).toLocaleString()}
-                    </div>
-                  </div>
-                  <div className="flex gap-1 shrink-0">
-                    {!notif.is_read && (
-                      <button
-                        onClick={() => handleMarkAsRead(notif.id, notif.is_read)}
-                        className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                        title="Mark as read"
-                      >
-                        <Check size={14} />
-                      </button>
-                    )}
-                    {/* <button
-                      onClick={() => handleDelete(notif.id)}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 size={14} />
-                    </button> */}
-                  </div>
+                  </AccordionItem>
+                </motion.div>
+              ))}
+            </Accordion>
+            
+            {/* Infinite Scroll Sentinel */}
+            <div ref={observerTarget} className="h-10 flex items-center justify-center">
+              {loadingMore && (
+                <div className="flex items-center gap-2">
+                  <Loader size={16} className="animate-spin text-blue-500" />
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Loading More</span>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Load More Button */}
-        {!loading && notifications.length > 0 && hasMore && (
-          <div className="py-4 flex justify-center">
-            <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore} className="gap-2">
-              {loadingMore ? <Loader className="animate-spin" size={14} /> : <ChevronDown size={14} />}
-              {loadingMore ? 'Loading...' : 'Load More'}
-            </Button>
-          </div>
+              )}
+              {!hasMore && notifications.length > 0 && (
+                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">End of List</p>
+              )}
+            </div>
+          </>
         )}
       </div>
 
-      {/* Footer */}
-      {notifications.length > 0 && !loading && (
-        <div className="border-t px-5 py-2.5 text-center text-xs text-muted-foreground bg-gray-50 dark:bg-gray-900/50">
-          Showing {notifications.length} of {stats?.totalCount || notifications.length}
+      {/* ── Footer ── */}
+      {notifications.length > 0 && (
+        <div className="border-t border-slate-100 dark:border-slate-800 px-6 py-3 flex items-center justify-center bg-slate-50/50 dark:bg-slate-900/50">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest tabular-nums">
+            Showing {notifications.length} of {stats?.totalCount ?? notifications.length} Notifications
+          </p>
         </div>
       )}
     </div>
