@@ -839,11 +839,11 @@ export default function StudentsPage({ type }) {
       />
 
       {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatsCard
           label={`Total ${terms.students}`}
           value={stats.total_records}
-          icon={<Users size={20} />}
+          icon={<Users size={20} className="text-blue-500" />}
           loading={isLoadingStats}
         />
         <StatsCard
@@ -855,16 +855,16 @@ export default function StudentsPage({ type }) {
         <StatsCard
           label={`Inactive ${terms.students}`}
           value={stats.inactive_students}
-          icon={<AlertCircle size={20} className="text-rose-500" />}
+          icon={<UserX size={20} className="text-rose-500" />}
           loading={isLoadingStats}
         />
-        {/* <StatsCard
-          label="Attendance Rate"
-          value="85%"
-          icon={<Layers size={20} className="text-blue-500" />}
-          description="Average this month"
+        <StatsCard
+          label="Birthdays Today"
+          value={stats.birthdays_today || 0}
+          icon={<Calendar size={20} className="text-amber-500" />}
+          description="Celebrate with students"
           loading={isLoadingStats}
-        /> */}
+        />
       </div>
 
       {/* Filters Card */}

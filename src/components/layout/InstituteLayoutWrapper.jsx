@@ -14,18 +14,21 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import useAuthStore from "@/store/authStore";
+import { Ghost, LogOut, ShieldAlert } from "lucide-react";
 import { useInstituteNav } from "@/hooks/useInstituteConfig";
 import useInstituteConfig from "@/hooks/useInstituteConfig";
 import * as Icons from "lucide-react";
+import { authService, publicService } from "@/services";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { authService } from "@/services";
 
 // ── Shared components ────────────────────────────────────────────
 import AppBreadcrumb from "@/components/common/AppBreadcrumb";
 import NotificationBell from "@/components/common/NotificationBell";
 import ThemeToggle from "@/components/common/ThemeToggle";
-import AvatarWithInitials from "@/components/common/AvatarWithInitials";
-import { UserMenu } from "../common";
+import { 
+  ConfirmDialog, AvatarWithInitials, GlobalAnnouncementBanner, UserMenu 
+} from "../common";
 import useUIStore from "@/store/uiStore";
 
 /* ─────────────────────────────────────────────
@@ -314,6 +317,59 @@ export default function InstituteLayoutWrapper({ children }) {
 
   const pathname = usePathname();
   const router = useRouter();
+  
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+  const getDashPath = useAuthStore((s) => s.dashboardPath);
+  const dashboardPath = getDashPath() || "/";
+  const instituteType = user?.institute?.institute_type;
+
+  // ── Feature Maintenance Check ──
+  const { data: platformStatus } = useQuery({
+    queryKey: ['global-status-public'],
+    queryFn: () => publicService.getPlatformStatus(),
+    refetchInterval: 1000 * 60 * 5, // Check every 5 mins
+  });
+
+  useEffect(() => {
+    if (!platformStatus?.data?.feature_overrides || !user) return;
+    
+    // Skip check for Master Admins
+    if (['MASTER_ADMIN', 'SUPPORT_STAFF'].includes(user.role_code)) return;
+
+    const overrides = platformStatus.data.feature_overrides;
+    
+    // Map current path to feature key
+    const pathFeatureMap = [
+      { pattern: /\/academic-year/, feature: 'academic_years', label: 'Academic Year' },
+      { pattern: /\/classes/, feature: 'classes', label: 'Classes' },
+      { pattern: /\/students/, feature: 'students', label: 'Students' },
+      { pattern: /\/teachers/, feature: 'teachers', label: 'Teachers' },
+      { pattern: /\/attendance/, feature: 'attendance', label: 'Attendance' },
+      { pattern: /\/fee/, feature: 'fees_voucher', label: 'Fees' },
+      { pattern: /\/exam/, feature: 'exams', label: 'Exams' },
+      { pattern: /\/payroll/, feature: 'payroll', label: 'Payroll' },
+      { pattern: /\/expense/, feature: 'expense', label: 'Expense' },
+      { pattern: /\/notification/, feature: 'notifications', label: 'Notifications' },
+    ];
+
+    for (const item of pathFeatureMap) {
+      if (item.pattern.test(pathname)) {
+        const feature = overrides[item.feature];
+        if (feature && feature.enabled === false) {
+          toast.error(`${item.label} module is under maintenance`, {
+            description: feature.message || 'This feature is temporarily unavailable.',
+            duration: 5000,
+            icon: <ShieldAlert className="w-5 h-5 text-rose-500" />
+          });
+          
+          // Redirect to dashboard
+          router.replace(dashboardPath);
+          break;
+        }
+      }
+    }
+  }, [pathname, platformStatus, user, dashboardPath, router]);
 
   useEffect(() => {
     setMounted(true);
@@ -338,12 +394,31 @@ export default function InstituteLayoutWrapper({ children }) {
     };
   }, [mobileOpen]);
 
-  const user = useAuthStore((s) => s.user);
-  const instituteType = user?.institute?.institute_type;
+  const [isImpersonating, setIsImpersonating] = useState(false);
 
-  const logout = useAuthStore((s) => s.logout);
-  const getDashPath = useAuthStore((s) => s.dashboardPath);
-  const dashboardPath = mounted ? getDashPath() : "/";
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsImpersonating(!!localStorage.getItem('originalAdminToken'));
+    }
+  }, []);
+
+  const handleReturnToAdmin = () => {
+    const originalToken = localStorage.getItem('originalAdminToken');
+    const originalUser = localStorage.getItem('originalAdminUser');
+    
+    if (originalToken && originalUser) {
+      localStorage.setItem('accessToken', originalToken);
+      localStorage.setItem('user', originalUser);
+      localStorage.removeItem('originalAdminToken');
+      localStorage.removeItem('originalAdminUser');
+      
+      toast.success('Returned to Master Admin session');
+      window.location.href = '/master-admin/ghost-mode';
+    } else {
+      logout();
+      window.location.href = '/login';
+    }
+  };
 
   const { typeDefinition } = useInstituteConfig();
   const allNavItems = useInstituteNav();
@@ -533,8 +608,24 @@ export default function InstituteLayoutWrapper({ children }) {
           </div>
         </header>
 
+        <GlobalAnnouncementBanner />
+        
         {/* Page content */}
         <main className="flex-1 overflow-auto">
+          {isImpersonating && (
+            <div className="bg-amber-500 text-white px-4 py-2 flex items-center justify-between sticky top-0 z-[60] shadow-md">
+              <div className="flex items-center gap-2 text-sm font-bold">
+                <Ghost className="w-4 h-4 animate-pulse" />
+                <span>Ghost Mode Active: Impersonating <b>{user?.first_name} {user?.last_name}</b></span>
+              </div>
+              <button 
+                onClick={handleReturnToAdmin}
+                className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-md text-xs font-black transition-colors flex items-center gap-1 uppercase tracking-wider"
+              >
+                <LogOut className="w-3 h-3" /> Return to Admin
+              </button>
+            </div>
+          )}
           <div className="p-4 md:p-6 h-full">{children}</div>
         </main>
       </div>

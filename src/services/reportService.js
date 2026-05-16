@@ -77,93 +77,49 @@ export const reportService = {
    */
   getStudentReport: async (filters = {}) => {
     try {
-      // Fetch students from studentService
-      const studentParams = {
-        academic_year_id: filters.academic_year_id,
+      // Build query parameters from filters
+      const queryParams = {
         institute_id: filters.institute_id,
+        academic_year_id: filters.academic_year_id,
         class_id: filters.class_id,
         section_id: filters.section_id,
+        status: filters.status,
         search: filters.search,
-        is_active:
-          filters.status === "active"
-            ? true
-            : filters.status === "inactive"
-              ? false
-              : undefined,
         page: filters.page || 1,
         limit: filters.limit || 50,
       };
 
-      // Map generic filters to institute-specific filters if needed
-      const instituteType = filters.institute_type || "school";
-      if (instituteType === "coaching" || instituteType === "academy") {
-        if (filters.class_id) studentParams.course_id = filters.class_id;
-        if (filters.section_id) studentParams.batch_id = filters.section_id;
-      } else if (
-        instituteType === "college" ||
-        instituteType === "university"
-      ) {
-        if (filters.class_id) studentParams.program_id = filters.class_id;
-        if (filters.section_id) studentParams.semester_id = filters.section_id;
-      }
-
-      // Remove undefined or empty values
-      Object.keys(studentParams).forEach((key) => {
+      // Remove undefined/null/empty values
+      Object.keys(queryParams).forEach((key) => {
         if (
-          studentParams[key] === undefined ||
-          studentParams[key] === null ||
-          studentParams[key] === ""
+          queryParams[key] === undefined ||
+          queryParams[key] === null ||
+          queryParams[key] === ""
         ) {
-          delete studentParams[key];
+          delete queryParams[key];
         }
       });
 
-      const studentsData = await studentService.getAll(
-        studentParams,
-        instituteType,
-      );
+      // Make API call to backend student report endpoint
+      const response = await api.get("/reports/student", {
+        params: queryParams,
+        timeout: 15000,
+      });
 
-      // Robust record extraction based on actual Postman response
-      const rawRecords = Array.isArray(studentsData)
-        ? studentsData
-        : Array.isArray(studentsData?.data)
-          ? studentsData.data
-          : studentsData?.records ||
-            studentsData?.items ||
-            studentsData?.students ||
-            [];
-
-      const pagination = studentsData?.pagination || {
-        total: rawRecords.length,
-        page: filters.page || 1,
-        limit: filters.limit || 50,
-      };
-
-      const totalRecords = pagination.total || rawRecords.length;
-      const activeStudents = rawRecords.filter(
-        (s) => s.is_active === true,
-      ).length;
-      const inactiveStudents = totalRecords - activeStudents;
-
+      // Response structure from backend: { status, message, data: { type, summary, records, pagination } }
+      const reportData = response.data?.data || response.data || {};
+      
       return {
         status: 200,
         message: "Student report retrieved successfully",
-        data: {
-          summary: {
-            total_records: totalRecords,
-            active_students: activeStudents,
-            inactive_students: inactiveStudents,
-          },
-          records: rawRecords,
-          pagination: pagination,
-        },
+        data: reportData,
       };
     } catch (error) {
       console.error("❌ Error fetching student report:", error);
       return {
         status: 500,
         message: "Failed to fetch student report",
-        data: { records: [], summary: {} },
+        data: { records: [], summary: { total_records: 0, active_students: 0, inactive_students: 0 } },
       };
     }
   },

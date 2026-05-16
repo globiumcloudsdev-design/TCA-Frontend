@@ -53,6 +53,7 @@ export { default as NotificationBell }  from './NotificationBell';
 export { default as UserMenu }          from './UserMenu';
 export { default as BranchSwitcher }    from './BranchSwitcher';
 export { default as BranchInitializer } from './BranchInitializer';
+export { default as GlobalAnnouncementBanner } from './GlobalAnnouncementBanner';
 
 // Permission
 export { default as PermissionGuard }   from '../shared/PermissionGuard';

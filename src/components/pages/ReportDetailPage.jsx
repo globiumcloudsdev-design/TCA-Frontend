@@ -50,6 +50,45 @@ import ExportModal from "@/components/common/ExportModal";
 // REPORT TYPE CONFIGS
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Robustly flattens a student/report record to ensure top-level access
+ * to roll_no, registration_no, names, etc.
+ */
+const flattenRecord = (r) => {
+  if (!r) return r;
+  
+  // Identify the student object (could be nested in 'student', 'Student', or be the record itself)
+  const student = r.student || r.Student || r;
+  const details = student.details?.studentDetails || r.details?.studentDetails || {};
+  
+  // Start with the base record, merge student data, then merge deep studentDetails
+  const flat = { 
+    ...r, 
+    ...student, 
+    ...details,
+    // Ensure ID isn't overwritten by sub-objects unless necessary
+    id: r.id || student.id
+  };
+
+  // Robustly extract identifiers (avoiding mixing Roll No with Reg No)
+  flat.roll_no = flat.roll_no || flat.roll_number || details.roll_no || details.roll_number || student.roll_no || student.roll_number;
+  flat.registration_no = flat.registration_no || flat.reg_no || details.registration_no || details.reg_no || student.registration_no || student.reg_no;
+  
+  // Normalize names
+  flat.display_name = flat.display_name || 
+                     `${flat.first_name || ""} ${flat.last_name || ""}`.trim() || 
+                     flat.name || 
+                     flat.student_name || 
+                     "—";
+
+  // Normalize dates
+  if (flat.date_of_birth && !flat.dob) flat.dob = flat.date_of_birth;
+  
+  return flat;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED COLUMN DEFINITIONS (A to Z)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -59,13 +98,12 @@ const STUDENT_REPORT_COLUMNS = [
   {
     id: "name",
     header: "Full Name",
-    accessorFn: (s) =>
-      `${s.first_name || ""} ${s.last_name || ""}`.trim() || s.name || "—",
+    accessorFn: (s) => s.display_name || "—",
   },
   {
     id: "roll_no",
     header: "Roll Number",
-    accessorFn: (s) => s.roll_no || s.registration_no || s.roll_number || "—",
+    accessorFn: (s) => s.roll_no || "—",
   },
   {
     id: "reg_no",
@@ -76,7 +114,7 @@ const STUDENT_REPORT_COLUMNS = [
   {
     id: "dob",
     header: "Date of Birth",
-    accessorFn: (s) => s.dob || s.date_of_birth || "—",
+    accessorFn: (s) => s.dob || "—",
   },
   {
     id: "admission_date",
@@ -303,38 +341,16 @@ const REPORT_CONFIGS = {
       {
         id: "ids",
         header: "Roll / Reg No",
-        accessorFn: (s) => {
-          const roll = s.roll_no || s.roll_number || s.Student?.roll_no || s.Student?.roll_number || s.student?.roll_no || s.student?.roll_number || s.details?.studentDetails?.roll_no || "—";
-          const reg = s.registration_no || s.reg_no || s.Student?.registration_no || s.student?.registration_no || s.details?.studentDetails?.registration_no || "—";
-          return `${roll} / ${reg}`;
-        },
+        accessorFn: (s) => `${s.roll_no || "—"} / ${s.registration_no || "—"}`,
         cell: ({ row }) => {
           const s = row.original;
-          const roll =
-            s.roll_no ||
-            s.roll_number ||
-            s.Student?.roll_no ||
-            s.Student?.roll_number ||
-            s.student?.roll_no ||
-            s.student?.roll_number ||
-            s.Student?.details?.studentDetails?.roll_no ||
-            s.student?.details?.studentDetails?.roll_no ||
-            s.details?.studentDetails?.roll_no;
-          const reg =
-            s.registration_no ||
-            s.reg_no ||
-            s.Student?.registration_no ||
-            s.student?.registration_no ||
-            s.Student?.details?.studentDetails?.registration_no ||
-            s.student?.details?.studentDetails?.registration_no ||
-            s.details?.studentDetails?.registration_no;
           return (
             <div className="flex flex-col py-1">
               <span className="text-slate-700 font-bold text-[11px] leading-none mb-1">
-                {roll || "—"}
+                {s.roll_no || "—"}
               </span>
               <span className="text-slate-400 text-[10px] leading-tight font-medium uppercase tracking-wider">
-                {reg || "—"}
+                {s.registration_no || "—"}
               </span>
             </div>
           );
@@ -419,38 +435,16 @@ const REPORT_CONFIGS = {
       {
         id: "ids",
         header: "Roll / Reg No",
-        accessorFn: (s) => {
-          const roll = s.roll_no || s.roll_number || s.Student?.roll_no || s.Student?.roll_number || s.student?.roll_no || s.student?.roll_number || s.details?.studentDetails?.roll_no || "—";
-          const reg = s.registration_no || s.reg_no || s.Student?.registration_no || s.student?.registration_no || s.details?.studentDetails?.registration_no || "—";
-          return `${roll} / ${reg}`;
-        },
+        accessorFn: (s) => `${s.roll_no || "—"} / ${s.registration_no || "—"}`,
         cell: ({ row }) => {
           const s = row.original;
-          const roll =
-            s.roll_no ||
-            s.roll_number ||
-            s.Student?.roll_no ||
-            s.Student?.roll_number ||
-            s.student?.roll_no ||
-            s.student?.roll_number ||
-            s.Student?.details?.studentDetails?.roll_no ||
-            s.student?.details?.studentDetails?.roll_no ||
-            s.details?.studentDetails?.roll_no;
-          const reg =
-            s.registration_no ||
-            s.reg_no ||
-            s.Student?.registration_no ||
-            s.student?.registration_no ||
-            s.Student?.details?.studentDetails?.registration_no ||
-            s.student?.details?.studentDetails?.registration_no ||
-            s.details?.studentDetails?.registration_no;
           return (
             <div className="flex flex-col py-1">
               <span className="text-emerald-700 font-bold text-[11px] leading-none mb-1">
-                {roll || "—"}
+                {s.roll_no || "—"}
               </span>
               <span className="text-emerald-400/80 text-[10px] leading-tight font-medium uppercase tracking-wider">
-                {reg || "—"}
+                {s.registration_no || "—"}
               </span>
             </div>
           );
@@ -666,30 +660,13 @@ const REPORT_CONFIGS = {
         header: "Roll / Reg No",
         cell: ({ row }) => {
           const s = row.original;
-          const student = s.student || s.Student || {};
-          const roll =
-            student.roll_no ||
-            student.roll_number ||
-            s.roll_no ||
-            s.roll_number ||
-            student.details?.studentDetails?.roll_no ||
-            s.details?.studentDetails?.roll_no ||
-            "—";
-          const reg =
-            student.registration_no ||
-            student.reg_no ||
-            s.registration_no ||
-            s.reg_no ||
-            student.details?.studentDetails?.registration_no ||
-            s.details?.studentDetails?.registration_no ||
-            "—";
           return (
             <div className="flex flex-col py-1">
               <span className="text-violet-700 font-bold text-[11px] leading-none mb-1">
-                {roll || "—"}
+                {s.roll_no || "—"}
               </span>
               <span className="text-violet-400/80 text-[10px] leading-tight font-medium uppercase tracking-wider">
-                {reg || "—"}
+                {s.registration_no || "—"}
               </span>
             </div>
           );
@@ -1390,40 +1367,9 @@ export default function ReportDetailPage() {
         limit: filters.limit || 500,
       };
 
-      // SIMPLE DIRECT INTEGRATION: Student Report
+      // USE Optimized Report Service for Student Report
       if (reportType === "student") {
-        const apiRes = await studentService.getAll({
-          ...filters, // Pass all selected filters (class_id, section_id, status, academic_year_id)
-          institute_id: currentInstitute?.id,
-          limit: filters.limit || 500,
-          page: filters.page || 1,
-        }, currentInstitute?.type || "school");
-
-        const rawArray = Array.isArray(apiRes?.data) ? apiRes.data : 
-                        (Array.isArray(apiRes) ? apiRes : []);
-
-        res = {
-          success: true,
-          data: {
-            records: rawArray.map(s => {
-              const sd = s.details?.studentDetails || s.details || {};
-              return {
-                ...s,
-                ...sd,
-                display_name: `${s.first_name || ""} ${s.last_name || ""}`.trim() || sd.first_name || "—",
-                class_name: sd.class_name || s.class_name || "—",
-                section_name: sd.section_name || s.section_name || "—",
-                roll_no: sd.roll_no || s.roll_no || s.registration_no || "—"
-              };
-            }),
-            pagination: apiRes?.pagination || {
-              total: rawArray.length,
-              page: filters.page,
-              limit: filters.limit,
-              totalPages: Math.ceil(rawArray.length / filters.limit)
-            }
-          }
-        };
+        res = await reportService.getStudentReport(apiParams);
       }
       else if (reportType === "attendance")
         res = await reportService.getAttendanceReport(apiParams);
@@ -1445,44 +1391,20 @@ export default function ReportDetailPage() {
         return null;
       }
 
-      // ─── Inject Mapping and Metadata for Exam Reports ───
-      if (reportType === "exam" && res?.data?.records) {
-        const records = res?.data?.records || [];
-        const selectedExam = examList.find(
+      // Normalize all records through robust flattenRecord
+      if (res?.data?.records && Array.isArray(res.data.records)) {
+        const selectedExam = reportType === "exam" ? examList.find(
           (ex) => String(ex.id) === String(filters.exam_id),
-        );
+        ) : null;
 
-        res.data.records = records.map((r) => {
-          const student = r.student || r.Student || {};
-          const sDetails = student.details?.studentDetails || {};
-          const guardians = sDetails.guardians || student.guardians || [];
-          const primaryG = Array.isArray(guardians)
-            ? guardians.find(
-                (g) => g.type === "father" || g.type === "guardian",
-              ) || guardians[0]
-            : null;
-
-          return {
-            ...r,
-            ...student,
-            ...sDetails,
-            _injectedExamTitle:
-              selectedExam?.title || selectedExam?.name || "Exam Result",
-            // Explicit extraction for the columns
-            roll_no: sDetails.roll_no || student.roll_no || r.roll_no,
-            class_name: sDetails.class_name || student.class_name,
-            section_name: sDetails.section_name || student.section_name,
-            father_name:
-              sDetails.father_name ||
-              student.father_name ||
-              primaryG?.name ||
-              "—",
-            phone: student.phone || sDetails.phone || primaryG?.phone || "—",
-            display_name:
-              `${student.first_name || ""} ${student.last_name || ""}`.trim() ||
-              student.email ||
-              "—",
-          };
+        res.data.records = res.data.records.map((r) => {
+          const flat = flattenRecord(r);
+          
+          if (reportType === "exam") {
+            flat._injectedExamTitle = selectedExam?.title || selectedExam?.name || "Exam Result";
+          }
+          
+          return flat;
         });
       }
 

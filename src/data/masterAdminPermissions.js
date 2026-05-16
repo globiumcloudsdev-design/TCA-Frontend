@@ -127,77 +127,78 @@ export const PLATFORM_PERMISSIONS = {
 
   // ── Notifications (Broadcast) ────────────────────────────────────────────
   notification: {
-    label: 'Platform Notifications',
+    label: 'Global Announcements / Broadcasts',
     permissions: [
       { code: 'notification.broadcast', label: 'Tamam institutes ko platform notification bhejna' },
-      { code: 'notification.targeted', label: 'Specific institute ya user ko notification' },
+      { code: 'notification.announcement', label: 'Dashboard announcements manage karna (Create/Edit/Delete)' },
+      { code: 'notification.targeted', label: 'Specific institute ya user ko targeted notification' },
     ],
   },
 
-  // // ── Platform Settings ────────────────────────────────────────────────────
-  // platform_settings: {
-  //   label: 'Platform Settings',
-  //   permissions: [
-  //     { code: 'platform.settings',         label: 'Platform-wide settings update karna'           },
-  //     { code: 'platform.backup',           label: 'Database backup manage karna'                  },
-  //     { code: 'platform.audit_logs',       label: 'Audit logs dekhna (kaun kya kar raha hai)'     },
-  //     { code: 'platform.maintenance',      label: 'Maintenance mode toggle karna'                 },
-  //   ],
-  // },
+  // ── Platform Settings ────────────────────────────────────────────────────
+  platform_settings: {
+    label: 'Platform Settings',
+    permissions: [
+      { code: 'platform.settings',         label: 'Platform-wide settings update karna'           },
+      { code: 'platform.backup',           label: 'Database backup manage karna'                  },
+      { code: 'platform.audit_logs',       label: 'Audit logs dekhna (kaun kya kar raha hai)'     },
+      { code: 'platform.maintenance',      label: 'Maintenance mode toggle karna'                 },
+    ],
+  },
 
-  // // ── Website CMS ──────────────────────────────────────────────────────────
-  // website_cms: {
-  //   label: 'Website CMS',
-  //   permissions: [
-  //     { code: 'cms.update_hero',           label: 'Hero section update karna'                      },
-  //     { code: 'cms.manage_faq',            label: 'FAQs manage karna'                             },
-  //     { code: 'cms.manage_testimonials',   label: 'Testimonials manage karna'                      },
-  //     { code: 'cms.manage_features',       label: 'Website features list manage karna'            },
-  //   ],
-  // },
+  // ── Website CMS ──────────────────────────────────────────────────────────
+  website_cms: {
+    label: 'Website CMS',
+    permissions: [
+      { code: 'cms.update_hero',           label: 'Hero section update karna'                      },
+      { code: 'cms.manage_faq',            label: 'FAQs manage karna'                             },
+      { code: 'cms.manage_testimonials',   label: 'Testimonials manage karna'                      },
+      { code: 'cms.manage_features',       label: 'Website features list manage karna'            },
+    ],
+  },
 
-  // // ── Blog Management ──────────────────────────────────────────────────────
-  // blog: {
-  //   label: 'Blog Management',
-  //   permissions: [
-  //     { code: 'blog.create',               label: 'Naya blog post likhna'                          },
-  //     { code: 'blog.read',                 label: 'Blog posts ki list dekhna'                      },
-  //     { code: 'blog.update',               label: 'Blog post edit karna'                           },
-  //     { code: 'blog.delete',               label: 'Blog post delete karna'                         },
-  //     { code: 'blog.seo',                  label: 'Blog SEO settings manage karna'                 },
-  //   ],
-  // },
+  // ── Blog Management ──────────────────────────────────────────────────────
+  blog: {
+    label: 'Blog Management',
+    permissions: [
+      { code: 'blog.create',               label: 'Naya blog post likhna'                          },
+      { code: 'blog.read',                 label: 'Blog posts ki list dekhna'                      },
+      { code: 'blog.update',               label: 'Blog post edit karna'                           },
+      { code: 'blog.delete',               label: 'Blog post delete karna'                         },
+      { code: 'blog.seo',                  label: 'Blog SEO settings manage karna'                 },
+    ],
+  },
 
-  // // ── Branding & Theming ───────────────────────────────────────────────────
-  // branding: {
-  //   label: 'Branding & Theming',
-  //   permissions: [
-  //     { code: 'branding.update_colors',    label: 'Platform colors change karna'                   },
-  //     { code: 'branding.update_logos',     label: 'Logos aur icons update karna'                   },
-  //     { code: 'branding.update_typography', label: 'Fonts aur styling update karna'                 },
-  //   ],
-  // },
+  // ── Branding & Theming ───────────────────────────────────────────────────
+  branding: {
+    label: 'Branding & Theming',
+    permissions: [
+      { code: 'branding.update_colors',    label: 'Platform colors change karna'                   },
+      { code: 'branding.update_logos',     label: 'Logos aur icons update karna'                   },
+      { code: 'branding.update_typography', label: 'Fonts aur styling update karna'                 },
+    ],
+  },
 
-  // // ── Support Desk ─────────────────────────────────────────────────────────
-  // support: {
-  //   label: 'Support Desk',
-  //   permissions: [
-  //     { code: 'support.view_tickets',      label: 'Support tickets dekhna'                         },
-  //     { code: 'support.reply_tickets',     label: 'Tickets ka reply dena'                          },
-  //     { code: 'support.whatsapp_settings', label: 'WhatsApp integration settings manage karna'     },
-  //   ],
-  // },
+  // ── Support Desk ─────────────────────────────────────────────────────────
+  support: {
+    label: 'Support Desk',
+    permissions: [
+      { code: 'support.view_tickets',      label: 'Support tickets dekhna'                         },
+      { code: 'support.reply_tickets',     label: 'Tickets ka reply dena'                          },
+      { code: 'support.whatsapp_settings', label: 'WhatsApp integration settings manage karna'     },
+    ],
+  },
 
-  // // ── Institute Data Access (Read-only for support) ─────────────────────────
-  // institute_data: {
-  //   label: 'Institute Data Access (Support Level)',
-  //   permissions: [
-  //     { code: 'institute_data.students',   label: 'Kisi bhi institute ke students dekhna (support)'  },
-  //     { code: 'institute_data.users',      label: 'Kisi bhi institute ke users dekhna'             },
-  //     { code: 'institute_data.fees',       label: 'Kisi bhi institute ka fee data dekhna'          },
-  //     { code: 'institute_data.attendance', label: 'Kisi bhi institute ka attendance dekhna'        },
-  //   ],
-  // },
+  // ── Institute Data Access (Read-only for support) ─────────────────────────
+  institute_data: {
+    label: 'Institute Data Access (Support Level)',
+    permissions: [
+      { code: 'institute_data.students',   label: 'Kisi bhi institute ke students dekhna (support)'  },
+      { code: 'institute_data.users',      label: 'Kisi bhi institute ke users dekhna'             },
+      { code: 'institute_data.fees',       label: 'Kisi bhi institute ka fee data dekhna'          },
+      { code: 'institute_data.attendance', label: 'Kisi bhi institute ka attendance dekhna'        },
+    ],
+  },
 
   // // ── Global System Control ────────────────────────────────────────────────
   // global_control: {
@@ -212,15 +213,26 @@ export const PLATFORM_PERMISSIONS = {
   //   ],
   // },
 
-  // // ── Platform Analytics ───────────────────────────────────────────────────
-  // analytics: {
-  //   label: 'Platform Analytics',
-  //   permissions: [
-  //     { code: 'analytics.view_traffic',    label: 'Website traffic aur visitor stats dekhna'       },
-  //     { code: 'analytics.view_heatmaps',   label: 'User click heatmaps aur interaction data dekhna' },
-  //     { code: 'analytics.view_page_stats', label: 'Page-wise popular content analytics dekhna'    },
-  //   ],
-  // },
+    // ── Global System Control ────────────────────────────────────────────────
+  global_control: {
+    label: 'Global System Control',
+    permissions: [
+      { code: 'global.system_health',      label: 'System health aur performance dekhna'           },
+      { code: 'global.feature_toggles',    label: 'Platform features ko globally enable/disable karna' },
+      { code: 'global.impersonation',      label: 'Institute admin ke taur par login karna (Ghost Mode)' },
+      { code: 'global.maintenance_mode',   label: 'Platform-wide maintenance mode toggle'          },
+    ],
+  },
+
+  // ── Platform Analytics ───────────────────────────────────────────────────
+  analytics: {
+    label: 'Platform Analytics',
+    permissions: [
+      { code: 'analytics.view_traffic',    label: 'Website traffic aur visitor stats dekhna'       },
+      { code: 'analytics.view_heatmaps',   label: 'User click heatmaps aur interaction data dekhna' },
+      { code: 'analytics.view_page_stats', label: 'Page-wise popular content analytics dekhna'    },
+    ],
+  },
 };
 
 
@@ -359,13 +371,14 @@ export const MASTER_ADMIN_PAGE_ACTIONS = {
     ],
   },
 
-  '/master-admin/notifications': {
-    label: 'Notifications',
+  '/master-admin/announcements': {
+    label: 'Global Announcements (Broadcasts)',
     actions: [
-      'Tamam ya specific institutes ko notification bhejna',
-      'Notification type select karna (info, warning, payment, subscription, etc.)',
-      'Scheduled notifications (future feature)',
-      'Sent notifications ka history dekhna',
+      'Tamam ya specific institutes ke liye dashboard banners create karna',
+      'Announcement type select karna (Info, Warning, Success, Urgent)',
+      'Active / Draft status toggle karna',
+      'Expiry date set karna taake message khud-ba-khud hat jaye',
+      'Sent broadcasts ka history aur stats dekhna',
     ],
   },
 

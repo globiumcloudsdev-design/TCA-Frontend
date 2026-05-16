@@ -146,6 +146,15 @@ export const broadcastNotification = (data) =>
     () => ({ data: { ...data, count: 10, notificationIds: [] } })
   );
 
+/**
+ * Get active global announcements for the current institute
+ */
+export const getGlobalAnnouncements = () =>
+  withFallback(
+    () => api.get('/notifications/global').then((r) => r.data),
+    () => ({ data: [] })
+  );
+
 export const notificationService = {
   getAll,
   getUnreadCount,
@@ -156,4 +165,5 @@ export const notificationService = {
   cleanupOld: cleanupOldNotifications,
   send: sendNotification,
   broadcast: broadcastNotification,
+  getGlobalAnnouncements,
 };

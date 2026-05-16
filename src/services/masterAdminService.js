@@ -170,6 +170,30 @@ export const masterAdminService = {
   changeUserPassword: (userId, password) =>
     api.post(`/master-admin/users/${userId}/change-password`, { password }).then((r) => r.data?.data ?? r.data),
 
+  // NEW: Ghost Mode (Impersonation)
+  impersonateUser: (userId) =>
+    api.post('/master-admin/ghost-mode/login', { userId }).then((r) => r.data),
+
+  // NEW: Get ALL users of a specific institute (for Ghost Mode)
+  getInstituteUsers: (instituteId, search = '') =>
+    api.get(`/master-admin/institutes/${instituteId}/all-users${search ? `?search=${search}` : ''}`).then((r) => r.data),
+
+  // NEW: Global Announcements
+  getAnnouncements: () =>
+    api.get('/master-admin/announcements').then((r) => r.data),
+  createAnnouncement: (data) =>
+    api.post('/master-admin/announcements', data).then((r) => r.data),
+  updateAnnouncement: (id, data) =>
+    api.put(`/master-admin/announcements/${id}`, data).then((r) => r.data),
+  deleteAnnouncement: (id) =>
+    api.delete(`/master-admin/announcements/${id}`).then((r) => r.data),
+
+  // ─── Global Settings ───────────────────────────
+  getGlobalSettings: () =>
+    api.get('/master-admin/settings').then((r) => r.data),
+  updateGlobalSetting: (data) =>
+    api.post('/master-admin/settings', data).then((r) => r.data),
+
   // ─── Subscription Plans (CRUD) ───────────────────────────
   getSubscriptionTemplates: (filters = {}) =>
     api.get(`/subscription-plans${buildQuery(filters)}`).then((r) => r.data),

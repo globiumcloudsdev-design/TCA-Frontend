@@ -11,7 +11,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Building2, Users, CreditCard,
   LogOut, FileText, Menu, X, ShieldCheck, Mail, BarChart3, Bell, BellRing,
-  Globe, Newspaper, Palette, LifeBuoy, ShieldAlert, TrendingUp
+  Globe, Newspaper, Palette, LifeBuoy, ShieldAlert, TrendingUp, Ghost, Megaphone
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Cookies from 'js-cookie';
@@ -27,6 +27,7 @@ const NAV = [
   { href: '/master-admin', label: 'Dashboard', icon: LayoutDashboard, perm: null },
   { href: '/master-admin/global-control', label: 'Global Control', icon: ShieldAlert, perm: 'global.system_health' },
   { href: '/master-admin/analytics', label: 'Analytics', icon: TrendingUp, perm: 'analytics.view_traffic' },
+  { href: '/master-admin/ghost-mode', label: 'Ghost Mode', icon: Ghost, perm: 'global.impersonation' },
   { href: '/master-admin/roles', label: 'Roles', icon: ShieldCheck, perm: 'platform_role.read' },
   { href: '/master-admin/subscription-templates', label: 'Sub. Templates', icon: FileText, perm: 'sub_template.read' },
   { href: '/master-admin/institutes', label: 'Institutes', icon: Building2, perm: 'institute.read' },
@@ -34,7 +35,7 @@ const NAV = [
   { href: '/master-admin/users', label: 'Users', icon: Users, perm: 'platform_user.read' },
   { href: '/master-admin/reports', label: 'Reports', icon: BarChart3, perm: 'report.platform_overview' },
   { href: '/master-admin/emails', label: 'Bulk Emails', icon: Mail, perm: 'email.view_history' },
-  { href: '/master-admin/notifications', label: 'Notifications', icon: BellRing, perm: 'notification.broadcast' },
+  { href: '/master-admin/announcements', label: 'Broadcasts', icon: Megaphone, perm: 'notification.broadcast' },
   { href: '/master-admin/website-cms', label: 'Website CMS', icon: Globe, perm: 'cms.update_hero' },
   { href: '/master-admin/blog', label: 'Blog Management', icon: Newspaper, perm: 'blog.read' },
   { href: '/master-admin/branding', label: 'Branding', icon: Palette, perm: 'branding.update_colors' },
@@ -60,6 +61,35 @@ export default function MasterAdminLayout({ children }) {
   const [open, setOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isImpersonating, setIsImpersonating] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsImpersonating(!!localStorage.getItem('originalAdminToken'));
+    }
+  }, []);
+
+  const handleReturnToAdmin = () => {
+    const originalToken = localStorage.getItem('originalAdminToken');
+    const originalUser = localStorage.getItem('originalAdminUser');
+    
+    if (originalToken && originalUser) {
+      localStorage.setItem('accessToken', originalToken);
+      localStorage.setItem('user', originalUser);
+      localStorage.removeItem('originalAdminToken');
+      localStorage.removeItem('originalAdminUser');
+      
+      // Also cleanup portal specific cookies if they exist
+      Cookies.remove('portal_token');
+      Cookies.remove('portal_type');
+      
+      toast.success('Returned to Master Admin session');
+      window.location.href = '/master-admin/ghost-mode';
+    } else {
+      logout();
+      router.replace('/login');
+    }
+  };
 
   console.log('Login User', user);
 
@@ -202,7 +232,23 @@ export default function MasterAdminLayout({ children }) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
+        <main className="flex-1 overflow-auto">
+          {isImpersonating && (
+            <div className="bg-amber-500 text-white px-4 py-2 flex items-center justify-between sticky top-0 z-[60] shadow-md mb-4 rounded-lg">
+              <div className="flex items-center gap-2 text-sm font-bold">
+                <Ghost className="w-4 h-4 animate-pulse" />
+                <span>Ghost Mode Active: Impersonating <b>{user?.first_name} {user?.last_name}</b></span>
+              </div>
+              <button 
+                onClick={handleReturnToAdmin}
+                className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-md text-xs font-black transition-colors flex items-center gap-1 uppercase tracking-wider"
+              >
+                <LogOut className="w-3 h-3" /> Return to Admin
+              </button>
+            </div>
+          )}
+          <div className="p-4 sm:p-6">{children}</div>
+        </main>
       </div>
 
       {/* ── Send Notification Modal ──────────────────── */}
