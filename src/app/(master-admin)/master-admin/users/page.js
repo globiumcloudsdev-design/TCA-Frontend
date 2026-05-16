@@ -12,6 +12,8 @@ import {
   ConfirmDialog, AppModal, InputField, SelectField,
   SwitchField, FormSubmitButton, AvatarWithInitials,
 } from '@/components/common';
+import { KeyRound } from 'lucide-react';
+import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
 import { Button } from '@/components/ui/button';
 import { Badge }  from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -36,7 +38,7 @@ const ROLE_BADGE = {
 const fmtDate = (v) => v ? new Date(v).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 // ─── Columns ─────────────────────────────────────────────────────────────────
-function buildColumns(onEdit, onToggle, onDelete) {
+function buildColumns(onEdit, onToggle, onDelete, onChangePassword) {
   return [
     {
       id: 'user',
@@ -116,8 +118,14 @@ function buildColumns(onEdit, onToggle, onDelete) {
             onDelete={() => onDelete(u)}
             extra={[
               {
-                label: u.is_active ? '🔒 Deactivate' : '✅ Activate',
+                label: u.is_active ? 'Deactivate' : 'Activate',
+                icon: u.is_active ? UserX : UserCheck,
                 onClick: () => onToggle(u),
+              },
+              {
+                label: 'Change Password',
+                icon: KeyRound,
+                onClick: () => onChangePassword(u),
               },
             ]}
           />
@@ -139,6 +147,7 @@ export default function MasterUsersPage() {
   const [editTarget,   setEditTarget]   = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [toggleTarget, setToggleTarget] = useState(null);
+  const [changePasswordUser, setChangePasswordUser] = useState(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['master-users', page, search, statusFilter],
@@ -200,10 +209,12 @@ export default function MasterUsersPage() {
     }
   };
 
-  const columns = useMemo(
-    () => buildColumns(setEditTarget, setToggleTarget, setDeleteTarget),
-    [],
-  );
+  const columns = useMemo(() => buildColumns(
+    setEditTarget,
+    setToggleTarget,
+    setDeleteTarget,
+    setChangePasswordUser
+  ), []);
 
   return (
     <div className="space-y-5">
@@ -281,16 +292,28 @@ export default function MasterUsersPage() {
       />
 
       {/* ── Toggle Confirm ─────────────────────────────────── */}
-      <ConfirmDialog
-        open={!!toggleTarget}
-        onClose={() => setToggleTarget(null)}
-        onConfirm={() => toggleMutation.mutate({ id: toggleTarget.id, is_active: !toggleTarget.is_active })}
-        loading={toggleMutation.isPending}
-        title={toggleTarget?.is_active ? 'Deactivate User' : 'Activate User'}
-        description={`${toggleTarget?.is_active ? 'Deactivate' : 'Activate'} "${toggleTarget?.first_name} ${toggleTarget?.last_name}"?`}
-        confirmLabel={toggleTarget?.is_active ? 'Deactivate' : 'Activate'}
-        variant={toggleTarget?.is_active ? 'destructive' : 'default'}
-      />
+      {toggleTarget && (
+        <ConfirmDialog
+          open={!!toggleTarget}
+          title={toggleTarget.is_active ? 'Deactivate User?' : 'Activate User?'}
+          description={`User will ${toggleTarget.is_active ? 'no longer' : 'now'} be able to login.`}
+          confirmLabel={toggleTarget.is_active ? 'Deactivate' : 'Activate'}
+          onConfirm={() => toggleMutation.mutate({ id: toggleTarget.id, is_active: !toggleTarget.is_active })}
+          onClose={() => setToggleTarget(null)}
+          loading={toggleMutation.isPending}
+          variant={toggleTarget.is_active ? 'destructive' : 'default'}
+        />
+      )}
+
+      {/* Change Password Modal */}
+      {changePasswordUser && (
+        <ChangePasswordModal
+          open={!!changePasswordUser}
+          user={changePasswordUser}
+          onClose={() => setChangePasswordUser(null)}
+          serviceType="masterAdmin"
+        />
+      )}
     </div>
   );
 }

@@ -9,14 +9,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppModal from '@/components/common/AppModal';
 import { dashboardService } from '@/services/dashboardService';
+import { masterAdminService } from '@/services/masterAdminService';
 
-export default function ChangePasswordModal({ open, onClose, user }) {
+export default function ChangePasswordModal({ open, onClose, user, serviceType = 'dashboard' }) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const changePassword = useMutation({
-    mutationFn: () => dashboardService.changeUserPassword(user.id, password),
+    mutationFn: () => {
+      const apiService = serviceType === 'masterAdmin' ? masterAdminService : dashboardService;
+      return apiService.changeUserPassword(user.id, password);
+    },
     onSuccess: (data) => {
       toast.success(`Password updated for ${data.name}`);
       handleClose();

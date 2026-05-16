@@ -45,6 +45,10 @@ function normalizeFilters(filters = {}, type = "school") {
   // Add academic_year_id if present (common to all types)
   if (filters.academic_year_id) base.academic_year_id = filters.academic_year_id;
 
+  // Add sorting parameters
+  if (filters.sortBy) base.sortBy = filters.sortBy;
+  if (filters.sortOrder) base.sortOrder = filters.sortOrder;
+
   // Add type-specific filters
   switch (type) {
     case "coaching":
@@ -149,7 +153,7 @@ export const studentService = {
         students: studentsData,
         institute_type: instituteType,
       });
-      return response;
+      return response.data;
     } catch (error) {
       console.error("Bulk create API error:", error);
       throw error;
@@ -159,7 +163,17 @@ export const studentService = {
   search: (query, limit = 20) =>
     api.get(`/students/search?q=${encodeURIComponent(query)}&limit=${limit}`).then(r => r.data),
 
-  bulkDelete: (ids) => api.post('/students/bulk-delete', { ids }).then(r => r.data),
+  getStats: (type, filters = {}) => {
+    const query = buildQuery({
+      type,
+      academicYearId: filters.academicYearId,
+      classId: filters.classId,
+      sectionId: filters.sectionId
+    });
+    return api.get(`/students/stats${query}`).then(r => r.data);
+  },
+
+  bulkDelete: (ids, type = 'inactive') => api.post('/students/bulk-delete', { ids, type }).then(r => r.data),
   /**
    * Check if a single student is eligible for promotion
    * @param {string} id - Student ID

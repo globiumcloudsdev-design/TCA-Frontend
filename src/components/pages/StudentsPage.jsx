@@ -24,16 +24,18 @@ import {
   Plus, Eye, Pencil, Trash2, Loader2, IdCard, Power, Filter,
   GraduationCap, Users, BookOpen, School, Building2, Layers,
   Calendar, Mail, Phone, MapPin, Shield,
-  AlertCircle, FileSpreadsheet, KeyRound
+  AlertCircle, FileSpreadsheet, KeyRound,
+  Download, ChevronDown, UserX
 } from 'lucide-react';
 import { TableRowActions } from '@/components/common';
 import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
 import { toast } from 'sonner';
+import { format, isValid, parseISO } from 'date-fns';
 
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
-import { studentService, academicYearService, classService } from '@/services';
+import { studentService, academicYearService, classService, reportService } from '@/services';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import StatsCard from '@/components/common/StatsCard';
@@ -47,6 +49,15 @@ import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '../ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 
 // Type-based terminology mapper
 const getTerminology = (type) => {
@@ -152,11 +163,27 @@ export default function StudentsPage({ type }) {
   const [isExporting, setIsExporting] = useState(false);
   const [changePasswordUser, setChangePasswordUser] = useState(null);
   const [mounted, setMounted] = useState(false);
+  const [skippedStudents, setSkippedStudents] = useState([]);
+  const [isSkippedModalOpen, setIsSkippedModalOpen] = useState(false);
 
   // Filter state
   const [academicYearId, setAcademicYearId] = useState('');
   const [classId, setClassId] = useState('');
   const [sectionId, setSectionId] = useState('');
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [sortBy, setSortBy] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('student_sort_by') || 'created_at';
+    }
+    return 'created_at';
+  });
+  const [sortOrder, setSortOrder] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('student_sort_order') || 'DESC';
+    }
+    return 'DESC';
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -232,7 +259,7 @@ export default function StudentsPage({ type }) {
       
       toast.success(message);
       qc.invalidateQueries({ queryKey: ['students', type] });
-      qc.invalidateQueries({ queryKey: ['students', type, filters] });
+      qc.invalidateQueries({ queryKey: ['student-stats', type] });
       setConfirmDialog(null);
     },
     onError: (error, variables) => {
@@ -253,6 +280,7 @@ export default function StudentsPage({ type }) {
       toast.success(`${terms.student} added successfully`);
       setIsAddModalOpen(false);
       qc.invalidateQueries({ queryKey: ['students', type] });
+      qc.invalidateQueries({ queryKey: ['student-stats', type] });
     },
     onError: (error) => {
       toast.error(error.message || `Failed to add ${terms.student}`);
@@ -268,6 +296,7 @@ export default function StudentsPage({ type }) {
       toast.success(`${terms.student} updated successfully`);
       setEditingId(null);
       qc.invalidateQueries({ queryKey: ['students', type] });
+      qc.invalidateQueries({ queryKey: ['student-stats', type] });
       qc.invalidateQueries({ queryKey: ['student', editingId] });
     },
     onError: (error) => {
@@ -317,6 +346,38 @@ export default function StudentsPage({ type }) {
     });
   };
 
+  const handleBulkDelete = async (ids, actionType = 'inactive') => {
+    if (!ids.length) return;
+    
+    const isDelete = actionType === 'delete';
+    
+    setConfirmDialog({
+      ids,
+      actionType,
+      title: isDelete ? `Permanent Bulk Delete` : `Bulk Deactivate ${terms.students}`,
+      description: isDelete 
+        ? `Are you sure you want to PERMANENTLY delete ${ids.length} selected ${terms.students.toLowerCase()}? This action cannot be undone.`
+        : `Are you sure you want to deactivate ${ids.length} selected ${terms.students.toLowerCase()}?`,
+      confirmLabel: isDelete ? 'Delete Permanently' : 'Deactivate All',
+      variant: 'destructive',
+      onConfirm: async () => {
+        setIsBulkDeleting(true);
+        try {
+          const res = await studentService.bulkDelete(ids, actionType);
+          toast.success(res.message || `${res.deletedCount} records processed successfully`);
+          qc.invalidateQueries({ queryKey: ['students', type] });
+          qc.invalidateQueries({ queryKey: ['student-stats', type] });
+          setSelectedIds([]);
+        } catch (error) {
+          toast.error(error.message || 'Failed to process bulk operation');
+        } finally {
+          setIsBulkDeleting(false);
+          setConfirmDialog(null);
+        }
+      }
+    });
+  };
+
   const filters = useMemo(() => {
     const f = { page, limit: pageSize, search };
     
@@ -324,6 +385,9 @@ export default function StudentsPage({ type }) {
     else if (status === 'inactive') f.is_active = false;
     
     if (academicYearId) f.academic_year_id = academicYearId;
+    
+    if (sortBy) f.sortBy = sortBy;
+    if (sortOrder) f.sortOrder = sortOrder;
     
     if (classId) {
       if (type === 'school') f.class_id = classId;
@@ -339,7 +403,7 @@ export default function StudentsPage({ type }) {
     }
     
     return f;
-  }, [page, pageSize, search, status, academicYearId, classId, sectionId, type]);
+  }, [page, pageSize, search, status, academicYearId, classId, sectionId, type, sortBy, sortOrder]);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['students', type, filters],
@@ -515,6 +579,26 @@ export default function StudentsPage({ type }) {
     }));
   }, [sections]);
 
+  const sortOptions = [
+    { value: 'created_at-DESC', label: 'Latest First' },
+    { value: 'created_at-ASC', label: 'Oldest First' },
+    { value: 'registration_no-ASC', label: 'Registration No (Serial Wise)' },
+    { value: 'roll_no-ASC', label: 'Roll Number (Serial Wise)' },
+    { value: 'first_name-ASC', label: 'Name (A-Z)' },
+    { value: 'first_name-DESC', label: 'Name (Z-A)' },
+  ];
+
+  const handleSortChange = (val) => {
+    const [field, order] = val.split('-');
+    setSortBy(field);
+    setSortOrder(order);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('student_sort_by', field);
+      localStorage.setItem('student_sort_order', order);
+    }
+    setPage(1);
+  };
+
   const addButton = canDo('students.create') ? (
     <SimpleTooltip content={`Add new ${terms.student.toLowerCase()}`} side="bottom">
       <button
@@ -603,12 +687,12 @@ export default function StudentsPage({ type }) {
   const ALL_STUDENT_COLUMNS = [
     // Personal Information
     { key: 'first_name', label: 'First Name', required: true, validation: 'text' },
-    { key: 'last_name', label: 'Last Name', required: true, validation: 'text' },
+    { key: 'last_name', label: 'Last Name', required: false, validation: 'text' },
     { key: 'email', label: 'Email', required: false, validation: 'email' },
     { key: 'phone', label: 'Phone', required: false, validation: 'phone' },
     { key: 'registration_no', label: 'Registration No', required: false, validation: 'text' },
     { key: 'cnic', label: 'CNIC/B-Form', required: false, validation: 'cnic' },
-    { key: 'dob', label: 'Date of Birth', required: false, validation: 'date' },
+    { key: 'dob', label: 'Date of Birth (DOB)', required: false, validation: 'date' },
     { key: 'gender', label: 'Gender', required: false, validation: 'select', options: ['male', 'female', 'other'] },
     { key: 'blood_group', label: 'Blood Group', required: false, validation: 'select' },
     { key: 'religion', label: 'Religion', required: false, validation: 'text' },
@@ -702,27 +786,52 @@ export default function StudentsPage({ type }) {
 
     try {
       const toastId = toast.loading(`Importing ${importedData.length} ${terms.students}...`);
-      const response = await studentService.bulkCreate(importedData, type);
+      const res = await studentService.bulkCreate(importedData, type);
       toast.dismiss(toastId);
 
-      if (response?.data?.failed?.length > 0) {
-        toast.warning(`✅ ${response.data.imported} imported | ❌ ${response.data.failed.length} failed`);
-      } else if (response?.data?.imported === response?.data?.total) {
-        toast.success(`🎉 Successfully imported ${response.data.imported} ${terms.students}!`);
+      const data = res?.data || res;
+      
+      if (data?.failed?.length > 0) {
+        setSkippedStudents(data.failed);
+        setIsSkippedModalOpen(true);
+        toast.warning(`✅ ${data.imported || 0} imported | ❌ ${data.failed.length} failed`);
+      } else if (data?.imported !== undefined) {
+        toast.success(`🎉 Successfully imported ${data.imported} ${terms.students}!`);
       } else {
         toast.error('Import failed');
       }
 
       qc.invalidateQueries({ queryKey: ['students', type] });
+      qc.invalidateQueries({ queryKey: ['student-stats', type] });
     } catch (error) {
       toast.error(error.message || 'Failed to import students');
+    }
+  };
+
+  const handleExportSkipped = () => {
+    if (!skippedStudents.length) return;
+
+    try {
+      const dataToExport = skippedStudents.map(item => ({
+        ...item.data,
+        Errors: item.errors?.join('; ') || 'Unknown error'
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Skipped Students");
+      XLSX.writeFile(wb, `${type}_skipped_students_${new Date().getTime()}.xlsx`);
+      toast.success('Skipped students data exported successfully');
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast.error('Failed to export skipped students');
     }
   };
 
   if (!mounted) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full max-w-full">
       <PageHeader
         title={terms.students}
         description={`${total} ${total === 1 ? terms.student : terms.students} total`}
@@ -805,6 +914,15 @@ export default function StudentsPage({ type }) {
               options={statusOptions}
               placeholder="Select Status"
             />
+
+            {/* Sort Order - Serial Wise */}
+            <SelectField
+              label="Order By"
+              value={`${sortBy}-${sortOrder}`}
+              onChange={handleSortChange}
+              options={sortOptions}
+              placeholder="Select Sorting"
+            />
           </div>
         </CardContent>
       </Card>
@@ -819,6 +937,36 @@ export default function StudentsPage({ type }) {
         onSearch={(v) => { setSearch(v); setPage(1); }}
         searchPlaceholder={`Search ${terms.students.toLowerCase()}...`}
         enableColumnVisibility
+        enableRowSelection
+        onRowSelectionChange={(selected) => setSelectedIds(selected.map((s) => s.id))}
+        selectionActions={
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="destructive" size="sm" className="h-8 gap-1.5">
+                  <Trash2 size={14} />
+                  Bulk Actions
+                  <ChevronDown size={14} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Selected: {selectedIds.length}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleBulkDelete(selectedIds, 'inactive')}>
+                  <UserX size={14} className="mr-2" />
+                  Deactivate Students
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => handleBulkDelete(selectedIds, 'delete')}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 size={14} className="mr-2" />
+                  Permanent Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        }
         importConfig={{
           columns: IMPORT_COLUMNS,
           onImport: handleBulkImport,
@@ -886,8 +1034,8 @@ export default function StudentsPage({ type }) {
         <ConfirmDialog
           open={!!confirmDialog}
           onClose={() => setConfirmDialog(null)}
-          onConfirm={handleConfirmAction}
-          loading={processStudentMutation.isPending}
+          onConfirm={confirmDialog.onConfirm || handleConfirmAction}
+          loading={isBulkDeleting || processStudentMutation.isPending}
           title={confirmDialog.title}
           description={confirmDialog.description}
           confirmLabel={confirmDialog.confirmLabel}
@@ -903,13 +1051,86 @@ export default function StudentsPage({ type }) {
           user={changePasswordUser}
         />
       )}
+
+      {/* Skipped Students Modal */}
+      <AppModal
+        open={isSkippedModalOpen}
+        onClose={() => setIsSkippedModalOpen(false)}
+        title="Skipped Students Report"
+        description={`${skippedStudents.length} records were skipped during import due to the following reasons.`}
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={handleExportSkipped}
+            >
+              <Download size={14} className="text-emerald-600" />
+              Export Skipped Data
+            </Button>
+          </div>
+          
+          <DataTable
+            columns={[
+              {
+                accessorKey: 'row',
+                header: 'Row',
+                size: 60,
+                cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground">{row.original.row}</span>
+              },
+              {
+                accessorKey: 'name',
+                header: 'Student Name',
+                cell: ({ row }) => {
+                  const d = row.original.data;
+                  return <span className="font-medium text-sm">{d?.first_name} {d?.last_name}</span>;
+                }
+              },
+              {
+                accessorKey: 'errors',
+                header: 'Error Reason',
+                cell: ({ row }) => (
+                  <div className="flex flex-wrap gap-1">
+                    {row.original.errors?.map((err, idx) => (
+                      <Badge key={idx} variant="destructive" className="bg-rose-50 text-rose-600 border-rose-100 font-normal text-[10px]">
+                        {err}
+                      </Badge>
+                    ))}
+                  </div>
+                )
+              }
+            ]}
+            data={skippedStudents}
+            emptyMessage="No skipped records found"
+          />
+          
+          <div className="flex justify-end pt-2">
+            <Button onClick={() => setIsSkippedModalOpen(false)}>
+              Close Report
+            </Button>
+          </div>
+        </div>
+      </AppModal>
     </div>
   );
 }
 
 // StudentCell Component
 function StudentCell({ student: s, columnKey, type, terms }) {
-  const val = (k) => s[k] ?? s.details?.studentDetails?.[k];
+  const val = (k) => {
+    // Try primary key, then details structure
+    const baseVal = s[k] ?? s.details?.studentDetails?.[k];
+    if (baseVal) return baseVal;
+
+    // Fallbacks for date fields
+    if (k === 'dob') return s.date_of_birth ?? s.details?.studentDetails?.date_of_birth;
+    if (k === 'admission_date') return s.admission_date ?? s.details?.studentDetails?.admission_date;
+    
+    return null;
+  };
 
   switch (columnKey) {
     case 'name':
@@ -967,6 +1188,24 @@ function StudentCell({ student: s, columnKey, type, terms }) {
         </SimpleTooltip>
       );
     
+    case 'dob':
+    case 'admission_date':
+    case 'created_at':
+      const dateVal = val(columnKey);
+      if (!dateVal) return <span className="text-muted-foreground">—</span>;
+      try {
+        const date = typeof dateVal === 'string' ? parseISO(dateVal) : new Date(dateVal);
+        if (isValid(date)) {
+          return (
+            <div className="flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="text-sm whitespace-nowrap">{format(date, 'MMM dd, yyyy')}</span>
+            </div>
+          );
+        }
+      } catch (e) {}
+      return <span className="text-sm">{String(dateVal)}</span>;
+
     default:
       const defaultValue = val(columnKey);
       if (!defaultValue) return <span className="text-muted-foreground">—</span>;
@@ -977,8 +1216,4 @@ function StudentCell({ student: s, columnKey, type, terms }) {
       );
   }
 }
-
-
-
-
 

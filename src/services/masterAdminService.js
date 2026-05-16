@@ -165,6 +165,10 @@ export const masterAdminService = {
   // NEW: Toggle user status
   toggleUserStatus: (id, is_active) =>
     api.patch(`/master-admin/users/${id}/status`, { is_active }).then((r) => r.data),
+    
+  // NEW: Change platform user password
+  changeUserPassword: (userId, password) =>
+    api.post(`/master-admin/users/${userId}/change-password`, { password }).then((r) => r.data?.data ?? r.data),
 
   // ─── Subscription Plans (CRUD) ───────────────────────────
   getSubscriptionTemplates: (filters = {}) =>

@@ -56,11 +56,11 @@ export default function StudentForm({
 }) {
   const [activeTab, setActiveTab] = useState('personal');
   const [selectedAcademicYear, setSelectedAcademicYear] = useState(
-    defaultValues.details?.studentDetails?.academic_year_id || ''
+    defaultValues.academic_year_id || defaultValues.details?.studentDetails?.academic_year_id || ''
   );
   const [avatarPreview, setAvatarPreview] = useState(defaultValues.avatar_url || null);
   const avatarFileRef = useRef(null);
-  const prevClassRef = useRef(defaultValues.details?.studentDetails?.class_id || '');
+  const prevClassRef = useRef(defaultValues.class_id || defaultValues.details?.studentDetails?.class_id || '');
 
   const isMobile = useMediaQuery('(max-width: 640px)');
 
@@ -81,6 +81,7 @@ export default function StudentForm({
       guardians: [{ name: '', relation: '', phone: '', cnic: '', email: '', type: 'father' }],
       nationality: defaultValues.nationality || 'Pakistan',
       admission_date: isEdit ? defaultValues.admission_date : new Date(),
+      is_active: defaultValues.is_active ?? true,
       ...defaultValues,
       details: {
         studentDetails: {
@@ -105,13 +106,24 @@ export default function StudentForm({
   });
 
   useEffect(() => {
-    if (defaultValues && Object.keys(defaultValues).length > 0) {
+    if (isEdit && defaultValues?.id) {
       reset(defaultValues);
-      if (defaultValues.details?.studentDetails?.academic_year_id) {
-        setSelectedAcademicYear(defaultValues.details.studentDetails.academic_year_id);
+      
+      const academicYearId = defaultValues.academic_year_id || defaultValues.details?.studentDetails?.academic_year_id;
+      if (academicYearId) {
+        setSelectedAcademicYear(academicYearId);
+        setValue('academic_year_id', academicYearId);
       }
-      if (defaultValues.details?.studentDetails?.class_id) {
-        prevClassRef.current = defaultValues.details.studentDetails.class_id;
+      
+      const classId = defaultValues.class_id || defaultValues.details?.studentDetails?.class_id;
+      if (classId) {
+        prevClassRef.current = classId;
+        setValue('class_id', classId);
+      }
+
+      const sectionId = defaultValues.section_id || defaultValues.details?.studentDetails?.section_id;
+      if (sectionId) {
+        setValue('section_id', sectionId);
       }
     }
   }, [defaultValues?.id, reset]);
@@ -191,6 +203,30 @@ export default function StudentForm({
     setValue('class_name', className, { shouldDirty: false });
     setValue('section_name', sectionName, { shouldDirty: false });
   }, [selectedClassData, selectedSectionData, setValue]);
+
+  // Sync Class and Section once data is loaded
+  useEffect(() => {
+    if (isEdit && classes.length > 0) {
+      const targetClassId = defaultValues.class_id || defaultValues.details?.studentDetails?.class_id;
+      if (targetClassId && !watchClass) {
+        setValue('class_id', targetClassId);
+        prevClassRef.current = targetClassId;
+      }
+    }
+  }, [isEdit, classes, watchClass, setValue, defaultValues]);
+
+  useEffect(() => {
+    if (isEdit && sections.length > 0) {
+      const targetSectionId = defaultValues.section_id || defaultValues.details?.studentDetails?.section_id;
+      const currentClassId = watchClass;
+      const originalClassId = defaultValues.class_id || defaultValues.details?.studentDetails?.class_id;
+      
+      // Only auto-select section if we are still on the original class
+      if (targetSectionId && !watchSection && currentClassId === originalClassId) {
+        setValue('section_id', targetSectionId);
+      }
+    }
+  }, [isEdit, sections, watchSection, watchClass, setValue, defaultValues]);
 
   // Tab Navigation logic
   const validateTab = async (tab) => {

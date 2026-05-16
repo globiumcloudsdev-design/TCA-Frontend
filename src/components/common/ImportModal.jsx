@@ -918,6 +918,9 @@ export default function ImportModal({
 }) {
   const [step, setStep] = useState(1); // 1: upload, 2: mapping, 3: preview
   const [file, setFile] = useState(null);
+  const [workbook, setWorkbook] = useState(null);
+  const [sheetNames, setSheetNames] = useState([]);
+  const [selectedSheet, setSelectedSheet] = useState('');
   const [parsedData, setParsedData] = useState([]);
   const [fileHeaders, setFileHeaders] = useState([]);
   const [mapping, setMapping] = useState({});
@@ -925,7 +928,7 @@ export default function ImportModal({
   const [errors, setErrors] = useState([]);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
-  const [importStatus, setImportStatus] = useState("idle");
+  const [importStatus, setImportStatus] = useState('idle');
 
   // Prepare available columns for mapping
   const availableColumns = useMemo(() => {
@@ -941,20 +944,55 @@ export default function ImportModal({
 
   // Parse file based on extension
   const parseFile = useCallback(
-    async (uploadedFile) => {
+    async (uploadedFile, sheetName = null) => {
       const extension = uploadedFile.name.split(".").pop().toLowerCase();
       let headers = [];
       let rows = [];
 
       try {
         if (["csv", "xlsx", "xls"].includes(extension)) {
-          const buffer = await uploadedFile.arrayBuffer();
-          const workbook = XLSX.read(buffer, { cellDates: true });
-          const sheetName = workbook.SheetNames[0];
-          const sheet = workbook.Sheets[sheetName];
-          const data = XLSX.utils.sheet_to_json(sheet);
-          headers = Object.keys(data[0] || {});
-          rows = data;
+          let currentWorkbook = workbook;
+          if (!currentWorkbook) {
+            const buffer = await uploadedFile.arrayBuffer();
+            currentWorkbook = XLSX.read(buffer, { cellDates: true });
+          }
+
+          if (["xlsx", "xls"].includes(extension)) {
+            const names = currentWorkbook.SheetNames;
+            setSheetNames(names);
+            setWorkbook(currentWorkbook);
+
+            if (!sheetName && names.length > 1) {
+              // Let user select sheet
+              return;
+            }
+
+            const targetSheet = sheetName || names[0];
+            setSelectedSheet(targetSheet);
+            const sheet = currentWorkbook.Sheets[targetSheet];
+            const data = XLSX.utils.sheet_to_json(sheet, { raw: false, defval: "" });
+            headers = Object.keys(data[0] || {});
+            rows = data;
+          } else {
+            // CSV
+            const sheetName = currentWorkbook.SheetNames[0];
+            const sheet = currentWorkbook.Sheets[sheetName];
+            const data = XLSX.utils.sheet_to_json(sheet, { raw: false, defval: "" });
+            headers = Object.keys(data[0] || {});
+            rows = data;
+          }
+        }
+
+        if (rows.length > 500) {
+          setErrors([
+            {
+              type: "limit",
+              message: "Maximum 500 records can be imported at once. Please split your file.",
+            },
+          ]);
+          setParsedData([]);
+          setFileHeaders([]);
+          return;
         }
 
         setFileHeaders(headers);
@@ -963,13 +1001,44 @@ export default function ImportModal({
         // Auto-map columns based on similarity
         const autoMapping = {};
         headers.forEach((fileCol) => {
-          const matchedCol = availableColumns.find(
-            (dbCol) =>
-              dbCol.label.toLowerCase() === fileCol.toLowerCase() ||
-              dbCol.key.toLowerCase() === fileCol.toLowerCase() ||
-              dbCol.label.toLowerCase().includes(fileCol.toLowerCase()) ||
-              fileCol.toLowerCase().includes(dbCol.label.toLowerCase()),
-          );
+          const normalizedFileCol = fileCol.toLowerCase().replace(/[^a-z0-9]/g, "");
+          
+          const matchedCol = availableColumns.find((dbCol) => {
+            const normalizedLabel = dbCol.label.toLowerCase().replace(/[^a-z0-9]/g, "");
+            const normalizedKey = dbCol.key.toLowerCase().replace(/[^a-z0-9]/g, "");
+            
+            // Special cases like DOB and Guardian details
+            const synonyms = {
+              dob: ["dob", "dateofbirth", "birthdate", "birth", "birthofdate"],
+              admission_date: ["admissiondate", "doj", "joiningdate", "enrollmentdate"],
+              registration_no: ["regno", "grno", "registration", "studentcode"],
+              cnic: ["cnic", "bform", "idcard", "identity"],
+              guardian_name: ["guardianname", "fathername", "parentname", "guardian"],
+              guardian_phone: ["guardianphone", "fatherphone", "parentphone", "guardianmobile", "mobile"],
+              guardian_cnic: ["guardiancnic", "fathercnic", "parentcnic"],
+              guardian_email: ["guardianemail", "fatheremail", "parentemail"],
+            };
+
+            if (synonyms.dob.includes(normalizedFileCol) && (normalizedKey === "dob" || normalizedKey === "dateofbirth")) return true;
+            if (synonyms.admission_date.includes(normalizedFileCol) && normalizedKey === "admission_date") return true;
+            if (synonyms.registration_no.includes(normalizedFileCol) && normalizedKey === "registration_no") return true;
+            if (synonyms.cnic.includes(normalizedFileCol) && normalizedKey === "cnic") return true;
+
+            // Flexible Guardian Matching
+            if (synonyms.guardian_name.includes(normalizedFileCol) && (normalizedKey === "guardian_name" || normalizedKey === "father_name")) return true;
+            if (synonyms.guardian_phone.includes(normalizedFileCol) && (normalizedKey === "guardian_phone" || normalizedKey === "father_phone")) return true;
+            if (synonyms.guardian_cnic.includes(normalizedFileCol) && (normalizedKey === "guardian_cnic" || normalizedKey === "father_cnic")) return true;
+            if (synonyms.guardian_email.includes(normalizedFileCol) && (normalizedKey === "guardian_email" || normalizedKey === "father_email")) return true;
+            
+            return (
+              normalizedLabel === normalizedFileCol ||
+              normalizedKey === normalizedFileCol ||
+              normalizedLabel.includes(normalizedFileCol) ||
+              normalizedFileCol.includes(normalizedLabel) ||
+              (normalizedFileCol === "dob" && normalizedKey === "dob")
+            );
+          });
+
           if (matchedCol) {
             autoMapping[fileCol] = matchedCol.key;
           } else {
@@ -992,16 +1061,26 @@ export default function ImportModal({
         ]);
       }
     },
-    [availableColumns],
+    [availableColumns, workbook],
   );
 
   // Generate preview data based on mapping
   const generatePreview = (data, currentMapping) => {
-    const preview = data.slice(0, 10).map((row) => {
+    const preview = data.map((row) => {
       const mappedRow = {};
       Object.entries(currentMapping).forEach(([fileCol, dbCol]) => {
         if (dbCol !== "skip") {
-          const val = row[fileCol];
+          let val = row[fileCol];
+          
+          // Handle potential Excel date number
+          if (typeof val === 'number' && (dbCol === 'dob' || dbCol === 'admission_date')) {
+             // Basic Excel date conversion if it's a number
+             const date = new Date((val - 25569) * 86400 * 1000);
+             if (!isNaN(date.getTime())) {
+               val = format(date, "yyyy-MM-dd");
+             }
+          }
+
           if (val instanceof Date) {
             mappedRow[dbCol] = format(val, "yyyy-MM-dd");
           } else {
@@ -1009,6 +1088,19 @@ export default function ImportModal({
           }
         }
       });
+      // Ensure is_active is true by default if not mapped
+      // Ensure is_active is true by default if not explicitly false/inactive
+      if (mappedRow.is_active === undefined || mappedRow.is_active === null || mappedRow.is_active === "") {
+        mappedRow.is_active = true;
+      } else {
+        // Normalize string values from file
+        const act = String(mappedRow.is_active).toLowerCase();
+        if (act === 'false' || act === '0' || act === 'inactive' || act === 'no') {
+          mappedRow.is_active = false;
+        } else {
+          mappedRow.is_active = true;
+        }
+      }
       return mappedRow;
     });
     setPreviewData(preview);
@@ -1072,7 +1164,16 @@ export default function ImportModal({
           if (previewRow && previewRow[dbCol] !== undefined) {
             mappedRow[dbCol] = previewRow[dbCol];
           } else {
-            const val = row[fileCol];
+            let val = row[fileCol];
+
+            // Handle potential Excel date number in final preparation
+            if (typeof val === 'number' && (dbCol === 'dob' || dbCol === 'admission_date')) {
+               const date = new Date((val - 25569) * 86400 * 1000);
+               if (!isNaN(date.getTime())) {
+                 val = format(date, "yyyy-MM-dd");
+               }
+            }
+
             if (val instanceof Date) {
               mappedRow[dbCol] = format(val, "yyyy-MM-dd");
             } else {
@@ -1131,13 +1232,16 @@ export default function ImportModal({
   const resetState = () => {
     setStep(1);
     setFile(null);
+    setWorkbook(null);
+    setSheetNames([]);
+    setSelectedSheet('');
     setParsedData([]);
     setFileHeaders([]);
     setMapping({});
     setPreviewData([]);
     setErrors([]);
     setImportProgress(0);
-    setImportStatus("idle");
+    setImportStatus('idle');
   };
 
   const handleClose = () => {
@@ -1208,6 +1312,36 @@ export default function ImportModal({
                 accept={accept}
                 isProcessing={false}
               />
+
+              {sheetNames.length > 1 && (
+                <div className="mt-6 p-4 border rounded-lg bg-primary/5 border-primary/20 space-y-3">
+                  <div className="flex items-center gap-2 text-primary">
+                    <FileSpreadsheet className="h-5 w-5" />
+                    <span className="text-sm font-semibold">Multiple Sheets Detected</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    This file contains multiple sheets. Please select the one you want to import data from:
+                  </p>
+                  <Select
+                    value={selectedSheet}
+                    onValueChange={(val) => {
+                      setSelectedSheet(val);
+                      parseFile(file, val);
+                    }}
+                  >
+                    <SelectTrigger className="w-full bg-background">
+                      <SelectValue placeholder="Select a sheet..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sheetNames.map((name) => (
+                        <SelectItem key={name} value={name}>
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {sampleData && (
                 <div className="rounded-lg border p-3 bg-muted/20 mt-4">
@@ -1298,7 +1432,7 @@ export default function ImportModal({
                 <div>
                   <p className="text-sm font-medium">Preview Data</p>
                   <p className="text-xs text-muted-foreground">
-                    Showing first 10 rows • Click on any cell to edit
+                    Click on any cell to edit data before importing
                   </p>
                 </div>
                 <Badge variant="outline">
@@ -1355,11 +1489,9 @@ export default function ImportModal({
                 </div>
               </div>
 
-              {totalRecords > 10 && (
-                <p className="text-xs text-muted-foreground text-center shrink-0">
-                  + {totalRecords - 10} more records will be imported
-                </p>
-              )}
+              <p className="text-[10px] text-muted-foreground text-center shrink-0 italic">
+                Scroll to view all {totalRecords} records. Review carefully before finalizing.
+              </p>
 
               {/* Progress during import */}
               {importing && importStatus === "processing" && (
