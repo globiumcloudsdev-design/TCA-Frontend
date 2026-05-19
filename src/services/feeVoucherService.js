@@ -426,7 +426,7 @@ export const feeVoucherService = {
         academicYearId: options.academicYearId || undefined,
         feeTemplateId: options.feeTemplateId || undefined,
       }, {
-        timeout: 30000
+        timeout: 600000
       });
 
       const result = response.data?.data || {};
@@ -468,7 +468,7 @@ export const feeVoucherService = {
         academicYearId: options.academicYearId || undefined,
         feeTemplateId: options.feeTemplateId || undefined,
       }, {
-        timeout: 60000
+        timeout: 600000
       });
 
       const result = response.data?.data || {};
@@ -1363,8 +1363,88 @@ export const feeVoucherService = {
       console.error('❌ Failed to export summary:', error);
       throw error;
     }
+  },
+
+  /**
+   * Get monthly/academic statistics for vouchers
+   * @param {object} filters - {month, year, academic_year_id}
+   * @returns {Promise<object>} Stats object
+   */
+  getStats: async (filters = {}) => {
+    try {
+      const queryString = buildQuery({
+        month: filters.month ? parseInt(filters.month) : undefined,
+        year: filters.year ? parseInt(filters.year) : undefined,
+        academic_year_id: filters.academic_year_id || undefined
+      });
+      const response = await api.get(`/fee-vouchers/stats${queryString}`, {
+        timeout: 10000
+      });
+      return response.data?.data || response.data || {};
+    } catch (error) {
+      console.error('❌ Failed to fetch voucher stats:', error);
+      throw {
+        message: error.response?.data?.message || error.message || 'Failed to fetch voucher stats',
+        status: error.response?.status,
+        error
+      };
+    }
+  },
+
+  /**
+   * Get list of fee defaulters with >= 2 unpaid months
+   * @returns {Promise<Array>} List of defaulters
+   */
+  getDefaulters: async () => {
+    try {
+      const response = await api.get('/fee-vouchers/defaulters', { timeout: 15000 });
+      return response.data?.data || response.data || [];
+    } catch (error) {
+      console.error('❌ Failed to fetch fee defaulters:', error);
+      throw {
+        message: error.response?.data?.message || error.message || 'Failed to fetch fee defaulters',
+        status: error.response?.status,
+        error
+      };
+    }
+  },
+
+  /**
+   * Warn fee defaulter and send real-time alerts
+   * @param {string} studentId - The student user ID
+   * @returns {Promise<object>} Warning result details
+   */
+  warnDefaulter: async (studentId) => {
+    try {
+      const response = await api.post(`/fee-vouchers/defaulters/${studentId}/warn`, {}, { timeout: 15000 });
+      return response.data?.data || response.data || {};
+    } catch (error) {
+      console.error('❌ Failed to send fee warning alert:', error);
+      throw {
+        message: error.response?.data?.message || error.message || 'Failed to send fee warning alert',
+        status: error.response?.status,
+        error
+      };
+    }
   }
 
 };
 
-export default feeVoucherService;
+feeVoucherService.bulkDelete = async (voucherIds) => {
+  try {
+    if (!Array.isArray(voucherIds) || voucherIds.length === 0) {
+      throw new Error('Voucher IDs array is required');
+    }
+    const response = await api.post('/fee-vouchers/bulk-delete', { voucherIds }, { timeout: 15000 });
+    return response.data;
+  } catch (error) {
+    console.error('❌ Failed to bulk delete vouchers:', error);
+    throw {
+      message: error.response?.data?.message || error.message || 'Failed to bulk delete vouchers',
+      status: error.response?.status,
+      error
+    };
+  }
+};
+
+export default feeVoucherService;

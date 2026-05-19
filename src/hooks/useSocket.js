@@ -87,6 +87,44 @@ const playChime = () => {
   }
 };
 
+// High-fidelity double-pulse warning siren synthesizer (Zero static assets required)
+const playWarningChime = () => {
+  try {
+    const audioCtx = getAudioContext();
+    if (!audioCtx) return;
+
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    
+    const playTone = (freq, startTime, duration) => {
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, startTime);
+      
+      gainNode.gain.setValueAtTime(0.12, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+      
+      osc.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    };
+
+    const now = audioCtx.currentTime;
+    // Pulsing siren alarm effect
+    playTone(880, now, 0.25);        // A5 (high)
+    playTone(587.33, now + 0.15, 0.25); // D5 (low)
+    playTone(880, now + 0.35, 0.25);    // A5 (high)
+    playTone(587.33, now + 0.50, 0.40); // D5 (low)
+  } catch (e) {
+    console.warn('[Socket Warning Chime] Audio blocked:', e.message);
+  }
+};
+
 export function useSocket() {
   const isAuthAdmin = useAuthStore((s) => s.isAuthenticated);
   const portalUser = usePortalStore((s) => s.portalUser);
@@ -114,14 +152,30 @@ export function useSocket() {
     socketInstance.on('notification', (data) => {
       console.log('📬 [Socket] Received notification:', data);
       incrementUnread();
-      playChime();
       
-      // Gorgeous popup notification with Sonner
-      toast(data.title || 'New Notification', {
-        description: data.body || 'You have received a new update.',
-        icon: <BellRing className="w-5.5 h-5.5 text-indigo-500 animate-bounce" />,
-        duration: 6000,
-      });
+      const isAlert = data.type === 'alert' || String(data.title).toLowerCase().includes('warning') || String(data.title).toLowerCase().includes('defaulter');
+      if (isAlert) {
+        playWarningChime();
+        // Dispatch event for real-time banner display
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('fee_warning_alert', { detail: data }));
+        }
+        
+        toast.error(data.title || 'System Warning Alert', {
+          description: data.body || 'You have received an important warning notice.',
+          icon: <ShieldAlert className="w-6 h-6 text-rose-500 animate-pulse" />,
+          duration: 10000,
+        });
+      } else {
+        playChime();
+        
+        // Gorgeous popup notification with Sonner
+        toast(data.title || 'New Notification', {
+          description: data.body || 'You have received a new update.',
+          icon: <BellRing className="w-5.5 h-5.5 text-indigo-500 animate-bounce" />,
+          duration: 6000,
+        });
+      }
     });
 
     // 2. Real-time Platform & Maintenance Updates Handler

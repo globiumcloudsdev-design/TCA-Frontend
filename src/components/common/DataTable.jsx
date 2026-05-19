@@ -122,7 +122,10 @@ function SearchBox({ value: ext = '', onChange, placeholder = 'Searchâ€¦' })
 
   useEffect(() => { setLocal(ext); }, [ext]);
   useEffect(() => {
-    const t = setTimeout(() => onChange?.(local), 200);
+    const t = setTimeout(() => {
+      const cleaned = local ? local.trim().replace(/\s+/g, ' ') : '';
+      onChange?.(cleaned);
+    }, 300);
     return () => clearTimeout(t);
   }, [local]); // eslint-disable-line
 

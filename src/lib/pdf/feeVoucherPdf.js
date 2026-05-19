@@ -357,3 +357,151 @@ export const generateFeeReceiptPdfBlob = async ({ payment, voucher, instituteNam
 
   return doc.output('blob');
 };
+
+export const generateStudentAccountStatementPdfBlob = async ({ student, vouchers = [], payments = [], instituteName, logoUrl }) => {
+  const doc = new jsPDF();
+  const logoImg = await loadLogo(logoUrl);
+
+  // 1. Header
+  if (logoImg) {
+    doc.addImage(logoImg, 'PNG', 15, 10, 20, 20);
+  }
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(22);
+  doc.setTextColor(30, 41, 59);
+  doc.text(instituteName.toUpperCase(), logoImg ? 40 : 15, 20);
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text('OFFICIAL STUDENT ACCOUNT STATEMENT', logoImg ? 40 : 15, 27);
+  
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.5);
+  doc.line(15, 35, 195, 35);
+
+  let currentY = 45;
+
+  // 2. Student & Statement Info Box
+  doc.setFillColor(248, 250, 252);
+  doc.rect(15, currentY, 180, 26, 'F');
+  
+  currentY += 7;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(30, 41, 59);
+  doc.text('Student Details', 20, currentY);
+  doc.text('Statement Summary', 110, currentY);
+
+  currentY += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Name: ${student.first_name || student.name || 'N/A'} ${student.last_name || ''}`, 20, currentY);
+  
+  // Calculate summary values
+  const totalInvoiced = vouchers.reduce((sum, v) => sum + Number(v.net_amount || v.netAmount || 0), 0);
+  const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount_paid || p.amountPaid || 0), 0);
+  const outstanding = Math.max(totalInvoiced - totalPaid, 0);
+
+  doc.text(`Total Invoiced: PKR ${totalInvoiced.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`, 110, currentY);
+
+  currentY += 5;
+  doc.text(`Reg No: ${student.registration_no || student.registrationNo || 'N/A'}`, 20, currentY);
+  doc.text(`Total Paid: PKR ${totalPaid.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`, 110, currentY);
+
+  currentY += 5;
+  const studentDetails = student.details?.studentDetails || student;
+  const className = studentDetails.class_name || student.className || 'N/A';
+  const sectionName = studentDetails.section_name || student.sectionName || 'N/A';
+  doc.text(`Class: ${className} - ${sectionName}`, 20, currentY);
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(220, 38, 38);
+  doc.text(`Outstanding Balance: PKR ${outstanding.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`, 110, currentY);
+
+  currentY += 12;
+
+  // 3. Compile Ledger Entries (Sorted by Date)
+  const entries = [];
+
+  // Vouchers as debits
+  vouchers.forEach(v => {
+    entries.push({
+      date: new Date(v.issued_date || v.issuedDate || v.createdAt),
+      type: 'Voucher',
+      reference: `Voucher #${v.voucher_number || v.voucherNumber} (${formatMonth(v)})`,
+      debit: Number(v.net_amount || v.netAmount || 0),
+      credit: 0
+    });
+  });
+
+  // Payments as credits
+  payments.forEach(p => {
+    entries.push({
+      date: new Date(p.payment_date || p.paymentDate || p.createdAt),
+      type: 'Receipt',
+      reference: `Receipt #${p.receipt_number || p.receiptNo || p.id} for Voucher #${p.voucher_number || p.voucherNumber || ''}`,
+      debit: 0,
+      credit: Number(p.amount_paid || p.amountPaid || 0)
+    });
+  });
+
+  // Sort entries ascending by date
+  entries.sort((a, b) => a.date - b.date);
+
+  // Compute rolling balance
+  let runningBalance = 0;
+  const tableRows = entries.map(entry => {
+    runningBalance += (entry.debit - entry.credit);
+    return [
+      formatDate(entry.date),
+      entry.type,
+      entry.reference,
+      entry.debit > 0 ? `PKR ${entry.debit.toLocaleString('en-PK', { minimumFractionDigits: 2 })}` : '—',
+      entry.credit > 0 ? `PKR ${entry.credit.toLocaleString('en-PK', { minimumFractionDigits: 2 })}` : '—',
+      `PKR ${runningBalance.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`
+    ];
+  });
+
+  // 4. Render Table
+  autoTable(doc, {
+    startY: currentY,
+    margin: { left: 15, right: 15 },
+    head: [['Date', 'Type', 'Reference / Details', 'Debit', 'Credit', 'Balance']],
+    body: tableRows,
+    theme: 'striped',
+    styles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      3: { halign: 'right' },
+      4: { halign: 'right' },
+      5: { halign: 'right', fontStyle: 'bold' }
+    }
+  });
+
+  const finalY = doc.lastAutoTable?.finalY || (currentY + 20);
+  currentY = finalY + 15;
+
+  // 5. Signature Footer
+  if (currentY > 260) {
+    doc.addPage();
+    currentY = 30;
+  }
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Statement generated on ${formatDate(new Date())} from system logs.`, 15, currentY);
+
+  currentY += 25;
+  doc.setDrawColor(200);
+  doc.line(15, currentY, 75, currentY);
+  doc.text('Prepared By', 45, currentY + 5, { align: 'center' });
+
+  doc.line(135, currentY, 195, currentY);
+  doc.text('Authorized Official Stamp', 165, currentY + 5, { align: 'center' });
+
+  return doc.output('blob');
+};

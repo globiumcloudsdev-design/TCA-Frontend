@@ -63,6 +63,7 @@ import { useQuery } from "@tanstack/react-query";
 import { publicService } from "@/services";
 import { ShieldAlert } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
+import { notificationService } from "@/services/notificationService";
 
 // ─── Nav helpers with updated permissions ────────────────────────────────────
 function buildParentNav(t, navLabels) {
@@ -271,6 +272,55 @@ export default function PortalShell({ children, type }) {
 
   // Initialize and keep real-time Socket.io active across all portal pages
   useSocket();
+
+  const [activeFeeWarning, setActiveFeeWarning] = useState(null);
+
+  // 1. Real-time Socket Event Listener
+  useEffect(() => {
+    const handleFeeWarning = (e) => {
+      console.log("🚨 [PortalShell] Caught real-time fee warning alert:", e.detail);
+      setActiveFeeWarning(e.detail);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('fee_warning_alert', handleFeeWarning);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('fee_warning_alert', handleFeeWarning);
+      }
+    };
+  }, []);
+
+  // 2. Persistent Database Sync (Fetches active fee warning notices on mount and page transition, refreshes every 30s)
+  useEffect(() => {
+    if (!portalUser) return;
+
+    const fetchActiveAlerts = async () => {
+      try {
+        const res = await notificationService.getAll({ is_read: 'false', type: 'alert' });
+        const notificationsList = res?.data?.rows || res?.data || [];
+        const warning = notificationsList.find(n => 
+          n.type === 'alert' || 
+          String(n.title).toLowerCase().includes('warning') || 
+          String(n.title).toLowerCase().includes('defaulter')
+        );
+        if (warning) {
+          console.log("🚨 [PortalShell] Found active fee warning notice:", warning);
+          setActiveFeeWarning(warning);
+        } else {
+          setActiveFeeWarning(null);
+        }
+      } catch (err) {
+        console.error("Failed to fetch active alerts:", err);
+      }
+    };
+
+    fetchActiveAlerts();
+    const interval = setInterval(fetchActiveAlerts, 30000);
+    return () => clearInterval(interval);
+  }, [portalUser, pathname]);
 
   // ── Global Platform Status Query ──
   const { data: platformStatus } = useQuery({
@@ -739,6 +789,30 @@ export default function PortalShell({ children, type }) {
             </DropdownMenu>
           </div>
         </header>
+
+        {activeFeeWarning && (
+          <div className="bg-rose-600 text-white px-4 py-3 sm:px-6 shadow-xl flex items-center justify-between flex-wrap gap-2 animate-pulse border-b border-rose-700 relative z-30">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0 border border-white/30">
+                <ShieldAlert className="h-5 w-5 text-white animate-bounce" />
+              </div>
+              <div className="space-y-0.5">
+                <h5 className="font-extrabold text-xs tracking-wider uppercase">{activeFeeWarning.title || '🚨 OVERDUE FEE WARNING'}</h5>
+                <p className="text-xs font-semibold text-rose-100">{activeFeeWarning.body}</p>
+              </div>
+            </div>
+            {isParent && (
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/parent/fees"
+                  className="bg-white text-rose-700 hover:bg-rose-50 px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all shadow-md"
+                >
+                  Pay Outstanding Fees Now
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Page content - Original padding preserved */}
         <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>

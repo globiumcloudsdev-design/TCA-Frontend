@@ -25,7 +25,8 @@ import StatsCard from '@/components/common/StatsCard';
 import BulkVoucherGenerator from '@/components/forms/BulkVoucherGenerator';
 import { cn } from '@/lib/utils';
 import { downloadBlob } from '@/lib/download';
-import { generateBulkFeeVouchersPdfBlob, generateFeeVoucherPdfBlob, generateFeeReceiptPdfBlob } from '@/lib/pdf/feeVoucherPdf';
+import { generateBulkFeeVouchersPdfBlob, generateFeeVoucherPdfBlob, generateFeeReceiptPdfBlob, generateStudentAccountStatementPdfBlob } from '@/lib/pdf/feeVoucherPdf';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { feeVoucherService, academicYearService, classService, sectionService, studentService } from '@/services';
 import { Check, ChevronDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -140,6 +141,8 @@ export default function FeesPage() {
 
   const [voucherGeneratorModal, setVoucherGeneratorModal] = useState(false);
   const [deletingVoucher, setDeletingVoucher] = useState(null);
+  const [selectedVouchers, setSelectedVouchers] = useState([]);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [confirmMarkPaid, setConfirmMarkPaid] = useState(null);
   const [markingPaid, setMarkingPaid] = useState(new Map());
   const [voucherPage, setVoucherPage] = useState(1);
@@ -173,6 +176,173 @@ const [bulkFilters, setBulkFilters] = useState({
     feeType: '__all__',
     dueDate: '',
   });
+
+  // Approved tab & ledger state variables
+  const [activeTab, setActiveTab] = useState('vouchers'); // 'vouchers' | 'analytics' | 'ledger'
+  const [selectedLedgerStudentId, setSelectedLedgerStudentId] = useState('');
+  const [ledgerDownloading, setLedgerDownloading] = useState(false);
+
+  // Dedicated React Queries for premium analytics and statement components
+  const { data: allStudentsData = [] } = useQuery({
+    queryKey: ['ledger-all-students', currentInstitute?.id, voucherAcademicYearId],
+    queryFn: async () => {
+      if (!currentInstitute?.id || !voucherAcademicYearId) return [];
+      try {
+        const response = await studentService.getAll({
+          institute_id: currentInstitute?.id,
+          institute_type: currentInstitute?.type,
+          academic_year_id: voucherAcademicYearId,
+          limit: 2000,
+        }, currentInstitute?.type || 'school');
+        const rows = response?.data?.rows || response?.rows || response?.data || response || [];
+        return Array.isArray(rows) ? rows : [];
+      } catch (err) {
+        console.error('Failed to load ledger students:', err);
+        return [];
+      }
+    },
+    enabled: !!currentInstitute?.id && !!voucherAcademicYearId && activeTab === 'ledger',
+  });
+
+  const allStudentOptions = useMemo(() => {
+    return allStudentsData.map(student => ({
+      value: String(student.id),
+      label: `${student.registration_no || student.registrationNo || 'N/A'} - ${student.first_name || ''} ${student.last_name || ''}`.trim()
+    }));
+  }, [allStudentsData]);
+
+  const { data: voucherStatsBackend = null, isLoading: statsLoading } = useQuery({
+    queryKey: ['voucher-stats', currentInstitute?.id, voucherMonth, voucherAcademicYearId],
+    queryFn: async () => {
+      if (!currentInstitute?.id || !voucherAcademicYearId || !hasPermission('fees.read')) return null;
+      try {
+        const response = await feeVoucherService.getStats({
+          month: voucherMonth ? parseInt(voucherMonth) : undefined,
+          academic_year_id: voucherAcademicYearId || undefined,
+        });
+        return response || null;
+      } catch (err) {
+        console.error('Failed to fetch voucher stats from API:', err);
+        return null;
+      }
+    },
+    enabled: !!currentInstitute?.id && !!voucherAcademicYearId && hasPermission('fees.read'),
+  });
+
+  const { data: analyticsVouchersData = [], isLoading: analyticsLoading } = useQuery({
+    queryKey: ['analytics-vouchers', currentInstitute?.id, voucherMonth, voucherAcademicYearId],
+    queryFn: async () => {
+      if (!currentInstitute?.id || !voucherAcademicYearId || !hasPermission('fees.read')) return [];
+      try {
+        const response = await feeVoucherService.getAll({
+          month: voucherMonth ? parseInt(voucherMonth) : undefined,
+          academic_year_id: voucherAcademicYearId || undefined,
+        }, { page: 1, limit: 5000 });
+        return response?.vouchers || [];
+      } catch (err) {
+        console.error('Failed to fetch analytics vouchers:', err);
+        return [];
+      }
+    },
+    enabled: !!currentInstitute?.id && !!voucherAcademicYearId && activeTab === 'analytics' && hasPermission('fees.read'),
+  });
+
+  const { data: ledgerVouchersData = [], isLoading: ledgerLoading } = useQuery({
+    queryKey: ['ledger-student-vouchers', selectedLedgerStudentId],
+    queryFn: async () => {
+      if (!selectedLedgerStudentId) return [];
+      try {
+        const response = await feeVoucherService.getAll({ student_id: selectedLedgerStudentId }, { page: 1, limit: 1000 });
+        return response?.vouchers || [];
+      } catch (err) {
+        console.error('Failed to fetch ledger student vouchers:', err);
+        return [];
+      }
+    },
+    enabled: !!selectedLedgerStudentId && activeTab === 'ledger',
+  });
+
+  const { data: defaultersData = [], isLoading: defaultersLoading, refetch: refetchDefaulters } = useQuery({
+    queryKey: ['fee-defaulters', currentInstitute?.id],
+    queryFn: async () => {
+      if (!currentInstitute?.id || !hasPermission('fees.read')) return [];
+      try {
+        const response = await feeVoucherService.getDefaulters();
+        return response || [];
+      } catch (err) {
+        console.error('Failed to fetch fee defaulters:', err);
+        return [];
+      }
+    },
+    enabled: !!currentInstitute?.id && activeTab === 'defaulters' && hasPermission('fees.read'),
+  });
+
+  const [warningStudentId, setWarningStudentId] = useState(null);
+
+  const warnDefaulterMutation = useMutation({
+    mutationFn: (studentId) => feeVoucherService.warnDefaulter(studentId),
+    onSuccess: (data) => {
+      toast.success(data?.message || 'Fee warning alert sent successfully');
+      setWarningStudentId(null);
+      refetchDefaulters();
+    },
+    onError: (err) => {
+      toast.error(err?.message || 'Failed to send fee warning alert');
+      setWarningStudentId(null);
+    }
+  });
+
+  const ledgerEntries = useMemo(() => {
+    if (!ledgerVouchersData.length) return [];
+    const entries = [];
+    
+    ledgerVouchersData.forEach(v => {
+      // 1. Add Voucher Debits
+      entries.push({
+        id: `v-${v.id}`,
+        date: new Date(v.issuedDate || v.createdAt),
+        type: 'Voucher',
+        reference: `Voucher #${v.voucherNumber} (${MONTH_OPTS.find(m => m.value === String(v.month))?.label || v.month} ${v.year})`,
+        debit: Number(v.netAmount || v.amount || 0),
+        credit: 0
+      });
+      
+      // 2. Add Payment Credits
+      const payments = Array.isArray(v.FeePayments) ? v.FeePayments : (Array.isArray(v.payments) ? v.payments : []);
+      payments.forEach(p => {
+        entries.push({
+          id: `p-${p.id || Math.random()}`,
+          date: new Date(p.payment_date || p.paymentDate || p.createdAt || v.issuedDate),
+          type: 'Receipt',
+          reference: `Receipt #${p.receipt_number || p.receiptNo || p.id || 'N/A'} for Voucher #${v.voucherNumber}`,
+          debit: 0,
+          credit: Number(p.amount_paid || p.amountPaid || p.amount || 0)
+        });
+      });
+    });
+    
+    entries.sort((a, b) => a.date - b.date);
+    
+    let balance = 0;
+    return entries.map(entry => {
+      balance += (entry.debit - entry.credit);
+      return {
+        ...entry,
+        runningBalance: balance
+      };
+    });
+  }, [ledgerVouchersData]);
+
+  const ledgerSummary = useMemo(() => {
+    if (!ledgerEntries.length) return { invoiced: 0, paid: 0, balance: 0 };
+    const invoiced = ledgerEntries.reduce((sum, e) => sum + e.debit, 0);
+    const paid = ledgerEntries.reduce((sum, e) => sum + e.credit, 0);
+    return {
+      invoiced,
+      paid,
+      balance: Math.max(invoiced - paid, 0)
+    };
+  }, [ledgerEntries]);
 
   // Debug permissions on mount
   useEffect(() => {
@@ -442,23 +612,24 @@ const { data: bulkClasses = [] } = useQuery({
   const vouchers = voucherData?.vouchers || [];
   const voucherPagination = voucherData?.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 };
 
-  // Stats
+  // Stats calculated using lightweight backend aggregated endpoint
   const voucherStats = useMemo(() => {
-    const paid = vouchers.filter((v) => v.status === 'paid');
-    const pending = vouchers.filter((v) => ['pending', 'overdue', 'partial'].includes(v.status));
-    return {
-      total: vouchers.length,
-      pending: pending.length,
-      paid: paid.length,
-      totalAmount: vouchers.reduce((sum, v) => sum + (Number(v.net_amount || v.netAmount || v.amount || 0)), 0),
-      pendingAmount: pending.reduce((sum, v) => sum + (Number(v.pending_amount ?? (v.net_amount || v.netAmount || v.amount || 0))), 0),
-    };
-  }, [vouchers]);
+    if (voucherStatsBackend) {
+      return {
+        total: voucherStatsBackend.total || 0,
+        pending: voucherStatsBackend.pending || 0,
+        paid: voucherStatsBackend.paid || 0,
+        totalAmount: voucherStatsBackend.totalAmount || 0,
+        pendingAmount: voucherStatsBackend.pendingAmount || 0,
+      };
+    }
+    return { total: 0, pending: 0, paid: 0, totalAmount: 0, pendingAmount: 0 };
+  }, [voucherStatsBackend]);
 
   // Only paid vouchers amount
   const collectedAmount = useMemo(() => {
-    return vouchers.reduce((sum, v) => sum + (Number(v.paid_amount || 0)), 0);
-  }, [vouchers]);
+    return voucherStatsBackend?.collectedAmount || 0;
+  }, [voucherStatsBackend]);
 
   // Delete (archive) voucher
   const deleteVoucher = useMutation({
@@ -476,6 +647,33 @@ const { data: bulkClasses = [] } = useQuery({
       }
     },
   });
+
+  // Bulk delete mutation
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (voucherIds) => feeVoucherService.bulkDelete(voucherIds),
+    onSuccess: (res) => {
+      toast.success(res?.message || 'Selected vouchers deleted successfully');
+      setConfirmBulkDelete(false);
+      setSelectedVouchers([]);
+      refetchVouchers();
+      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to delete selected vouchers');
+      setConfirmBulkDelete(false);
+    }
+  });
+
+  const handleBulkDelete = () => {
+    const voucherIds = Array.isArray(selectedVouchers)
+      ? selectedVouchers.map(v => v.id).filter(Boolean)
+      : [];
+    if (voucherIds.length === 0) {
+      toast.warning('No vouchers selected');
+      return;
+    }
+    bulkDeleteMutation.mutate(voucherIds);
+  };
 
   // Mark voucher as paid
   const markAsPaidMutation = useMutation({
@@ -1013,6 +1211,50 @@ const handleDownloadVoucher = async (voucher) => {
   }
 };
 
+const handleDownloadStatement = async () => {
+  if (!selectedLedgerStudentId) return;
+  const student = allStudentsData.find(s => String(s.id) === String(selectedLedgerStudentId));
+  if (!student) return;
+  
+  try {
+    setLedgerDownloading(true);
+    toast.info(`Generating Account Statement for ${student.first_name || ''} ${student.last_name || ''}...`);
+    
+    const allPayments = [];
+    ledgerVouchersData.forEach(v => {
+      const payments = Array.isArray(v.FeePayments) ? v.FeePayments : (Array.isArray(v.payments) ? v.payments : []);
+      payments.forEach(p => {
+        allPayments.push({
+          ...p,
+          voucher_number: v.voucherNumber
+        });
+      });
+    });
+    
+    const blob = await generateStudentAccountStatementPdfBlob({
+      student,
+      vouchers: ledgerVouchersData.map(v => ({
+        ...v,
+        voucher_number: v.voucherNumber,
+        issued_date: v.issuedDate,
+        net_amount: v.netAmount
+      })),
+      payments: allPayments,
+      instituteName: currentInstitute?.name || 'The Clouds Academy',
+      logoUrl: currentInstitute?.logo_url
+    });
+    
+    downloadBlob(blob, `account_statement_${student.registration_no || 'student'}.pdf`);
+    toast.success('Account Statement downloaded successfully! 🎉');
+  } catch (err) {
+    console.error('Failed to generate ledger PDF:', err);
+    toast.error('Failed to generate PDF Statement: ' + err.message);
+  } finally {
+    setLedgerDownloading(false);
+  }
+};
+
+
 const openVoucherInNewTab = async (voucher) => {
   if (!voucher?.id) return;
   try {
@@ -1179,8 +1421,8 @@ const downloadReceipt = async (payment, voucher) => {
   return (
     <div className="space-y-5">
       <PageHeader 
-        title="Fee Vouchers" 
-        description={`${voucherStats.total} vouchers • ${voucherStats.pending} pending`} 
+        title="Fee Management & Portals" 
+        description={`${voucherStats.total} total vouchers generated this month`} 
         action={
           mounted && (
             <div className="flex flex-wrap items-center gap-2">
@@ -1203,50 +1445,590 @@ const downloadReceipt = async (payment, voucher) => {
         }
       />
 
-      {/* Filters */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-muted-foreground">Filter Vouchers</h3>
-          <Filter size={16} className="text-muted-foreground" />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <SelectField label="Month" options={MONTH_OPTS} value={voucherMonth} onChange={setVoucherMonth} />
-          <SelectField label="Academic Year" options={academicYearsData.map(ay => ({ value: ay.id, label: ay.name }))} value={voucherAcademicYearId} onChange={setVoucherAcademicYearId} />
-          <SelectField label="Status" options={[{ value: '', label: 'All Statuses' }, ...STATUS_OPTS]} value={voucherStatus} onChange={setVoucherStatus} />
-        </div>
+      {/* Premium Segmented Controls Tab Bar */}
+      <div className="flex border-b border-slate-200 gap-1 pb-px">
+        <button
+          onClick={() => setActiveTab('vouchers')}
+          className={cn(
+            "px-5 py-3 text-sm font-bold border-b-2 transition-all duration-300",
+            activeTab === 'vouchers'
+              ? "border-indigo-600 text-indigo-600"
+              : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+          )}
+        >
+          📋 Vouchers List
+        </button>
+        <button
+          onClick={() => setActiveTab('analytics')}
+          className={cn(
+            "px-5 py-3 text-sm font-bold border-b-2 transition-all duration-300",
+            activeTab === 'analytics'
+              ? "border-indigo-600 text-indigo-600"
+              : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+          )}
+        >
+          📊 Analytics Dashboard
+        </button>
+        <button
+          onClick={() => setActiveTab('ledger')}
+          className={cn(
+            "px-5 py-3 text-sm font-bold border-b-2 transition-all duration-300",
+            activeTab === 'ledger'
+              ? "border-indigo-600 text-indigo-600"
+              : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+          )}
+        >
+          📈 Student Payment Ledger
+        </button>
+        <button
+          onClick={() => setActiveTab('defaulters')}
+          className={cn(
+            "px-5 py-3 text-sm font-bold border-b-2 transition-all duration-300",
+            activeTab === 'defaulters'
+              ? "border-rose-600 text-rose-600"
+              : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+          )}
+        >
+          🚨 Defaulters Control
+        </button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-4">
-        <StatsCard label="Total Vouchers" value={voucherStats.total} icon={<FileText size={18} />} />
-        <StatsCard label="Collected (Paid)" value={`PKR ${collectedAmount.toLocaleString('en-PK')}`} icon={<DollarSign size={18} />} />
-        <StatsCard label="Pending Collection" value={voucherStats.pending} icon={<AlertCircle size={18} />} />
-        <StatsCard label="Pending Amount" value={`PKR ${voucherStats.pendingAmount.toLocaleString('en-PK')}`} icon={<DollarSign size={18} />} />
-      </div>
+      {/* TAB CONTENT 1: Vouchers List */}
+      {activeTab === 'vouchers' && (
+        <>
+          {/* Filters */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-muted-foreground">Filter Vouchers</h3>
+              <Filter size={16} className="text-muted-foreground" />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <SelectField label="Month" options={MONTH_OPTS} value={voucherMonth} onChange={setVoucherMonth} />
+              <SelectField label="Academic Year" options={academicYearsData.map(ay => ({ value: ay.id, label: ay.name }))} value={voucherAcademicYearId} onChange={setVoucherAcademicYearId} />
+              <SelectField label="Status" options={[{ value: '', label: 'All Statuses' }, ...STATUS_OPTS]} value={voucherStatus} onChange={setVoucherStatus} />
+            </div>
+          </div>
 
-      {/* Vouchers Table with Action Buttons and Pagination */}
-      <DataTable
-        columns={voucherColumns}
-        data={vouchers}
-        loading={vouchersLoading}
-        search={voucherSearch}
-        onSearch={setVoucherSearch}
-        searchPlaceholder="Search Name, Reg #, Email or Voucher #..."
-        emptyMessage="No vouchers found for selected filters"
-        enableColumnVisibility
-        exportConfig={{ fileName: `fee-vouchers-${voucherMonth}` }}
-        pagination={{
-          page: voucherPagination.page,
-          pageSize: voucherPageSize,
-          total: voucherPagination.total,
-          totalPages: voucherPagination.totalPages,
-          onPageChange: setVoucherPage,
-          onPageSizeChange: (size) => {
-            setVoucherPageSize(size);
-            setVoucherPage(1);
-          },
-        }}
-      />
+          {/* Stats Cards */}
+          <div className="grid gap-4 sm:grid-cols-4">
+            <StatsCard label="Total Vouchers" value={statsLoading ? '⏳ Loading...' : voucherStats.total} icon={<FileText size={18} />} />
+            <StatsCard label="Collected (Paid)" value={statsLoading ? '⏳ Loading...' : `PKR ${collectedAmount.toLocaleString('en-PK')}`} icon={<DollarSign size={18} />} />
+            <StatsCard label="Pending Collection" value={statsLoading ? '⏳ Loading...' : voucherStats.pending} icon={<AlertCircle size={18} />} />
+            <StatsCard label="Pending Amount" value={statsLoading ? '⏳ Loading...' : `PKR ${voucherStats.pendingAmount.toLocaleString('en-PK')}`} icon={<DollarSign size={18} />} />
+          </div>
+
+          {/* Vouchers Table with Action Buttons and Pagination */}
+          <DataTable
+            columns={voucherColumns}
+            data={vouchers}
+            loading={vouchersLoading}
+            search={voucherSearch}
+            onSearch={setVoucherSearch}
+            searchPlaceholder="Search Name, Reg #, Email or Voucher #..."
+            emptyMessage="No vouchers found for selected filters"
+            enableColumnVisibility
+            exportConfig={{ fileName: `fee-vouchers-${voucherMonth}` }}
+            enableRowSelection={hasPermission('fees.delete')}
+            onRowSelectionChange={setSelectedVouchers}
+            selectionActions={
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                className="h-9 gap-1.5 text-sm"
+                onClick={() => setConfirmBulkDelete(true)}
+              >
+                <Trash2 size={14} /> Delete Selected Vouchers
+              </Button>
+            }
+            pagination={{
+              page: voucherPagination.page,
+              pageSize: voucherPageSize,
+              total: voucherPagination.total,
+              totalPages: voucherPagination.totalPages,
+              onPageChange: setVoucherPage,
+              onPageSizeChange: (size) => {
+                setVoucherPageSize(size);
+                setVoucherPage(1);
+              },
+            }}
+          />
+        </>
+      )}
+
+      {/* TAB CONTENT 2: Analytics Dashboard */}
+      {activeTab === 'analytics' && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Filters Context */}
+          <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+            <div className="flex items-center justify-between border-b pb-2 mb-2">
+              <h3 className="text-sm font-semibold text-slate-700">Filter Analytics Context</h3>
+              <Filter size={16} className="text-slate-400" />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectField label="Month" options={MONTH_OPTS} value={voucherMonth} onChange={setVoucherMonth} />
+              <SelectField label="Academic Year" options={academicYearsData.map(ay => ({ value: ay.id, label: ay.name }))} value={voucherAcademicYearId} onChange={setVoucherAcademicYearId} />
+            </div>
+          </div>
+
+          {analyticsLoading ? (
+            <div className="flex flex-col items-center justify-center min-h-[300px] bg-white rounded-2xl border border-slate-200 shadow-sm">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mb-4"></div>
+              <p className="text-slate-500 font-medium">Crunching transaction records...</p>
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-3">
+              {/* Radial Recovery Rate Tracker Card */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                <div>
+                  <h4 className="text-base font-bold text-slate-800 mb-1">Collection Recovery Rate</h4>
+                  <p className="text-xs text-slate-400 font-medium">Percentage of total invoiced fees paid</p>
+                </div>
+                <div className="py-6">
+                  <div className="relative flex items-center justify-center h-40 w-40 mx-auto">
+                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="40" stroke="#f1f5f9" strokeWidth="8" fill="transparent" />
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="40"
+                        stroke="url(#progressGradient)"
+                        strokeWidth="8"
+                        fill="transparent"
+                        strokeDasharray={2 * Math.PI * 40}
+                        strokeDashoffset={2 * Math.PI * 40 * (1 - (analyticsVouchersData.reduce((sum, v) => sum + Number(v.netAmount || 0), 0) > 0 ? (analyticsVouchersData.reduce((sum, v) => sum + Number(v.paid_amount || 0), 0) / analyticsVouchersData.reduce((sum, v) => sum + Number(v.netAmount || 0), 0)) * 100 : 0) / 100)}
+                        strokeLinecap="round"
+                        className="transition-all duration-1000 ease-out"
+                      />
+                      <defs>
+                        <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#6366f1" stopOpacity="1" />
+                          <stop offset="100%" stopColor="#10b981" stopOpacity="1" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div className="absolute text-center">
+                      <span className="text-3xl font-extrabold tracking-tight text-slate-800">
+                        {analyticsVouchersData.reduce((sum, v) => sum + Number(v.netAmount || 0), 0) > 0
+                          ? Math.round((analyticsVouchersData.reduce((sum, v) => sum + Number(v.paid_amount || 0), 0) / analyticsVouchersData.reduce((sum, v) => sum + Number(v.netAmount || 0), 0)) * 100)
+                          : 0}%
+                      </span>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Recovery</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="border-t border-slate-100 pt-4 flex justify-between text-xs font-bold text-slate-500">
+                  <div>
+                    <p className="text-slate-400 font-medium">Invoiced</p>
+                    <p className="text-slate-700 text-sm mt-0.5">PKR {analyticsVouchersData.reduce((sum, v) => sum + Number(v.netAmount || 0), 0).toLocaleString('en-PK')}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-slate-400 font-medium">Collected</p>
+                    <p className="text-emerald-600 text-sm mt-0.5">PKR {analyticsVouchersData.reduce((sum, v) => sum + Number(v.paid_amount || 0), 0).toLocaleString('en-PK')}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grouped Bar Chart Card */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm md:col-span-2 flex flex-col justify-between min-h-[320px]">
+                <div>
+                  <h4 className="text-base font-bold text-slate-800 mb-1">Collection vs Pending Amount</h4>
+                  <p className="text-xs text-slate-400 font-medium">Monthly cash collection dynamics for academic year</p>
+                </div>
+                <div className="h-56 mt-4">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={(() => {
+                        const monthlyMap = new Map();
+                        MONTH_OPTS.forEach(m => {
+                          monthlyMap.set(Number(m.value), { name: m.label.substring(0, 3), Collected: 0, Pending: 0 });
+                        });
+                        analyticsVouchersData.forEach(v => {
+                          const mNum = Number(v.month);
+                          const current = monthlyMap.get(mNum) || { name: String(v.month), Collected: 0, Pending: 0 };
+                          const net = Number(v.netAmount || 0);
+                          const paid = Number(v.paid_amount || 0);
+                          current.Collected += paid;
+                          current.Pending += Math.max(net - paid, 0);
+                          monthlyMap.set(mNum, current);
+                        });
+                        return Array.from(monthlyMap.values());
+                      })()}
+                      margin={{ top: 10, right: 10, left: -10, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+                      <ChartTooltip
+                        cursor={{ fill: 'rgba(241, 245, 249, 0.4)' }}
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="bg-white p-3 border border-slate-100 rounded-xl shadow-lg space-y-1">
+                                <p className="text-xs font-bold text-slate-800">{payload[0].payload.name}</p>
+                                <p className="text-xs font-semibold text-emerald-600">Collected: PKR {payload[0].value.toLocaleString('en-PK')}</p>
+                                <p className="text-xs font-semibold text-amber-600">Pending: PKR {payload[1].value.toLocaleString('en-PK')}</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Bar dataKey="Collected" fill="#10b981" radius={[4, 4, 0, 0]} barSize={12} />
+                      <Bar dataKey="Pending" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={12} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Concessions Breakdowns Donut Chart */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm md:col-span-3 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex-1 space-y-2">
+                  <h4 className="text-base font-bold text-slate-800">Concessions & Scholarships Breakdown</h4>
+                  <p className="text-xs text-slate-400 font-medium">Breakdown of student concessions, waivers, and fee discounts distributed for this filter.</p>
+                  
+                  {/* Concession Legend list */}
+                  <div className="grid grid-cols-2 gap-4 mt-6 pt-4 border-t border-slate-100">
+                    {(() => {
+                      let fixed = 0;
+                      let percent = 0;
+                      let totalConcession = 0;
+                      analyticsVouchersData.forEach(v => {
+                        const discount = Number(v.discount || 0);
+                        const breakdn = v.feeBreakdown || {};
+                        const type = breakdn.discount_type || breakdn.concession_type || 'none';
+                        if (discount > 0) {
+                          totalConcession += discount;
+                          if (type === 'fixed') fixed += discount;
+                          else percent += discount;
+                        }
+                      });
+                      return [
+                        { label: 'Fixed Waivers', value: fixed, color: '#f59e0b', bg: 'bg-amber-500' },
+                        { label: 'Percentage Discounts', value: percent, color: '#6366f1', bg: 'bg-indigo-500' },
+                        { label: 'Total Value Given', value: totalConcession, color: '#10b981', bg: 'bg-emerald-500', fullWidth: true }
+                      ];
+                    })().map((item, idx) => (
+                      <div key={idx} className={cn("space-y-1", item.fullWidth && "col-span-2 pt-2 border-t border-dashed border-slate-100")}>
+                        <div className="flex items-center gap-2">
+                          <span className={cn("h-2.5 w-2.5 rounded-full", item.bg)}></span>
+                          <span className="text-xs font-bold text-slate-500">{item.label}</span>
+                        </div>
+                        <p className="text-sm font-extrabold text-slate-800 ml-4.5">PKR {item.value.toLocaleString('en-PK')}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="h-48 w-48 relative flex items-center justify-center shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={(() => {
+                          let fixed = 0;
+                          let percent = 0;
+                          analyticsVouchersData.forEach(v => {
+                            const discount = Number(v.discount || 0);
+                            const breakdn = v.feeBreakdown || {};
+                            const type = breakdn.discount_type || breakdn.concession_type || 'none';
+                            if (discount > 0) {
+                              if (type === 'fixed') fixed += discount;
+                              else percent += discount;
+                            }
+                          });
+                          return [
+                            { name: 'Fixed Waivers', value: fixed || 1, color: '#f59e0b' },
+                            { name: 'Percentage Discounts', value: percent || 1, color: '#6366f1' }
+                          ];
+                        })()}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={75}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {[{ color: '#f59e0b' }, { color: '#6366f1' }].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute text-center">
+                    <span className="text-2xl font-black text-slate-800">
+                      {analyticsVouchersData.filter(v => Number(v.discount || 0) > 0).length}
+                    </span>
+                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Students</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Batch/Class-wise Recovery Analytics horizontal bar chart */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm md:col-span-3 flex flex-col justify-between">
+                <div>
+                  <h4 className="text-base font-bold text-slate-800 mb-1">Batch & Class-wise Recovery Analytics</h4>
+                  <p className="text-xs text-slate-400 font-medium">Fee collection recovery rate percentage sorted by class</p>
+                </div>
+                <div className="h-64 mt-6">
+                  {voucherStatsBackend?.classwiseRecovery && voucherStatsBackend.classwiseRecovery.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={voucherStatsBackend.classwiseRecovery}
+                        layout="vertical"
+                        margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+                      >
+                        <XAxis type="number" domain={[0, 100]} unit="%" stroke="#94a3b8" fontSize={11} fontWeight={600} />
+                        <YAxis dataKey="className" type="category" stroke="#94a3b8" fontSize={11} fontWeight={600} width={90} />
+                        <ChartTooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              return (
+                                <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs space-y-1.5 border border-slate-800">
+                                  <p className="font-extrabold text-indigo-400">{data.className}</p>
+                                  <p className="font-medium">Recovery Rate: <span className="font-extrabold text-emerald-400">{data.recoveryRate}%</span></p>
+                                  <p className="font-medium text-slate-300">Invoiced: <span className="font-extrabold text-white">PKR {Number(data.invoiced).toLocaleString('en-PK')}</span></p>
+                                  <p className="font-medium text-slate-300">Collected: <span className="font-extrabold text-white">PKR {Number(data.collected).toLocaleString('en-PK')}</span></p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar dataKey="recoveryRate" radius={[0, 4, 4, 0]} barSize={16}>
+                          {voucherStatsBackend.classwiseRecovery.map((entry, index) => {
+                            let color = '#3b82f6';
+                            if (entry.recoveryRate >= 80) color = '#10b981';
+                            else if (entry.recoveryRate < 50) color = '#ef4444';
+                            return <Cell key={`cell-${index}`} fill={color} />;
+                          })}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-xs font-semibold text-slate-400">
+                      No class-wise data available for this selection.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB CONTENT 3: Student Ledger */}
+      {activeTab === 'ledger' && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div className="flex-1 max-w-md">
+                <SearchableSingleSelect
+                  label="Select Student for Ledger Lookup"
+                  value={selectedLedgerStudentId}
+                  onChange={setSelectedLedgerStudentId}
+                  options={allStudentOptions}
+                  placeholder="Search by name or registration number..."
+                />
+              </div>
+              {selectedLedgerStudentId && (
+                <Button
+                  onClick={handleDownloadStatement}
+                  disabled={ledgerDownloading || !ledgerEntries.length}
+                  className="h-10 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-all"
+                >
+                  {ledgerDownloading ? (
+                    <>⏳ Generating Statement...</>
+                  ) : (
+                    <>
+                      <Download size={14} /> Download PDF Statement
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+
+            {!selectedLedgerStudentId ? (
+              <div className="text-center py-16 text-slate-400 space-y-2">
+                <FileText size={48} className="mx-auto text-slate-300 stroke-[1.5]" />
+                <h5 className="font-bold text-slate-600 text-base">No Student Selected</h5>
+                <p className="text-xs text-slate-400">Please select a student from the dropdown list above to compile their chronological transaction ledger.</p>
+              </div>
+            ) : ledgerLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-4"></div>
+                <p className="text-sm font-medium">Compiling ledger journals...</p>
+              </div>
+            ) : !ledgerEntries.length ? (
+              <div className="text-center py-16 text-slate-400 space-y-2">
+                <AlertCircle size={48} className="mx-auto text-slate-300 stroke-[1.5]" />
+                <h5 className="font-bold text-slate-600 text-base">No Ledger Transactions Found</h5>
+                <p className="text-xs text-slate-400">There are no fee vouchers or payments recorded in the system for this student.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Ledger Metrics Summary Cards */}
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-xl border border-slate-150 bg-slate-50/50 p-4 space-y-0.5">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Invoiced (Debits)</span>
+                    <p className="text-xl font-extrabold text-slate-800">PKR {ledgerSummary.invoiced.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-150 bg-slate-50/50 p-4 space-y-0.5">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Received (Credits)</span>
+                    <p className="text-xl font-extrabold text-emerald-600">PKR {ledgerSummary.paid.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="rounded-xl border border-indigo-100 bg-indigo-50/20 p-4 space-y-0.5">
+                    <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Net Outstanding Balance</span>
+                    <p className="text-xl font-extrabold text-rose-600">PKR {ledgerSummary.balance.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                </div>
+
+                {/* Ledger Statement Table */}
+                <div className="overflow-hidden border border-slate-200 rounded-xl bg-white">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-200">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Reference / details</th>
+                          <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Debit (+)</th>
+                          <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Credit (-)</th>
+                          <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Running Balance</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {ledgerEntries.map((entry) => (
+                          <tr key={entry.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">
+                              {new Date(entry.date).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </td>
+                            <td className="px-4 py-3 text-sm whitespace-nowrap">
+                              <span className={cn(
+                                "rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide",
+                                entry.type === 'Voucher' ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              )}>
+                                {entry.type}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-slate-700 font-semibold max-w-xs truncate">
+                              {entry.reference}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right text-rose-600 font-bold whitespace-nowrap">
+                              {entry.debit > 0 ? `PKR ${entry.debit.toLocaleString('en-PK', { minimumFractionDigits: 2 })}` : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right text-emerald-600 font-bold whitespace-nowrap">
+                              {entry.credit > 0 ? `PKR ${entry.credit.toLocaleString('en-PK', { minimumFractionDigits: 2 })}` : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right text-slate-800 font-black whitespace-nowrap bg-slate-50/30">
+                              PKR {entry.runningBalance.toLocaleString('en-PK', { minimumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT 4: Defaulters Control Center */}
+      {activeTab === 'defaulters' && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                <span className="flex h-2.5 w-2.5 rounded-full bg-rose-500 animate-ping"></span>
+                Defaulters Deficit Control & Warning Action Center
+              </h3>
+              <p className="text-xs text-slate-400 font-medium mt-1">
+                List of students with outstanding school fee vouchers across 2 or more distinct months. Click &quot;Send Warning Notice&quot; to alert linked parents immediately.
+              </p>
+            </div>
+
+            {defaultersLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rose-600 mb-4"></div>
+                <p className="text-sm font-medium">Scanning for defaulter matches...</p>
+              </div>
+            ) : !defaultersData.length ? (
+              <div className="text-center py-16 bg-emerald-50/20 border border-dashed border-emerald-200 rounded-2xl text-emerald-600 space-y-2">
+                <Check size={48} className="mx-auto text-emerald-500 stroke-[1.5] animate-bounce" />
+                <h5 className="font-extrabold text-emerald-800 text-base">All Clear! No Defaulters</h5>
+                <p className="text-xs text-emerald-600 font-medium">All students have outstanding balances of less than 2 months. Keep up the great collections!</p>
+              </div>
+            ) : (
+              <div className="overflow-hidden border border-slate-200 rounded-xl bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Reg / GR #</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Student Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Class</th>
+                        <th className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Overdue Months</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Months Overdue</th>
+                        <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Total Outstanding</th>
+                        <th className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {defaultersData.map((student) => (
+                        <tr key={student.id} className="hover:bg-rose-50/10 transition-colors">
+                          <td className="px-4 py-3 text-sm text-slate-600 font-mono whitespace-nowrap">
+                            {student.registration_no}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-900 font-extrabold whitespace-nowrap">
+                            {student.first_name} {student.last_name}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">
+                            {student.class_name}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-center whitespace-nowrap">
+                            <span className="rounded-full px-2.5 py-0.5 text-xs font-black uppercase tracking-wide bg-rose-50 text-rose-700 border border-rose-200">
+                              {student.overdueMonthsCount} Months
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600 max-w-xs truncate">
+                            {student.overdueMonthsList.join(', ')}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right text-rose-600 font-black whitespace-nowrap">
+                            PKR {Number(student.outstandingAmount).toLocaleString('en-PK', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-center whitespace-nowrap">
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={warnDefaulterMutation.isPending && warningStudentId === student.id}
+                              onClick={() => {
+                                setWarningStudentId(student.id);
+                                warnDefaulterMutation.mutate(student.id);
+                              }}
+                              className="h-8 gap-1 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-sm transition-all"
+                            >
+                              {warnDefaulterMutation.isPending && warningStudentId === student.id ? (
+                                <>⏳ Sending Alert...</>
+                              ) : (
+                                <>
+                                  <AlertCircle size={12} /> Send Warning Notice
+                                </>
+                              )}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
 
       {/* Bulk Voucher Generator Modal */}
       <AppModal open={voucherGeneratorModal} onClose={() => setVoucherGeneratorModal(false)} title="Generate Bulk Vouchers" size="xl">
@@ -1448,6 +2230,18 @@ const downloadReceipt = async (payment, voucher) => {
         title="Delete Voucher"
         description={`Delete voucher ${deletingVoucher?.voucher_number}? This action cannot be undone.`}
         confirmLabel="Delete"
+        variant="destructive"
+      />
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        onClose={() => setConfirmBulkDelete(false)}
+        onConfirm={handleBulkDelete}
+        loading={bulkDeleteMutation.isPending}
+        title="Delete Selected Vouchers"
+        description={`Are you sure you want to delete ${Array.isArray(selectedVouchers) ? selectedVouchers.length : 0} selected vouchers? This action cannot be undone.`}
+        confirmLabel="Delete All Selected"
         variant="destructive"
       />
 
