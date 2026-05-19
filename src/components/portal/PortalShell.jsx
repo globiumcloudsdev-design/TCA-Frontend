@@ -59,6 +59,10 @@ import useAuthStore from "@/store/authStore";
 import { getPortalTerms, getNavItems } from "@/constants/portalInstituteConfig";
 import { PERM } from "@/constants/permissions";
 import { NotificationBell } from "../common";
+import { useQuery } from "@tanstack/react-query";
+import { publicService } from "@/services";
+import { ShieldAlert } from "lucide-react";
+import { useSocket } from "@/hooks/useSocket";
 
 // ─── Nav helpers with updated permissions ────────────────────────────────────
 function buildParentNav(t, navLabels) {
@@ -75,24 +79,28 @@ function buildParentNav(t, navLabels) {
       href: "/parent/attendance",
       icon: Calendar,
       permission: PERM.ATTENDANCE_VIEW,
+      feature: 'attendance',
     },
     {
       label: navLabels.results,
       href: "/parent/results",
       icon: BookOpen,
       permission: PERM.EXAM_RESULTS_VIEW,
+      feature: 'exams',
     },
     {
       label: navLabels.fees,
       href: "/parent/fees",
       icon: DollarSign,
       permission: PERM.FEES_READ,
+      feature: 'fees_voucher',
     },
     {
       label: navLabels.announcements,
       href: "/parent/announcements",
       icon: Bell,
       permission: PERM.NOTICES_READ,
+      feature: 'notifications',
     },
   ];
 }
@@ -110,50 +118,57 @@ function buildStudentNav(t, navLabels) {
       href: "/student/attendance",
       icon: Calendar,
       permission: PERM.ATTENDANCE_VIEW,
+      feature: 'attendance',
     },
     {
       label: navLabels.myTimetable,
       href: "/student/timetable",
       icon: Clock,
       permission: PERM.TIMETABLE_READ,
+      feature: 'timetable',
     },
     {
       label: navLabels.syllabus,
       href: "/student/syllabus",
       icon: BookOpen,
       permission: PERM.ASSIGNMENTS_READ || PERM.SYLLABUS_READ,
+      feature: 'classes',
     },
     {
       label: navLabels.assignments,
       href: "/student/assignments",
       icon: ClipboardList,
       permission: PERM.ASSIGNMENTS_READ,
+      feature: 'classes',
     },
     {
       label: navLabels.homework,
       href: "/student/homework",
       icon: NotebookPen,
       permission: PERM.HOMEWORK_READ,
+      feature: 'classes',
     },
     {
       label: navLabels.notes,
       href: "/student/notes",
       icon: FileText,
       permission: PERM.NOTES_READ,
+      feature: 'classes',
     },
     {
       label: navLabels.announcements,
       href: "/student/announcements",
       icon: Bell,
       permission: PERM.NOTICES_READ,
+      feature: 'notifications',
     },
     {
       label: navLabels.exams,
       href: "/student/exams",
       icon: FileText,
       permission: PERM.EXAMS_READ,
+      feature: 'exams',
     },
-    // { label: navLabels.myFees, href: '/student/fees', icon: DollarSign, permission: PERM.FEES_READ },
   ];
 }
 
@@ -170,69 +185,76 @@ function buildTeacherNav(t, navLabels) {
       href: "/teacher/classes",
       icon: Briefcase,
       permission: PERM.CLASSES_READ,
+      feature: 'classes',
     },
     {
       label: navLabels.myStudents,
       href: "/teacher/students",
       icon: Users,
       permission: PERM.STUDENTS_READ,
+      feature: 'students',
     },
     {
       label: navLabels.myTimetable,
       href: "/teacher/timetable",
       icon: Clock,
       permission: PERM.TIMETABLE_READ,
+      feature: 'timetable',
     },
     {
       label: navLabels.attendance,
       href: "/teacher/attendance",
       icon: Calendar,
       permission: PERM.ATTENDANCE_MARK,
+      feature: 'attendance',
     },
     {
       label: navLabels.homework,
       href: "/teacher/homework",
       icon: NotebookPen,
       permission: PERM.HOMEWORK_CREATE,
+      feature: 'classes',
     },
     {
       label: navLabels.assignments,
       href: "/teacher/assignments",
       icon: ClipboardList,
       permission: PERM.ASSIGNMENTS_CREATE,
+      feature: 'classes',
     },
     {
       label: navLabels.notes,
       href: "/teacher/notes",
       icon: FileText,
       permission: PERM.NOTES_CREATE,
+      feature: 'classes',
     },
-    // { label: t.notesLabel, href: '/teacher/study-material', icon: BookMarked, permission: PERM.NOTES_CREATE },
-    // { label: t.syllabusLabel, href: '/teacher/syllabus', icon: BookOpen, permission: PERM.SYLLABUS_UPDATE },
     {
       label: t.examsLabel,
       href: "/teacher/exams",
       icon: FileText,
       permission: PERM.EXAMS_UPDATE,
+      feature: 'exams',
     },
-    // { label: t.resultsLabel, href: '/teacher/exam-results', icon: TrendingUp, permission: PERM.EXAM_RESULTS_ENTER },
     {
       label: navLabels.announcements,
       href: "/teacher/announcements",
       icon: Bell,
       permission: PERM.NOTICES_CREATE,
+      feature: 'notifications',
     },
-    // { label: navLabels.reports, href: '/teacher/reports', icon: PieChart, permission: PERM.REPORTS_STUDENT },
-    // { label: t.nav.grade, href: '/teacher/gradebook', icon: BookOpen, permission: PERM.EXAM_RESULTS_GRADE },
-    // { label: navLabels.lessonPlans, href: '/teacher/lesson-plans', icon: FileText, permission: PERM.LESSON_PLANS_CREATE },
-    // { label: t.profileLabel, href: '/teacher/profile', icon: User, permission: PERM.TEACHER_PROFILE_VIEW },
-    // { label: t.achievementsLabel, href: '/teacher/achievements', icon: Award, permission: PERM.TEACHER_ACHIEVEMENTS },
     {
       label: "My Attendance",
       href: "/teacher/selfAttendance",
       icon: Calendar,
+      feature: 'staff_attendance',
     },
-    { label: "My Payroll", href: "/teacher/payroll", icon: DollarSign },
+    { 
+      label: "My Payroll", 
+      href: "/teacher/payroll", 
+      icon: DollarSign,
+      feature: 'payroll',
+    },
   ];
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -246,6 +268,58 @@ export default function PortalShell({ children, type }) {
   const [hydrated, setHydrated] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const user = portalUser;
+
+  // Initialize and keep real-time Socket.io active across all portal pages
+  useSocket();
+
+  // ── Global Platform Status Query ──
+  const { data: platformStatus } = useQuery({
+    queryKey: ['global-status-public'],
+    queryFn: () => publicService.getPlatformStatus(),
+    refetchInterval: 1000 * 60 * 5, // Check every 5 mins
+  });
+
+  // ── Feature Overrides Maintenance Guard ──
+  useEffect(() => {
+    if (!platformStatus?.data?.feature_overrides) return;
+
+    const overrides = platformStatus.data.feature_overrides;
+    
+    // Map current path to feature key
+    const pathFeatureMap = [
+      { pattern: /\/attendance/, feature: 'attendance', label: 'Attendance' },
+      { pattern: /\/fees/, feature: 'fees_voucher', label: 'Fees' },
+      { pattern: /\/exams/, feature: 'exams', label: 'Exams' },
+      { pattern: /\/results/, feature: 'exams', label: 'Exams' },
+      { pattern: /\/classes/, feature: 'classes', label: 'Classes' },
+      { pattern: /\/students/, feature: 'students', label: 'Students' },
+      { pattern: /\/timetable/, feature: 'timetable', label: 'Timetable' },
+      { pattern: /\/announcements/, feature: 'notifications', label: 'Announcements' },
+      { pattern: /\/homework/, feature: 'classes', label: 'Homework' },
+      { pattern: /\/assignments/, feature: 'classes', label: 'Assignments' },
+      { pattern: /\/syllabus/, feature: 'classes', label: 'Syllabus' },
+      { pattern: /\/notes/, feature: 'classes', label: 'Notes' },
+      { pattern: /\/selfAttendance/, feature: 'staff_attendance', label: 'Attendance' },
+      { pattern: /\/payroll/, feature: 'payroll', label: 'Payroll' },
+    ];
+
+    for (const item of pathFeatureMap) {
+      if (item.pattern.test(pathname)) {
+        const feature = overrides[item.feature];
+        if (feature && feature.enabled === false) {
+          toast.error(`${item.label} module is under maintenance`, {
+            description: feature.message || 'This feature is temporarily unavailable.',
+            duration: 5000,
+            icon: <ShieldAlert className="w-5 h-5 text-rose-500" />
+          });
+          
+          // Redirect to portal dashboard
+          router.replace(`/${type.toLowerCase()}`);
+          break;
+        }
+      }
+    }
+  }, [pathname, platformStatus, type, router]);
 
   useEffect(() => {
     if (usePortalStore.persist?.hasHydrated?.()) {
@@ -308,10 +382,20 @@ export default function PortalShell({ children, type }) {
       ? buildTeacherNav(t, navLabels)
       : buildStudentNav(t, navLabels);
   
-  // If permission is undefined, it's allowed by default (or handle specially)
+  // Filter nav items by permissions and global feature overrides
   const navItems = allNavItems.filter((item) => {
-    if (!item.permission) return true;
-    return canDo(item.permission);
+    // 1. Permission Check
+    if (item.permission && !canDo(item.permission)) {
+      return false;
+    }
+    // 2. Global Feature Override Check
+    if (item.feature && platformStatus?.data?.feature_overrides) {
+      const override = platformStatus.data.feature_overrides[item.feature];
+      if (override && override.enabled === false) {
+        return false;
+      }
+    }
+    return true;
   });
 
   const themeClasses = isParent

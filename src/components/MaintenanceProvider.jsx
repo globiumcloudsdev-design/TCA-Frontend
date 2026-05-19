@@ -30,7 +30,10 @@ export default function MaintenanceProvider({ children }) {
       pathname.startsWith('/coaching') || 
       pathname.startsWith('/academy') || 
       pathname.startsWith('/college') || 
-      pathname.startsWith('/university');
+      pathname.startsWith('/university') ||
+      pathname.startsWith('/student') ||
+      pathname.startsWith('/parent') ||
+      pathname.startsWith('/teacher');
 
     if (isDashboardArea) {
       return <MaintenancePage maintenance={maintenanceMode} />;

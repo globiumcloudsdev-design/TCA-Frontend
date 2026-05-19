@@ -21,6 +21,7 @@ import * as Icons from "lucide-react";
 import { authService, publicService } from "@/services";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useSocket } from "@/hooks/useSocket";
 
 // ── Shared components ────────────────────────────────────────────
 import AppBreadcrumb from "@/components/common/AppBreadcrumb";
@@ -323,6 +324,9 @@ export default function InstituteLayoutWrapper({ children }) {
   const getDashPath = useAuthStore((s) => s.dashboardPath);
   const dashboardPath = getDashPath() || "/";
   const instituteType = user?.institute?.institute_type;
+
+  // Initialize and keep real-time Socket.io active across all school pages
+  useSocket();
 
   // ── Feature Maintenance Check ──
   const { data: platformStatus } = useQuery({
