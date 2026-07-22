@@ -25,7 +25,14 @@ import StatsCard from '@/components/common/StatsCard';
 import SelectField from '@/components/common/SelectField';
 import { staffService } from '@/services/staffService';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
+import { generateAndDownloadTeacherIdCard } from '@/lib/idCardGenerator';
+import { generateExperienceCertificate } from '@/lib/pdf/experienceCertificatePdf';
+import { generateSalarySlip } from '@/lib/pdf/salarySlipPdf';
+import { Button } from '@/components/ui/button';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
+  PieChart, Pie, Cell
+} from 'recharts';
 
 // ─── Helpers ─────────────────────────────────────────────
 function initials(s) {
@@ -62,7 +69,7 @@ function formatTime(t) {
   }
 }
 
-const TABS = ['Overview', 'Attendance', 'Payroll', 'Documents'];
+const TABS = ['Overview', 'Attendance', 'Payroll', 'Performance', 'Documents'];
 
 // ─── No Data Component ──────────────────────────────────
 function NoDataPlaceholder({ message = 'Data Not Found' }) {
@@ -319,6 +326,17 @@ function PayrollTab({ staff }) {
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: currentYear - joiningYear + 1 }, (_, i) => currentYear - i);
 
+  // Format data for Recharts
+  const chartData = useMemo(() => {
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return payslips.map(p => ({
+      name: monthNames[p.month - 1],
+      NetSalary: Number(p.net_salary) || 0,
+      Allowances: Number(p.total_allowances) || 0,
+      Deductions: Number(p.total_deductions) || 0,
+    }));
+  }, [payslips]);
+
   return (
     <div className="space-y-4">
       {/* Filters */}
@@ -332,6 +350,26 @@ function PayrollTab({ staff }) {
           />
         </div>
       </div>
+
+      {chartData.length > 0 && (
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden p-6">
+          <h3 className="text-sm font-bold uppercase tracking-wide mb-6">Salary Trends</h3>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(value) => `Rs ${value}`} />
+                <RechartsTooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                <Bar dataKey="NetSalary" name="Net Salary" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="Allowances" name="Allowances" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="Deductions" name="Deductions" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <div className="flex items-center gap-2 border-b bg-muted/30 px-4 py-3">
@@ -371,9 +409,15 @@ function PayrollTab({ staff }) {
                       {p.paid_on ? formatDate(p.paid_on) : '—'}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button className="text-primary hover:bg-primary/10 p-2 rounded-md transition-colors" title="Download Payslip">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-primary hover:bg-primary/10 h-8 w-8" 
+                        title="Download Payslip"
+                        onClick={() => generateSalarySlip({ teacher: staff, payslip: p, institute: useInstituteStore.getState().currentInstitute })}
+                      >
                         <Download size={16} />
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))
@@ -386,6 +430,110 @@ function PayrollTab({ staff }) {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ========== PERFORMANCE TAB ==========
+function PerformanceTab({ staff }) {
+  const attendances = staff.staffAttendances || [];
+
+  const stats = useMemo(() => {
+    let present = 0, absent = 0, late = 0, leave = 0;
+    attendances.forEach(a => {
+      const s = a.status?.toLowerCase();
+      if (s === 'present') present++;
+      else if (s === 'absent') absent++;
+      else if (s === 'late') late++;
+      else if (s === 'leave') leave++;
+    });
+    return { present, absent, late, leave };
+  }, [attendances]);
+
+  const total = stats.present + stats.absent + stats.late + stats.leave;
+
+  const pieData = [
+    { name: 'Present', value: stats.present, color: '#10b981' },
+    { name: 'Late', value: stats.late, color: '#f59e0b' },
+    { name: 'Absent', value: stats.absent, color: '#ef4444' },
+    { name: 'Leave', value: stats.leave, color: '#3b82f6' },
+  ].filter(d => d.value > 0);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <CheckSquare size={18} className="text-primary" />
+            <h3 className="text-sm font-bold uppercase tracking-wide">Punctuality Overview</h3>
+          </div>
+          {total > 0 ? (
+            <div className="h-[250px] w-full relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none pb-8">
+                <div className="text-center">
+                  <span className="text-2xl font-bold">{Math.round((stats.present / total) * 100)}%</span>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Present</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="h-[250px] flex items-center justify-center">
+              <NoDataPlaceholder message="No attendance data to calculate performance" />
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden flex flex-col">
+          <div className="flex items-center gap-2 border-b bg-muted/30 px-4 py-3">
+            <AlertCircle size={16} className="text-primary" />
+            <h3 className="text-sm font-bold uppercase tracking-wide">Key Metrics</h3>
+          </div>
+          <div className="p-4 flex-1 flex flex-col justify-center gap-4">
+            <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-emerald-800 uppercase tracking-wide mb-1">Total Present</p>
+                <p className="text-2xl font-black text-emerald-700">{stats.present} <span className="text-xs font-medium opacity-70">Days</span></p>
+              </div>
+              <CheckSquare size={32} className="text-emerald-200" />
+            </div>
+            
+            <div className="bg-amber-50 rounded-lg p-4 border border-amber-100 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-amber-800 uppercase tracking-wide mb-1">Total Late</p>
+                <p className="text-2xl font-black text-amber-700">{stats.late} <span className="text-xs font-medium opacity-70">Days</span></p>
+              </div>
+              <Clock size={32} className="text-amber-200" />
+            </div>
+
+            <div className="bg-red-50 rounded-lg p-4 border border-red-100 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-red-800 uppercase tracking-wide mb-1">Total Absent</p>
+                <p className="text-2xl font-black text-red-700">{stats.absent} <span className="text-xs font-medium opacity-70">Days</span></p>
+              </div>
+              <AlertCircle size={32} className="text-red-200" />
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -582,16 +730,31 @@ export default function StaffDetailPage({ type, id }) {
             <ArrowLeft size={14} /> Back
           </button>
 
-          {/* <button
-            onClick={() => generateAndDownloadIdCard({
-              role: 'staff',
-              person: staff,
-              institute: currentInstitute || {}
-            })}
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm hover:bg-accent transition-colors"
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              const allPolicies = useAuthStore.getState().getPoliciesByType('id_card') || [];
+              const staffPolicy = allPolicies.find(p => p.config?.card_type === 'staff') || useAuthStore.getState().getLatestPolicy('id_card');
+              generateAndDownloadTeacherIdCard({ 
+                person: staff, 
+                institute: currentInstitute, 
+                policyConfig: staffPolicy?.config 
+              });
+            }}
+            className="flex items-center gap-1.5"
           >
-            <CreditCard size={14} /> ID Card
-          </button> */}
+            <UserCheck size={14} /> Print ID Card
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => generateExperienceCertificate({ teacher: staff, institute: currentInstitute })}
+            className="flex items-center gap-1.5"
+          >
+            <FileText size={14} /> Experience Certificate
+          </Button>
 
           {canDo('staff.update') && (
             <button
@@ -605,15 +768,6 @@ export default function StaffDetailPage({ type, id }) {
               <Power size={14} /> {staff.is_active ? 'Deactivate' : 'Activate'}
             </button>
           )}
-
-          {/* {canDo('staff.update') && (
-            <button
-              onClick={() => router.push(`/${type}/staff/${id}/edit`)}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
-            >
-              <Pencil size={14} /> Edit
-            </button>
-          )} */}
         </div>
       </div>
 
@@ -640,6 +794,7 @@ export default function StaffDetailPage({ type, id }) {
         {activeTab === 'Overview'    && <OverviewTab    staff={staff} />}
         {activeTab === 'Attendance'  && <AttendanceTab  staff={staff} />}
         {activeTab === 'Payroll'     && <PayrollTab     staff={staff} />}
+        {activeTab === 'Performance' && <PerformanceTab staff={staff} />}
         {activeTab === 'Documents'   && <DocumentsTab   staff={staff} />}
       </div>
     </div>

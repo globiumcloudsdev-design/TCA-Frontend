@@ -1,4 +1,3 @@
-
 'use client';
 
 /**
@@ -25,6 +24,7 @@ import { TableRowActions } from '@/components/common';
 import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
 import useAuthStore from '@/store/authStore';
 import { staffService } from '@/services/staffService';
+import { settingService } from '@/services';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
@@ -190,7 +190,8 @@ export default function StaffManagementPage({ instituteType }) {
     const canDo = useAuthStore((s) => s.canDo);
     const user = useAuthStore((s) => s.user);
 
-    // State
+    // ✅ State declarations - MUST be before any hooks that depend on them
+    const [activeTab, setActiveTab] = useState('personal');
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
@@ -201,12 +202,42 @@ export default function StaffManagementPage({ instituteType }) {
     const [deletingStaff, setDeletingStaff] = useState(null);
     const [avatarFile, setAvatarFile] = useState(null);
     const [avatarPreview, setAvatarPreview] = useState('');
-    const [activeTab, setActiveTab] = useState('personal');
     const [uploadingFiles, setUploadingFiles] = useState({});
     const [showCustomType, setShowCustomType] = useState({});
     const [isMobile, setIsMobile] = useState(false);
     const [changePasswordUser, setChangePasswordUser] = useState(null);
     const [mounted, setMounted] = useState(false);
+    const [selectedPermissions, setSelectedPermissions] = useState([]);
+    const [useCustomPermissions, setUseCustomPermissions] = useState(false);
+
+    // Fetch settingsData to check document allowance settings
+    const { data: settingsData } = useQuery({
+        queryKey: ['institute-settings'],
+        queryFn: () => settingService.getSettings(),
+        staleTime: 5 * 60_000,
+    });
+
+    // ✅ CORRECT: Check if staff docs are allowed from settings
+    const staffDocsAllowed = settingsData?.data?.settings?.document_settings?.staff_docs_allowed === true;
+
+    // ✅ Define available tabs based on document setting (after staffDocsAllowed is defined)
+    const allTabs = useMemo(() => {
+        const tabs = ['personal', 'employment', 'permissions'];
+        if (staffDocsAllowed) {
+            tabs.push('documents');
+        }
+        return tabs;
+    }, [staffDocsAllowed]);
+
+    // ✅ Reset active tab if current tab is not available (after allTabs is defined)
+    useEffect(() => {
+        if (allTabs.length > 0 && !allTabs.includes(activeTab)) {
+            setActiveTab(allTabs[0]);
+        }
+    }, [allTabs, activeTab]);
+
+    console.log('staffDocsAllowed', staffDocsAllowed);
+    console.log('allTabs', allTabs);
 
     useEffect(() => {
         setMounted(true);
@@ -215,10 +246,6 @@ export default function StaffManagementPage({ instituteType }) {
         window.addEventListener('resize', checkMobile);
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
-
-    // Permissions state
-    const [selectedPermissions, setSelectedPermissions] = useState([]);
-    const [useCustomPermissions, setUseCustomPermissions] = useState(false);
 
     // Check permissions for buttons
     const canCreate = canDo('staff.create') || canDo('users.create') || user?.user_type === 'MASTER_ADMIN';
@@ -322,7 +349,7 @@ export default function StaffManagementPage({ instituteType }) {
     const selectedStaffType = watch('staff_type');
     const watchDocuments = watch('documents');
 
-    // Auto-navigate to first error tab
+    // ✅ Updated error navigation - uses allTabs
     useEffect(() => {
         const errorFields = Object.keys(errors);
         if (errorFields.length > 0) {
@@ -338,11 +365,11 @@ export default function StaffManagementPage({ instituteType }) {
                 if (activeTab !== 'employment') setActiveTab('employment');
             } else if (errorFields.some(f => permissionFields.includes(f))) {
                 if (activeTab !== 'permissions') setActiveTab('permissions');
-            } else if (errorFields.some(f => documentFields.includes(f)) || errorFields.some(f => f.startsWith('documents.'))) {
+            } else if (staffDocsAllowed && (errorFields.some(f => documentFields.includes(f)) || errorFields.some(f => f.startsWith('documents.')))) {
                 if (activeTab !== 'documents') setActiveTab('documents');
             }
         }
-    }, [errors, activeTab]);
+    }, [errors, activeTab, staffDocsAllowed]);
 
     // Update permissions when staff type changes (if not using custom)
     useEffect(() => {
@@ -465,13 +492,24 @@ export default function StaffManagementPage({ instituteType }) {
         setShowCustomType(prev => ({ ...prev, [index]: value === 'other' }));
     };
 
+    // ✅ Updated handleTabChange - uses allTabs
     const handleTabChange = async (value) => {
-        const tabs = ['personal', 'employment', 'permissions', 'documents'];
-        const currentIdx = tabs.indexOf(activeTab);
-        const targetIdx = tabs.indexOf(value);
+        const currentIndex = allTabs.indexOf(activeTab);
+        const targetIndex = allTabs.indexOf(value);
 
-        if (targetIdx > currentIdx) {
-            const fields = currentIdx === 0 ? ['first_name', 'last_name', 'email', 'phone', 'dob'] : [];
+        if (targetIndex === -1) return;
+
+        if (targetIndex > currentIndex) {
+            let fields = [];
+            if (activeTab === 'personal') {
+                fields = ['first_name', 'last_name', 'email', 'phone', 'dob'];
+            } else if (activeTab === 'employment') {
+                fields = ['staff_type', 'designation', 'employment_type', 'joining_date'];
+            } else if (activeTab === 'permissions') {
+                fields = ['permissions'];
+            } else if (activeTab === 'documents') {
+                fields = ['documents'];
+            }
             const isValid = await trigger(fields);
             if (!isValid) return;
         }
@@ -849,22 +887,30 @@ export default function StaffManagementPage({ instituteType }) {
                         <Button variant="outline" onClick={() => setModalOpen(false)}>
                             Cancel
                         </Button>
-                        {activeTab !== 'personal' && (
+                        {activeTab !== allTabs[0] && (
                             <Button type="button" variant="outline" onClick={() => {
-                                const tabs = ['personal', 'employment', 'permissions', 'documents'];
-                                const currentIndex = tabs.indexOf(activeTab);
-                                if (currentIndex > 0) setActiveTab(tabs[currentIndex - 1]);
+                                const currentIndex = allTabs.indexOf(activeTab);
+                                if (currentIndex > 0) setActiveTab(allTabs[currentIndex - 1]);
                             }}>
                                 Previous
                             </Button>
                         )}
-                        {activeTab !== 'documents' ? (
+                        {activeTab !== allTabs[allTabs.length - 1] ? (
                             <Button type="button" onClick={async () => {
-                                const isValid = await trigger();
+                                let fields = [];
+                                if (activeTab === 'personal') {
+                                    fields = ['first_name', 'last_name', 'email', 'phone', 'dob'];
+                                } else if (activeTab === 'employment') {
+                                    fields = ['staff_type', 'designation', 'employment_type', 'joining_date'];
+                                } else if (activeTab === 'permissions') {
+                                    fields = ['permissions'];
+                                } else if (activeTab === 'documents') {
+                                    fields = ['documents'];
+                                }
+                                const isValid = await trigger(fields);
                                 if (isValid) {
-                                    const tabs = ['personal', 'employment', 'permissions', 'documents'];
-                                    const currentIndex = tabs.indexOf(activeTab);
-                                    if (currentIndex < tabs.length - 1) setActiveTab(tabs[currentIndex + 1]);
+                                    const currentIndex = allTabs.indexOf(activeTab);
+                                    if (currentIndex < allTabs.length - 1) setActiveTab(allTabs[currentIndex + 1]);
                                 }
                             }}>
                                 Next
@@ -886,35 +932,43 @@ export default function StaffManagementPage({ instituteType }) {
             >
                 <form id="staff-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-                        {/* Tabs List */}
+                        {/* Tabs List - Dynamic based on staffDocsAllowed */}
                         <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
-                            <TabsList className={`inline-flex w-auto sm:grid ${isMobile ? 'flex-nowrap' : 'grid-cols-4'} mb-4 sm:mb-6`}>
-                                <TabsTrigger value="personal" className="gap-2" disabled={activeTab === 'personal' && Object.keys(errors).length > 0}>
-                                    <User size={14} />
-                                    <span>Personal</span>
-                                </TabsTrigger>
-                                <TabsTrigger value="employment" className="gap-2" disabled={activeTab === 'personal'}>
-                                    <Briefcase size={14} />
-                                    <span>Employment</span>
-                                </TabsTrigger>
-                                <TabsTrigger value="permissions" className="gap-2">
-                                    <Shield size={14} />
-                                    <span className="hidden sm:inline">Permissions</span>
-                                    {selectedPermissions.length > 0 && (
-                                        <Badge variant="secondary" className="ml-1">
-                                            {selectedPermissions.length}
-                                        </Badge>
-                                    )}
-                                </TabsTrigger>
-                                <TabsTrigger value="documents" className="gap-2">
-                                    <FileText size={14} />
-                                    <span className="hidden sm:inline">Documents</span>
-                                    {watchDocuments?.length > 0 && (
-                                        <Badge variant="secondary" className="ml-1">
-                                            {watchDocuments.length}
-                                        </Badge>
-                                    )}
-                                </TabsTrigger>
+                            <TabsList className={`inline-flex w-auto sm:grid mb-4 sm:mb-6`} style={{ gridTemplateColumns: `repeat(${allTabs.length}, minmax(0, 1fr))` }}>
+                                {allTabs.includes('personal') && (
+                                    <TabsTrigger value="personal" className="gap-2">
+                                        <User size={14} />
+                                        <span>Personal</span>
+                                    </TabsTrigger>
+                                )}
+                                {allTabs.includes('employment') && (
+                                    <TabsTrigger value="employment" className="gap-2">
+                                        <Briefcase size={14} />
+                                        <span>Employment</span>
+                                    </TabsTrigger>
+                                )}
+                                {allTabs.includes('permissions') && (
+                                    <TabsTrigger value="permissions" className="gap-2">
+                                        <Shield size={14} />
+                                        <span className="hidden sm:inline">Permissions</span>
+                                        {selectedPermissions.length > 0 && (
+                                            <Badge variant="secondary" className="ml-1">
+                                                {selectedPermissions.length}
+                                            </Badge>
+                                        )}
+                                    </TabsTrigger>
+                                )}
+                                {staffDocsAllowed && allTabs.includes('documents') && (
+                                    <TabsTrigger value="documents" className="gap-2">
+                                        <FileText size={14} />
+                                        <span className="hidden sm:inline">Documents</span>
+                                        {watchDocuments?.length > 0 && (
+                                            <Badge variant="secondary" className="ml-1">
+                                                {watchDocuments.length}
+                                            </Badge>
+                                        )}
+                                    </TabsTrigger>
+                                )}
                             </TabsList>
                         </div>
 
@@ -1342,145 +1396,147 @@ export default function StaffManagementPage({ instituteType }) {
                             </Card>
                         </TabsContent>
 
-                        {/* Tab 4: Documents */}
-                        <TabsContent value="documents">
-                            <Card>
-                                <CardContent className="p-4 sm:p-6">
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-center">
-                                            <h3 className="text-lg font-semibold">Documents</h3>
-                                            <Button type="button" variant="outline" size="sm" onClick={addDocument}>
-                                                <Plus className="h-4 w-4 mr-2" />
-                                                Add Document
-                                            </Button>
-                                        </div>
-
-                                        {watchDocuments?.length === 0 ? (
-                                            <div className="text-center py-8 border-2 border-dashed rounded-lg">
-                                                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                                                <p className="text-muted-foreground">No documents added yet</p>
-                                                <p className="text-sm text-muted-foreground mt-1">
-                                                    Click "Add Document" to upload files
-                                                </p>
+                        {/* ✅ Tab 4: Documents - Only render if staffDocsAllowed is true */}
+                        {staffDocsAllowed && (
+                            <TabsContent value="documents">
+                                <Card>
+                                    <CardContent className="p-4 sm:p-6">
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center">
+                                                <h3 className="text-lg font-semibold">Documents</h3>
+                                                <Button type="button" variant="outline" size="sm" onClick={addDocument}>
+                                                    <Plus className="h-4 w-4 mr-2" />
+                                                    Add Document
+                                                </Button>
                                             </div>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                {watchDocuments.map((doc, index) => (
-                                                    <div key={index} className="border rounded-lg p-4">
-                                                        <div className="flex justify-between mb-3">
-                                                            <h4 className="font-medium">Document {index + 1}</h4>
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => removeDocument(index)}
-                                                                className="text-destructive"
-                                                            >
-                                                                <X className="h-4 w-4" />
-                                                            </Button>
-                                                        </div>
 
-                                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                                            <div>
-                                                                <SelectField
-                                                                    label="Document Type *"
-                                                                    name={`documents.${index}.type`}
-                                                                    control={control}
-                                                                    error={errors.documents?.[index]?.type}
-                                                                    options={DOCUMENT_TYPES}
-                                                                    placeholder="Select type"
-                                                                    onChange={(value) => handleDocumentTypeChange(index, value)}
-                                                                    required
-                                                                />
-
-                                                                {showCustomType[index] && (
-                                                                    <div className="mt-2">
-                                                                        <InputField
-                                                                            label="Specify Document Type"
-                                                                            name={`documents.${index}.customType`}
-                                                                            register={register}
-                                                                            error={errors.documents?.[index]?.customType}
-                                                                            placeholder="e.g. Training Certificate"
-                                                                            required
-                                                                        />
-                                                                    </div>
-                                                                )}
-                                                            </div>
-
-                                                            <InputField
-                                                                label="Document Title *"
-                                                                name={`documents.${index}.title`}
-                                                                register={register}
-                                                                error={errors.documents?.[index]?.title}
-                                                                placeholder="e.g. CNIC, Degree"
-                                                                required
-                                                            />
-                                                        </div>
-
-                                                        <div className="mt-3">
-                                                            <Label>Upload File (Max {MAX_FILE_MB}MB)</Label>
-
-                                                            {doc.file_url && !uploadingFiles[index] && (
-                                                                <div className="flex items-center gap-2 text-sm bg-accent/30 rounded px-3 py-2 mb-2">
-                                                                    <span className="truncate">{doc.file_name || 'Current file'}</span>
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className="text-blue-500 hover:text-blue-600 h-8 gap-1 px-2 ml-auto"
-                                                                        onClick={() => window.open(doc.file_url, '_blank')}
-                                                                    >
-                                                                        <Eye className="h-4 w-4" />
-                                                                        <span className="text-xs">View</span>
-                                                                    </Button>
-                                                                </div>
-                                                            )}
-
-                                                            <div className="flex items-center gap-2">
-                                                                <input
-                                                                    type="file"
-                                                                    id={`doc-${index}`}
-                                                                    className="hidden"
-                                                                    onChange={(e) => handleDocumentUpload(e, index)}
-                                                                />
+                                            {watchDocuments?.length === 0 ? (
+                                                <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                                                    <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                                                    <p className="text-muted-foreground">No documents added yet</p>
+                                                    <p className="text-sm text-muted-foreground mt-1">
+                                                        Click "Add Document" to upload files
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    {watchDocuments.map((doc, index) => (
+                                                        <div key={index} className="border rounded-lg p-4">
+                                                            <div className="flex justify-between mb-3">
+                                                                <h4 className="font-medium">Document {index + 1}</h4>
                                                                 <Button
                                                                     type="button"
-                                                                    variant="outline"
+                                                                    variant="ghost"
                                                                     size="sm"
-                                                                    onClick={() => document.getElementById(`doc-${index}`).click()}
-                                                                    className="flex-1"
+                                                                    onClick={() => removeDocument(index)}
+                                                                    className="text-destructive"
                                                                 >
-                                                                    <Upload className="h-4 w-4 mr-2" />
-                                                                    {uploadingFiles[index] || 'Choose File'}
+                                                                    <X className="h-4 w-4" />
                                                                 </Button>
                                                             </div>
-                                                        </div>
 
-                                                        {editingStaff && doc.file_url && (
-                                                            <div className="mt-3 flex items-center space-x-2">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    id={`verified-${index}`}
-                                                                    checked={doc.verified || false}
-                                                                    onChange={(e) => {
-                                                                        const currentDocs = getValues('documents') || [];
-                                                                        const updatedDocs = [...currentDocs];
-                                                                        updatedDocs[index].verified = e.target.checked;
-                                                                        setValue('documents', updatedDocs);
-                                                                    }}
-                                                                    className="h-4 w-4 rounded border-gray-300"
+                                                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                                                <div>
+                                                                    <SelectField
+                                                                        label="Document Type *"
+                                                                        name={`documents.${index}.type`}
+                                                                        control={control}
+                                                                        error={errors.documents?.[index]?.type}
+                                                                        options={DOCUMENT_TYPES}
+                                                                        placeholder="Select type"
+                                                                        onChange={(value) => handleDocumentTypeChange(index, value)}
+                                                                        required
+                                                                    />
+
+                                                                    {showCustomType[index] && (
+                                                                        <div className="mt-2">
+                                                                            <InputField
+                                                                                label="Specify Document Type"
+                                                                                name={`documents.${index}.customType`}
+                                                                                register={register}
+                                                                                error={errors.documents?.[index]?.customType}
+                                                                                placeholder="e.g. Training Certificate"
+                                                                                required
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
+                                                                <InputField
+                                                                    label="Document Title *"
+                                                                    name={`documents.${index}.title`}
+                                                                    register={register}
+                                                                    error={errors.documents?.[index]?.title}
+                                                                    placeholder="e.g. CNIC, Degree"
+                                                                    required
                                                                 />
-                                                                <Label htmlFor={`verified-${index}`}>Verified</Label>
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
+
+                                                            <div className="mt-3">
+                                                                <Label>Upload File (Max {MAX_FILE_MB}MB)</Label>
+
+                                                                {doc.file_url && !uploadingFiles[index] && (
+                                                                    <div className="flex items-center gap-2 text-sm bg-accent/30 rounded px-3 py-2 mb-2">
+                                                                        <span className="truncate">{doc.file_name || 'Current file'}</span>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            className="text-blue-500 hover:text-blue-600 h-8 gap-1 px-2 ml-auto"
+                                                                            onClick={() => window.open(doc.file_url, '_blank')}
+                                                                        >
+                                                                            <Eye className="h-4 w-4" />
+                                                                            <span className="text-xs">View</span>
+                                                                        </Button>
+                                                                    </div>
+                                                                )}
+
+                                                                <div className="flex items-center gap-2">
+                                                                    <input
+                                                                        type="file"
+                                                                        id={`doc-${index}`}
+                                                                        className="hidden"
+                                                                        onChange={(e) => handleDocumentUpload(e, index)}
+                                                                    />
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() => document.getElementById(`doc-${index}`).click()}
+                                                                        className="flex-1"
+                                                                    >
+                                                                        <Upload className="h-4 w-4 mr-2" />
+                                                                        {uploadingFiles[index] || 'Choose File'}
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+
+                                                            {editingStaff && doc.file_url && (
+                                                                <div className="mt-3 flex items-center space-x-2">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        id={`verified-${index}`}
+                                                                        checked={doc.verified || false}
+                                                                        onChange={(e) => {
+                                                                            const currentDocs = getValues('documents') || [];
+                                                                            const updatedDocs = [...currentDocs];
+                                                                            updatedDocs[index].verified = e.target.checked;
+                                                                            setValue('documents', updatedDocs);
+                                                                        }}
+                                                                        className="h-4 w-4 rounded border-gray-300"
+                                                                    />
+                                                                    <Label htmlFor={`verified-${index}`}>Verified</Label>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+                        )}
                     </Tabs>
                 </form>
             </AppModal>

@@ -33,3 +33,5 @@ export { masterAdminService }   from './masterAdminService';
 export { branchService }        from './branchService';
 export { eventService }         from './eventService';
 export { publicService }        from './publicService';
+export { settingService }       from './settingService';
+

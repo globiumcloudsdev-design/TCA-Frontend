@@ -205,6 +205,48 @@ export function useSocket() {
       }
     });
 
+    // 3. Support Tickets Real-time Handler
+    socketInstance.on('support_ticket_update', (data) => {
+      console.log('🎫 [Socket] Support Ticket Update:', data);
+      
+      // Always invalidate the list views
+      queryClient.invalidateQueries({ queryKey: ['master-admin-tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['my-support-tickets'] });
+
+      if (data.ticketId) {
+        // Invalidate specific ticket details to refresh chat instantly
+        queryClient.invalidateQueries({ queryKey: ['support-ticket', data.ticketId] });
+        queryClient.invalidateQueries({ queryKey: ['my-support-ticket', data.ticketId] });
+      }
+
+      playChime();
+      
+      let title = 'Support Ticket Update';
+      let description = 'A support ticket has been updated.';
+      
+      if (data.type === 'new_ticket') {
+        title = 'New Support Ticket';
+        description = 'A new support ticket has been raised by an institute.';
+      } else if (data.type === 'new_reply') {
+        title = 'New Reply';
+        description = 'You received a new reply on a support ticket.';
+      } else if (data.type === 'status_changed') {
+        title = 'Ticket Status Updated';
+        description = `Your support ticket status is now ${data.status || 'updated'}.`;
+      }
+
+      if (data.is_self) {
+        // Skip toast for actions performed by users on the same side, but keep the data fresh
+        return;
+      }
+
+      toast(title, {
+        description: description,
+        icon: <BellRing className="w-5.5 h-5.5 text-indigo-500 animate-bounce" />,
+        duration: 5000,
+      });
+    });
+
     socketInstance.on('connect_error', (err) => {
       console.warn('[Socket] Connection error:', err.message);
     });

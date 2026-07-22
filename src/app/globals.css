@@ -202,3 +202,14 @@
     margin: 12mm;
   }
 }
+
+/* app/globals.css mein add karein */
+.tiptap-button-active {
+  background-color: rgb(226 232 240) !important;
+  color: rgb(15 23 42) !important;
+}
+
+button[data-state="active"] {
+  background-color: rgb(226 232 240);
+  color: rgb(15 23 42);
+}

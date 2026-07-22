@@ -23,6 +23,12 @@ export const masterAdminService = {
   getReports: (params = {}) =>
     api.get(`/master-admin/reports${buildQuery(params)}`).then((r) => r.data?.data ?? r.data),
 
+  getSystemHealth: () =>
+    api.get('/master-admin/system-health').then((r) => r.data?.data ?? r.data),
+
+  triggerBackup: () =>
+    api.post('/master-admin/backup/trigger').then((r) => r.data?.data ?? r.data),
+
   // ─── Lookup tables (for dropdowns) ───────────────────────
   getInstituteTypes: () =>
     api.get('/master-admin/institute-types').then((r) => r.data),
@@ -103,9 +109,15 @@ export const masterAdminService = {
   deleteSchool: (id) =>
     api.delete(`/master-admin/institutes/${id}`).then((r) => r.data),
 
+  restoreSchool: (id) =>
+    api.patch(`/master-admin/institutes/${id}/restore`).then((r) => r.data),
+
   // ─── Invoice Management (NEW) ────────────────────────────
   getInstituteInvoices: (instituteId, filters = {}) =>
     api.get(`/master-admin/institutes/${instituteId}/invoices${buildQuery(filters)}`).then((r) => r.data),
+
+  createManualInvoice: (instituteId, data) =>
+    api.post(`/master-admin/institutes/${instituteId}/invoices/manual`, data).then((r) => r.data),
 
   // All invoices across ALL institutes (for master-admin global view)
   getAllInvoices: (filters = {}) =>
@@ -126,6 +138,17 @@ export const masterAdminService = {
       () => DUMMY_SUBSCRIPTION_HISTORY,
     ),
 
+  // ==========================================
+  // AUDIT LOGS
+  // ==========================================
+  getAuditLogs: async (params) => {
+    return await api.get('/master-admin/audit-logs', { params });
+  },
+
+  // ==========================================
+  // BRANDING
+  // ==========================================
+  
   // ─── Subscriptions ────────────────────────────────────────
   // filters: { school_id?, status? }
   getSubscriptions: (filters = {}) =>
@@ -165,6 +188,10 @@ export const masterAdminService = {
   // NEW: Toggle user status
   toggleUserStatus: (id, is_active) =>
     api.patch(`/master-admin/users/${id}/status`, { is_active }).then((r) => r.data),
+
+  // NEW: Delete platform user
+  deleteUser: (id) =>
+    api.delete(`/master-admin/users/${id}`).then((r) => r.data),
     
   // NEW: Change platform user password
   changeUserPassword: (userId, password) =>
@@ -193,6 +220,25 @@ export const masterAdminService = {
     api.get('/master-admin/settings').then((r) => r.data),
   updateGlobalSetting: (data) =>
     api.post('/master-admin/settings', data).then((r) => r.data),
+
+  // ─── Website CMS Settings (Dedicated Table) ─────
+  getWebsiteCms: () =>
+    api.get('/master-admin/website-cms').then((r) => r.data?.data ?? r.data),
+  updateWebsiteCms: (key, value) =>
+    api.post('/master-admin/website-cms', { key, value }).then((r) => r.data?.data ?? r.data),
+  bulkUpdateWebsiteCms: (data) =>
+    api.post('/master-admin/website-cms', data).then((r) => r.data?.data ?? r.data),
+  uploadCmsImage: (file, folder, oldPublicId) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('folder', folder);
+    if (oldPublicId) formData.append('oldPublicId', oldPublicId);
+    return api.post('/master-admin/website-cms/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    }).then((r) => r.data?.data ?? r.data);
+  },
 
   // ─── Subscription Plans (CRUD) ───────────────────────────
   getSubscriptionTemplates: (filters = {}) =>

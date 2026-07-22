@@ -58,8 +58,10 @@ export default function AppModal({
         {/* ── Sticky Header ── */}
         <DialogHeader className="shrink-0 border-b px-5 pt-5 pb-4">
           <DialogTitle className="text-base sm:text-lg">{title}</DialogTitle>
-          {description && (
+          {description ? (
             <DialogDescription className="text-sm">{description}</DialogDescription>
+          ) : (
+            <DialogDescription className="sr-only">Dialog Content</DialogDescription>
           )}
         </DialogHeader>
 

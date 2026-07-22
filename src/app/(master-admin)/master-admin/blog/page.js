@@ -1,11 +1,11 @@
 'use client';
 import { useState, useMemo, useEffect } from 'react';
-import { 
-  Newspaper, Plus, 
+import {
+  Newspaper, Plus,
   Eye, Edit, Trash2, Calendar, User, Share2,
   Image as ImageIcon, FileText, CheckCircle, Clock
 } from 'lucide-react';
-import { 
+import {
   AppModal, InputField, TextareaField, FormSubmitButton, DataTable, SelectField, MultiSelectField, ConfirmDialog
 } from '@/components/common';
 import { Button } from '@/components/ui/button';
@@ -25,21 +25,21 @@ export default function BlogManagementPage() {
   }, []);
 
   const [posts, setPosts] = useState([
-    { 
-      id: 1, 
-      title: 'Digital Transformation in Schools', 
-      author: 'Admin', 
-      status: 'Published', 
+    {
+      id: 1,
+      title: 'Digital Transformation in Schools',
+      author: 'Admin',
+      status: 'Published',
       date: '2026-05-10',
       category: 'Education',
       views: '1.2k',
       tags: ['digital', 'education']
     },
-    { 
-      id: 2, 
-      title: 'Top 5 Benefits of LMS', 
-      author: 'Support', 
-      status: 'Draft', 
+    {
+      id: 2,
+      title: 'Top 5 Benefits of LMS',
+      author: 'Support',
+      status: 'Draft',
       date: '2026-05-08',
       category: 'Technology',
       views: '0',
@@ -71,8 +71,8 @@ export default function BlogManagementPage() {
   };
 
   const columns = useMemo(() => [
-    { 
-      header: 'Title', 
+    {
+      header: 'Title',
       accessorKey: 'title',
       cell: ({ row }) => {
         const r = row.original;
@@ -88,13 +88,13 @@ export default function BlogManagementPage() {
         );
       }
     },
-    { 
-      header: 'Category', 
+    {
+      header: 'Category',
       accessorKey: 'category',
       cell: ({ row }) => <Badge variant="secondary" className="rounded-full bg-slate-100 text-slate-600 border-none px-3">{row.original.category}</Badge>
     },
-    { 
-      header: 'Status', 
+    {
+      header: 'Status',
       accessorKey: 'status',
       cell: ({ row }) => {
         const status = row.original.status;
@@ -105,8 +105,8 @@ export default function BlogManagementPage() {
         );
       }
     },
-    { 
-      header: 'Actions', 
+    {
+      header: 'Actions',
       id: 'actions',
       cell: ({ row }) => (
         <div className="flex gap-1 justify-center">
@@ -164,7 +164,7 @@ export default function BlogManagementPage() {
           columns={columns}
           data={posts}
           searchPlaceholder="Search articles..."
-          pagination={{ page: 1, totalPages: 1, onPageChange: () => {} }}
+          pagination={{ page: 1, totalPages: 1, onPageChange: () => { } }}
           action={
             <Button variant="default" onClick={() => handleOpenModal()} className="shadow-md shadow-primary/10">
               <Plus className="w-4 h-4 mr-2" /> New Blog Post
@@ -182,10 +182,10 @@ export default function BlogManagementPage() {
         footer={
           <div className="flex gap-3 w-full">
             <Button type="button" variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
-            <FormSubmitButton 
-              form="blog-form" 
-              label={editingPost ? 'Update Post' : 'Publish Article'} 
-              className="flex-[2] shadow-lg shadow-primary/10" 
+            <FormSubmitButton
+              form="blog-form"
+              label={editingPost ? 'Update Post' : 'Publish Article'}
+              className="flex-[2] shadow-lg shadow-primary/10"
             />
           </div>
         }
@@ -193,32 +193,32 @@ export default function BlogManagementPage() {
         <form id="blog-form" onSubmit={handleSave} className="space-y-6">
           <div className="space-y-4">
             <InputField label="Article Title" required defaultValue={editingPost?.title} placeholder="e.g. The Future of E-Learning" />
-            
+
             <div className="grid grid-cols-2 gap-4">
-              <SelectField 
-                label="Category" 
+              <SelectField
+                label="Category"
                 defaultValue={editingPost?.category?.toLowerCase() || 'edu'}
                 options={[
                   { label: 'Education', value: 'edu' },
                   { label: 'Technology', value: 'tech' },
                   { label: 'Management', value: 'mgmt' },
                   { label: 'Updates', value: 'updates' }
-                ]} 
+                ]}
                 required
               />
-              <SelectField 
-                label="Status" 
+              <SelectField
+                label="Status"
                 defaultValue={editingPost?.status?.toLowerCase() || 'draft'}
                 options={[
                   { label: 'Draft', value: 'draft' },
                   { label: 'Published', value: 'published' },
                   { label: 'Private', value: 'private' }
-                ]} 
+                ]}
               />
             </div>
 
-            <MultiSelectField 
-              label="Tags" 
+            <MultiSelectField
+              label="Tags"
               options={[
                 { label: 'Digital', value: 'digital' },
                 { label: 'Education', value: 'education' },
@@ -231,14 +231,22 @@ export default function BlogManagementPage() {
             />
 
             <div className="p-4 border-2 border-dashed border-slate-200 rounded-2xl text-center space-y-2 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group">
-               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm group-hover:scale-110 transition-transform">
-                 <ImageIcon className="w-5 h-5 text-primary" />
-               </div>
-               <p className="text-xs font-bold text-slate-600">Featured Image</p>
-               <p className="text-[10px] text-slate-400">Click to upload or drag & drop</p>
+              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm group-hover:scale-110 transition-transform">
+                <ImageIcon className="w-5 h-5 text-primary" />
+              </div>
+              <p className="text-xs font-bold text-slate-600">Featured Image</p>
+              <p className="text-[10px] text-slate-400">Click to upload or drag & drop</p>
             </div>
 
-            <TextareaField label="Post Content" required defaultValue={editingPost ? 'Dummy content for ' + editingPost.title : ''} placeholder="Write your content here..." rows={12} />
+            {/* <TextareaField label="Post Content" required defaultValue={editingPost ? 'Dummy content for ' + editingPost.title : ''} placeholder="Write your content here..." rows={12} /> */}
+            <TextareaField
+              label="Post Content"
+              required
+              defaultValue={editingPost ? 'Dummy content for ' + editingPost.title : ''}
+              placeholder="Write your content here..."
+              rows={12}
+              isTiptap={true}  // Add this prop to enable Tiptap editor
+            />
           </div>
 
           <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">

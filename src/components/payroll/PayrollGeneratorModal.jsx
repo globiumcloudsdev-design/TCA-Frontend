@@ -44,6 +44,8 @@ export default function PayrollGeneratorModal({ open, onClose }) {
   const [year, setYear] = useState(String(currentYear));
   const [category, setCategory] = useState('all');
 
+  const [resultData, setResultData] = useState(null);
+
   const [selectedStaffIds, setSelectedStaffIds] = useState([]);
   const [selectedTeacherIds, setSelectedTeacherIds] = useState([]);
 
@@ -100,21 +102,11 @@ export default function PayrollGeneratorModal({ open, onClose }) {
     mutationFn: (payload) => payrollService.generatePayroll(payload),
 
     onSuccess: (res) => {
-      const { generated, skipped, failed, errors } = res.data;
-
-      toast.success(
-        `Generated: ${generated}, Skipped: ${skipped}, Failed: ${failed}`
-      );
-
-      if (errors?.length) {
-        console.error(errors);
-        toast.warning(`${errors.length} records failed. Check console.`);
-      }
+      setResultData(res.data);
+      toast.success('Payroll generation process finished.');
 
       queryClient.invalidateQueries(['payroll']);
       queryClient.invalidateQueries(['payroll-years']);
-
-      handleClose();
     },
 
     onError: (err) => {
@@ -152,13 +144,61 @@ export default function PayrollGeneratorModal({ open, onClose }) {
   };
 
   const handleClose = () => {
-    setSelectedStaffIds([]);
-    setSelectedTeacherIds([]);
-    setCategory('all');
-    setMonth(String(new Date().getMonth() + 1));
-    setYear(String(currentYear));
-    onClose();
+      setSelectedStaffIds([]);
+      setSelectedTeacherIds([]);
+      setCategory('all');
+      setMonth(String(new Date().getMonth() + 1));
+      setYear(String(currentYear));
+      setResultData(null);
+      onClose();
   };
+
+  if (resultData) {
+    return (
+      <AppModal
+        open={open}
+        onClose={handleClose}
+        title="Payroll Generation Results"
+        size="md"
+        footer={
+          <button onClick={handleClose} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90">
+            Close
+          </button>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="bg-emerald-50 text-emerald-700 p-3 rounded-lg border border-emerald-100">
+              <p className="text-sm font-semibold">Generated</p>
+              <p className="text-2xl font-bold">{resultData.generated}</p>
+            </div>
+            <div className="bg-amber-50 text-amber-700 p-3 rounded-lg border border-amber-100">
+              <p className="text-sm font-semibold">Already Exists</p>
+              <p className="text-2xl font-bold">{resultData.skipped}</p>
+            </div>
+            <div className="bg-red-50 text-red-700 p-3 rounded-lg border border-red-100">
+              <p className="text-sm font-semibold">Skipped / Failed</p>
+              <p className="text-2xl font-bold">{resultData.failed}</p>
+            </div>
+          </div>
+          
+          {resultData.errors && resultData.errors.length > 0 && (
+            <div className="mt-4">
+              <h4 className="font-semibold text-sm mb-2 text-red-600">Skipped Records & Reasons:</h4>
+              <div className="max-h-60 overflow-y-auto border rounded-md divide-y text-sm bg-white">
+                {resultData.errors.map((err, i) => (
+                  <div key={i} className="p-3 flex flex-col gap-1">
+                    <span className="font-semibold text-slate-800">{err.name}</span>
+                    <span className="text-red-500 text-xs bg-red-50 px-2 py-1 rounded w-fit">{err.error}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </AppModal>
+    );
+  }
 
   return (
     <AppModal

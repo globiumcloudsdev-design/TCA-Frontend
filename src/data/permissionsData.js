@@ -214,6 +214,8 @@ export const ALL_PERMISSIONS = [
   'platform.settings',
   'platform.backup',
   'platform.audit_logs',
+  'global.view_audit_logs',
+  'global.audit_logs',
   'platform.maintenance',
 
   // ── Institute Data Access (Support Level) ────────────────────────────────

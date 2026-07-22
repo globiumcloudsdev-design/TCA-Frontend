@@ -39,7 +39,7 @@ import {
   GENDER_OPTIONS, RELIGION_OPTIONS, BLOOD_GROUP_OPTIONS, DOCUMENT_TYPES, CONCESSION_OPTIONS, GUARDIAN_TYPES
 } from '@/constants';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { classService, academicYearService } from '@/services';
+import { classService, academicYearService, settingService } from '@/services';
 import { toast } from 'react-hot-toast';
 
 const generateUniqueId = (prefix = 'doc') => `${prefix}-${new Date().getTime()}-${Math.floor(Math.random() * 1000)}`;
@@ -55,6 +55,33 @@ export default function StudentForm({
   isEdit = false,
 }) {
   const [activeTab, setActiveTab] = useState('personal');
+
+  // Fetch settingsData to check document allowance settings
+  const { data: settingsData } = useQuery({
+    queryKey: ['institute-settings'],
+    queryFn: () => settingService.getSettings(),
+    staleTime: 5 * 60_000,
+  });
+
+  // ✅ CORRECT: Check if student docs are allowed from settings
+  const studentDocsAllowed = settingsData?.data?.settings?.document_settings?.student_docs_allowed === true;
+
+  // ✅ Define available tabs based on document setting
+  const availableTabs = useMemo(() => {
+    const tabs = ['personal', 'academic', 'guardian', 'contact', 'fee'];
+    if (studentDocsAllowed) {
+      tabs.push('documents');
+    }
+    return tabs;
+  }, [studentDocsAllowed]);
+
+  // ✅ Reset active tab if current tab is not available
+  useEffect(() => {
+    if (!availableTabs.includes(activeTab)) {
+      setActiveTab(availableTabs[0]);
+    }
+  }, [availableTabs, activeTab]);
+  
   const [selectedAcademicYear, setSelectedAcademicYear] = useState(
     defaultValues.academic_year_id || defaultValues.details?.studentDetails?.academic_year_id || ''
   );
@@ -221,14 +248,13 @@ export default function StudentForm({
       const currentClassId = watchClass;
       const originalClassId = defaultValues.class_id || defaultValues.details?.studentDetails?.class_id;
       
-      // Only auto-select section if we are still on the original class
       if (targetSectionId && !watchSection && currentClassId === originalClassId) {
         setValue('section_id', targetSectionId);
       }
     }
   }, [isEdit, sections, watchSection, watchClass, setValue, defaultValues]);
 
-  // Tab Navigation logic
+  // ✅ Updated Tab Navigation logic - dynamically using availableTabs
   const validateTab = async (tab) => {
     let fields = [];
     if (tab === 'personal') {
@@ -241,36 +267,45 @@ export default function StudentForm({
       fields = ['phone', 'city', 'present_address'];
     } else if (tab === 'fee') {
       fields = ['monthly_fee', 'concession_type'];
+    } else if (tab === 'documents') {
+      fields = ['documents'];
     }
     return await trigger(fields);
   };
 
+  // ✅ Updated nextTab - uses availableTabs
   const nextTab = async () => {
     const isValid = await validateTab(activeTab);
     if (!isValid) return;
-    const tabs = ['personal', 'academic', 'guardian', 'contact', 'fee', 'documents'];
-    const idx = tabs.indexOf(activeTab);
-    if (idx < tabs.length - 1) setActiveTab(tabs[idx + 1]);
+    const currentIndex = availableTabs.indexOf(activeTab);
+    if (currentIndex < availableTabs.length - 1) {
+      setActiveTab(availableTabs[currentIndex + 1]);
+    }
   };
 
+  // ✅ Updated prevTab - uses availableTabs
   const prevTab = () => {
-    const tabs = ['personal', 'academic', 'guardian', 'contact', 'fee', 'documents'];
-    const idx = tabs.indexOf(activeTab);
-    if (idx > 0) setActiveTab(tabs[idx - 1]);
+    const currentIndex = availableTabs.indexOf(activeTab);
+    if (currentIndex > 0) {
+      setActiveTab(availableTabs[currentIndex - 1]);
+    }
   };
 
+  // ✅ Updated handleTabChange - uses availableTabs
   const handleTabChange = async (value) => {
-    const tabs = ['personal', 'academic', 'guardian', 'contact', 'fee', 'documents'];
-    const currentIdx = tabs.indexOf(activeTab);
-    const targetIdx = tabs.indexOf(value);
-    if (targetIdx > currentIdx) {
+    const currentIndex = availableTabs.indexOf(activeTab);
+    const targetIndex = availableTabs.indexOf(value);
+    
+    if (targetIndex === -1) return;
+    
+    if (targetIndex > currentIndex) {
       const isValid = await validateTab(activeTab);
       if (!isValid) return;
     }
     setActiveTab(value);
   };
 
-  // Auto-navigate to first error tab
+  // ✅ Updated error navigation - uses availableTabs
   useEffect(() => {
     const errorFields = Object.keys(errors);
     if (errorFields.length > 0) {
@@ -284,9 +319,9 @@ export default function StudentForm({
       else if (errorFields.some(f => f.startsWith('guardians'))) setActiveTab('guardian');
       else if (errorFields.some(f => contactFields.includes(f))) setActiveTab('contact');
       else if (errorFields.some(f => feeFields.includes(f))) setActiveTab('fee');
-      else if (errorFields.some(f => f.startsWith('documents'))) setActiveTab('documents');
+      else if (studentDocsAllowed && errorFields.some(f => f.startsWith('documents'))) setActiveTab('documents');
     }
-  }, [errors]);
+  }, [errors, studentDocsAllowed]);
 
   const watchConcessionType = watch('concession_type');
   const isConcessionNone = watchConcessionType === 'none' || !watchConcessionType;
@@ -380,13 +415,25 @@ export default function StudentForm({
       <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4 sm:space-y-6">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <div className="overflow-x-auto pb-2 mb-4 -mx-4 px-4 sm:mx-0 sm:px-0">
-            <TabsList className="inline-flex w-auto sm:grid sm:grid-cols-6 min-w-full">
-              <TabsTrigger value="personal">Personal</TabsTrigger>
-              <TabsTrigger value="academic">Academic</TabsTrigger>
-              <TabsTrigger value="guardian">Guardian</TabsTrigger>
-              <TabsTrigger value="contact">Contact</TabsTrigger>
-              <TabsTrigger value="fee">Fee</TabsTrigger>
-              <TabsTrigger value="documents">Docs</TabsTrigger>
+            <TabsList className="inline-flex w-auto sm:grid min-w-full" style={{ gridTemplateColumns: `repeat(${availableTabs.length}, minmax(0, 1fr))` }}>
+              {availableTabs.includes('personal') && (
+                <TabsTrigger value="personal">Personal</TabsTrigger>
+              )}
+              {availableTabs.includes('academic') && (
+                <TabsTrigger value="academic">Academic</TabsTrigger>
+              )}
+              {availableTabs.includes('guardian') && (
+                <TabsTrigger value="guardian">Guardian</TabsTrigger>
+              )}
+              {availableTabs.includes('contact') && (
+                <TabsTrigger value="contact">Contact</TabsTrigger>
+              )}
+              {availableTabs.includes('fee') && (
+                <TabsTrigger value="fee">Fee</TabsTrigger>
+              )}
+              {studentDocsAllowed && availableTabs.includes('documents') && (
+                <TabsTrigger value="documents">Docs</TabsTrigger>
+              )}
             </TabsList>
           </div>
 
@@ -499,45 +546,50 @@ export default function StudentForm({
             </CardContent></Card>
           </TabsContent>
 
-          <TabsContent value="documents">
-            <Card><CardContent className="p-4 sm:p-6 space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-semibold">Documents</h3>
-                <Button type="button" variant="outline" onClick={() => document.getElementById('doc-upload').click()}><Upload className="w-4 h-4 mr-2" />Upload</Button>
-                <input id="doc-upload" type="file" multiple className="hidden" onChange={handleDocumentUpload} />
-              </div>
-              <div className="space-y-4">
-                {docFields.map((field, index) => (
-                  <div key={field.id} className="border p-4 rounded-lg space-y-4">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">Document {index + 1}</span>
-                        {field.file_url && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="text-blue-500 hover:text-blue-600 h-8 gap-1 px-2"
-                            onClick={() => window.open(field.file_url, '_blank')}
-                          >
-                            <Eye className="h-4 w-4" />
-                            <span className="text-xs">View</span>
-                          </Button>
-                        )}
+          {/* ✅ Documents Tab - Only render if studentDocsAllowed is true */}
+          {studentDocsAllowed && (
+            <TabsContent value="documents">
+              <Card><CardContent className="p-4 sm:p-6 space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-semibold">Documents</h3>
+                  <Button type="button" variant="outline" onClick={() => document.getElementById('doc-upload').click()}>
+                    <Upload className="w-4 h-4 mr-2" />Upload
+                  </Button>
+                  <input id="doc-upload" type="file" multiple className="hidden" onChange={handleDocumentUpload} />
+                </div>
+                <div className="space-y-4">
+                  {docFields.map((field, index) => (
+                    <div key={field.id} className="border p-4 rounded-lg space-y-4">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Document {index + 1}</span>
+                          {field.file_url && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-blue-500 hover:text-blue-600 h-8 gap-1 px-2"
+                              onClick={() => window.open(field.file_url, '_blank')}
+                            >
+                              <Eye className="h-4 w-4" />
+                              <span className="text-xs">View</span>
+                            </Button>
+                          )}
+                        </div>
+                        <Button type="button" variant="ghost" onClick={() => removeDoc(index)} className="text-red-500 h-8 w-8 p-0">
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <Button type="button" variant="ghost" onClick={() => removeDoc(index)} className="text-red-500 h-8 w-8 p-0">
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <SelectField label="Type *" name={`documents.${index}.type`} control={control} options={DOCUMENT_TYPES} required placeholder="Select Type" />
+                        <InputField label="Title *" name={`documents.${index}.title`} register={register} required placeholder="e.g. B-Form Front" />
+                      </div>
                     </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <SelectField label="Type *" name={`documents.${index}.type`} control={control} options={DOCUMENT_TYPES} required placeholder="Select Type" />
-                      <InputField label="Title *" name={`documents.${index}.title`} register={register} required placeholder="e.g. B-Form Front" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent></Card>
-          </TabsContent>
+                  ))}
+                </div>
+              </CardContent></Card>
+            </TabsContent>
+          )}
         </Tabs>
 
         <div className="flex justify-between items-center pt-4 border-t">
@@ -546,14 +598,14 @@ export default function StudentForm({
           </Button>
           
           <div className="flex gap-3">
-            {activeTab !== 'personal' && (
+            {activeTab !== availableTabs[0] && (
               <Button type="button" variant="outline" onClick={prevTab} className="gap-2">
                 <ChevronLeft className="h-4 w-4" />
                 Previous
               </Button>
             )}
 
-            {activeTab !== 'documents' ? (
+            {activeTab !== availableTabs[availableTabs.length - 1] ? (
               <Button type="button" onClick={nextTab} className="gap-2">
                 Next
                 <ChevronRight className="h-4 w-4" />

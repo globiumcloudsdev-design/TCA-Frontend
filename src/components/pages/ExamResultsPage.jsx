@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, Check, Download } from 'lucide-react';
 
 import PageHeader from '@/components/common/PageHeader';
 import PageLoader from '@/components/common/PageLoader';
@@ -20,6 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore } from '@/store/authStore';
 
 import { examService } from '@/services/examService';
+import { generateReportCard } from '@/lib/pdf/reportCardPdf';
+import { generateMarkSheet } from '@/lib/pdf/markSheetPdf';
 
 export default function ExamResultsPage({ examId, type }) {
   const router = useRouter();
@@ -239,14 +241,25 @@ export default function ExamResultsPage({ examId, type }) {
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>Student Results</CardTitle>
-            <Button 
-              onClick={handleSaveResults} 
-              disabled={saveMutation.isPending || students.length === 0}
-              className="gap-2"
-            >
-              <Check className="h-4 w-4" />
-              {saveMutation.isPending ? 'Saving...' : 'Save Results'}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline"
+                onClick={() => generateMarkSheet(students, exam, subjectSchedules, user?.institute || user?.school)}
+                disabled={students.length === 0}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Class Mark Sheet
+              </Button>
+              <Button 
+                onClick={handleSaveResults} 
+                disabled={saveMutation.isPending || students.length === 0}
+                className="gap-2"
+              >
+                <Check className="h-4 w-4" />
+                {saveMutation.isPending ? 'Saving...' : 'Save Results'}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -268,6 +281,7 @@ export default function ExamResultsPage({ examId, type }) {
                       </th>
                     ))}
                     <th className="px-4 py-2 text-center font-medium">Absent</th>
+                    <th className="px-4 py-2 text-center font-medium">Report Card</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -322,6 +336,17 @@ export default function ExamResultsPage({ examId, type }) {
                             onChange={() => handleToggleAbsent(studentId)}
                             className="h-4 w-4 rounded border"
                           />
+                        </td>
+                        <td className="px-4 py-2 text-center">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="h-8 text-blue-600 hover:text-blue-800"
+                            onClick={() => generateReportCard(student, exam, subjectSchedules, markEntries[studentId] || {}, user?.institute || user?.school, absentStudents.has(studentId))}
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            PDF
+                          </Button>
                         </td>
                       </tr>
                     );

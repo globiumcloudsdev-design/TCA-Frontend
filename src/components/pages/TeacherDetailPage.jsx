@@ -24,8 +24,15 @@ import DataTable from '@/components/common/DataTable';
 import StatsCard from '@/components/common/StatsCard';
 import SelectField from '@/components/common/SelectField';
 import { teacherService } from '@/services/teacherService';
-import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
+import { generateAndDownloadTeacherIdCard } from '@/lib/idCardGenerator';
+import { generateExperienceCertificate } from '@/lib/pdf/experienceCertificatePdf';
+import { generateSalarySlip } from '@/lib/pdf/salarySlipPdf';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend
+} from 'recharts';
 
 // ─── Helpers ─────────────────────────────────────────────
 function initials(s) {
@@ -63,7 +70,7 @@ function formatTime(t) {
   }
 }
 
-const TABS = ['Overview', 'Timetable', 'Attendance', 'Payroll', 'Documents'];
+const TABS = ['Overview', 'Timetable', 'Attendance', 'Payroll', 'Performance', 'Documents'];
 
 // ─── No Data Component ──────────────────────────────────
 function NoDataPlaceholder({ message = 'Data Not Found' }) {
@@ -94,6 +101,18 @@ function InfoRow({ icon: Icon, label, value, color }) {
 // ========== OVERVIEW TAB ==========
 function OverviewTab({ teacher }) {
   const tDetails = teacher.details?.teacherDetails || {};
+  const slots = teacher.timetableSlots || [];
+  
+  const uniqueSubjects = useMemo(() => {
+    const subs = new Set(slots.map(s => s.subject_name).filter(Boolean));
+    return Array.from(subs);
+  }, [slots]);
+
+  const uniqueClasses = useMemo(() => {
+    // The slot contains timetable_name which usually represents the class/section
+    const cls = new Set(slots.map(s => s.timetable_name).filter(Boolean));
+    return Array.from(cls);
+  }, [slots]);
   
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -153,6 +172,45 @@ function OverviewTab({ teacher }) {
         ) : (
           <NoDataPlaceholder />
         )}
+      </div>
+
+      
+      {/* Academic Allocation */}
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden flex flex-col lg:col-span-2">
+        <div className="flex items-center gap-2 border-b bg-muted/30 px-4 py-3">
+          <BookOpen size={16} className="text-primary" />
+          <h3 className="text-sm font-bold uppercase tracking-wide">Academic Allocation Summary</h3>
+        </div>
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div>
+            <p className="text-xs text-muted-foreground mb-2 uppercase font-bold tracking-wider">Subjects Taught ({uniqueSubjects.length})</p>
+            {uniqueSubjects.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {uniqueSubjects.map(sub => (
+                  <span key={sub} className="bg-primary/10 text-primary text-xs font-semibold px-2.5 py-1 rounded-md">
+                    {sub}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm italic text-muted-foreground">No subjects assigned</p>
+            )}
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-2 uppercase font-bold tracking-wider">Classes Assigned ({uniqueClasses.length})</p>
+            {uniqueClasses.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {uniqueClasses.map(cls => (
+                  <span key={cls} className="bg-secondary text-secondary-foreground text-xs font-semibold px-2.5 py-1 rounded-md">
+                    {cls}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm italic text-muted-foreground">No classes assigned</p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Bank Details */}
@@ -361,11 +419,11 @@ function AttendanceTab({ teacher }) {
 }
 
 // ========== PAYROLL TAB ==========
-function PayrollTab({ teacher }) {
+function PayrollTab({ teacher, institute }) {
   const [filterYear, setFilterYear] = useState(String(new Date().getFullYear()));
   
   const payslips = useMemo(() => {
-    return (teacher.payslips || []).filter(p => Number(p.year) === Number(filterYear));
+    return (teacher.payslips || []).filter(p => Number(p.year) === Number(filterYear)).sort((a,b) => a.month - b.month);
   }, [teacher.payslips, filterYear]);
 
   const joiningYear = teacher.details?.teacherDetails?.joining_date 
@@ -373,6 +431,17 @@ function PayrollTab({ teacher }) {
     : new Date().getFullYear();
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: currentYear - joiningYear + 1 }, (_, i) => currentYear - i);
+
+  // Format data for Recharts
+  const chartData = useMemo(() => {
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return payslips.map(p => ({
+      name: monthNames[p.month - 1],
+      NetSalary: Number(p.net_salary) || 0,
+      Allowances: Number(p.total_allowances) || 0,
+      Deductions: Number(p.total_deductions) || 0,
+    }));
+  }, [payslips]);
 
   return (
     <div className="space-y-4">
@@ -387,6 +456,26 @@ function PayrollTab({ teacher }) {
           />
         </div>
       </div>
+
+      {chartData.length > 0 && (
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden p-6">
+          <h3 className="text-sm font-bold uppercase tracking-wide mb-6">Salary Trends</h3>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(value) => `Rs ${value}`} />
+                <RechartsTooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                <Bar dataKey="NetSalary" name="Net Salary" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="Allowances" name="Allowances" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="Deductions" name="Deductions" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <div className="flex items-center gap-2 border-b bg-muted/30 px-4 py-3">
@@ -426,9 +515,15 @@ function PayrollTab({ teacher }) {
                       {p.paid_on ? formatDate(p.paid_on) : '—'}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button className="text-primary hover:bg-primary/10 p-2 rounded-md transition-colors" title="Download Payslip">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-primary hover:bg-primary/10 h-8 w-8" 
+                        title="Download Payslip"
+                        onClick={() => generateSalarySlip({ teacher, payslip: p, institute })}
+                      >
                         <Download size={16} />
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))
@@ -441,6 +536,110 @@ function PayrollTab({ teacher }) {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ========== PERFORMANCE TAB ==========
+function PerformanceTab({ teacher }) {
+  const attendances = teacher.staffAttendances || [];
+
+  const stats = useMemo(() => {
+    let present = 0, absent = 0, late = 0, leave = 0;
+    attendances.forEach(a => {
+      const s = a.status?.toLowerCase();
+      if (s === 'present') present++;
+      else if (s === 'absent') absent++;
+      else if (s === 'late') late++;
+      else if (s === 'leave') leave++;
+    });
+    return { present, absent, late, leave };
+  }, [attendances]);
+
+  const total = stats.present + stats.absent + stats.late + stats.leave;
+
+  const pieData = [
+    { name: 'Present', value: stats.present, color: '#10b981' },
+    { name: 'Late', value: stats.late, color: '#f59e0b' },
+    { name: 'Absent', value: stats.absent, color: '#ef4444' },
+    { name: 'Leave', value: stats.leave, color: '#3b82f6' },
+  ].filter(d => d.value > 0);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <CheckSquare size={18} className="text-primary" />
+            <h3 className="text-sm font-bold uppercase tracking-wide">Punctuality Overview</h3>
+          </div>
+          {total > 0 ? (
+            <div className="h-[250px] w-full relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none pb-8">
+                <div className="text-center">
+                  <span className="text-2xl font-bold">{Math.round((stats.present / total) * 100)}%</span>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Present</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="h-[250px] flex items-center justify-center">
+              <NoDataPlaceholder message="No attendance data to calculate performance" />
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden flex flex-col">
+          <div className="flex items-center gap-2 border-b bg-muted/30 px-4 py-3">
+            <AlertCircle size={16} className="text-primary" />
+            <h3 className="text-sm font-bold uppercase tracking-wide">Key Metrics</h3>
+          </div>
+          <div className="p-4 flex-1 flex flex-col justify-center gap-4">
+            <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-emerald-800 uppercase tracking-wide mb-1">Total Present</p>
+                <p className="text-2xl font-black text-emerald-700">{stats.present} <span className="text-xs font-medium opacity-70">Days</span></p>
+              </div>
+              <CheckSquare size={32} className="text-emerald-200" />
+            </div>
+            
+            <div className="bg-amber-50 rounded-lg p-4 border border-amber-100 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-amber-800 uppercase tracking-wide mb-1">Total Late</p>
+                <p className="text-2xl font-black text-amber-700">{stats.late} <span className="text-xs font-medium opacity-70">Days</span></p>
+              </div>
+              <Clock size={32} className="text-amber-200" />
+            </div>
+
+            <div className="bg-red-50 rounded-lg p-4 border border-red-100 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-red-800 uppercase tracking-wide mb-1">Total Absent</p>
+                <p className="text-2xl font-black text-red-700">{stats.absent} <span className="text-xs font-medium opacity-70">Days</span></p>
+              </div>
+              <AlertCircle size={32} className="text-red-200" />
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -652,6 +851,32 @@ export default function TeacherDetailPage({ type, id }) {
             </button>
           )}
 
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              const allPolicies = useAuthStore.getState().getPoliciesByType('id_card') || [];
+              const staffPolicy = allPolicies.find(p => p.config?.card_type === 'staff') || useAuthStore.getState().getLatestPolicy('id_card');
+              generateAndDownloadTeacherIdCard({ 
+                person: teacher, 
+                institute: currentInstitute, 
+                policyConfig: staffPolicy?.config 
+              });
+            }}
+            className="flex items-center gap-1.5"
+          >
+            <UserCheck size={14} /> Print ID Card
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => generateExperienceCertificate({ teacher, institute: currentInstitute })}
+            className="flex items-center gap-1.5"
+          >
+            <FileText size={14} /> Experience Certificate
+          </Button>
+
           {/* {canDo('teachers.update') && (
             <button
               onClick={() => router.push(`/${type}/teachers/${id}/edit`)}
@@ -686,7 +911,8 @@ export default function TeacherDetailPage({ type, id }) {
         {activeTab === 'Overview'    && <OverviewTab    teacher={teacher} />}
         {activeTab === 'Timetable'   && <TimetableTab   teacher={teacher} />}
         {activeTab === 'Attendance'  && <AttendanceTab  teacher={teacher} />}
-        {activeTab === 'Payroll'     && <PayrollTab     teacher={teacher} />}
+        {activeTab === 'Payroll'     && <PayrollTab     teacher={teacher} institute={currentInstitute} />}
+        {activeTab === 'Performance' && <PerformanceTab teacher={teacher} />}
         {activeTab === 'Documents'   && <DocumentsTab   teacher={teacher} />}
       </div>
     </div>

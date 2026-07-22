@@ -18,15 +18,15 @@ import useInstituteConfig from '@/hooks/useInstituteConfig';
 import { DUMMY_FLAT_STUDENTS } from '@/data/dummyData';
 import useAuthStore from '@/store/authStore';
 import { toast } from 'sonner';
-import AppModal from '@/components/common/AppModal';
 import FeeVoucherForm from '@/components/forms/FeeVoucherForm';
 import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
 import useInstituteStore from '@/store/instituteStore';
 import { FileText, Download, Eye, CreditCard } from 'lucide-react';
 import useUIStore from '@/store/uiStore';
-import DataTable from '@/components/common/DataTable';
-import StatsCard from '@/components/common/StatsCard';
+import ResultCard from '@/components/cards/ResultCard';
+import { DataTable, StatsCard, AppModal, ConfirmDialog, InputField, SelectField, TextareaField, FormSubmitButton } from '@/components/common';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 
 // ─── Helpers ─────────────────────────────────────────────
 function initials(s) {
@@ -48,13 +48,67 @@ function age(dob) {
   return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
 }
 
-const TABS = ['Overview', 'Attendance', 'Fees', 'Exams', 'Documents'];
+import {
+  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip as RechartsTooltip,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Legend
+} from 'recharts';
+import { generateAndDownloadSLC } from '@/lib/pdf/slcPdf';
+import { generateAcademicProfile } from '@/lib/pdf/academicProfilePdf';
+import { studentService } from '@/services/studentService';
+
+const TABS = ['Overview', 'Attendance', 'Fees', 'Exams', 'Documents', 'Behavioral'];
 
 // ========== OVERVIEW TAB (with Start & End Dates) ==========
-function OverviewTab({ student, terms }) {
+function OverviewTab({ student, terms, currentInstitute }) {
   const sDetails = student.details?.studentDetails || {};
   const sessions = sDetails.academicSessions || [];
   const guardians = sDetails.guardians || [];
+
+  const guardianColumns = [
+    { accessorKey: 'name', header: 'Name', cell: ({ row }) => <span className="font-medium">{row.original.name || '—'}</span> },
+    { accessorKey: 'relation', header: 'Relation', cell: ({ row }) => <span className="capitalize">{row.original.relation || row.original.type || '—'}</span> },
+    { accessorKey: 'phone', header: 'Phone', cell: ({ row }) => <span className="font-mono">{row.original.phone || '—'}</span> },
+    { accessorKey: 'email', header: 'Email', cell: ({ row }) => row.original.email || '—' },
+    { accessorKey: 'cnic', header: 'CNIC', cell: ({ row }) => <span className="font-mono">{row.original.cnic || '—'}</span> }
+  ];
+
+  const sessionColumns = [
+    { accessorKey: 'academic_year_name', header: 'Academic Year', cell: ({ row }) => <span className="font-bold text-primary">{row.original.academic_year_name || '—'}</span> },
+    { id: 'class_section', header: 'Class & Section', cell: ({ row }) => `${row.original.class_name || '—'} ${row.original.section_name ? ` · ${row.original.section_name}` : ''}` },
+    { accessorKey: 'roll_no', header: 'Roll No', cell: ({ row }) => <span className="font-mono text-xs">{row.original.roll_no || '—'}</span> },
+    { accessorKey: 'start_date', header: 'Start Date', cell: ({ row }) => <span className="text-muted-foreground">{row.original.start_date ? formatDate(row.original.start_date) : '—'}</span> },
+    { accessorKey: 'end_date', header: 'End Date', cell: ({ row }) => <span className="text-muted-foreground">{row.original.end_date ? formatDate(row.original.end_date) : (row.original.status === 'active' ? 'Ongoing' : '—')}</span> },
+    { accessorKey: 'status', header: 'Status', cell: ({ row }) => (
+        <span className={cn(
+          'rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider',
+          row.original.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
+        )}>
+          {row.original.status === 'active' ? 'Active' : 'Completed'}
+        </span>
+      )
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            toast.loading("Generating Academic Profile...", { id: "academic-profile" });
+            try {
+              generateAcademicProfile({ student, session: row.original, institute: currentInstitute });
+              toast.success("Profile Generated", { id: "academic-profile" });
+            } catch (err) {
+              toast.error("Failed to generate profile", { id: "academic-profile" });
+            }
+          }}
+          className="text-xs"
+        >
+          Download Report
+        </Button>
+      )
+    }
+  ];
 
   const idLabel = {
     school: 'Roll Number',
@@ -130,36 +184,7 @@ function OverviewTab({ student, terms }) {
           <Users size={16} className="text-primary" />
           <h3 className="text-sm font-bold uppercase tracking-wide">Family & Guardian Details</h3>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-xs font-bold text-muted-foreground uppercase">
-              <tr>
-                <th className="px-6 py-3 text-left">Guardian Name</th>
-                <th className="px-6 py-3 text-left">Relation</th>
-                <th className="px-6 py-3 text-left">Phone</th>
-                <th className="px-6 py-3 text-left">Email</th>
-                <th className="px-6 py-3 text-left">CNIC</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {guardians.length > 0 ? (
-                guardians.map((g, idx) => (
-                  <tr key={idx} className="hover:bg-muted/30">
-                    <td className="px-6 py-4 font-medium">{g.name || '—'}</td>
-                    <td className="px-6 py-4 capitalize">{g.relation || g.type || '—'}</td>
-                    <td className="px-6 py-4 font-mono">{g.phone || '—'}</td>
-                    <td className="px-6 py-4">{g.email || '—'}</td>
-                    <td className="px-6 py-4 font-mono">{g.cnic || '—'}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground italic">No guardian information found.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable columns={guardianColumns} data={guardians} emptyMessage="No guardian information found." />
       </div>
 
       {/* Academic Sessions History - with Academic Year Name & End Date */}
@@ -168,55 +193,7 @@ function OverviewTab({ student, terms }) {
           <Clock size={16} className="text-primary" />
           <h3 className="text-sm font-bold uppercase tracking-wide">Academic Session History</h3>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-xs font-bold text-muted-foreground uppercase">
-              <tr>
-                <th className="px-6 py-3 text-left">Academic Year</th>
-                <th className="px-6 py-3 text-left">Class & Section</th>
-                <th className="px-6 py-3 text-left">Roll No</th>
-                <th className="px-6 py-3 text-left">Start Date</th>
-                <th className="px-6 py-3 text-left">End Date</th>
-                <th className="px-6 py-3 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {sessions.length > 0 ? (
-                sessions.map((s, idx) => (
-                  <tr key={idx} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-6 py-4 font-bold text-primary">
-                      {s.academic_year_name || '—'}
-                    </td>
-                    <td className="px-6 py-4">
-                      {s.class_name || '—'} {s.section_name ? ` · ${s.section_name}` : ''}
-                    </td>
-                    <td className="px-6 py-4 font-mono text-xs">{s.roll_no || '—'}</td>
-                    <td className="px-6 py-4 text-muted-foreground">
-                      {s.start_date ? formatDate(s.start_date) : '—'}
-                    </td>
-                    <td className="px-6 py-4 text-muted-foreground">
-                      {s.end_date ? formatDate(s.end_date) : (s.status === 'active' ? 'Ongoing' : '—')}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={cn(
-                        'rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider',
-                        s.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
-                      )}>
-                        {s.status === 'active' ? 'Active' : 'Completed'}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground italic">
-                    No academic session records found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable columns={sessionColumns} data={sessions} emptyMessage="No academic session records found." />
       </div>
     </div>
   );
@@ -330,8 +307,9 @@ function FeesTab({ student }) {
   );
 }
 
-// ========== EXAMS TAB ==========
+// ========== EXAMS TAB (With Analytics) ==========
 function ExamsTab({ student }) {
+  const [selectedResult, setSelectedResult] = useState(null);
   const results = student.examResults || [];
 
   const examColumns = [
@@ -352,10 +330,214 @@ function ExamsTab({ student }) {
         </span>
       )
     },
-    { accessorKey: 'updated_at', header: 'Release Date', cell: ({ row }) => formatDate(row.original.updated_at || row.original.created_at) }
+    { accessorKey: 'updated_at', header: 'Release Date', cell: ({ row }) => formatDate(row.original.updated_at || row.original.created_at) },
+    {
+      id: 'actions',
+      cell: ({ row }) => (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setSelectedResult(row.original)}
+          className="flex items-center gap-1.5 text-xs"
+        >
+          <Download size={14} /> Download Result
+        </Button>
+      )
+    }
   ];
 
-  return <DataTable columns={examColumns} data={results} emptyMessage="No exam records found." />;
+  // Prepare data for Analytics
+  // Reverse to show chronological order if sorted desc
+  const chartData = [...results].reverse().map(r => ({
+    name: r.exam_name || r.exam?.name || 'Term Exam',
+    percentage: parseFloat(r.percentage || 0),
+    gpa: parseFloat(r.gpa || 0)
+  }));
+
+  return (
+    <div className="space-y-6">
+      {chartData.length > 0 && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* Radar Chart for term overview */}
+          <div className="rounded-xl border bg-card p-4 shadow-sm flex flex-col items-center">
+            <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Performance Radar</h4>
+            <div className="h-[250px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={chartData}>
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <PolarRadiusAxis angle={30} domain={[0, 100]} />
+                  <Radar name="Percentage" dataKey="percentage" stroke="#0ea5e9" fill="#0ea5e9" fillOpacity={0.6} />
+                  <RechartsTooltip />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          
+          {/* Line Chart for progress trend */}
+          <div className="rounded-xl border bg-card p-4 shadow-sm flex flex-col items-center">
+            <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Academic Trend</h4>
+            <div className="h-[250px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                  <RechartsTooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="percentage" stroke="#10b981" strokeWidth={2} activeDot={{ r: 8 }} name="Percentage" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <DataTable columns={examColumns} data={results} emptyMessage="No exam records found." />
+
+      <AppModal 
+        open={!!selectedResult} 
+        onClose={() => setSelectedResult(null)} 
+        title="Exam Result Card"
+        className="max-w-4xl"
+        size="lg"
+      >
+        {selectedResult && (
+          <div className="pt-4 max-h-[80vh] overflow-y-auto">
+            <ResultCard 
+              student={student} 
+              exam={selectedResult.exam || { name: selectedResult.exam_name }} 
+              result={selectedResult} 
+            />
+          </div>
+        )}
+      </AppModal>
+    </div>
+  );
+}
+
+// ========== BEHAVIORAL TAB ==========
+function BehavioralTab({ student, type, id }) {
+  const qc = useQueryClient();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({ type: 'merit', title: '', description: '', points: 0 });
+
+  const behaviorLog = student.details?.studentDetails?.behaviorLog || [];
+  
+  const columns = [
+    { 
+      accessorKey: 'date', 
+      header: 'Date', 
+      cell: ({ row }) => formatDate(row.original.date) 
+    },
+    { 
+      accessorKey: 'type', 
+      header: 'Type', 
+      cell: ({ row }) => (
+        <span className={cn(
+          'rounded-full px-2.5 py-1 text-[10px] font-bold uppercase',
+          row.original.type === 'merit' ? 'bg-emerald-100 text-emerald-700' :
+          row.original.type === 'demerit' ? 'bg-amber-100 text-amber-700' :
+          'bg-red-100 text-red-700'
+        )}>
+          {row.original.type}
+        </span>
+      )
+    },
+    { accessorKey: 'title', header: 'Title', cell: ({ row }) => <span className="font-semibold">{row.original.title}</span> },
+    { accessorKey: 'description', header: 'Description' },
+    { 
+      accessorKey: 'points', 
+      header: 'Points', 
+      cell: ({ row }) => (
+        <span className={cn('font-bold', row.original.type === 'merit' ? 'text-emerald-600' : 'text-red-600')}>
+          {row.original.type === 'merit' ? '+' : '-'}{Math.abs(row.original.points || 0)}
+        </span>
+      ) 
+    }
+  ];
+
+  const totalMerits = behaviorLog.filter(b => b.type === 'merit').reduce((a, b) => a + (b.points || 0), 0);
+  const totalDemerits = behaviorLog.filter(b => b.type !== 'merit').reduce((a, b) => a + Math.abs(b.points || 0), 0);
+
+  const addMutation = useMutation({
+    mutationFn: (data) => studentService.addBehaviorRecord(student.id, data),
+    onSuccess: () => {
+      toast.success('Record added successfully');
+      qc.invalidateQueries({ queryKey: ['student', type, id] });
+      setIsModalOpen(false);
+      setFormData({ type: 'merit', title: '', description: '', points: 0 });
+    },
+    onError: (err) => toast.error(err.message || 'Failed to add record')
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!formData.title) return toast.error("Title is required");
+    addMutation.mutate(formData);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-bold">Behavioral Records</h3>
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+        >
+          + Add Record
+        </button>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatsCard label="Net Score" value={totalMerits - totalDemerits} description="Merits - Demerits" />
+        <StatsCard label="Total Merits" value={totalMerits} description="Positive Points" />
+        <StatsCard label="Total Demerits" value={totalDemerits} description="Negative Points" />
+      </div>
+      
+      <DataTable columns={columns} data={behaviorLog} emptyMessage="No behavioral records found." />
+
+      <AppModal open={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Behavioral Record">
+        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+          <SelectField
+            label="Type"
+            value={formData.type}
+            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+            options={[
+              { value: 'merit', label: 'Merit (+)' },
+              { value: 'demerit', label: 'Demerit (-)' },
+              { value: 'incident', label: 'Incident / Report (-)' }
+            ]}
+          />
+          <InputField
+            label="Title"
+            placeholder="e.g. Participated in Debate"
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            required
+          />
+          <TextareaField
+            label="Description"
+            placeholder="Details about the incident/merit..."
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            rows={3}
+          />
+          <InputField
+            label="Points"
+            type="number"
+            min="0"
+            value={formData.points}
+            onChange={(e) => setFormData({ ...formData, points: parseInt(e.target.value) || 0 })}
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-md border px-4 py-2 text-sm hover:bg-muted">Cancel</button>
+            <FormSubmitButton loading={addMutation.isPending} label="Save Record" loadingLabel="Saving..." />
+          </div>
+        </form>
+      </AppModal>
+    </div>
+  );
 }
 
 // ========== DOCUMENTS TAB ==========
@@ -432,6 +614,8 @@ export default function StudentDetailPage({ type, id }) {
   const { currentInstitute } = useInstituteStore();
   const [activeTab, setActiveTab] = useState('Overview');
   const [voucherOpen, setVoucherOpen] = useState(false);
+  const [slcConfirmOpen, setSlcConfirmOpen] = useState(false);
+  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['student', type, id],
@@ -481,6 +665,48 @@ export default function StudentDetailPage({ type, id }) {
     } catch (error) {
       toast.error(error.message, { id: "id-card" });
     }
+  };
+
+  const alumniMutation = useMutation({
+    mutationFn: () => studentService.markAsAlumni(student.id),
+    onSuccess: () => {
+      toast.success("Student marked as Alumni");
+      qc.invalidateQueries({ queryKey: ['student', type, id] });
+    },
+    onError: (err) => toast.error(err.message || "Failed to mark as alumni")
+  });
+
+  const restoreAlumniMutation = useMutation({
+    mutationFn: () => studentService.restoreAlumni(student.id),
+    onSuccess: () => {
+      toast.success("Student restored from Alumni");
+      qc.invalidateQueries({ queryKey: ['student', type, id] });
+    },
+    onError: (err) => toast.error(err.message || "Failed to restore student")
+  });
+
+  const handleGenerateSLC = async () => {
+    setSlcConfirmOpen(false);
+    try {
+      toast.loading("Generating SLC...", { id: "slc" });
+      
+      await generateAndDownloadSLC({
+        student: student,
+        institute: currentInstitute,
+      });
+      toast.success("SLC Generated", { id: "slc" });
+
+      if (student.is_active) {
+        alumniMutation.mutate();
+      }
+    } catch (error) {
+      toast.error(error.message, { id: "slc" });
+    }
+  };
+
+  const handleRestoreAlumni = () => {
+    setRestoreConfirmOpen(false);
+    restoreAlumniMutation.mutate();
   };
 
   const createVoucher = useMutation({
@@ -583,23 +809,34 @@ export default function StudentDetailPage({ type, id }) {
             <CreditCard size={14} /> ID Card
           </button>
 
-          {/* {canDo('fees.create') && (
+          {canDo('students.update') && student.details?.studentDetails?.is_alumni && (
             <button
-              onClick={() => setVoucherOpen(true)}
-              className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm hover:bg-accent transition-colors"
+              onClick={() => setRestoreConfirmOpen(true)}
+              disabled={restoreAlumniMutation.isPending}
+              className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
             >
-              <Receipt size={14} /> Voucher
+              <UserCheck size={14} /> Restore Alumni
             </button>
-          )} */}
+          )}
 
-          {canDo('student.update') && (
+          {canDo('students.update') && !student.details?.studentDetails?.is_alumni && (
+            <button
+              onClick={() => setSlcConfirmOpen(true)}
+              disabled={alumniMutation.isPending}
+              className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
+            >
+              <FileText size={14} /> SLC & Alumni
+            </button>
+          )}
+
+          {/* {canDo('students.update') && (
             <button
               onClick={() => router.push(`/${type}/students/${id}/edit`)}
               className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
             >
               <Pencil size={14} /> Edit
             </button>
-          )}
+          )} */}
         </div>
       </div>
 
@@ -623,12 +860,35 @@ export default function StudentDetailPage({ type, id }) {
 
       {/* Tab Content */}
       <div className="min-h-[300px]">
-        {activeTab === 'Overview'    && <OverviewTab    student={student} terms={{ ...terms, type }} />}
+        {activeTab === 'Overview'    && <OverviewTab    student={student} terms={{ ...terms, type }} currentInstitute={currentInstitute} />}
         {activeTab === 'Attendance'  && <AttendanceTab  student={student} />}
         {activeTab === 'Fees'        && <FeesTab        student={student} />}
         {activeTab === 'Exams'       && <ExamsTab       student={student} />}
         {activeTab === 'Documents'   && <DocumentsTab   student={student} />}
+        {activeTab === 'Behavioral'  && <BehavioralTab  student={student} type={type} id={id} />}
       </div>
+
+      <ConfirmDialog
+        open={slcConfirmOpen}
+        onClose={() => setSlcConfirmOpen(false)}
+        onConfirm={handleGenerateSLC}
+        loading={alumniMutation.isPending}
+        title="Generate SLC & Mark Alumni"
+        description="This will permanently disable the student's active login and move them to Alumni status. Are you sure you want to proceed?"
+        confirmLabel="Yes, Generate & Disable"
+        variant="destructive"
+      />
+
+      <ConfirmDialog
+        open={restoreConfirmOpen}
+        onClose={() => setRestoreConfirmOpen(false)}
+        onConfirm={handleRestoreAlumni}
+        loading={restoreAlumniMutation.isPending}
+        title="Restore from Alumni"
+        description="This will reactivate the student's account and restore their active status. Are you sure?"
+        confirmLabel="Yes, Restore Student"
+        variant="default"
+      />
     </div>
   );
 }

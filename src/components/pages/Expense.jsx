@@ -622,17 +622,7 @@ export default function Expense() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Receipt URL</label>
-              <input
-                type="url"
-                value={form.receipt_url}
-                onChange={(e) => setForm((prev) => ({ ...prev, receipt_url: e.target.value }))}
-                className="input-base"
-                placeholder="https://..."
-              />
-            </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 sm:col-span-2">
               <label className="text-sm font-medium">Payment Reference</label>
               <input
                 value={form.payment_reference}
@@ -706,14 +696,7 @@ export default function Expense() {
                   <p className="font-medium">{viewingExpense.payment_reference}</p>
                 </div>
               )}
-              {viewingExpense.receipt_url && (
-                <div>
-                  <p className="text-muted-foreground">Receipt</p>
-                  <a href={viewingExpense.receipt_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-sm">
-                    View Receipt
-                  </a>
-                </div>
-              )}
+
               <div className="sm:col-span-2">
                 <p className="text-muted-foreground">Description</p>
                 <p className="font-medium whitespace-pre-wrap">{viewingExpense.description || '—'}</p>

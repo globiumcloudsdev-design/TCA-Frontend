@@ -1,190 +1,275 @@
 'use client';
+
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { 
-  TrendingUp, MousePointerClick, Globe2, Users, 
-  Clock, Map as MapIcon, BarChart3, RefreshCw, 
-  ArrowUpRight, ArrowDownRight, Globe, Info, Activity
+  TrendingUp, Globe2, Building2, Database, CreditCard, RefreshCw, HardDrive
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { SimpleTooltip } from '@/components/ui/SimpleTooltip';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
+  BarChart, Bar, PieChart, Pie, Cell, Legend
+} from 'recharts';
+
+import { useForm } from 'react-hook-form';
+import { masterAdminService } from '@/services';
+import { PageHeader, StatsCard, DatePickerField, InputField, SelectField } from '@/components/common';
+import { cn } from '@/lib/utils';
+
+const COLORS = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#f97316'];
 
 export default function AnalyticsPage() {
   const [mounted, setMounted] = useState(false);
+  
+  const { control, watch, reset } = useForm({
+    defaultValues: {
+      date_from: '',
+      date_to: '',
+      city: '',
+      plan_id: 'all'
+    }
+  });
+
+  const filters = watch();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  const { data: plans } = useQuery({
+    queryKey: ['master-admin-subscription-plans'],
+    queryFn: () => masterAdminService.getSubscriptionPlans()
+  });
+
+  const planOptions = [
+    { label: 'All Plans', value: 'all' },
+    ...(plans?.data || []).map(p => ({ label: p.name, value: p.id }))
+  ];
+
+  const queryParams = {
+    ...(filters.date_from && { date_from: filters.date_from }),
+    ...(filters.date_to && { date_to: filters.date_to }),
+    ...(filters.city && { city: filters.city }),
+    ...(filters.plan_id !== 'all' && { plan_id: filters.plan_id }),
+  };
+
+  const { data: reports, isLoading, isFetching, refetch } = useQuery({
+    queryKey: ['master-admin-analytics', queryParams],
+    queryFn: () => masterAdminService.getReports(queryParams)
+  });
+
   if (!mounted) return null;
 
+  const revenueGrowthData = reports?.revenueGrowth || [];
+  const regionalData = reports?.regionalDistribution || [];
+  const topConsumers = reports?.topConsumers || [];
+
+  const handleRefresh = () => {
+    refetch();
+    toast.success('Analytics data refreshed successfully');
+  };
+
+  const handleClearFilters = () => {
+    reset();
+  };
+
   return (
-    <div className="p-6 space-y-8">
-      {/* Page Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <TrendingUp className="w-6 h-6 text-primary" />
-            Platform Analytics
-          </h1>
-          <p className="text-slate-500 text-sm font-medium">Real-time website traffic and user engagement metrics.</p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" className="rounded-xl h-10 px-4 font-bold text-xs border-slate-200">
-            Export Report
+    <div className="space-y-5">
+      {/* ── Header ── */}
+      <PageHeader
+        title="📊 Analytics"
+        description="Global analytics for revenue, regions, and resource usage."
+        action={
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching} className="gap-1.5">
+            <RefreshCw size={13} className={cn(isFetching && 'animate-spin')} />
+            Refresh Data
           </Button>
-          <Button variant="default" className="rounded-xl h-10 px-5 font-bold text-xs gap-2 shadow-lg shadow-primary/20" onClick={() => toast.success('Syncing with Google Analytics...')}>
-            <RefreshCw className="w-3.5 h-3.5" /> Sync Data
-          </Button>
-        </div>
+        }
+      />
+
+      {/* ── Filter Bar ── */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-end">
+         <div className="w-full md:w-48">
+           <DatePickerField 
+             control={control}
+             name="date_from"
+             label="Date From"
+             maxDate={filters.date_to ? new Date(filters.date_to) : undefined}
+           />
+         </div>
+         <div className="w-full md:w-48">
+           <DatePickerField 
+             control={control}
+             name="date_to"
+             label="Date To"
+             minDate={filters.date_from ? new Date(filters.date_from) : undefined}
+           />
+         </div>
+         <div className="w-full md:w-48">
+           <InputField 
+             control={control}
+             name="city"
+             label="City"
+             placeholder="Search by city..." 
+           />
+         </div>
+         <div className="w-full md:w-56">
+           <SelectField 
+             control={control}
+             name="plan_id"
+             label="Subscription Plan"
+             options={planOptions}
+           />
+         </div>
+         <div className="w-full md:w-auto pb-1">
+           <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 text-slate-500 hover:text-slate-800 w-full md:w-auto">
+             Clear Filters
+           </Button>
+         </div>
       </div>
 
-      {/* Main Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          { label: 'Total Page Views', value: '142,502', change: '+18.5%', icon: Globe2, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Unique Visitors', value: '38,291', change: '+12.3%', icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'Avg. Session', value: '5m 12s', change: '-2.1%', icon: Clock, color: 'text-purple-600', bg: 'bg-purple-50' },
-          { label: 'Bounce Rate', value: '22.8%', change: '-5.4%', icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50' },
-        ].map((stat, i) => (
-          <div key={i} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-primary/20 transition-all">
-             <div className="flex justify-between items-start mb-4 relative z-10">
-                <div className={`${stat.bg} ${stat.color} p-3 rounded-2xl`}>
-                  <stat.icon className="w-6 h-6" />
-                </div>
-                <Badge className={`rounded-full px-3 py-1 font-bold text-[10px] ${stat.change.startsWith('+') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'} border`}>
-                  {stat.change} {stat.change.startsWith('+') ? <ArrowUpRight className="w-3 h-3 ml-1 inline" /> : <ArrowDownRight className="w-3 h-3 ml-1 inline" />}
-                </Badge>
-             </div>
-             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest relative z-10">{stat.label}</p>
-             <h4 className="text-3xl font-black text-slate-900 mt-1 relative z-10">{stat.value}</h4>
-             {/* Decorative background icon */}
-             <stat.icon className="absolute -right-4 -bottom-4 w-24 h-24 text-slate-50 opacity-50 group-hover:scale-110 transition-transform" />
-          </div>
-        ))}
+      {/* ── Summary Stats ── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatsCard
+          label="This Month Revenue"
+          value={isLoading ? '…' : `PKR ${(reports?.thisMonthRevenue || 0).toLocaleString()}`}
+          icon={<TrendingUp size={16} />}
+          valueClassName="text-blue-600"
+        />
+        <StatsCard
+          label="Monthly Recurring (MRR)"
+          value={isLoading ? '…' : `PKR ${(reports?.mrr || 0).toLocaleString()}`}
+          icon={<CreditCard size={16} />}
+          valueClassName="text-emerald-600"
+        />
+        <StatsCard
+          label="Active Institutes"
+          value={isLoading ? '…' : (reports?.activeInstitutes || 0)}
+          icon={<Building2 size={16} />}
+          valueClassName="text-purple-600"
+        />
+        <StatsCard
+          label="Overdue Invoices"
+          value={isLoading ? '…' : (reports?.overduePayments || 0)}
+          icon={<Database size={16} />}
+          valueClassName="text-amber-600"
+        />
       </div>
 
       {/* Analytics Content Tabs */}
-      <Tabs defaultValue="traffic" className="space-y-6">
-        <TabsList className="bg-slate-100 p-1 rounded-2xl h-12 w-fit">
-          <TabsTrigger value="traffic" className="rounded-xl px-8 font-bold text-sm data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-md">
-            Traffic Over Time
-          </TabsTrigger>
-          <TabsTrigger value="behavior" className="rounded-xl px-8 font-bold text-sm data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-md">
-            User Behavior
-          </TabsTrigger>
-          <TabsTrigger value="audience" className="rounded-xl px-8 font-bold text-sm data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-md">
-            Audience Location
-          </TabsTrigger>
+      <Tabs defaultValue="revenue" className="space-y-4">
+        <TabsList className="bg-white border shadow-sm rounded-lg w-full justify-start h-auto p-1">
+          <TabsTrigger value="revenue" className="rounded-md px-4 py-2 text-sm">Revenue & Growth</TabsTrigger>
+          <TabsTrigger value="regions" className="rounded-md px-4 py-2 text-sm">Regional Distribution</TabsTrigger>
+          <TabsTrigger value="resources" className="rounded-md px-4 py-2 text-sm">Resource Usage</TabsTrigger>
         </TabsList>
 
-        {/* --- TRAFFIC TAB --- */}
-        <TabsContent value="traffic" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm min-h-[400px] flex flex-col">
-               <div className="flex justify-between items-center mb-8">
-                  <div>
-                    <h3 className="text-xl font-black text-slate-900 tracking-tight">Traffic Volume</h3>
-                    <p className="text-sm text-slate-500 font-medium">Daily sessions and page views for the last 30 days.</p>
-                  </div>
-                  <SelectPlaceholder label="Last 30 Days" />
+        {/* --- REVENUE TAB --- */}
+        <TabsContent value="revenue" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col min-h-[350px]">
+               <div className="mb-4">
+                 <h3 className="text-base font-semibold text-slate-800">Revenue Growth (6 Months)</h3>
+                 <p className="text-xs text-slate-500">Monthly collected revenue trend across all institutes.</p>
                </div>
-               <div className="flex-1 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center space-y-3">
-                  <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-primary">
-                    <BarChart3 className="w-8 h-8" />
-                  </div>
-                  <p className="text-sm font-bold text-slate-400">Google Analytics Chart Rendering...</p>
-                  <div className="flex gap-2">
-                    <div className="w-3 h-3 rounded-full bg-primary/20 animate-bounce" />
-                    <div className="w-3 h-3 rounded-full bg-primary/20 animate-bounce delay-100" />
-                    <div className="w-3 h-3 rounded-full bg-primary/20 animate-bounce delay-200" />
-                  </div>
+               <div className="flex-1 h-[250px]">
+                 {isLoading ? (
+                   <div className="flex h-full items-center justify-center"><RefreshCw className="animate-spin text-slate-400" /></div>
+                 ) : (
+                   <ResponsiveContainer width="100%" height="100%">
+                     <AreaChart data={revenueGrowthData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                       <defs>
+                         <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                           <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                           <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                         </linearGradient>
+                       </defs>
+                       <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                       <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(value) => `PKR ${(value/1000)}k`} />
+                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                       <RechartsTooltip formatter={(value) => [`PKR ${value.toLocaleString()}`, 'Revenue']} />
+                       <Area type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
+                     </AreaChart>
+                   </ResponsiveContainer>
+                 )}
                </div>
             </div>
 
-            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col">
-               <h3 className="text-xl font-black text-slate-900 tracking-tight mb-6">Top Referral Sources</h3>
-               <div className="space-y-6 flex-1">
-                  {[
-                    { label: 'Direct Traffic', value: '42%', color: 'bg-blue-500' },
-                    { label: 'Google Search', value: '31%', color: 'bg-emerald-500' },
-                    { label: 'Social Media', value: '18%', color: 'bg-purple-500' },
-                    { label: 'Email Campaigns', value: '9%', color: 'bg-amber-500' },
-                  ].map((source, i) => (
-                    <div key={i} className="space-y-2">
-                       <div className="flex justify-between text-xs font-black text-slate-700 uppercase tracking-tighter">
-                          <span>{source.label}</span>
-                          <span>{source.value}</span>
-                       </div>
-                       <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                          <div className={`h-full ${source.color} rounded-full`} style={{ width: source.value }} />
-                       </div>
-                    </div>
-                  ))}
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+               <div className="mb-4">
+                 <h3 className="text-base font-semibold text-slate-800">Plan Breakdown</h3>
+                 <p className="text-xs text-slate-500">Revenue distributed by subscription plan.</p>
                </div>
-               <div className="mt-8 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase text-center tracking-widest">Data syncs every 15 mins</p>
+               <div className="flex-1 h-[250px]">
+                 {isLoading ? (
+                   <div className="flex h-full items-center justify-center"><RefreshCw className="animate-spin text-slate-400" /></div>
+                 ) : (
+                   <ResponsiveContainer width="100%" height="100%">
+                     <PieChart>
+                       <Pie
+                         data={reports?.planBreakdown || []}
+                         cx="50%"
+                         cy="50%"
+                         innerRadius={60}
+                         outerRadius={80}
+                         paddingAngle={2}
+                         dataKey="total"
+                         nameKey="plan_name"
+                       >
+                         {(reports?.planBreakdown || []).map((entry, index) => (
+                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                         ))}
+                       </Pie>
+                       <RechartsTooltip formatter={(value) => `PKR ${value.toLocaleString()}`} />
+                       <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
+                     </PieChart>
+                   </ResponsiveContainer>
+                 )}
                </div>
             </div>
           </div>
         </TabsContent>
 
-        {/* --- BEHAVIOR TAB --- */}
-        <TabsContent value="behavior" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Heatmap Visualization */}
-            <div className="lg:col-span-8 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-               <div className="flex justify-between items-center mb-8">
-                  <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                    <MousePointerClick className="w-6 h-6 text-primary" /> User Interaction Heatmap
-                  </h3>
-                  <div className="flex bg-slate-50 p-1 rounded-xl">
-                    <Button variant="ghost" size="sm" className="bg-white shadow-sm rounded-lg text-[10px] font-black uppercase">Home</Button>
-                    <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase text-slate-400">Dashboard</Button>
-                  </div>
+        {/* --- REGIONS TAB --- */}
+        <TabsContent value="regions" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-8 bg-white p-5 rounded-xl border border-slate-200 shadow-sm min-h-[350px] flex flex-col">
+               <div className="mb-4">
+                 <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                   <Globe2 className="w-4 h-4 text-slate-500" /> Institutes by City
+                 </h3>
                </div>
-               <div className="relative aspect-[16/9] bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border-4 border-slate-800 group">
-                  <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1551288049-bbbda5366991?q=80&w=1000')] bg-cover bg-center opacity-30 grayscale group-hover:grayscale-0 transition-all duration-700" />
-                  
-                  {/* Heatmap Points */}
-                  <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-red-500/30 rounded-full blur-3xl animate-pulse" />
-                  <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-amber-500/40 rounded-full blur-3xl animate-pulse delay-500" />
-                  <div className="absolute bottom-1/4 right-1/3 w-40 h-40 bg-emerald-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
-                  
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-12">
-                     <div className="bg-white/10 backdrop-blur-xl p-8 rounded-[3rem] border border-white/20 shadow-2xl scale-95 group-hover:scale-100 transition-all">
-                        <MapIcon className="w-12 h-12 text-white mx-auto mb-4 drop-shadow-lg" />
-                        <h4 className="text-2xl font-black text-white">Visual Intelligence</h4>
-                        <p className="text-sm text-slate-300 mt-2 max-w-xs font-medium">Tracking 1.8M clicks per week across the Global TCA Network.</p>
-                     </div>
-                  </div>
+               <div className="h-[250px] flex-1">
+                 {isLoading ? (
+                   <div className="flex h-full items-center justify-center"><RefreshCw className="animate-spin text-slate-400" /></div>
+                 ) : (
+                   <ResponsiveContainer width="100%" height="100%">
+                     <BarChart data={regionalData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                       <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
+                       <XAxis type="number" stroke="#94a3b8" fontSize={11} />
+                       <YAxis dataKey="city" type="category" stroke="#94a3b8" fontSize={11} width={100} tickLine={false} axisLine={false} />
+                       <RechartsTooltip />
+                       <Bar dataKey="count" name="Institutes" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={16} />
+                     </BarChart>
+                   </ResponsiveContainer>
+                 )}
                </div>
             </div>
 
-            {/* Popular Pages */}
-            <div className="lg:col-span-4 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col">
-               <h3 className="text-xl font-black text-slate-900 tracking-tight mb-8">Hot Landing Pages</h3>
-               <div className="space-y-4 flex-1">
-                  {[
-                    { path: '/school/dashboard', count: '18.4k', growth: '+22%' },
-                    { path: '/auth/login', count: '14.2k', growth: '+15%' },
-                    { path: '/school/fees', count: '9.8k', growth: '-5%' },
-                    { path: '/coaching/students', count: '7.1k', growth: '+31%' },
-                    { path: '/university/exam', count: '5.2k', growth: '+8%' },
-                    { path: '/contact-us', count: '4.9k', growth: '-12%' },
-                  ].map((page, i) => (
-                    <div key={i} className="flex justify-between items-center p-4 hover:bg-slate-50 rounded-2xl transition-all border border-transparent hover:border-slate-100 group">
-                       <div className="flex items-center gap-4">
-                          <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-400 text-[10px] group-hover:bg-white transition-colors">#{i+1}</div>
-                          <div>
-                            <p className="text-xs font-bold text-slate-800 truncate max-w-[140px]">{page.path}</p>
-                            <p className="text-[10px] font-black text-primary/60 uppercase tracking-tighter">{page.count} hits</p>
-                          </div>
+            <div className="lg:col-span-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+               <h3 className="text-base font-semibold text-slate-800 mb-4">Top Regions</h3>
+               <div className="space-y-2 flex-1">
+                  {isLoading ? <RefreshCw className="animate-spin mx-auto text-slate-400 mt-10" /> : regionalData.slice(0, 6).map((region, i) => (
+                    <div key={i} className="flex justify-between items-center py-2 px-1 border-b last:border-0 border-slate-100">
+                       <div className="flex items-center gap-3">
+                          <div className="text-xs font-medium text-slate-500 w-4">{i+1}.</div>
+                          <p className="text-sm font-medium text-slate-700">{region.city}</p>
                        </div>
-                       <Badge className={`text-[9px] font-black border-none ${page.growth.startsWith('+') ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                         {page.growth}
+                       <Badge variant="outline" className="text-xs font-normal">
+                         {region.count} Institutes
                        </Badge>
                     </div>
                   ))}
@@ -193,34 +278,47 @@ export default function AnalyticsPage() {
           </div>
         </TabsContent>
 
-        {/* --- AUDIENCE TAB --- */}
-        <TabsContent value="audience" className="space-y-6">
-           <div className="bg-white p-12 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center space-y-6 min-h-[500px]">
-              <div className="w-24 h-24 bg-slate-50 rounded-[2.5rem] border border-slate-100 flex items-center justify-center text-slate-300">
-                 <Globe className="w-12 h-12 animate-[spin_20s_linear_infinite]" />
+        {/* --- RESOURCES TAB --- */}
+        <TabsContent value="resources" className="space-y-4">
+           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+              <div className="mb-6">
+                <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                   <HardDrive className="w-4 h-4 text-slate-500" /> Top Consumers
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">Institutes ranked by total user base (Students, Teachers, Staff).</p>
               </div>
-              <div className="max-w-md">
-                 <h3 className="text-2xl font-black text-slate-900 tracking-tight">Global Audience Map</h3>
-                 <p className="text-sm text-slate-500 mt-2 font-medium leading-relaxed">
-                   Integrate Google Maps API to visualize user distribution across different countries and cities in real-time. 
-                   Currently tracking connections from <span className="text-primary font-bold">142 different regions</span>.
-                 </p>
+              
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="py-3 px-4 font-medium text-slate-600 border-b">Institute Name</th>
+                      <th className="py-3 px-4 font-medium text-slate-600 border-b">City</th>
+                      <th className="py-3 px-4 font-medium text-slate-600 border-b text-right">Total Users</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isLoading ? (
+                      <tr><td colSpan="3" className="text-center py-10"><RefreshCw className="animate-spin mx-auto text-slate-400" /></td></tr>
+                    ) : topConsumers.length === 0 ? (
+                      <tr><td colSpan="3" className="text-center py-10 text-slate-500">No data available</td></tr>
+                    ) : topConsumers.map((inst, idx) => (
+                      <tr key={idx} className="border-b last:border-0 hover:bg-slate-50 transition-colors">
+                        <td className="py-3 px-4 text-slate-800 font-medium">{inst.institute_name}</td>
+                        <td className="py-3 px-4 text-slate-600">{inst.city}</td>
+                        <td className="py-3 px-4 text-right">
+                           <span className="font-mono bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs">
+                             {inst.total_users.toLocaleString()}
+                           </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <Button variant="outline" className="rounded-xl h-11 px-8 font-bold border-slate-200 hover:bg-slate-50 transition-all">
-                Setup Region Tracking
-              </Button>
            </div>
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
-
-function SelectPlaceholder({ label }) {
-  return (
-    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 cursor-pointer hover:bg-slate-100 transition-all">
-      <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">{label}</span>
-      <TrendingUp className="w-3 h-3 text-slate-400 rotate-90" />
     </div>
   );
 }

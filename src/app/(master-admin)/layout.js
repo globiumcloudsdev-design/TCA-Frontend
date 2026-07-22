@@ -22,6 +22,7 @@ import {
   AppModal, InputField, SelectField, TextareaField, FormSubmitButton, DatePickerField,
 } from '@/components/common';
 import { cn } from '@/lib/utils';
+import { useSocket } from '@/hooks/useSocket';
 
 const NAV = [
   { href: '/master-admin', label: 'Dashboard', icon: LayoutDashboard, perm: null },
@@ -38,6 +39,7 @@ const NAV = [
   { href: '/master-admin/announcements', label: 'Broadcasts', icon: Megaphone, perm: 'notification.broadcast' },
   { href: '/master-admin/website-cms', label: 'Website CMS', icon: Globe, perm: 'cms.update_hero' },
   { href: '/master-admin/blog', label: 'Blog Management', icon: Newspaper, perm: 'blog.read' },
+  { href: '/master-admin/audit-logs', label: 'Audit Logs', icon: ShieldCheck, perm: 'global.view_audit_logs' },
   { href: '/master-admin/branding', label: 'Branding', icon: Palette, perm: 'branding.update_colors' },
   { href: '/master-admin/support', label: 'Support Desk', icon: LifeBuoy, perm: 'support.view_tickets' },
 ];
@@ -62,6 +64,9 @@ export default function MasterAdminLayout({ children }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isImpersonating, setIsImpersonating] = useState(false);
+
+  // Initialize socket connection for real-time features like support tickets
+  useSocket();
 
   useEffect(() => {
     if (typeof window !== 'undefined') {

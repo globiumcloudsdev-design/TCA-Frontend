@@ -255,7 +255,6 @@ function TeacherTable({ instituteId, onView }) {
         </div>
       ),
     },
-    { accessorKey: 'subject', header: 'Subject' },
     { accessorKey: 'qualification', header: 'Qualification' },
     { accessorKey: 'experience', header: 'Experience' },
     { accessorKey: 'phone', header: 'Phone' },
@@ -369,7 +368,6 @@ function StaffTable({ instituteId, onView }) {
       ),
     },
     { accessorKey: 'role', header: 'Role' },
-    { accessorKey: 'department', header: 'Department' },
     { accessorKey: 'phone', header: 'Phone' },
     {
       accessorKey: 'status',
@@ -714,7 +712,6 @@ function PersonDetailModal({ person, type, onClose }) {
             ['Name', person.name],
             ['Email', person.email],
             ['Phone', person.phone],
-            ['Subject', person.subject],
             ['Qualification', person.qualification],
             ['Experience', person.experience],
             ['Status', person.status]
@@ -734,7 +731,6 @@ function PersonDetailModal({ person, type, onClose }) {
               ['Email', person.email],
               ['Phone', person.phone],
               ['Role', person.role],
-              ['Department', person.department],
               ['Status', person.status]
             ];
 
@@ -813,7 +809,7 @@ function SubEditModal({ open, onClose, school, onSuccess }) {
       onClose={() => { onClose(); reset(); }}
       title="📋 Edit Subscription"
       description="Update subscription plan and validity dates"
-      size="sm"
+      size="md"
       footer={
         <div className="flex justify-end gap-2 w-full">
           <Button variant="outline" onClick={() => { onClose(); reset(); }}>Cancel</Button>

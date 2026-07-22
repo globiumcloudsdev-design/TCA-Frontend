@@ -200,27 +200,18 @@ export const PLATFORM_PERMISSIONS = {
     ],
   },
 
-  // // ── Global System Control ────────────────────────────────────────────────
-  // global_control: {
-  //   label: 'Global System Control',
-  //   permissions: [
-  //     { code: 'global.system_health',      label: 'System health aur performance dekhna'           },
-  //     { code: 'global.feature_toggles',    label: 'Platform features ko globally enable/disable karna' },
-  //     { code: 'global.impersonation',      label: 'Institute admin ke taur par login karna (Global Control Access)' },
-  //     { code: 'global.db_explorer',        label: 'Database record explorer (Read-only)'           },
-  //     { code: 'global.maintenance_mode',   label: 'Platform-wide maintenance mode toggle'          },
-  //     { code: 'global.asset_manager',      label: 'Global system assets aur scripts manage karna'  },
-  //   ],
-  // },
-
-    // ── Global System Control ────────────────────────────────────────────────
+  // ── Global System Control ────────────────────────────────────────────────
   global_control: {
     label: 'Global System Control',
     permissions: [
       { code: 'global.system_health',      label: 'System health aur performance dekhna'           },
       { code: 'global.feature_toggles',    label: 'Platform features ko globally enable/disable karna' },
       { code: 'global.impersonation',      label: 'Institute admin ke taur par login karna (Ghost Mode)' },
+      { code: 'global.db_explorer',        label: 'Database record explorer (Read-only)'           },
       { code: 'global.maintenance_mode',   label: 'Platform-wide maintenance mode toggle'          },
+      { code: 'global.asset_manager',      label: 'Global system assets aur scripts manage karna'  },
+      { code: 'global.view_audit_logs',    label: 'Audit logs dekhna (kaun kya kar raha hai)'      },
+      { code: 'global.audit_logs',         label: 'Legacy Audit logs dekhna'                       },
     ],
   },
 

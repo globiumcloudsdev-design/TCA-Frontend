@@ -24,6 +24,7 @@ import SelectField from '@/components/common/SelectField';
 import InputField from '@/components/common/InputField';
 import DatePickerField from '@/components/common/DatePickerField';
 import TimePickerField from '@/components/common/TimePickerField';
+import SwitchField from '@/components/common/SwitchField';
 
 import { examService } from '@/services/examService';
 import { classService } from '@/services/classService';
@@ -72,7 +73,6 @@ const step2Schema = z.object({
 // STEP 3 SCHEMA: Settings
 const step3Schema = z.object({
   pass_percentage: z.coerce.number().min(0).max(100).default(40),
-
 });
 
 // FULL SCHEMA
@@ -86,7 +86,10 @@ export default function ExamForm({
 }) {
   const { user } = useAuthStore();
   const instituteId = user?.institute?.id || user?.school_id;
-  const instituteType = user?.institute?.institute_type;
+  const rawInstituteType = user?.institute?.institute_type || user?.institute?.instituteType;
+  const instituteType = typeof rawInstituteType === 'object' 
+    ? (rawInstituteType?.name?.toLowerCase() || 'school') 
+    : (rawInstituteType?.toLowerCase() || 'school');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [classes, setClasses] = useState([]);
@@ -112,13 +115,17 @@ export default function ExamForm({
   } = useForm({
     resolver: zodResolver(fullSchema),
     mode: 'onBlur',
-    defaultValues: initialData || {
+    defaultValues: initialData ? {
+      ...initialData,
+      has_section: !!initialData.section_id
+    } : {
       type: 'mid_term',
       category: 'theory',
       entity_type: instituteType || 'school',
       pass_percentage: 40,
       subject_schedules: [],
-      section_id: ''
+      section_id: '',
+      has_section: false
     }
   });
 
@@ -135,6 +142,13 @@ export default function ExamForm({
   const watchedClassId = watch('class_id');
   const watchedSchedules = watch('subject_schedules');
   const passPercentage = watch('pass_percentage');
+  const hasSection = watch('has_section');
+
+  useEffect(() => {
+    if (!hasSection) {
+      setValue('section_id', '');
+    }
+  }, [hasSection, setValue]);
 
   // Fetch academic years and classes on mount
   useEffect(() => {
@@ -177,7 +191,13 @@ export default function ExamForm({
     if (!watchedClassId) {
       setSections([]);
       setSubjects([]);
+      setValue('section_id', '');
       return;
+    }
+
+    // Reset section if class changed
+    if (previousClassId.current !== watchedClassId) {
+      setValue('section_id', '');
     }
 
     const fetchClassData = async () => {
@@ -280,7 +300,7 @@ export default function ExamForm({
         ...data,
         section_id: data.section_id?.trim() ? data.section_id : null,
         school_id: instituteId,
-        status: 'draft'
+        status: isEdit ? initialData.status : 'draft'
       };
 
       let response;
@@ -292,13 +312,14 @@ export default function ExamForm({
         toast.success('Exam created successfully');
       }
 
-      if (response?.data) {
-        onSuccess?.(response.data);
+      if (response) {
+        onSuccess?.(response.data || response);
         reset();
       }
     } catch (error) {
       console.error('Error saving exam:', error);
-      toast.error(error?.message || 'Failed to save exam');
+      const serverMessage = error?.response?.data?.message || error?.message;
+      toast.error(serverMessage || 'Failed to save exam');
     } finally {
       setIsSubmitting(false);
     }
@@ -329,7 +350,7 @@ export default function ExamForm({
       {/* PROGRESS BAR */}
       <div className="space-y-2">
         <div className="flex justify-between items-center">
-          <h2 className="text-lg font-semibold">Create Exam</h2>
+          <h2 className="text-lg font-semibold">{isEdit ? 'Edit Exam' : 'Create Exam'}</h2>
           <span className="text-sm text-muted-foreground">Step {step} of 3</span>
         </div>
         <Progress value={progressValue} className="h-2" />
@@ -400,7 +421,7 @@ export default function ExamForm({
               </div> */}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
               <SelectField
                 label="Class/Standard *"
                 name="class_id"
@@ -410,13 +431,28 @@ export default function ExamForm({
                 required
               />
 
-              <SelectField
-                label="Section (Optional)"
-                name="section_id"
-                control={control}
-                options={sectionOptions}
-              />
+              <div className="flex flex-col gap-2 pt-2">
+                <SwitchField
+                  label="Target Specific Section?"
+                  description="Enable to apply this exam to a single section only."
+                  name="has_section"
+                  control={control}
+                />
+              </div>
             </div>
+
+            {hasSection && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-start-2">
+                  <SelectField
+                    label="Section *"
+                    name="section_id"
+                    control={control}
+                    options={sectionOptions}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Exam Description</Label>
@@ -645,7 +681,7 @@ export default function ExamForm({
           )}
           {step === 3 && (
             <Button type="submit" disabled={isSubmitting} className="min-w-32">
-              {isSubmitting ? 'Creating...' : isEdit ? 'Update Exam' : 'Create Exam'}
+              {isSubmitting ? (isEdit ? 'Updating...' : 'Creating...') : isEdit ? 'Update Exam' : 'Create Exam'}
             </Button>
           )}
         </div>

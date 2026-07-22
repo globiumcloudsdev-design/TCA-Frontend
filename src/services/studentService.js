@@ -224,4 +224,26 @@ export const studentService = {
       return { data: [] };
     }
   },
+
+  /**
+   * Mark student as Alumni
+   * @param {string} id - Student ID
+   */
+  markAsAlumni: (id) =>
+    api.patch(`/students/${id}/alumni`).then((r) => r.data),
+
+  /**
+   * Restore student from Alumni
+   * @param {string} id - Student ID
+   */
+  restoreAlumni: (id) =>
+    api.patch(`/students/${id}/restore-alumni`).then((r) => r.data),
+
+  /**
+   * Add Behavioral Record
+   * @param {string} id - Student ID
+   * @param {object} data - { type, title, description, points }
+   */
+  addBehaviorRecord: (id, data) =>
+    api.post(`/students/${id}/behavior`, data).then((r) => r.data),
 };

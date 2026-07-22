@@ -63,16 +63,16 @@ function buildColumns(onEdit, onToggle, onDelete, onChangePassword) {
         );
       },
     },
-    {
-      id: 'school',
-      header: 'Institute',
-      cell: ({ row }) => {
-        const name = row.original.school?.name;
-        return name
-          ? <span className="text-sm text-slate-700">{name}</span>
-          : <span className="text-xs text-muted-foreground italic">Platform</span>;
-      },
-    },
+    // {
+    //   id: 'school',
+    //   header: 'Institute',
+    //   cell: ({ row }) => {
+    //     const name = row.original.school?.name;
+    //     return name
+    //       ? <span className="text-sm text-slate-700">{name}</span>
+    //       : <span className="text-xs text-muted-foreground italic">Platform</span>;
+    //   },
+    // },
     {
       id: 'role',
       header: 'Role',
@@ -99,7 +99,7 @@ function buildColumns(onEdit, onToggle, onDelete, onChangePassword) {
       id: 'joined',
       header: 'Joined',
       cell: ({ row }) => (
-        <span className="text-xs text-muted-foreground">{fmtDate(row.original.createdAt)}</span>
+        <span className="text-xs text-muted-foreground">{fmtDate(row.original.created_at || row.original.createdAt)}</span>
       ),
     },
     {
@@ -332,6 +332,7 @@ function UserFormModal({ open, onClose, defaultValues, onSubmit, loading, isEdit
     defaultValues: {
       is_active: true,
       permissions: [],
+      view_own_data: defaultValues?.details?.view_own_data || false,
       ...defaultValues,
     },
   });
@@ -340,6 +341,7 @@ function UserFormModal({ open, onClose, defaultValues, onSubmit, loading, isEdit
     reset({
       is_active: true,
       permissions: [],
+      view_own_data: defaultValues?.details?.view_own_data || false,
       ...defaultValues,
     });
   }, [defaultValues, reset]);
@@ -429,6 +431,9 @@ function UserFormModal({ open, onClose, defaultValues, onSubmit, loading, isEdit
 
         <SwitchField label="Active" name="is_active" control={control}
           hint="User can log in and access the platform" />
+          
+        <SwitchField label="View Own Data" name="view_own_data" control={control}
+          hint="If enabled, this user will only see the data they have created or updated themselves." />
 
       </form>
     </AppModal>

@@ -673,6 +673,229 @@ export const generateAndDownloadIdCard = async ({ role, person, institute, polic
 
 export default generateAndDownloadIdCard;
 
+// ==========================================
+// TEACHER ID CARD GENERATION
+// ==========================================
+
+const flattenTeacherData = (teacher) => {
+  const details = teacher?.details?.teacherDetails || {};
+  
+  return {
+    full_name: `${teacher?.first_name || ""} ${teacher?.last_name || ""}`.trim(),
+    employee_id: teacher?.registration_no || details?.employee_id || "EMP-000",
+    designation: details?.designation || "Teacher",
+    department: details?.department || "Faculty",
+    blood_group: teacher?.blood_group || details?.blood_group || "O+",
+    dob: teacher?.date_of_birth || details?.date_of_birth || "",
+    valid_upto: "31 Dec 2026", // Could be dynamic
+    photo_url: teacher?.avatar_url || "",
+    phone: teacher?.phone || "",
+    email: teacher?.email || "",
+    address: details?.present_address || details?.permanent_address || "",
+    qr_code_url: teacher?.qr_code_url || "",
+    qr_value: teacher?.registration_no || teacher?.id || "EMP-000",
+  };
+};
+
+const createTeacherCompleteCardHTML = (teacher, institute, policyConfig) => {
+  const design = policyConfig?.design || DEFAULT_POLICY_CONFIG.design;
+  const layout = policyConfig?.layout || 'vertical';
+  const watermark = policyConfig?.show_watermark !== false;
+  const showQr = policyConfig?.qr_enabled !== false; // Default to true for Teacher ID
+  const termsList = [
+    "This card is the property of the institution.",
+    "Must be worn at all times while on campus.",
+    "Loss of card must be reported immediately.",
+    "Return upon termination of employment."
+  ];
+  const bgColor = design.background_color || '#0f172a';
+  const accentColor = design.accent_color || '#3b82f6'; // Fallback to blue for teachers
+  const textColor = design.text_color || '#ffffff';
+  const logoUrl = institute?.logo_url || '';
+  const instituteName = institute?.name || 'ABC School';
+  const tagline = institute?.settings?.academic?.school_tagline || 'Excellence in Education';
+  const address = institute?.address || '123 Street, City';
+  const phone = institute?.phone || '(123) 456-7890';
+  const email = institute?.email || 'info@school.com';
+  const validUpto = teacher.valid_upto;
+  const teacherName = teacher.full_name;
+  const employeeId = teacher.employee_id;
+  const designation = teacher.designation;
+  const department = teacher.department;
+  const bloodGroup = teacher.blood_group;
+  const photoUrl = teacher.photo_url;
+  
+  const qrCodeSVG = showQr
+  ? teacher.qr_code_url
+    ? `<img src="${teacher.qr_code_url}" 
+         style="width:60px;height:60px;border-radius:8px;
+         background:#fff;padding:4px;" />`
+    : generateQRCodeSVG(teacher.qr_value)
+  : "";
+
+  if (layout === 'horizontal') {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Teacher ID Card - ${teacherName}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          body { background: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+          .id-card-container { display: flex; flex-direction: column; gap: 20px; align-items: center; }
+          .card-row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+          .card { width: 340px; height: 215px; border-radius: ${design.border_radius || '16px'}; overflow: hidden; position: relative; box-shadow: ${design.card_shadow ? '0 10px 30px rgba(0,0,0,0.3)' : 'none'}; border: ${design.show_border ? `1px solid ${design.border_color || '#e2e8f0'}` : 'none'}; }
+          .label { text-align: center; font-size: 10px; font-weight: 600; margin-top: 5px; color: #64748b; }
+          @media print { body { background: white; padding: 0; margin: 0; } .label { display: none; } }
+        </style>
+      </head>
+      <body>
+        <div class="id-card-container">
+          <div class="card-row">
+            <div>
+              <div class="card" style="background: ${bgColor}; display: flex;">
+                ${watermark ? `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-25deg); font-size: 30px; font-weight: bold; color: ${textColor}08; white-space: nowrap; pointer-events: none; z-index: 0; letter-spacing: 6px;">${instituteName.split(' ')[0] || 'SCHOOL'}</div>` : ''}
+                <div style="width: 110px; background: linear-gradient(135deg, ${accentColor} 0%, ${bgColor} 100%); padding: 12px 8px; display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative; z-index: 1;">
+                  <div style="width: 50px; height: 50px; border-radius: 12px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden;">${logoUrl ? `<img src="${logoUrl}" style="width:100%;height:100%;object-fit:contain;padding:4px" />` : '<span style="font-size:22px">🏫</span>'}</div>
+                  <div style="color: #fff; font-weight: 800; font-size: 9px; text-align: center; text-transform: uppercase;">${instituteName.split(' ').slice(0,2).join(' ')}</div>
+                  <div style="background: rgba(255,255,255,0.2); border-radius: 20px; padding: 2px 8px; font-size: 6px; font-weight: 600; color: #fff;">STAFF ID</div>
+                  <div style="width: 60px; height: 60px; border-radius: 50%; border: 2px solid #fff; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #1e3a5f; margin-top: 4px;">${photoUrl ? `<img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover" />` : '<span style="font-size:26px">👨‍🏫</span>'}</div>
+                  <div style="margin-top: 6px; text-align: center;"><div style="font-size:8px;font-weight:900;color:#fff">${designation}</div></div>
+                </div>
+                <div style="flex: 1; padding: 10px 12px; display: flex; flex-direction: column; justify-content: space-around; position: relative; z-index: 1;">
+                  <div><div style="color: ${textColor}99; font-size: 6px; font-weight: 600; text-transform: uppercase;">Staff Name</div><div style="color: ${textColor}; font-size: 12px; font-weight: 800;">${teacherName}</div></div>
+
+                  <div style="display: flex; gap: 12px;"><div><div style="color: ${textColor}99; font-size: 5px; font-weight: 600; text-transform: uppercase;">Employee ID</div><div style="color: ${textColor}; font-size: 9px; font-weight: 600; font-family: monospace;">${employeeId}</div></div></div>
+                </div>
+              </div>
+              <div class="label">FRONT SIDE</div>
+            </div>
+            <div>
+              <div class="card" style="background: #f8fafc; display: flex; flex-direction: column;">
+                <div style="background: ${bgColor}; padding: 6px 16px; display: flex; justify-content: flex-end; align-items: center;">
+
+                  <div style="font-size: 7px; color: #fff; background: ${accentColor}; padding: 2px 8px; border-radius: 20px;">BACK SIDE</div>
+                </div>
+                <div style="flex: 1; padding: 8px 16px; display: flex; gap: 16px;">
+                  <div style="flex: 1;"><div style="font-size: 10px; font-weight: 800; color: ${bgColor}; margin-bottom: 6px;">📜 Terms & Conditions</div><div style="max-height: 85px; overflow-y: auto;">${termsList.slice(0,3).map(term => `<div style="display:flex; gap:4px; margin-bottom:3px;"><div style="width:3px; height:3px; border-radius:50%; background:${accentColor}; margin-top:4px;"></div><span style="font-size:6.5px; color:#374151;">${term}</span></div>`).join('')}</div><div style="margin-top: 6px;"><div style="font-size: 8px; font-weight: 700; color: ${bgColor};">Signature Authority</div><svg width="60" height="14" viewBox="0 0 60 14"><path d="M5 10 Q15 3 25 8 Q35 15 45 6 Q55 0 65 7" stroke="${bgColor}" stroke-width="1" fill="none" /></svg></div></div>
+                  <div style="width: 1px; background: #e2e8f0;"></div>
+                  <div style="flex: 0.8;"><div style="font-size: 8px; font-weight: 700; color: ${bgColor}; margin-bottom: 4px;">Contact Info</div><div style="font-size: 6.5px; color: #4b5563; margin-bottom: 2px;">📍 ${address.slice(0,30)}</div><div style="font-size: 6.5px; color: #4b5563; margin-bottom: 2px;">✉️ ${email}</div><div style="font-size: 6.5px; color: #4b5563;">📞 ${phone}</div>${qrCodeSVG ? `<div style="margin-top: 4px; display: flex; justify-content: center;">${qrCodeSVG}</div>` : ''}</div>
+                </div>
+                <div style="background: ${bgColor}; padding: 5px 16px; display: flex; align-items: center; gap: 6px;"><div style="width: 22px; height: 22px; border-radius: 6px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden;">${logoUrl ? `<img src="${logoUrl}" style="width:100%;height:100%;object-fit:contain;padding:2px" />` : '<span style="font-size:12px">🏫</span>'}</div><div><div style="color: #fff; font-weight: 800; font-size: 8px;">${instituteName}</div><div style="color: rgba(255,255,255,0.5); font-size: 5px; font-style: italic;">${tagline}</div></div></div>
+              </div>
+              <div class="label">BACK SIDE</div>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  // Vertical Card
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Teacher ID Card - ${teacherName}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body { background: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        .id-card-container { display: flex; flex-direction: column; gap: 20px; align-items: center; }
+        .card { width: 280px; height: 400px; border-radius: ${design.border_radius || '16px'}; overflow: hidden; position: relative; box-shadow: ${design.card_shadow ? '0 20px 60px rgba(0,0,0,0.4)' : 'none'}; border: ${design.show_border ? `1px solid ${design.border_color || '#e2e8f0'}` : 'none'}; }
+        .label { text-align: center; font-size: 10px; font-weight: 600; margin-top: 5px; color: #64748b; }
+        @media print { body { background: white; padding: 0; margin: 0; } .label { display: none; } }
+      </style>
+    </head>
+    <body>
+      <div class="id-card-container">
+        <div>
+          <div class="card" style="background: ${bgColor};">
+            ${watermark ? `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-25deg); font-size: 40px; font-weight: bold; color: ${textColor}08; white-space: nowrap; pointer-events: none; z-index: 0; letter-spacing: 8px;">${instituteName.split(' ')[0] || 'SCHOOL'}</div>` : ''}
+            <svg style="position: absolute; top: 0; right: 0; z-index: 1; width: 130px; height: 170px;" viewBox="0 0 130 170"><path d="M130 0 Q75 40 100 170 L130 170 Z" fill="${accentColor}" opacity="0.9" /></svg>
+            <div style="position: relative; z-index: 2; padding: 16px 14px 0; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+              <div style="width: 48px; height: 48px; border-radius: 12px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 0 0 2px ${accentColor};">${logoUrl ? `<img src="${logoUrl}" style="width:100%;height:100%;object-fit:contain;padding:4px" />` : '<span style="font-size:20px">🏫</span>'}</div>
+              <div style="color: ${textColor}; font-weight: 800; font-size: 13px; text-align: center; text-transform: uppercase;">${instituteName}</div>
+              <div style="color: ${textColor}99; font-size: 7px; text-align: center; font-style: italic;">${tagline}</div>
+              <div style="background: ${accentColor}; color: #fff; font-size: 8px; font-weight: 700; padding: 2px 12px; border-radius: 20px; text-transform: uppercase; margin-top: 4px;">STAFF ID CARD</div>
+            </div>
+            <div style="position: relative; z-index: 2; display: flex; justify-content: center; margin-top: 8px;">
+              <div style="width: 75px; height: 75px; border-radius: 50%; border: 3px solid ${accentColor}; background: #1e3a5f; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px rgba(255,255,255,0.15);">${photoUrl ? `<img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover" />` : '<span style="font-size:32px">👨‍🏫</span>'}</div>
+              <div style="position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); background: #fff; border: 2px solid ${accentColor}; border-radius: 6px; padding: 2px 12px; display: flex; justify-content: center;"><div style="text-align:center;"><div style="font-size:6px;font-weight:900;color:${bgColor};text-transform:uppercase;">${designation}</div></div></div>
+            </div>
+            <div style="position: relative; z-index: 2; padding: 16px 16px 6px; display: flex; flex-direction: column; gap: 8px;">
+              <div><div style="color: ${textColor}99; font-size: 7px; font-weight: 600; text-transform: uppercase;">Staff Name</div><div style="color: ${textColor}; font-size: 12px; font-weight: 700;">${teacherName}</div></div>
+
+              <div style="display: flex; gap: 12px;"><div><div style="color: ${textColor}99; font-size: 7px; font-weight: 600; text-transform: uppercase;">Employee ID</div><div style="color: ${textColor}; font-size: 10px; font-weight: 600; font-family: monospace;">${employeeId}</div></div></div>
+            </div>
+          </div>
+          <div class="label">FRONT SIDE</div>
+        </div>
+        
+        <div>
+          <div class="card" style="background: #f8fafc;">
+            <div style="background: ${bgColor}; padding: 10px 16px; position: relative; overflow: hidden; height: 36px;"><svg style="position: absolute; right: 0; top: 0; width: 70px; height: 70px;" viewBox="0 0 70 70"><path d="M70 0 Q35 20 50 70 L70 70 Z" fill="${accentColor}" opacity="0.6" /></svg></div>
+            <div style="position: absolute; top: 70px; right: -10px; opacity: 0.05; z-index: 0; font-size: 80px;">${logoUrl ? `<img src="${logoUrl}" style="width:120px;height:120px;object-fit:contain" />` : '🏫'}</div>
+            <div style="padding: 12px 16px; position: relative; z-index: 1;"><div style="font-size: 12px; font-weight: 800; color: ${bgColor}; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;"><span>📜</span> Terms & Conditions</div><div style="max-height: 130px; overflow-y: auto;">${termsList.map(term => `<div style="display:flex; gap:5px; margin-bottom:5px; align-items:flex-start;"><div style="width:4px; height:4px; border-radius:50%; background:${accentColor}; margin-top:3px; flex-shrink:0;"></div><span style="font-size:8px; color:#374151; line-height:1.4;">${term}</span></div>`).join('')}</div></div>
+            <div style="padding: 0 16px 8px; position: relative; z-index: 1;"><div style="font-size: 10px; font-weight: 700; color: ${bgColor};">Signature Authority</div><div style="font-size: 7px; color: #6b7280; margin-bottom: 3px;">Principal / Admin</div><svg width="80" height="18" viewBox="0 0 80 18"><path d="M5 14 Q15 3 25 11 Q35 20 45 8 Q55 0 65 10 Q75 20 85 7" stroke="${bgColor}" stroke-width="1.2" fill="none" /></svg><div style="border-top: 1px solid ${bgColor}; width: 80px; margin-top: 2px;"></div></div>
+            ${qrCodeSVG ? `<div style="padding: 8px 16px; display: flex; justify-content: center; position: relative; z-index: 1;">${qrCodeSVG}</div>` : ''}
+            <div style="padding: 6px 16px; background: #f1f5f9; border-top: 1px solid #e2e8f0; position: relative; z-index: 1;"><div style="display:flex; gap:5px; align-items:center; margin-bottom:2px;"><span style="font-size:8px;">📍</span><span style="font-size:7px; color:#4b5563;">${address.slice(0,30)}</span></div><div style="display:flex; gap:5px; align-items:center; margin-bottom:2px;"><span style="font-size:8px;">✉️</span><span style="font-size:7px; color:#4b5563;">${email}</span></div><div style="display:flex; gap:5px; align-items:center;"><span style="font-size:8px;">📞</span><span style="font-size:7px; color:#4b5563;">${phone}</span></div></div>
+            <div style="background: ${bgColor}; padding: 6px 16px; display: flex; align-items: center; gap: 8px; position: relative; overflow: hidden;"><svg style="position: absolute; left: 0; bottom: 0; width: 50px; height: 40px;" viewBox="0 0 50 40"><ellipse cx="0" cy="40" rx="45" ry="35" fill="${accentColor}" opacity="0.2" /></svg><div style="width: 28px; height: 28px; border-radius: 6px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden;">${logoUrl ? `<img src="${logoUrl}" style="width:100%;height:100%;object-fit:contain;padding:2px" />` : '<span style="font-size:14px">🏫</span>'}</div><div><div style="color: #fff; font-weight: 800; font-size: 8px;">${instituteName}</div><div style="color: rgba(255,255,255,0.5); font-size: 5px; font-style: italic;">${tagline}</div></div></div>
+          </div>
+          <div class="label">BACK SIDE</div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+};
+
+export const generateAndDownloadTeacherIdCard = async ({ person, institute, policyConfig }) => {
+  try {
+    const teacher = flattenTeacherData(person);
+    const finalPolicyConfig = { ...DEFAULT_POLICY_CONFIG, ...policyConfig };
+    const completeHTML = createTeacherCompleteCardHTML(teacher, institute, finalPolicyConfig);
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) throw new Error('Pop-up blocked. Please allow pop-ups for this site.');
+    
+    const layout = finalPolicyConfig.layout || 'vertical';
+    const pageSize = layout === 'vertical' ? '3.15in 9.5in' : '8.5in 5.5in';
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Teacher ID Card - ${teacher.full_name}</title>
+          <style>
+            @page { size: ${pageSize}; margin: 0.2in; }
+            body { margin: 0; padding: 0; background: #e2e8f0; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          </style>
+        </head>
+        <body>
+          ${completeHTML}
+          <script>
+            window.onload = () => {
+              setTimeout(() => {
+                window.print();
+                setTimeout(() => window.close(), 1000);
+              }, 500);
+            };
+          <\/script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    return { success: true, message: 'ID Card generated successfully' };
+  } catch (error) {
+    console.error('Error generating Teacher ID card:', error);
+    throw new Error('Failed to generate Teacher ID card: ' + error.message);
+  }
+};
+
 
 
 

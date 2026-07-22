@@ -465,8 +465,9 @@ export default function InstituteLayoutWrapper({ children }) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      {/* Mobile backdrop */}
+// <div className="flex h-screen overflow-hidden bg-background">
+    // only 1 scrollbar on the page
+    <div className="fixed inset-0 flex overflow-hidden bg-background">      {/* Mobile backdrop */}
       <div
         onClick={() => setMobileOpen(false)}
         aria-hidden="true"

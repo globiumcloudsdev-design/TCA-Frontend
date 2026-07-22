@@ -23,6 +23,7 @@ import StatusBadge from '@/components/common/StatusBadge';
 import PageLoader from '@/components/common/PageLoader';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import TableRowActions from '@/components/common/TableRowActions';
+import SelectField from '@/components/common/SelectField';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -69,6 +70,7 @@ export default function ExamsPage({ type }) {
   const [editingExam, setEditingExam] = useState(null);
   const [deletingExam, setDeletingExam] = useState(null);
   const [publishingExam, setPublishingExam] = useState(null);
+  const [statusExam, setStatusExam] = useState(null);
 
   const label = type === 'coaching' ? 'Test' : type === 'academy' ? 'Assessment' : 'Exam';
   const labelP = type === 'coaching' ? 'Tests' : type === 'academy' ? 'Assessments' : 'Exams';
@@ -120,6 +122,18 @@ export default function ExamsPage({ type }) {
     onError: (error) => {
       toast.error(error.message || `Failed to publish ${label.toLowerCase()}`);
       setPublishingExam(null);
+    }
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }) => examService.updateStatus(id, status),
+    onSuccess: () => {
+      toast.success(`Status updated successfully`);
+      queryClient.invalidateQueries({ queryKey: ['exams'] });
+      setStatusExam(null);
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to update status');
     }
   });
 
@@ -249,6 +263,15 @@ export default function ExamsPage({ type }) {
           });
         }
 
+        // Change Status Action
+        if (canDo('exams.update')) {
+          extraActions.push({
+            label: 'Change Status',
+            icon: '🔄',
+            onClick: () => setStatusExam(exam)
+          });
+        }
+
         // Enter Results (published/ongoing exams)
         if (canDo('exam_results.enter') && ['scheduled', 'ongoing', 'completed'].includes(exam.status)) {
           extraActions.push({
@@ -369,6 +392,7 @@ export default function ExamsPage({ type }) {
       >
         <ExamForm
           initialData={editingExam}
+          isEdit={!!editingExam}
           onSuccess={handleSuccess}
           onCancel={() => { setModalOpen(false); setEditingExam(null); }}
           instituteId={currentInstitute?.id}
@@ -398,6 +422,38 @@ export default function ExamsPage({ type }) {
         confirmLabel="Publish"
         variant="info"
       />
+
+      {/* Change Status Modal */}
+      <AppModal
+        open={!!statusExam}
+        onClose={() => setStatusExam(null)}
+        title="Change Status"
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setStatusExam(null)}>Cancel</Button>
+            <Button 
+              onClick={() => statusMutation.mutate({ id: statusExam.id, status: statusExam.status })}
+              disabled={statusMutation.isPending}
+            >
+              {statusMutation.isPending ? 'Updating...' : 'Update Status'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Select the new status for <b>{statusExam?.name}</b></p>
+          <div className="space-y-2">
+            <SelectField
+              name="status"
+              value={statusExam?.status || ''}
+              onChange={(value) => setStatusExam({ ...statusExam, status: value })}
+              options={STATUS_OPTIONS}
+              placeholder="Select Status"
+            />
+          </div>
+        </div>
+      </AppModal>
     </div>
   );
 }

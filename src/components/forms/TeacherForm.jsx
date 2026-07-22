@@ -3,7 +3,9 @@
 'use client';
 
 import { useForm } from 'react-hook-form';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { settingService } from '@/services';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -151,6 +153,33 @@ export default function TeacherForm({
   isEdit = false,
 }) {
   const [activeTab, setActiveTab] = useState('personal');
+
+  // Fetch settingsData to check document allowance settings
+  const { data: settingsData } = useQuery({
+    queryKey: ['institute-settings'],
+    queryFn: () => settingService.getSettings(),
+    staleTime: 5 * 60_000,
+  });
+
+  // ✅ CORRECT: Check if teacher docs are allowed from settings
+  const teacherDocsAllowed = settingsData?.data?.settings?.document_settings?.teacher_docs_allowed === true;
+
+  // ✅ Define available tabs based on document setting
+  const allTabs = useMemo(() => {
+    const tabs = ['personal', 'professional', 'employment'];
+    if (teacherDocsAllowed) {
+      tabs.push('documents');
+    }
+    return tabs;
+  }, [teacherDocsAllowed]);
+
+  // ✅ Reset active tab if current tab is not available
+  useEffect(() => {
+    if (!allTabs.includes(activeTab)) {
+      setActiveTab(allTabs[0]);
+    }
+  }, [allTabs, activeTab]);
+
   const [uploadingFiles, setUploadingFiles] = useState({});
   const [isMobile, setIsMobile] = useState(false);
   const [showCustomType, setShowCustomType] = useState({});
@@ -225,11 +254,8 @@ export default function TeacherForm({
     for (const key of Object.keys(current)) {
       const curr = current[key];
       const orig = original[key];
-      // Strict equality
       if (curr === orig) continue;
-      // Both falsy (empty string, null, undefined) -> treat as no change
       if (!curr && !orig) continue;
-      // Arrays compare by JSON
       if (Array.isArray(curr) && Array.isArray(orig)) {
         if (JSON.stringify(curr) === JSON.stringify(orig)) continue;
       }
@@ -311,7 +337,7 @@ export default function TeacherForm({
     setShowCustomType(prev => ({ ...prev, [index]: value === 'other' }));
   };
 
-  // Tab validation helpers
+  // ✅ Updated Tab validation helpers - uses allTabs
   const validateTab = async (tab) => {
     let fields = [];
     if (tab === 'personal') {
@@ -320,39 +346,38 @@ export default function TeacherForm({
       fields = ['qualification', 'experience_years'];
     } else if (tab === 'employment') {
       fields = ['designation', 'employment_type', 'joining_date'];
+    } else if (tab === 'documents') {
+      fields = ['documents'];
     }
-
     return await trigger(fields);
   };
 
-  const prevTab = () => {
-    const tabs = ['personal', 'professional', 'employment', 'documents'];
-    const idx = tabs.indexOf(activeTab);
-    if (idx > 0) setActiveTab(tabs[idx - 1]);
-  };
-
-  // Mobile navigation
+  // ✅ Updated nextTab - uses allTabs
   const nextTab = async () => {
     const isValid = await validateTab(activeTab);
-    
-    if (!isValid) {
-      console.log('❌ Navigation blocked: Current tab is invalid');
-      // The useEffect will handle the tab switching if errors are populated
-      return;
+    if (!isValid) return;
+    const currentIndex = allTabs.indexOf(activeTab);
+    if (currentIndex < allTabs.length - 1) {
+      setActiveTab(allTabs[currentIndex + 1]);
     }
-
-    const tabs = ['personal', 'professional', 'employment', 'documents'];
-    const idx = tabs.indexOf(activeTab);
-    if (idx < tabs.length - 1) setActiveTab(tabs[idx + 1]);
   };
 
-  const handleTabChange = async (value) => {
-    const tabs = ['personal', 'professional', 'employment', 'documents'];
-    const currentIdx = tabs.indexOf(activeTab);
-    const targetIdx = tabs.indexOf(value);
+  // ✅ Updated prevTab - uses allTabs
+  const prevTab = () => {
+    const currentIndex = allTabs.indexOf(activeTab);
+    if (currentIndex > 0) {
+      setActiveTab(allTabs[currentIndex - 1]);
+    }
+  };
 
-    // If moving forward, validate current tab
-    if (targetIdx > currentIdx) {
+  // ✅ Updated handleTabChange - uses allTabs
+  const handleTabChange = async (value) => {
+    const currentIndex = allTabs.indexOf(activeTab);
+    const targetIndex = allTabs.indexOf(value);
+    
+    if (targetIndex === -1) return;
+    
+    if (targetIndex > currentIndex) {
       const isValid = await validateTab(activeTab);
       if (!isValid) return;
     }
@@ -381,29 +406,26 @@ export default function TeacherForm({
     avatarFileRef.current = null;
   };
 
-  // Auto-navigate to first error tab
+  // ✅ Updated error navigation - uses allTabs
   useEffect(() => {
     const errorFields = Object.keys(errors);
     if (errorFields.length > 0) {
-      console.log('⚠️ Form errors detected in fields:', errorFields);
-      
       const personalFields = ['first_name', 'last_name', 'email', 'phone', 'dob', 'cnic', 'gender', 'religion', 'blood_group', 'nationality', 'city', 'present_address', 'permanent_address', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relation'];
       const professionalFields = ['qualification', 'experience_years', 'specialization', 'previous_institution'];
       const employmentFields = ['designation', 'employment_type', 'joining_date', 'contract_start_date', 'contract_end_date', 'salary', 'bank_name', 'bank_account_no', 'bank_branch', 'status', 'password'];
       const documentFields = ['documents'];
 
-      // Check priority order (first error found wins)
       if (errorFields.some(f => personalFields.includes(f))) {
         if (activeTab !== 'personal') setActiveTab('personal');
       } else if (errorFields.some(f => professionalFields.includes(f))) {
         if (activeTab !== 'professional') setActiveTab('professional');
       } else if (errorFields.some(f => employmentFields.includes(f))) {
         if (activeTab !== 'employment') setActiveTab('employment');
-      } else if (errorFields.some(f => documentFields.includes(f)) || errorFields.some(f => f.startsWith('documents.'))) {
+      } else if (teacherDocsAllowed && (errorFields.some(f => documentFields.includes(f)) || errorFields.some(f => f.startsWith('documents.')))) {
         if (activeTab !== 'documents') setActiveTab('documents');
       }
     }
-  }, [errors, activeTab]);
+  }, [errors, activeTab, teacherDocsAllowed]);
 
   // SUBMIT HANDLER - sends only changed fields
   const onSubmitForm = (data) => {
@@ -421,7 +443,6 @@ export default function TeacherForm({
       submitData = getChangedValues(formattedData, originalValuesRef.current);
       console.log('🔁 Changed fields only:', submitData);
       
-      // If no normal fields changed, and we don't have a new avatar AND no new files, then skip.
       const hasNewDocs = (data.documents || []).some(doc => doc.file instanceof Error || doc.file instanceof File);
       if (Object.keys(submitData).length === 0 && !avatarFileRef.current && !hasNewDocs) {
         console.warn('No changes detected, skipping submit');
@@ -430,7 +451,6 @@ export default function TeacherForm({
     }
 
     const formData = new FormData();
-    // Append all (or changed) fields (skip undefined/null, but keep empty string to clear)
     for (const [key, value] of Object.entries(submitData)) {
       if (value === undefined || value === null) continue;
       
@@ -459,10 +479,8 @@ export default function TeacherForm({
       formData.append('photo', avatarFileRef.current);
     }
 
-    // Debug log
     console.log('📦 FormData entries:');
     for (let pair of formData.entries()) {
-      // Don't log full file objects if possible, just their name
       if (pair[1] instanceof File) {
         console.log(pair[0], pair[1].name);
       } else {
@@ -499,29 +517,37 @@ export default function TeacherForm({
 
       <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4 sm:space-y-6">
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        {/* Tabs List */}
+        {/* Tabs List - Dynamic based on teacherDocsAllowed */}
         <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
-          <TabsList className={`inline-flex w-auto sm:grid ${isMobile ? 'flex-nowrap' : 'grid-cols-4'} mb-4 sm:mb-6`}>
-            <TabsTrigger value="personal">Personal</TabsTrigger>
-            <TabsTrigger value="professional" disabled={activeTab === 'personal' && Object.keys(errors).length > 0}>Professional</TabsTrigger>
-            <TabsTrigger value="employment" disabled={activeTab === 'personal' || activeTab === 'professional'}>Employment</TabsTrigger>
-            <TabsTrigger value="documents" disabled={activeTab !== 'documents' && activeTab !== 'employment' && isEdit === false}>
-              Documents
-              {watchDocuments?.length > 0 && (
-                <Badge variant="secondary" className="ml-2">{watchDocuments.length}</Badge>
-              )}
-            </TabsTrigger>
+          <TabsList className={`inline-flex w-auto sm:grid mb-4 sm:mb-6`} style={{ gridTemplateColumns: `repeat(${allTabs.length}, minmax(0, 1fr))` }}>
+            {allTabs.includes('personal') && (
+              <TabsTrigger value="personal">Personal</TabsTrigger>
+            )}
+            {allTabs.includes('professional') && (
+              <TabsTrigger value="professional">Professional</TabsTrigger>
+            )}
+            {allTabs.includes('employment') && (
+              <TabsTrigger value="employment">Employment</TabsTrigger>
+            )}
+            {teacherDocsAllowed && allTabs.includes('documents') && (
+              <TabsTrigger value="documents">
+                Documents
+                {watchDocuments?.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">{watchDocuments.length}</Badge>
+                )}
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
 
         {/* Mobile Navigation */}
         {isMobile && (
           <div className="flex items-center justify-between mb-4">
-            <Button type="button" variant="outline" size="sm" onClick={prevTab} disabled={activeTab === 'personal'}>
+            <Button type="button" variant="outline" size="sm" onClick={prevTab} disabled={activeTab === allTabs[0]}>
               Previous
             </Button>
             <span className="text-sm font-medium capitalize">{activeTab}</span>
-            <Button type="button" variant="outline" size="sm" onClick={nextTab} disabled={activeTab === 'documents'}>
+            <Button type="button" variant="outline" size="sm" onClick={nextTab} disabled={activeTab === allTabs[allTabs.length - 1]}>
               Next
             </Button>
           </div>
@@ -704,122 +730,124 @@ export default function TeacherForm({
           </Card>
         </TabsContent>
 
-        {/* Tab 4: Documents */}
-        <TabsContent value="documents">
-          <Card>
-            <CardContent className="p-4 sm:p-6">
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">Documents</h3>
-                  <Button type="button" variant="outline" size="sm" onClick={addDocument}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Document
-                  </Button>
-                </div>
-
-                {watchDocuments?.length === 0 ? (
-                  <div className="text-center py-8 border-2 border-dashed rounded-lg">
-                    <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-muted-foreground">No documents added yet</p>
-                    <p className="text-sm text-muted-foreground mt-1">Click "Add Document" to upload files</p>
+        {/* ✅ Tab 4: Documents - Only render if teacherDocsAllowed is true */}
+        {teacherDocsAllowed && (
+          <TabsContent value="documents">
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">Documents</h3>
+                    <Button type="button" variant="outline" size="sm" onClick={addDocument}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Document
+                    </Button>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    {watchDocuments.map((doc, index) => (
-                      <div key={index} className="border rounded-lg p-4">
-                        <div className="flex justify-between mb-3">
-                          <h4 className="font-medium">Document {index + 1}</h4>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => removeDocument(index)} className="text-destructive">
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                          <div>
-                            <SelectField
-                              label="Document Type *"
-                              name={`documents.${index}.type`}
-                              control={control}
-                              error={errors.documents?.[index]?.type}
-                              options={DOCUMENT_TYPES}
-                              placeholder="Select type"
-                              onChange={(value) => handleDocumentTypeChange(index, value)}
-                              required
-                            />
-                            {showCustomType[index] && (
-                              <div className="mt-2">
-                                <InputField
-                                  label="Specify Document Type"
-                                  name={`documents.${index}.customType`}
-                                  register={register}
-                                  error={errors.documents?.[index]?.customType}
-                                  placeholder="e.g. Training Certificate"
-                                  required
-                                />
-                              </div>
-                            )}
-                          </div>
-                          <InputField
-                            label="Document Title *"
-                            name={`documents.${index}.title`}
-                            register={register}
-                            error={errors.documents?.[index]?.title}
-                            placeholder="e.g. CNIC, Degree"
-                            required
-                          />
-                        </div>
-                        <div className="mt-3">
-                          <Label>Upload File (Max {MAX_FILE_MB}MB)</Label>
-                          {doc.file_url && !uploadingFiles[index] && (
-                            <div className="flex items-center gap-2 text-sm bg-accent/30 rounded px-3 py-2 mb-2">
-                              <span className="truncate max-w-[200px]">{doc.file_name || 'Current file'}</span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="text-blue-500 hover:text-blue-600 h-8 gap-1 px-2 ml-auto"
-                                onClick={() => window.open(doc.file_url, '_blank')}
-                              >
-                                <Eye className="h-4 w-4" />
-                                <span className="text-xs">View</span>
-                              </Button>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2">
-                            <input type="file" id={`doc-${index}`} className="hidden" onChange={(e) => handleDocumentUpload(e, index)} />
-                            <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById(`doc-${index}`).click()} className="flex-1">
-                              <Upload className="h-4 w-4 mr-2" />
-                              {uploadingFiles[index] || 'Choose File'}
+
+                  {watchDocuments?.length === 0 ? (
+                    <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                      <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-muted-foreground">No documents added yet</p>
+                      <p className="text-sm text-muted-foreground mt-1">Click "Add Document" to upload files</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {watchDocuments.map((doc, index) => (
+                        <div key={index} className="border rounded-lg p-4">
+                          <div className="flex justify-between mb-3">
+                            <h4 className="font-medium">Document {index + 1}</h4>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => removeDocument(index)} className="text-destructive">
+                              <X className="h-4 w-4" />
                             </Button>
                           </div>
-                        </div>
-                        {isEdit && doc.file_url && (
-                          <div className="mt-3 flex items-center space-x-2">
-                            <input type="checkbox" id={`verified-${index}`} checked={doc.verified || false} onChange={(e) => {
-                              const currentDocs = getValues('documents') || [];
-                              const updatedDocs = [...currentDocs];
-                              updatedDocs[index].verified = e.target.checked;
-                              setValue('documents', updatedDocs);
-                            }} className="h-4 w-4 rounded border-gray-300" />
-                            <Label htmlFor={`verified-${index}`}>Verified</Label>
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                              <SelectField
+                                label="Document Type *"
+                                name={`documents.${index}.type`}
+                                control={control}
+                                error={errors.documents?.[index]?.type}
+                                options={DOCUMENT_TYPES}
+                                placeholder="Select type"
+                                onChange={(value) => handleDocumentTypeChange(index, value)}
+                                required
+                              />
+                              {showCustomType[index] && (
+                                <div className="mt-2">
+                                  <InputField
+                                    label="Specify Document Type"
+                                    name={`documents.${index}.customType`}
+                                    register={register}
+                                    error={errors.documents?.[index]?.customType}
+                                    placeholder="e.g. Training Certificate"
+                                    required
+                                  />
+                                </div>
+                              )}
+                            </div>
+                            <InputField
+                              label="Document Title *"
+                              name={`documents.${index}.title`}
+                              register={register}
+                              error={errors.documents?.[index]?.title}
+                              placeholder="e.g. CNIC, Degree"
+                              required
+                            />
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                          <div className="mt-3">
+                            <Label>Upload File (Max {MAX_FILE_MB}MB)</Label>
+                            {doc.file_url && !uploadingFiles[index] && (
+                              <div className="flex items-center gap-2 text-sm bg-accent/30 rounded px-3 py-2 mb-2">
+                                <span className="truncate max-w-[200px]">{doc.file_name || 'Current file'}</span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-blue-500 hover:text-blue-600 h-8 gap-1 px-2 ml-auto"
+                                  onClick={() => window.open(doc.file_url, '_blank')}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  <span className="text-xs">View</span>
+                                </Button>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <input type="file" id={`doc-${index}`} className="hidden" onChange={(e) => handleDocumentUpload(e, index)} />
+                              <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById(`doc-${index}`).click()} className="flex-1">
+                                <Upload className="h-4 w-4 mr-2" />
+                                {uploadingFiles[index] || 'Choose File'}
+                              </Button>
+                            </div>
+                          </div>
+                          {isEdit && doc.file_url && (
+                            <div className="mt-3 flex items-center space-x-2">
+                              <input type="checkbox" id={`verified-${index}`} checked={doc.verified || false} onChange={(e) => {
+                                const currentDocs = getValues('documents') || [];
+                                const updatedDocs = [...currentDocs];
+                                updatedDocs[index].verified = e.target.checked;
+                                setValue('documents', updatedDocs);
+                              }} className="h-4 w-4 rounded border-gray-300" />
+                              <Label htmlFor={`verified-${index}`}>Verified</Label>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
 
-      {/* Tab Navigation & Actions */}
+      {/* Tab Navigation & Actions - Dynamic based on allTabs */}
       <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t">
         <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">Cancel</Button>
-        {activeTab !== 'personal' && (
+        {activeTab !== allTabs[0] && (
           <Button type="button" variant="outline" onClick={prevTab} className="w-full sm:w-auto">Previous</Button>
         )}
-        {activeTab !== 'documents' ? (
+        {activeTab !== allTabs[allTabs.length - 1] ? (
           <Button type="button" onClick={nextTab} className="w-full sm:w-auto">Next</Button>
         ) : (
           <FormSubmitButton loading={loading} label={isEdit ? 'Save Changes' : 'Add Teacher'} loadingLabel={isEdit ? 'Saving…' : 'Adding…'} className="w-full sm:w-auto" />

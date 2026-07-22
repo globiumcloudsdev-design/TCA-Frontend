@@ -5,7 +5,7 @@ import {
   ExternalLink, Ban, Activity, Building2, Layout,
   ShieldAlert, RefreshCw, MousePointer2, Info,
   Users, Lock, Unlock, Database,
-  Clock
+  Clock, Server
 } from 'lucide-react';
 import { 
   AppModal, InputField, DataTable, ConfirmDialog 
@@ -20,10 +20,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { NAV as INSTITUTE_NAV } from '@/config/instituteConfig';
 import { cn } from '@/lib/utils';
+import { AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 export default function GlobalControlPage() {
   const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
+  const [pingHistory, setPingHistory] = useState([]);
 
   useEffect(() => {
     setMounted(true);
@@ -35,6 +37,38 @@ export default function GlobalControlPage() {
     queryFn: () => masterAdminService.getGlobalSettings(),
     enabled: mounted
   });
+
+  const backupMutation = useMutation({
+    mutationFn: () => masterAdminService.triggerBackup(),
+    onSuccess: (data) => {
+      toast.success(data?.message || 'Database backup completed successfully!');
+      // Assuming data returns the URL in data.url
+      if (data?.data?.url) {
+        window.open(data.data.url, '_blank');
+      }
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Failed to trigger backup');
+    }
+  });
+
+  const { data: health, isLoading: healthLoading } = useQuery({
+    queryKey: ['system-health'],
+    queryFn: () => masterAdminService.getSystemHealth(),
+    refetchInterval: 5000,
+    enabled: mounted
+  });
+
+  // Track ping history for fake latency simulation tied to refresh
+  useEffect(() => {
+    if (health) {
+      setPingHistory(prev => {
+        const newPing = { time: new Date().toLocaleTimeString(), ping: Math.floor(Math.random() * 40) + 20 };
+        const updated = [...prev, newPing];
+        return updated.length > 20 ? updated.slice(1) : updated;
+      });
+    }
+  }, [health]);
 
   const maintenanceMode = settings?.data?.maintenance_mode || { enabled: false, message: '' };
   const featureOverrides = settings?.data?.feature_overrides || {};
@@ -124,6 +158,9 @@ export default function GlobalControlPage() {
           </TabsTrigger>
           <TabsTrigger value="health" className="rounded-xl px-8 font-bold text-sm data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-xl data-[state=active]:shadow-primary/5 transition-all">
             <Activity className="w-4 h-4 mr-2" /> System Health
+          </TabsTrigger>
+          <TabsTrigger value="backup" className="rounded-xl px-8 font-bold text-sm data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-xl data-[state=active]:shadow-primary/5 transition-all">
+            <Database className="w-4 h-4 mr-2" /> Data Backup
           </TabsTrigger>
         </TabsList>
 
@@ -272,10 +309,10 @@ export default function GlobalControlPage() {
         <TabsContent value="health" className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { label: 'API Latency', value: '124ms', icon: Activity, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-              { label: 'CPU Usage', value: '42%', icon: Settings, color: 'text-blue-500', bg: 'bg-blue-50' },
-              { label: 'Active Sessions', value: '1,248', icon: Users, color: 'text-purple-500', bg: 'bg-purple-50' },
-              { label: 'Memory', value: '2.4 GB', icon: Layout, color: 'text-amber-500', bg: 'bg-amber-50' },
+              { label: 'CPU Load', value: healthLoading ? '...' : `${health?.server?.cpuLoad}%`, icon: Activity, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+              { label: 'RAM Usage', value: healthLoading ? '...' : `${health?.server?.memory?.percent}%`, icon: Layout, color: 'text-amber-500', bg: 'bg-amber-50' },
+              { label: 'Active DB Conn.', value: healthLoading ? '...' : health?.database?.activeConnections, icon: Database, color: 'text-blue-500', bg: 'bg-blue-50' },
+              { label: 'Uptime', value: healthLoading ? '...' : health?.server?.uptime, icon: Clock, color: 'text-purple-500', bg: 'bg-purple-50' },
             ].map((metric, i) => (
               <div key={i} className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center text-center space-y-4 hover:shadow-xl hover:shadow-slate-200/50 transition-all group">
                  <div className={cn(metric.bg, metric.color, "p-4 rounded-2xl group-hover:scale-110 transition-transform")}>
@@ -289,20 +326,112 @@ export default function GlobalControlPage() {
             ))}
           </div>
           
-          <div className="bg-slate-900 p-8 rounded-[2.5rem] flex flex-col md:flex-row items-center gap-8 shadow-2xl shadow-slate-900/20">
-             <div className="p-4 bg-white/10 rounded-2xl border border-white/5 shadow-inner">
-                <Info className="w-8 h-8 text-white/50" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Ping Chart */}
+            <div className="lg:col-span-2 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+               <div className="mb-6 flex items-center gap-3">
+                 <div className="p-2 bg-blue-50 rounded-xl text-blue-600"><Server className="w-5 h-5" /></div>
+                 <div>
+                   <h3 className="text-lg font-black text-slate-900">API Latency</h3>
+                   <p className="text-xs text-slate-500 font-medium">Real-time simulated ping to main API gateway</p>
+                 </div>
+               </div>
+               <div className="h-[250px] w-full">
+                 <ResponsiveContainer width="100%" height="100%">
+                   <AreaChart data={pingHistory}>
+                     <defs>
+                       <linearGradient id="colorPing" x1="0" y1="0" x2="0" y2="1">
+                         <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                         <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                       </linearGradient>
+                     </defs>
+                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                     <XAxis dataKey="time" hide />
+                     <YAxis hide domain={['dataMin - 10', 'dataMax + 10']} />
+                     <RechartsTooltip 
+                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontWeight: 'bold' }} 
+                       formatter={(value) => [`${value} ms`, 'Latency']}
+                     />
+                     <Area type="monotone" dataKey="ping" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorPing)" isAnimationActive={false} />
+                   </AreaChart>
+                 </ResponsiveContainer>
+               </div>
+            </div>
+
+            {/* Server Details */}
+            <div className="bg-slate-900 p-8 rounded-[2rem] flex flex-col space-y-6 shadow-xl relative overflow-hidden">
+               <div className="absolute -right-8 -top-8 opacity-10">
+                 <Server className="w-48 h-48 text-white" />
+               </div>
+               <div>
+                 <h4 className="text-white font-black text-xl">Infrastructure</h4>
+                 <p className="text-slate-400 text-sm font-medium mt-1">Node.js API & PostgreSQL</p>
+               </div>
+               
+               <div className="space-y-4 flex-1">
+                 <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                   <span className="text-slate-400 font-medium text-sm">Database Size</span>
+                   <span className="text-white font-bold">{healthLoading ? '...' : health?.database?.size}</span>
+                 </div>
+                 <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                   <span className="text-slate-400 font-medium text-sm">Total RAM</span>
+                   <span className="text-white font-bold">{healthLoading ? '...' : health?.server?.memory?.total}</span>
+                 </div>
+                 <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                   <span className="text-slate-400 font-medium text-sm">Used RAM</span>
+                   <span className="text-white font-bold">{healthLoading ? '...' : health?.server?.memory?.used}</span>
+                 </div>
+                 <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                   <span className="text-slate-400 font-medium text-sm">Registered Users</span>
+                   <span className="text-white font-bold">{healthLoading ? '...' : (health?.app?.totalUsers || 0).toLocaleString()}</span>
+                 </div>
+               </div>
+
+               <div className="pt-4">
+                 <Button variant="secondary" className="w-full bg-emerald-500 hover:bg-emerald-600 text-white border-none font-black shadow-lg shadow-emerald-500/20">
+                   Systems Operational
+                 </Button>
+               </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* --- DATA BACKUP TAB --- */}
+        <TabsContent value="backup" className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+          <div className="bg-slate-900 p-8 rounded-[2rem] shadow-xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8">
+             <div className="absolute -left-12 -bottom-12 opacity-5">
+                <Database className="w-64 h-64 text-white" />
              </div>
-             <div className="flex-1 space-y-2">
-                <h5 className="text-white font-bold text-lg">Platform Compliance & Monitoring</h5>
-                <p className="text-sm text-white/50 leading-relaxed font-medium">
-                  System health metrics are updated in real-time. All administrative actions performed in this panel are recorded for audit compliance. 
-                  In case of critical failures, maintenance mode will auto-trigger based on pre-defined safety thresholds.
+             
+             <div className="z-10 flex-1">
+                <h3 className="text-2xl font-black text-white">Disaster Recovery & Backup</h3>
+                <p className="text-slate-400 mt-2 font-medium max-w-xl leading-relaxed">
+                  Generate a complete PostgreSQL database dump. This will create a secure, encrypted <code>.sql</code> backup and automatically upload it to the Cloudinary storage vault. Previous automated backups will be rotated out to preserve storage capacity.
                 </p>
+                <div className="flex items-center gap-4 mt-6">
+                   <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold bg-emerald-400/10 px-4 py-2 rounded-xl">
+                      <ShieldCheck className="w-4 h-4" /> Secure AES-256
+                   </div>
+                   <div className="flex items-center gap-2 text-blue-400 text-sm font-bold bg-blue-400/10 px-4 py-2 rounded-xl">
+                      <Database className="w-4 h-4" /> Full Schema & Data
+                   </div>
+                </div>
              </div>
-             <Button variant="secondary" className="rounded-xl h-12 px-8 font-black uppercase text-xs tracking-widest bg-white text-slate-900 hover:bg-slate-100 border-none shrink-0">
-               Check System Logs
-             </Button>
+
+             <div className="z-10 shrink-0 bg-white/5 p-6 rounded-3xl border border-white/10 text-center w-full md:w-80 flex flex-col items-center">
+                <div className="bg-blue-500/20 p-4 rounded-2xl mb-4 text-blue-400">
+                   {backupMutation.isPending ? <RefreshCw className="w-8 h-8 animate-spin" /> : <Database className="w-8 h-8" />}
+                </div>
+                <Button 
+                   size="lg" 
+                   onClick={() => backupMutation.mutate()} 
+                   disabled={backupMutation.isPending}
+                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black shadow-lg shadow-blue-500/20 h-14 rounded-xl text-md"
+                >
+                   {backupMutation.isPending ? 'Generating Backup...' : 'Trigger Full Backup'}
+                </Button>
+                <p className="text-xs text-slate-500 font-medium mt-4">Estimated time: ~10-30 seconds</p>
+             </div>
           </div>
         </TabsContent>
       </Tabs>

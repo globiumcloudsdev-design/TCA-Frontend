@@ -90,7 +90,7 @@
  */
 'use client';
 
-import { LogOut, User, Settings, UserCircle } from 'lucide-react';
+import { LogOut, User, Settings, UserCircle, LifeBuoy } from 'lucide-react';
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -142,6 +142,13 @@ export default function UserMenu({ user, onLogout , type}) {
           <DropdownMenuItem asChild>
             <Link href={`/${type}/settings`}>
               <Settings size={14} className="mr-2" /> Settings
+            </Link>
+          </DropdownMenuItem>
+          
+          {/* Support link */}
+          <DropdownMenuItem asChild>
+            <Link href={`/${type}/support`}>
+              <LifeBuoy size={14} className="mr-2" /> Help & Support
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>

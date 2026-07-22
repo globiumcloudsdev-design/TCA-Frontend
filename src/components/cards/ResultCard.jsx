@@ -348,12 +348,17 @@ export default function ResultCard({ student, exam, result, institute }) {
   const inst = institute || getInstitute?.() || { name: 'Institute Name', code: 'INST-CODE', logo_url: null, institute_type: 'institution' };
 
   const subjectMarks       = Array.isArray(result.subject_marks) ? result.subject_marks : [];
-  const examSubjects       = Array.isArray(exam.subject_schedules) ? exam.subject_schedules : [];
+  const examSubjects       = Array.isArray(exam.subject_schedules) && exam.subject_schedules.length > 0 ? exam.subject_schedules : subjectMarks.map(sm => ({
+    subject_id: sm.subject_id,
+    subject_name: sm.subject_name || sm.subject || 'Unknown',
+    total_marks: sm.total_marks || 100
+  }));
   const totalMarksObtained = result.total_marks_obtained || 0;
   const percentage         = parseFloat(result.percentage || 0);
   const grade              = result.grade || 'N/A';
   const status             = result.status || 'absent';
   const registrationNo     = student.registration_no || 'N/A';
+  const rollNo             = student.roll_number || student.details?.studentDetails?.roll_no || student.roll_no || 'N/A';
 
   const badgeClass =
     status === 'pass'   ? 'rc-badge rc-badge-pass' :
@@ -424,7 +429,7 @@ export default function ResultCard({ student, exam, result, institute }) {
             </div>
             <div className="rc-info-cell">
               <div className="rc-info-label">Roll Number</div>
-              <div className="rc-info-value">{student.roll_number || student.roll_no || 'N/A'}</div>
+              <div className="rc-info-value">{rollNo}</div>
             </div>
             <div className="rc-info-cell">
               <div className="rc-info-label">Registration No.</div>

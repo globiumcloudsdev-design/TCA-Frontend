@@ -451,6 +451,52 @@ export const reportService = {
     }
   },
 
+  /**
+   * Profit & Loss Report
+   * Fetches aggregated financial metrics
+   */
+  getProfitLossReport: async (filters = {}) => {
+    try {
+      const queryParams = {
+        institute_id: filters.institute_id,
+        academic_year_id: filters.academic_year_id,
+        month: filters.month,
+        year: filters.year,
+        from_date: filters.from_date,
+        to_date: filters.to_date,
+      };
+
+      Object.keys(queryParams).forEach((key) => {
+        if (
+          queryParams[key] === undefined ||
+          queryParams[key] === null ||
+          queryParams[key] === ""
+        ) {
+          delete queryParams[key];
+        }
+      });
+
+      const response = await api.get("/reports/profit-loss", {
+        params: queryParams,
+        timeout: 15000,
+      });
+
+      const reportData = response.data?.data || response.data || {};
+      return {
+        status: 200,
+        message: "Profit & Loss report retrieved successfully",
+        data: reportData,
+      };
+    } catch (error) {
+      console.error("❌ Error fetching profit & loss report:", error);
+      return {
+        status: 500,
+        message: "Failed to fetch profit & loss report",
+        data: { summary: {}, monthly_trends: [] },
+      };
+    }
+  },
+
   // ────────────────────────────────────────────────────────────────────────────
   // EXPORT FUNCTIONALITY
   // ────────────────────────────────────────────────────────────────────────────

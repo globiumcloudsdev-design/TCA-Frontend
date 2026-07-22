@@ -50,30 +50,30 @@ function PermissionCheckbox({ label, code, checked, onChange, disabled }) {
 const branchSchema = z.object({
   // Branch Info
   name: z.string().min(2, 'Branch name must be at least 2 characters'),
-  code: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().email('Invalid email').optional().or(z.literal('')),
-  address: z.string().optional(),
-  city: z.string().optional(),
+  code: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  email: z.string().email('Invalid email').optional().nullable().or(z.literal('')),
+  address: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
 
   // Location
   location: z.object({
     latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
     longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
-    address: z.string().optional(),
-    place_id: z.string().optional()
+    address: z.string().optional().nullable(),
+    place_id: z.string().optional().nullable()
   }).optional().default({}),
 
   // Settings
   settings: z.object({
-    has_hostel: z.boolean().default(false),
-    has_transport: z.boolean().default(false),
-    has_library: z.boolean().default(true),
-    has_lab: z.boolean().default(true),
-    has_playground: z.boolean().default(false),
-    has_cafeteria: z.boolean().default(false),
-    has_mosque: z.boolean().default(false),
-    has_parking: z.boolean().default(false),
+    has_hostel: z.boolean().nullable().optional().default(false),
+    has_transport: z.boolean().nullable().optional().default(false),
+    has_library: z.boolean().nullable().optional().default(false),
+    has_lab: z.boolean().nullable().optional().default(false),
+    has_playground: z.boolean().nullable().optional().default(false),
+    has_cafeteria: z.boolean().nullable().optional().default(false),
+    has_mosque: z.boolean().nullable().optional().default(false),
+    has_parking: z.boolean().nullable().optional().default(false),
     working_hours: z.object({
       monday: z.object({ open: z.string().nullable(), close: z.string().nullable() }),
       tuesday: z.object({ open: z.string().nullable(), close: z.string().nullable() }),
@@ -99,11 +99,11 @@ const branchSchema = z.object({
 
   // 👇 HEAD USER FIELDS - will be created in users table
   head: z.object({
-    first_name: z.string().min(2, 'First name required'),
-    last_name: z.string().min(2, 'Last name required'),
-    email: z.string().email('Valid email required'),
+    first_name: z.string().min(2, 'First name required').optional().or(z.literal('')),
+    last_name: z.string().min(2, 'Last name required').optional().or(z.literal('')),
+    email: z.string().email('Valid email required').optional().or(z.literal('')),
     phone: z.string().optional(),
-    password: z.string().min(6, 'Password must be at least 6 characters').optional(),
+    password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
     permissions: z.array(z.string()).default([])
   }).optional().default({})
 });
@@ -269,10 +269,42 @@ export default function BranchForm({
     onSubmit(formattedData);
   };
 
+  const onInvalid = (errors) => {
+    console.error('Form validation errors:', errors);
+    
+    // Extract first error message for toast
+    let firstErrorMsg = 'Please check all tabs for missing or invalid fields.';
+    try {
+      // Find the first error in the errors object
+      const getFirstError = (obj) => {
+        for (let key in obj) {
+          if (obj[key]?.message) return `${key}: ${obj[key].message}`;
+          if (typeof obj[key] === 'object') return getFirstError(obj[key]);
+        }
+        return null;
+      };
+      const msg = getFirstError(errors);
+      if (msg) firstErrorMsg = `Validation Error: ${msg}`;
+    } catch (e) {}
+    
+    // Navigate to the tab with the error
+    if (errors.name || errors.code || errors.phone || errors.email || errors.city) {
+      setActiveTab('basic');
+    } else if (errors.location || errors.address) {
+      setActiveTab('location');
+    } else if (errors.head) {
+      setActiveTab('head');
+    } else if (errors.settings) {
+      setActiveTab('settings');
+    }
+
+    toast.error(firstErrorMsg);
+  };
+
   if (!isMounted) return null;
 
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(onFormSubmit, onInvalid)} className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid grid-cols-4">
           <TabsTrigger value="basic" className="gap-2">
@@ -309,6 +341,7 @@ export default function BranchForm({
                     <InputField
                       label="Branch Name"
                       {...field}
+                      value={field.value ?? ''}
                       error={error}
                       required
                       placeholder="e.g. Main Campus"
@@ -323,6 +356,7 @@ export default function BranchForm({
                     <InputField
                       label="Branch Code"
                       {...field}
+                      value={field.value ?? ''}
                       error={error}
                       placeholder="e.g. MAIN-01"
                     />
@@ -338,6 +372,7 @@ export default function BranchForm({
                     <InputField
                       label="Phone"
                       {...field}
+                      value={field.value ?? ''}
                       error={error}
                       placeholder="+92-42-XXXXXXXX"
                     />
@@ -351,6 +386,7 @@ export default function BranchForm({
                     <InputField
                       label="Email"
                       {...field}
+                      value={field.value ?? ''}
                       type="email"
                       error={error}
                       placeholder="branch@school.edu.pk"
@@ -366,6 +402,7 @@ export default function BranchForm({
                   <InputField
                     label="City"
                     {...field}
+                    value={field.value ?? ''}
                     error={error}
                     placeholder="e.g. Lahore"
                   />
@@ -426,6 +463,7 @@ export default function BranchForm({
                     <InputField
                       label="Latitude"
                       {...field}
+                      value={field.value ?? ''}
                       error={error}
                       type="number"
                       step="any"
@@ -441,6 +479,7 @@ export default function BranchForm({
                     <InputField
                       label="Longitude"
                       {...field}
+                      value={field.value ?? ''}
                       error={error}
                       type="number"
                       step="any"
@@ -458,6 +497,7 @@ export default function BranchForm({
                   <TextareaField
                     label="Full Address"
                     {...field}
+                    value={field.value ?? ''}
                     error={error}
                     rows={3}
                     placeholder="Complete address"
@@ -494,6 +534,7 @@ export default function BranchForm({
                     <InputField
                       label="First Name"
                       {...field}
+                      value={field.value ?? ''}
                       error={error}
                       required
                       placeholder="e.g. Muhammad"
@@ -508,6 +549,7 @@ export default function BranchForm({
                     <InputField
                       label="Last Name"
                       {...field}
+                      value={field.value ?? ''}
                       error={error}
                       required
                       placeholder="e.g. Ali"
@@ -524,6 +566,7 @@ export default function BranchForm({
                     <InputField
                       label="Email"
                       {...field}
+                      value={field.value ?? ''}
                       error={error}
                       type="email"
                       required
@@ -539,6 +582,7 @@ export default function BranchForm({
                     <InputField
                       label="Phone"
                       {...field}
+                      value={field.value ?? ''}
                       error={error}
                       placeholder="+92-300-1234567"
                     />
@@ -554,6 +598,7 @@ export default function BranchForm({
                     <InputField
                       label="Password"
                       {...field}
+                      value={field.value ?? ''}
                       error={error}
                       type="password"
                       placeholder={isEdit ? "Leave empty to keep current" : "Enter password"}
