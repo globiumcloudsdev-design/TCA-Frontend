@@ -408,7 +408,7 @@ export function middleware(request) {
   // =============================
   if (isPublicPath && (accessToken || portalToken)) {
     // Determine dashboard path from cookies
-    let redirectPath = '/dashboard';
+    let redirectPath = '/school/dashboard';
     const role = (userType || roleCode || '').toUpperCase();
     const instType = (instituteType || 'school').toLowerCase();
 

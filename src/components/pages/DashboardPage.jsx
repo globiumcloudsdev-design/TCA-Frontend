@@ -95,7 +95,7 @@ export default function DashboardPage({ type }) {
     if (canAddStudent) actions.push({ href: `/${type}/students`, label: `Add ${terms.student}`, icon: <Plus size={14} /> });
     if (canMarkAttendance) actions.push({ href: `/${type}/attendance`, label: 'Mark Attendance', icon: <ClipboardCheck size={14} /> });
     if (canCollectFee) actions.push({ href: `/${type}/fees`, label: 'Collect Fee', icon: <DollarSign size={14} /> });
-    if (canAddExpense) actions.push({ href: `/${type}/expenses`, label: 'Add Expense', icon: <ArrowUpRight size={14} /> });
+    if (canAddExpense) actions.push({ href: `/${type}/expense`, label: 'Add Expense', icon: <ArrowUpRight size={14} /> });
 
     if (type === 'school' && (user?.role_code === 'MASTER_ADMIN' || user?.permissions?.includes('timetable.view'))) {
       actions.push({ href: `/${type}/timetable`, label: 'Timetable', icon: <Calendar size={14} /> });

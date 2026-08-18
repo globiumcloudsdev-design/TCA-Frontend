@@ -33,5 +33,5 @@ export const getDashboardPath = (user, fallbackInstituteType = 'school') => {
   }
 
   // Default fallback
-  return '/dashboard';
+  return '/school/dashboard';
 };

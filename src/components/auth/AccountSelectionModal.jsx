@@ -128,7 +128,7 @@ export default function AccountSelectionModal({
     } else if (role === 'PARENT') {
       router.replace('/parent');
     } else {
-      router.replace('/dashboard');
+      router.replace(`/${instType || 'school'}/dashboard`);
     }
   };
 
