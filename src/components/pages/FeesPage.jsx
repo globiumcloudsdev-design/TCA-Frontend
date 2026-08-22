@@ -11,13 +11,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, DollarSign, AlertCircle, FileText, Filter, Download, Trash2 } from 'lucide-react';
+import { Plus, DollarSign, AlertCircle, FileText, Filter, Download, Trash2, Printer, CheckCircle, AlertTriangle, Check as CheckIcon, RotateCcw, CreditCard, Coins, RefreshCw, ChevronDown } from 'lucide-react';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
+import CollectPaymentModal from '@/components/common/CollectPaymentModal';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import SelectField from '@/components/common/SelectField';
 import DatePickerField from '@/components/common/DatePickerField';
@@ -28,7 +29,6 @@ import { downloadBlob } from '@/lib/download';
 import { generateBulkFeeVouchersPdfBlob, generateFeeVoucherPdfBlob, generateFeeReceiptPdfBlob, generateStudentAccountStatementPdfBlob } from '@/lib/pdf/feeVoucherPdf';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { feeVoucherService, academicYearService, classService, sectionService, studentService } from '@/services';
-import { Check, ChevronDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Command,
@@ -114,7 +114,7 @@ function SearchableSingleSelect({ label, value, onChange, options = [], placehol
                     }}
                   >
                     <span className="flex-1">{option.label}</span>
-                    {String(option.value) === String(value) ? <Check className="h-4 w-4" /> : null}
+                    {String(option.value) === String(value) ? <CheckIcon className="h-4 w-4" /> : null}
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -149,7 +149,6 @@ export default function FeesPage() {
   const [voucherPageSize, setVoucherPageSize] = useState(20);
   const [markingAsPaid, setMarkingAsPaid] = useState(null);
   const [recordingPayment, setRecordingPayment] = useState(null);
-  const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'cash', referenceNo: '', remarks: '' });
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -696,38 +695,6 @@ const { data: bulkClasses = [] } = useQuery({
     },
   });
 
-  // Record partial payment
-  const recordPaymentMutation = useMutation({
-    mutationFn: (paymentData) => feeVoucherService.recordPayment(paymentData.voucherId, {
-      amount: parseFloat(paymentData.amount),
-      paymentMethod: paymentData.method,
-      referenceNo: paymentData.referenceNo || null,
-      remarks: paymentData.remarks || null
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
-      toast.success('Payment recorded successfully');
-      setPaymentForm({ amount: '', method: 'cash', referenceNo: '', remarks: '' });
-      setRecordingPayment(null);
-      if (viewingVoucher) setViewingVoucher(null);
-      refetchVouchers();
-    },
-    onError: (err) => {
-      if (err.response?.status === 403) {
-        toast.error('Permission denied. Required: fees.update');
-      } else {
-        toast.error(err.message || 'Failed to record payment');
-      }
-    },
-  });
-
-  const handleRecordPayment = async (voucherId) => {
-    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
-      toast.error('Please enter a valid payment amount');
-      return;
-    }
-    recordPaymentMutation.mutate({ voucherId, ...paymentForm });
-  };
   // Bulk download vouchers as PDF 
 const handleBulkDownload = async () => {
   // Check permission first
@@ -1211,6 +1178,136 @@ const handleDownloadVoucher = async (voucher) => {
   }
 };
 
+// Direct Print single voucher PDF workflow
+const handlePrintVoucher = async (voucher) => {
+  if (!hasPermission('fees.read')) {
+    toast.error('You need fees.read permission to print vouchers');
+    return;
+  }
+
+  try {
+    toast.info(`Preparing voucher ${voucher.voucherNumber || voucher.voucher_number || ''} for printing...`);
+    
+    let className = '';
+    let sectionName = '';
+    
+    // Try to get from student record with full details
+    const targetStudentId = voucher.studentId || voucher.student_id || voucher.Student?.id;
+    if (targetStudentId) {
+      try {
+        const studentResponse = await studentService.getById(targetStudentId, { 
+          params: { institute_type: currentInstitute?.type, include: 'class,section' } 
+        });
+        const student = studentResponse?.data || studentResponse;
+        
+        className = 
+          student.class_name ||
+          student.Class?.name ||
+          student.class?.name ||
+          student.current_class?.name ||
+          student.enrolled_class?.name ||
+          (student.classes && student.classes[0]?.name) ||
+          (student.currentClass?.name) ||
+          '';
+        
+        sectionName = 
+          student.section_name ||
+          student.Section?.name ||
+          student.section?.name ||
+          student.current_section?.name ||
+          student.enrolled_section?.name ||
+          (student.sections && student.sections[0]?.name) ||
+          (student.currentSection?.name) ||
+          '';
+      } catch (studentErr) {
+        console.error('Failed to fetch student:', studentErr);
+      }
+    }
+    
+    const { classNameById, sectionNameById } = buildClassSectionMaps();
+    
+    const cid = voucher.classId || voucher.class_id;
+    if (cid && (!className || className === '')) {
+      className = classNameById.get(String(cid)) || normalizeDisplayValue(voucher.className || voucher.class_name);
+    }
+    
+    const sid = voucher.sectionId || voucher.section_id;
+    if (sid && (!sectionName || sectionName === '')) {
+      sectionName = sectionNameById.get(String(sid)) || normalizeDisplayValue(voucher.sectionName || voucher.section_name);
+    }
+    
+    className = normalizeDisplayValue(className) || 'N/A';
+    sectionName = normalizeDisplayValue(sectionName) || 'N/A';
+    
+    const studentData = {
+      className: className,
+      sectionName: sectionName,
+      name: voucher.studentName || 'Student',
+      registrationNo: voucher.registrationNo || 'N/A',
+      class: className,
+      section: sectionName
+    };
+    
+    const enrichedVoucher = {
+      ...voucher,
+      className: className,
+      class_name: className,
+      sectionName: sectionName,
+      section_name: sectionName,
+      student: studentData
+    };
+    
+    const blob = await generateFeeVoucherPdfBlob({
+      voucher: enrichedVoucher,
+      student: studentData,
+      instituteName: currentInstitute?.name || 'School Management System',
+      logoUrl: currentInstitute?.logo_url
+    });
+    
+    const blobUrl = URL.createObjectURL(blob);
+    
+    // Create temporary hidden iframe for seamless direct print
+    const printIframe = document.createElement('iframe');
+    printIframe.style.position = 'fixed';
+    printIframe.style.right = '0';
+    printIframe.style.bottom = '0';
+    printIframe.style.width = '0';
+    printIframe.style.height = '0';
+    printIframe.style.border = '0';
+    printIframe.src = blobUrl;
+    document.body.appendChild(printIframe);
+    
+    printIframe.onload = () => {
+      setTimeout(() => {
+        try {
+          printIframe.contentWindow?.focus();
+          printIframe.contentWindow?.print();
+        } catch (e) {
+          const printWindow = window.open(blobUrl, '_blank');
+          if (printWindow) {
+            printWindow.focus();
+            printWindow.print();
+          }
+        }
+      }, 300);
+      
+      setTimeout(() => {
+        try {
+          if (document.body.contains(printIframe)) {
+            document.body.removeChild(printIframe);
+          }
+          URL.revokeObjectURL(blobUrl);
+        } catch (err) {}
+      }, 60000);
+    };
+    
+    toast.success('Print dialog opened');
+  } catch (error) {
+    console.error('Failed to print voucher PDF:', error);
+    toast.error('Failed to print voucher: ' + (error.message || 'Unknown error'));
+  }
+};
+
 const handleDownloadStatement = async () => {
   if (!selectedLedgerStudentId) return;
   const student = allStudentsData.find(s => String(s.id) === String(selectedLedgerStudentId));
@@ -1353,19 +1450,10 @@ const downloadReceipt = async (payment, voucher) => {
             {row.original.status !== 'paid' && hasPermission('fees.update') && (
               <>
                 <button
-                  onClick={() => { 
-                    setRecordingPayment(row.original); 
-                    const initialAmount = row.original.pending_amount ?? (row.original.net_amount || row.original.netAmount || 0);
-                    setPaymentForm({ 
-                      amount: String(Number(initialAmount).toFixed(2)), 
-                      method: 'cash', 
-                      referenceNo: '', 
-                      remarks: '' 
-                    }); 
-                  }}
+                  onClick={() => setRecordingPayment(row.original)}
                   disabled={recordingPayment?.id === row.original.id}
                   className="rounded p-1 hover:bg-blue-100 text-blue-700 hover:text-blue-800 disabled:opacity-50"
-                  title="Record Payment"
+                  title="Process Selective Payment"
                 >
                   {recordingPayment?.id === row.original.id ? '⏳' : '💰'}
                 </button>
@@ -1379,8 +1467,8 @@ const downloadReceipt = async (payment, voucher) => {
                 </button>
               </>
             )}
-            <button onClick={() => handleDownloadVoucher(row.original)} className="rounded p-1 hover:bg-accent" title="Download">
-              <Download size={14} />
+            <button onClick={() => handlePrintVoucher(row.original)} className="rounded p-1 hover:bg-accent" title="Print Voucher">
+              <Printer size={14} />
             </button>
             {hasPermission('fees.delete') && (
               <button onClick={() => setDeletingVoucher(row.original)} className="rounded p-1 text-destructive hover:bg-destructive/10" title="Delete">
@@ -1391,7 +1479,7 @@ const downloadReceipt = async (payment, voucher) => {
         ),
       },
     ],
-    [terms.student, hasPermission, setViewingVoucher, setDeletingVoucher, handleDownloadVoucher, markingAsPaid, recordingPayment, setRecordingPayment, setPaymentForm]
+    [terms.student, hasPermission, setViewingVoucher, setDeletingVoucher, handlePrintVoucher, markingAsPaid, recordingPayment, setRecordingPayment]
   );
 
   // Show permission denied message if user doesn't have read access
@@ -1956,7 +2044,7 @@ const downloadReceipt = async (payment, voucher) => {
               </div>
             ) : !defaultersData.length ? (
               <div className="text-center py-16 bg-emerald-50/20 border border-dashed border-emerald-200 rounded-2xl text-emerald-600 space-y-2">
-                <Check size={48} className="mx-auto text-emerald-500 stroke-[1.5] animate-bounce" />
+                <CheckIcon size={48} className="mx-auto text-emerald-500 stroke-[1.5] animate-bounce" />
                 <h5 className="font-extrabold text-emerald-800 text-base">All Clear! No Defaulters</h5>
                 <p className="text-xs text-emerald-600 font-medium">All students have outstanding balances of less than 2 months. Keep up the great collections!</p>
               </div>
@@ -2245,97 +2333,13 @@ const downloadReceipt = async (payment, voucher) => {
         variant="destructive"
       />
 
-      {/* Record Payment Modal */}
-      <AppModal open={!!recordingPayment} onClose={() => setRecordingPayment(null)} title={`Record Payment - ${recordingPayment?.voucherNumber}`} size="md">
-        {recordingPayment && (
-          <div className="space-y-4">
-            {/* Amount Info */}
-            <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
-              <div>
-                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Total Net Amount</p>
-                <p className="font-bold text-lg text-blue-600">PKR {(Number(recordingPayment.net_amount || recordingPayment.netAmount || 0)).toLocaleString('en-PK')}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider text-orange-600">Pending Outstanding</p>
-                <p className="font-bold text-lg text-orange-600">PKR {(Number(recordingPayment.pending_amount ?? (recordingPayment.net_amount || recordingPayment.netAmount || 0))).toLocaleString('en-PK')}</p>
-              </div>
-            </div>
-
-            {/* Payment Form */}
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-semibold flex justify-between">
-                  <span>Payment Amount *</span>
-                  <span className="text-xs text-muted-foreground">Max: PKR {(Number(recordingPayment.pending_amount ?? (recordingPayment.net_amount || recordingPayment.netAmount || 0))).toLocaleString('en-PK')}</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max={Number(recordingPayment.pending_amount ?? (recordingPayment.net_amount || recordingPayment.netAmount || 0))}
-                  step="0.01"
-                  value={paymentForm.amount}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const max = Number(recordingPayment.pending_amount ?? (recordingPayment.net_amount || recordingPayment.netAmount || 0));
-                    if (parseFloat(val) > max) {
-                      setPaymentForm({ ...paymentForm, amount: String(max.toFixed(2)) });
-                      toast.warning(`Amount capped at outstanding balance: PKR ${max.toFixed(2)}`);
-                    } else {
-                      setPaymentForm({ ...paymentForm, amount: val });
-                    }
-                  }}
-                  placeholder="Enter payment amount"
-                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                />
-              </div>
-
-              <SelectField
-                label="Payment Method"
-                required
-                options={PAYMENT_METHOD_OPTS}
-                value={paymentForm.method}
-                onChange={(val) => setPaymentForm({ ...paymentForm, method: val })}
-              />
-
-              <div>
-                <label className="text-sm font-semibold">Reference No. (Optional)</label>
-                <input
-                  type="text"
-                  value={paymentForm.referenceNo}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, referenceNo: e.target.value })}
-                  placeholder="e.g., Check #, Transaction ID"
-                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold">Remarks (Optional)</label>
-                <textarea
-                  value={paymentForm.remarks}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, remarks: e.target.value })}
-                  placeholder="Additional notes..."
-                  rows="2"
-                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-2 justify-end pt-4 border-t">
-              <button onClick={() => setRecordingPayment(null)} className="rounded-md border px-4 py-2 text-sm">
-                Cancel
-              </button>
-              <button
-                onClick={() => handleRecordPayment(recordingPayment.id)}
-                disabled={recordPaymentMutation.isPending}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {recordPaymentMutation.isPending ? '⏳ Recording...' : '💾 Record Payment'}
-              </button>
-            </div>
-          </div>
-        )}
-      </AppModal>
+      {/* Selective / Manual Fee Voucher Payment Processing Modal */}
+      <CollectPaymentModal
+        open={!!recordingPayment}
+        onClose={() => setRecordingPayment(null)}
+        target={recordingPayment}
+        onSuccess={() => refetchVouchers()}
+      />
 
       {/* Voucher Detail View Modal */}
       <AppModal open={!!viewingVoucher} onClose={() => setViewingVoucher(null)} title="Voucher Details" size="lg">
@@ -2461,7 +2465,7 @@ const downloadReceipt = async (payment, voucher) => {
                           <div key={payment.id || idx} className="flex justify-between items-center p-3 rounded-xl bg-white border border-slate-100 shadow-sm hover:border-emerald-200 transition-all">
                             <div className="flex items-center gap-3">
                               <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
-                                <Check size={18} />
+                                <CheckIcon size={18} />
                               </div>
                               <div className="space-y-0.5">
                                 <p className="font-bold text-slate-900">PKR {Number(payment.amount_paid || payment.amount || 0).toLocaleString('en-PK')}</p>
@@ -2504,10 +2508,10 @@ const downloadReceipt = async (payment, voucher) => {
             <div className="flex gap-2 justify-end pt-4 border-t">
               <Button variant="outline" onClick={() => setViewingVoucher(null)}>Close</Button>
               <Button 
-                onClick={() => handleDownloadVoucher(viewingVoucher)} 
+                onClick={() => handlePrintVoucher(viewingVoucher)} 
                 className="bg-primary text-white flex items-center gap-2 font-bold"
               >
-                <Download size={16} /> Download Fee Voucher
+                <Printer size={16} /> Print Fee Voucher
               </Button>
             </div>
           </div>

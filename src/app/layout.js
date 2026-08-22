@@ -6,6 +6,7 @@
  */
 
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 import Providers from "@/components/Providers";
@@ -19,6 +20,14 @@ export const metadata = {
     template: "%s | The Clouds Academy",
   },
   description: "Institute Management System",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/logos/TCA APP Icon.png", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/logos/TCA APP Icon.png",
+  },
 };
 
 export default function RootLayout({ children }) {

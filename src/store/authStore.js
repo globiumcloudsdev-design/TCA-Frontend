@@ -235,6 +235,10 @@ export const useAuthStore = create(
         return perms.includes(permissionCode);
       },
 
+      hasPermission: (permissionCode) => {
+        return get().canDo(permissionCode);
+      },
+
       canDoAny: (codes = []) => {
         const u = get().user;
         if (!u) return false;

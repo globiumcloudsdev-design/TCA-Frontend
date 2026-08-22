@@ -9,10 +9,8 @@
  * @returns {string} The dashboard URL
  */
 export const getDashboardPath = (user, fallbackInstituteType = 'school') => {
-  if (!user) return '/login';
-
-  const role = (user.user_type || user.role_code || user.role?.code || '').toUpperCase();
-  const instType = (user.institute?.institute_type || user.institute_type || user.school?.institute_type || fallbackInstituteType || '').toLowerCase();
+  const role = (user?.user_type || user?.role_code || user?.role?.code || '').toUpperCase();
+  const instType = (user?.institute?.institute_type || user?.institute_type || user?.school?.institute_type || fallbackInstituteType || 'school').toLowerCase();
 
   // Master Admin Roles
   const MASTER_ROLES = ['MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPPORT_STAFF', 'MASTER_STAFF', 'MASTER_SUPPORT', 'SUPER_ADMIN', 'ADMIN', 'MASTER'];
@@ -27,11 +25,9 @@ export const getDashboardPath = (user, fallbackInstituteType = 'school') => {
 
   // Institute Admin & Staff Roles
   if (role === 'INSTITUTE_ADMIN' || role === 'BRANCH_ADMIN' || role === 'STAFF') {
-    // If user belongs to a specific branch, we might want to go to branch dashboard
-    // But for now, following existing logic of institute-type based dashboard
     return `/${instType}/dashboard`;
   }
 
   // Default fallback
-  return '/school/dashboard';
+  return `/${instType || 'school'}/dashboard`;
 };

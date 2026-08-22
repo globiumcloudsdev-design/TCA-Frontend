@@ -40,12 +40,13 @@ export const DASHBOARD = {
 //  STUDENTS
 // ─────────────────────────────────────────────────────────────────
 export const STUDENTS = {
-  LIST:       '/students',               // GET    ?page&limit&search&class_id&section_id&academic_year_id&is_active
-  CREATE:     '/students',               // POST   { first_name, last_name, gr_number, dob, gender, ... }
-  BY_ID:      '/students/:id',           // GET
-  UPDATE:     '/students/:id',           // PUT
-  DELETE:     '/students/:id',           // DELETE (soft)
-  PHOTO:      '/students/:id/photo',     // POST   multipart/form-data
+  LIST:             '/students',               // GET    ?page&limit&search&class_id&section_id&academic_year_id&is_active
+  CREATE:           '/students',               // POST   { first_name, last_name, gr_number, dob, gender, ... }
+  BY_ID:            '/students/:id',           // GET
+  UPDATE:           '/students/:id',           // PUT
+  DELETE:           '/students/:id',           // DELETE (soft)
+  PHOTO:            '/students/:id/photo',     // POST   multipart/form-data
+  UNPAID_VOUCHERS:  '/students/:id/unpaid-vouchers', // GET
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -133,12 +134,15 @@ export const EXAMS = {
 //  FEES
 // ─────────────────────────────────────────────────────────────────
 export const FEES = {
-  VOUCHERS:         '/fees/vouchers',                  // GET    ?student_id&status&month&year&academic_year_id&page&limit
-  CREATE_VOUCHER:   '/fees/vouchers',                  // POST   { student_id, amount, month, year, due_date, academic_year_id, discount?, notes? }
-  VOUCHER_BY_ID:    '/fees/vouchers/:id',              // GET
-  UPDATE_VOUCHER:   '/fees/vouchers/:id',              // PUT
-  COLLECT:          '/fees/vouchers/:id/collect',      // PATCH  { amount_paid, payment_method, transaction_id?, notes? }
-  PAYMENTS:         '/fees/payments',                  // GET    ?student_id&month&year&payment_method
+  VOUCHERS:                 '/fees/vouchers',                  // GET    ?student_id&status&month&year&academic_year_id&page&limit
+  CREATE_VOUCHER:           '/fees/vouchers',                  // POST   { student_id, amount, month, year, due_date, academic_year_id, discount?, notes? }
+  VOUCHER_BY_ID:            '/fees/vouchers/:id',              // GET
+  UPDATE_VOUCHER:           '/fees/vouchers/:id',              // PUT
+  COLLECT:                  '/fees/vouchers/:id/collect',      // PATCH  { amount_paid, payment_method, transaction_id?, notes? }
+  PAYMENTS:                 '/fees/payments',                  // GET    ?student_id&month&year&payment_method
+  STUDENT_UNPAID_VOUCHERS:  '/students/:id/unpaid-vouchers',   // GET
+  FIFO_PAYMENT:             '/fee-vouchers/process-fifo-payment', // POST
+  SELECTIVE_PAYMENT:        '/fee-vouchers/process-selective-payment', // POST
 };
 
 // ─────────────────────────────────────────────────────────────────

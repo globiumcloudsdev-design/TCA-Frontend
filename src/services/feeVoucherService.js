@@ -1,3 +1,5 @@
+
+
 /**
  * Fee Voucher Service — Frontend
  * 
@@ -125,6 +127,92 @@ const pickFirst = (...values) => {
     }
   }
   return undefined;
+};
+
+const MONTH_NAMES_LIST = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+/**
+ * Derives a clean human-readable month string (e.g. "July 2026 Voucher", "August 2026 Voucher")
+ */
+export const computeVoucherMonthLabel = (data = {}, options = {}) => {
+  if (!data) return options?.withSuffix === false ? 'Monthly' : 'Monthly Voucher';
+
+  const withSuffix = options?.withSuffix !== false;
+  const suffix = withSuffix ? ' Voucher' : '';
+
+  // 1. Explicit month (1-12) & year
+  const m = Number(data.month || data.fee_month || data.feeMonth);
+  const y = Number(data.year || data.fee_year || data.feeYear);
+  if (m >= 1 && m <= 12 && y >= 2000) {
+    return `${MONTH_NAMES_LIST[m - 1]} ${y}${suffix}`;
+  }
+  if (m >= 1 && m <= 12) {
+    const defaultYear = y || new Date().getFullYear();
+    return `${MONTH_NAMES_LIST[m - 1]} ${defaultYear}${suffix}`;
+  }
+
+  // 2. String fee_month format like "2026-07" or "July 2026"
+  const rawFeeMonth = String(data.fee_month || data.feeMonth || '').trim();
+  if (rawFeeMonth) {
+    if (/^\d{4}-\d{2}/.test(rawFeeMonth)) {
+      const parts = rawFeeMonth.split('-');
+      const monthIdx = parseInt(parts[1], 10) - 1;
+      if (monthIdx >= 0 && monthIdx < 12) {
+        return `${MONTH_NAMES_LIST[monthIdx]} ${parts[0]}${suffix}`;
+      }
+    }
+    if (rawFeeMonth.toLowerCase().includes('voucher')) {
+      return rawFeeMonth;
+    }
+    return `${rawFeeMonth}${suffix}`;
+  }
+
+  // 3. From due_date, issue_date, created_at
+  const dateStr = data.due_date || data.dueDate || data.issue_date || data.issued_date || data.issuedDate || data.created_at || data.createdAt;
+  if (dateStr) {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      return `${MONTH_NAMES_LIST[d.getMonth()]} ${d.getFullYear()}${suffix}`;
+    }
+  }
+
+  return withSuffix ? 'Monthly Voucher' : 'Monthly';
+};
+
+/**
+ * Sort vouchers strictly in ascending chronological order (oldest due_date first)
+ */
+export const sortVouchersChronologically = (vouchers = []) => {
+  return [...vouchers].sort((a, b) => {
+    // 1. Due date (primary)
+    const aDue = a.due_date || a.dueDate;
+    const bDue = b.due_date || b.dueDate;
+    if (aDue && bDue) {
+      const diff = new Date(aDue).getTime() - new Date(bDue).getTime();
+      if (diff !== 0) return diff;
+    } else if (aDue && !bDue) {
+      return -1;
+    } else if (!aDue && bDue) {
+      return 1;
+    }
+
+    // 2. Year and Month
+    const aYear = Number(a.year || a.fee_year || a.feeYear) || (aDue ? new Date(aDue).getFullYear() : 0);
+    const bYear = Number(b.year || b.fee_year || b.feeYear) || (bDue ? new Date(bDue).getFullYear() : 0);
+    if (aYear !== bYear && aYear > 0 && bYear > 0) return aYear - bYear;
+
+    const aMonth = Number(a.month || a.fee_month || a.feeMonth) || (aDue ? new Date(aDue).getMonth() + 1 : 0);
+    const bMonth = Number(b.month || b.fee_month || b.feeMonth) || (bDue ? new Date(bDue).getMonth() + 1 : 0);
+    if (aMonth !== bMonth && aMonth > 0 && bMonth > 0) return aMonth - bMonth;
+
+    // 3. Issue date or createdAt
+    const aCreated = new Date(a.issue_date || a.issuedDate || a.created_at || a.createdAt || 0).getTime();
+    const bCreated = new Date(b.issue_date || b.issuedDate || b.created_at || b.createdAt || 0).getTime();
+    return aCreated - bCreated;
+  });
 };
 
 const studentMetaCache = new Map();
@@ -296,6 +384,7 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
   // Final fallbacks
   className = normalizeText(className) || 'N/A';
   sectionName = normalizeText(sectionName) || 'N/A';
+  const monthLabel = computeVoucherMonthLabel(data);
 
   return {
     id: data.id,
@@ -312,6 +401,8 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
     section_name: sectionName,
     month: data.month,
     year: data.year,
+    monthLabel: monthLabel,
+    month_label: monthLabel,
     academicYearId: data.academic_year_id || data.academicYearId || studentRaw.academic_year_id || studentRaw.academicYearId,
     amount: parseFloat(data.amount || 0),
     discount: parseFloat(data.discount || 0),
@@ -388,6 +479,12 @@ export const feeVoucherService = {
         dueDate: options.dueDate || undefined,
         academicYearId: options.academicYearId || undefined,
         feeTemplateId: options.feeTemplateId || undefined,
+        include_arrears: false,
+        includeArrears: false,
+        merge_arrears: false,
+        mergeArrears: false,
+        separate_vouchers: true,
+        separateVouchers: true,
       }, {
         timeout: 10000
       });
@@ -425,6 +522,12 @@ export const feeVoucherService = {
         dueDate: options.dueDate || undefined,
         academicYearId: options.academicYearId || undefined,
         feeTemplateId: options.feeTemplateId || undefined,
+        include_arrears: false,
+        includeArrears: false,
+        merge_arrears: false,
+        mergeArrears: false,
+        separate_vouchers: true,
+        separateVouchers: true,
       }, {
         timeout: 600000
       });
@@ -467,6 +570,12 @@ export const feeVoucherService = {
         dueDate: options.dueDate || undefined,
         academicYearId: options.academicYearId || undefined,
         feeTemplateId: options.feeTemplateId || undefined,
+        include_arrears: false,
+        includeArrears: false,
+        merge_arrears: false,
+        mergeArrears: false,
+        separate_vouchers: true,
+        separateVouchers: true,
       }, {
         timeout: 600000
       });
@@ -931,6 +1040,275 @@ export const feeVoucherService = {
       throw {
         message: error.response?.data?.message || error.message || 'Failed to record batch payments',
         status: error.response?.status,
+        error
+      };
+    }
+  },
+
+  /**
+   * Process selective / manual fee voucher payment allocations
+   * Distributes lump-sum or specific payments across chosen vouchers with strict balance verification.
+   * @param {object} params - { studentId, totalAmount, paymentMethod, referenceNo, remarks, paidDate, allocations: [{ voucherId, amountApplied }] }
+   * @returns {Promise<object>} Processing summary & updated voucher receipts
+   */
+  processSelectivePayment: async ({
+    studentId,
+    totalAmount,
+    paymentMethod = 'cash',
+    referenceNo = null,
+    remarks = null,
+    paidDate = null,
+    allocations = []
+  }) => {
+    try {
+      const parsedTotal = parseFloat(totalAmount);
+      if (isNaN(parsedTotal) || parsedTotal <= 0) {
+        throw new Error('Valid total payment amount is required');
+      }
+      if (!Array.isArray(allocations) || allocations.length === 0) {
+        throw new Error('At least one voucher allocation is required');
+      }
+
+      const activeAllocations = allocations.filter(a => a.voucherId && parseFloat(a.amountApplied) > 0);
+      if (activeAllocations.length === 0) {
+        throw new Error('No allocations with positive amount found');
+      }
+
+      const totalAllocated = activeAllocations.reduce((sum, a) => sum + parseFloat(a.amountApplied), 0);
+      if (Math.abs(totalAllocated - parsedTotal) > 0.01) {
+        throw new Error(`Total allocated (PKR ${totalAllocated.toFixed(2)}) must match total received (PKR ${parsedTotal.toFixed(2)})`);
+      }
+
+      const payload = {
+        studentId,
+        totalAmount: parsedTotal,
+        paymentMethod,
+        referenceNo: referenceNo || null,
+        remarks: remarks || null,
+        paidDate: paidDate || new Date().toISOString().split('T')[0],
+        allocations: activeAllocations.map(a => ({
+          voucherId: a.voucherId,
+          amountApplied: parseFloat(a.amountApplied)
+        }))
+      };
+
+      // 1. Try dedicated selective payment endpoint on backend
+      try {
+        const response = await api.post('/fee-vouchers/process-selective-payment', payload, {
+          timeout: 20000
+        });
+        return {
+          success: true,
+          message: response.data?.message || 'Selective payment processed successfully',
+          data: response.data?.data || response.data
+        };
+      } catch (endpointError) {
+        // If error is not a 404 (e.g. 403 Forbidden or 400 Validation), throw directly
+        if (endpointError.response?.status && endpointError.response.status !== 404) {
+          throw endpointError;
+        }
+
+        // 2. Fallback: Execute iterative voucher payments sequentially
+        console.warn('Dedicated endpoint /fee-vouchers/process-selective-payment returned 404. Falling back to iterative voucher allocation...');
+        
+        const results = {
+          success: true,
+          totalAmount: parsedTotal,
+          allocatedCount: activeAllocations.length,
+          payments: []
+        };
+
+        for (const alloc of payload.allocations) {
+          const singleResult = await feeVoucherService.recordPayment(alloc.voucherId, {
+            amount: alloc.amountApplied,
+            paymentMethod: payload.paymentMethod,
+            referenceNo: payload.referenceNo,
+            remarks: payload.remarks ? `${payload.remarks} (Selective Allocation)` : 'Selective Allocation',
+            paidDate: payload.paidDate
+          });
+          results.payments.push({
+            voucherId: alloc.voucherId,
+            amountApplied: alloc.amountApplied,
+            receipt: singleResult.receipt,
+            paymentRecord: singleResult.paymentRecord
+          });
+        }
+
+        // Post-transaction sync of student pending dues
+        try {
+          if (studentId) {
+            await studentService.syncStudentPendingDues(studentId);
+          }
+        } catch (syncErr) {
+          console.warn('Post-payment student dues sync note:', syncErr.message);
+        }
+
+        return results;
+      }
+    } catch (error) {
+      console.error('❌ Failed to process selective payment:', error);
+      throw {
+        message: error.response?.data?.message || error.message || 'Failed to process selective payment',
+        status: error.response?.status,
+        details: error.response?.data?.details,
+        error
+      };
+    }
+  },
+
+  /**
+   * Get all unpaid / partial / overdue vouchers for a student
+   * Sorted strictly in ascending chronological order (oldest month/due date first).
+   * Explicitly computes human-readable month labels.
+   * @param {string} studentId - Student UUID
+   * @returns {Promise<Array>} List of sorted unpaid vouchers
+   */
+  getUnpaidByStudent: async (studentId) => {
+    try {
+      if (!studentId) throw new Error('Student ID is required');
+
+      let vouchersList = [];
+
+      // 1. Try dedicated endpoint GET /students/:id/unpaid-vouchers
+      try {
+        const response = await api.get(`/students/${studentId}/unpaid-vouchers`, {
+          timeout: 10000
+        });
+        const raw = response.data?.data?.vouchers || response.data?.data || response.data?.vouchers || response.data || [];
+        if (Array.isArray(raw) && raw.length > 0) {
+          vouchersList = await Promise.all(raw.map(v => transformVoucherResponse(v, classService, sectionService)));
+        }
+      } catch (endpointError) {
+        if (endpointError.response?.status && endpointError.response.status !== 404) {
+          console.warn('Dedicated unpaid vouchers endpoint returned non-404 error:', endpointError.message);
+        }
+      }
+
+      // 2. Fallback to feeVoucherService.getAll with student filter
+      if (!vouchersList || vouchersList.length === 0) {
+        const response = await feeVoucherService.getAll(
+          { student_id: studentId },
+          { page: 1, limit: 100 }
+        );
+        vouchersList = response?.vouchers || [];
+      }
+
+      // Filter: non-archived (archived = false), status pending/partial/overdue, with pending balance > 0
+      const activeUnpaid = vouchersList.filter(
+        (v) => !v.archived && ['pending', 'partial', 'overdue'].includes(String(v.status || '').toLowerCase()) && Number(v.pending_amount ?? (v.net_amount || v.amount || 0)) > 0
+      );
+
+      // Sort strictly in ascending chronological order (oldest due_date first)
+      return sortVouchersChronologically(activeUnpaid);
+    } catch (error) {
+      console.error('❌ Failed to fetch unpaid student vouchers:', error);
+      throw {
+        message: error.response?.data?.message || error.message || 'Failed to fetch unpaid vouchers',
+        status: error.response?.status,
+        error
+      };
+    }
+  },
+
+  /**
+   * Process FIFO multi-voucher payment
+   * Allocates payment amount strictly in First-In, First-Out (FIFO) order to oldest pending vouchers.
+   * @param {object} params - { studentId, totalAmount, paymentMethod, referenceNo, remarks, paidDate, allocations? }
+   * @returns {Promise<object>} Payment execution results
+   */
+  processFifoPayment: async ({
+    studentId,
+    totalAmount,
+    paymentMethod = 'cash',
+    referenceNo = null,
+    remarks = null,
+    paidDate = null,
+    allocations = null
+  }) => {
+    try {
+      const parsedTotal = parseFloat(totalAmount);
+      if (isNaN(parsedTotal) || parsedTotal <= 0) {
+        throw new Error('Valid total payment amount is required');
+      }
+
+      let activeAllocations = allocations;
+      if (!activeAllocations || activeAllocations.length === 0) {
+        const unpaidVouchers = await feeVoucherService.getUnpaidByStudent(studentId);
+        let remaining = parsedTotal;
+        activeAllocations = [];
+        for (const v of unpaidVouchers) {
+          if (remaining <= 0) break;
+          const pending = Number(v.pending_amount ?? (v.net_amount || v.amount || 0));
+          const toApply = Math.min(remaining, pending);
+          if (toApply > 0) {
+            activeAllocations.push({
+              voucherId: v.id,
+              amountApplied: toApply
+            });
+            remaining -= toApply;
+          }
+        }
+      }
+
+      // 1. Try dedicated endpoint POST /fee-vouchers/process-fifo-payment
+      try {
+        const response = await api.post('/fee-vouchers/process-fifo-payment', {
+          studentId,
+          totalAmount: parsedTotal,
+          paymentMethod,
+          referenceNo,
+          remarks,
+          paidDate: paidDate || new Date().toISOString().split('T')[0],
+          allocations: activeAllocations
+        }, { timeout: 20000 });
+
+        // Sync student pending dues post-transaction
+        try {
+          if (studentId) {
+            await studentService.syncStudentPendingDues(studentId);
+          }
+        } catch (syncErr) {
+          console.warn('Post-payment dues sync note:', syncErr.message);
+        }
+
+        return {
+          success: true,
+          message: response.data?.message || 'FIFO payment processed successfully',
+          data: response.data?.data || response.data
+        };
+      } catch (fifoEndpointError) {
+        if (fifoEndpointError.response?.status && fifoEndpointError.response.status !== 404) {
+          throw fifoEndpointError;
+        }
+
+        // Fallback to processSelectivePayment
+        const selectiveResult = await feeVoucherService.processSelectivePayment({
+          studentId,
+          totalAmount: parsedTotal,
+          paymentMethod,
+          referenceNo,
+          remarks: remarks ? `${remarks} (FIFO Payment)` : 'FIFO Payment',
+          paidDate,
+          allocations: activeAllocations
+        });
+
+        // Sync student pending dues post-transaction
+        try {
+          if (studentId) {
+            await studentService.syncStudentPendingDues(studentId);
+          }
+        } catch (syncErr) {
+          console.warn('Post-payment dues sync note:', syncErr.message);
+        }
+
+        return selectiveResult;
+      }
+    } catch (error) {
+      console.error('❌ Failed to process FIFO payment:', error);
+      throw {
+        message: error.response?.data?.message || error.message || 'Failed to process FIFO payment',
+        status: error.response?.status,
+        details: error.response?.data?.details,
         error
       };
     }
@@ -1447,4 +1825,4 @@ feeVoucherService.bulkDelete = async (voucherIds) => {
   }
 };
 
-export default feeVoucherService;
+export default feeVoucherService;

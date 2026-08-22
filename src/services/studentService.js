@@ -246,4 +246,48 @@ export const studentService = {
    */
   addBehaviorRecord: (id, data) =>
     api.post(`/students/${id}/behavior`, data).then((r) => r.data),
+
+  /**
+   * Get all unpaid / partial / overdue vouchers for a student
+   * @param {string} studentId - Student UUID
+   * @returns {Promise<Array>} List of unpaid vouchers sorted chronologically
+   */
+  getUnpaidVouchers: async (studentId) => {
+    if (!studentId) return [];
+    try {
+      const response = await api.get(`/students/${studentId}/unpaid-vouchers`, { timeout: 10000 });
+      const rawList = response.data?.data?.vouchers || response.data?.data || response.data?.vouchers || response.data || [];
+      return Array.isArray(rawList) ? rawList : [];
+    } catch (error) {
+      console.warn(`Direct /students/${studentId}/unpaid-vouchers endpoint error. Fallback will be handled.`, error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * Sync student pending dues post-payment
+   * Recalculates and updates Student.total_pending_dues
+   * @param {string} studentId - Student UUID
+   * @returns {Promise<object>}
+   */
+  syncStudentPendingDues: async (studentId) => {
+    if (!studentId) return null;
+    try {
+      const response = await api.post(`/students/${studentId}/sync-dues`, {}, { timeout: 10000 });
+      return response.data?.data || response.data;
+    } catch (err) {
+      try {
+        const response = await api.get(`/students/${studentId}/unpaid-vouchers`, { timeout: 10000 });
+        const vouchers = response.data?.data?.vouchers || response.data?.data || response.data || [];
+        const totalPending = (Array.isArray(vouchers) ? vouchers : []).reduce(
+          (sum, v) => sum + Number(v.pending_amount ?? (v.net_amount || v.amount || 0)),
+          0
+        );
+        return { studentId, total_pending_dues: totalPending };
+      } catch (fallbackErr) {
+        return null;
+      }
+    }
+  },
 };
+
