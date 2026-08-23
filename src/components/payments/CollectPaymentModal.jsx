@@ -12,14 +12,10 @@ import {
   AlertCircle,
   RefreshCw,
   Sparkles,
-  Calendar,
-  Layers,
-  ArrowRight,
-  Info,
 } from 'lucide-react';
 import AppModal from '@/components/common/AppModal';
 import SelectField from '@/components/common/SelectField';
-import { feePaymentService, feeVoucherService } from '@/services';
+import { feePaymentService } from '@/services';
 import useAuthStore from '@/store/authStore';
 import { cn } from '@/lib/utils';
 
@@ -91,30 +87,8 @@ export default function CollectPaymentModal({
     return target.registrationNo || target.registration_no || target.student?.registration_no || target.student?.registrationNo || 'N/A';
   }, [target]);
 
-  const className = useMemo(() => {
-    if (!target) return 'N/A';
-    return target.class_name || target.className || target.Class?.name || target.class?.name || target.student?.class_name || 'N/A';
-  }, [target]);
-
-  const sectionName = useMemo(() => {
-    if (!target) return 'N/A';
-    return target.section_name || target.sectionName || target.Section?.name || target.section?.name || target.student?.section_name || 'N/A';
-  }, [target]);
-
-  // Mode: 'fifo' (auto real-time calculation) vs 'custom' (manual per-voucher adjustments)
-  const [allocationMode, setAllocationMode] = useState('fifo');
-  const [customAllocations, setCustomAllocations] = useState({});
-
-  const [paymentForm, setPaymentForm] = useState({
-    totalReceived: '',
-    method: 'cash',
-    referenceNo: '',
-    remarks: '',
-    paidDate: new Date().toISOString().split('T')[0],
-  });
-
   // Query ALL active non-archived pending/partial/overdue vouchers for the student (sorted due_date ASC)
-  const { data: rawStudentPendingVouchers = [], isLoading: loadingVouchers, refetch: refetchUnpaidVouchers } = useQuery({
+  const { data: rawStudentPendingVouchers = [], isLoading: loadingVouchers } = useQuery({
     queryKey: ['student-unpaid-vouchers', studentId],
     queryFn: async () => {
       if (!studentId) return [];
@@ -129,12 +103,64 @@ export default function CollectPaymentModal({
     enabled: !!studentId && !!open,
   });
 
+  const className = useMemo(() => {
+    if (!target) return 'N/A';
+    const directClass =
+      target.class_name ||
+      target.className ||
+      target.Class?.name ||
+      target.class?.name ||
+      target.student?.class_name ||
+      target.student?.className ||
+      target.student?.Class?.name ||
+      target.student?.class?.name ||
+      target.student?.details?.academic_info?.class_name ||
+      target.student?.details?.academic_info?.class?.name;
+
+    if (directClass && directClass !== 'N/A') return directClass;
+
+    const vWithClass = (rawStudentPendingVouchers || []).find((v) => v.class_name || v.className);
+    return vWithClass?.class_name || vWithClass?.className || 'N/A';
+  }, [target, rawStudentPendingVouchers]);
+
+  const sectionName = useMemo(() => {
+    if (!target) return 'N/A';
+    const directSection =
+      target.section_name ||
+      target.sectionName ||
+      target.Section?.name ||
+      target.section?.name ||
+      target.student?.section_name ||
+      target.student?.sectionName ||
+      target.student?.Section?.name ||
+      target.student?.section?.name ||
+      target.student?.details?.academic_info?.section_name ||
+      target.student?.details?.academic_info?.section?.name;
+
+    if (directSection && directSection !== 'N/A') return directSection;
+
+    const vWithSec = (rawStudentPendingVouchers || []).find((v) => v.section_name || v.sectionName);
+    return vWithSec?.section_name || vWithSec?.sectionName || 'N/A';
+  }, [target, rawStudentPendingVouchers]);
+
+  // Mode: 'fifo' (auto real-time calculation) vs 'custom' (manual per-voucher adjustments)
+  const [allocationMode, setAllocationMode] = useState('fifo');
+  const [customAllocations, setCustomAllocations] = useState({});
+
+  const [paymentForm, setPaymentForm] = useState({
+    totalReceived: '',
+    method: 'cash',
+    referenceNo: '',
+    remarks: '',
+    paidDate: new Date().toISOString().split('T')[0],
+  });
+
   // Ensure target voucher is in the list and sort chronologically by due_date ASC
   const availablePendingVouchers = useMemo(() => {
     if (!target) return [];
     const list = [...rawStudentPendingVouchers];
     if (target.id && !list.some((v) => String(v.id) === String(target.id))) {
-      const pendingOfTarget = Number(target.pending_amount ?? (target.net_amount || target.netAmount || target.amount || 0));
+      const pendingOfTarget = feePaymentService.getStandalonePendingAmount(target);
       if (!target.archived && target.status !== 'paid' && target.status !== 'cancelled' && pendingOfTarget > 0) {
         list.unshift(target);
       }
@@ -150,9 +176,7 @@ export default function CollectPaymentModal({
   // Initial pre-population when modal opens
   useEffect(() => {
     if (open && target) {
-      const initialPending = Number(
-        target.pending_amount ?? (target.net_amount || target.netAmount || target.amount || 0)
-      );
+      const initialPending = feePaymentService.getStandalonePendingAmount(target);
       const defaultAmount = initialPending > 0 ? initialPending : totalStudentPendingDues;
       setPaymentForm({
         totalReceived: String(defaultAmount || ''),
@@ -188,30 +212,31 @@ export default function CollectPaymentModal({
   // Display Itemized Rows with combined live metrics
   const itemizedVoucherRows = useMemo(() => {
     return availablePendingVouchers.map((voucher) => {
-      const pendingAmount = Number(
-        voucher.pending_amount ?? (voucher.net_amount || voucher.netAmount || voucher.amount || 0)
+      const baseAmount = Number(
+        voucher.base_amount ?? voucher.baseAmount ?? voucher.amount ?? voucher.net_amount ?? 0
       );
       const originalAmount = Number(
-        voucher.net_amount || voucher.netAmount || voucher.amount || 0
+        voucher.net_amount || voucher.netAmount || voucher.amount_due || baseAmount
       );
-      const alreadyPaid = Number(voucher.paid_amount || 0);
+      const alreadyPaid = Number(voucher.paid_amount || voucher.paidAmount || 0);
+      const pendingAmount = feePaymentService.getStandalonePendingAmount(voucher);
       const monthLabel = feePaymentService.formatMonthLabel(voucher);
 
       const allocated = parseFloat(activeAllocationsMap[voucher.id]) || 0;
       const newRemainingBalance = Math.max(0, pendingAmount - allocated);
       const newPaidAmount = alreadyPaid + allocated;
 
-      let settlementStatus = 'Unpaid';
-      let badgeLabel = 'Unpaid';
+      let settlementStatus = 'Unsettled';
+      let badgeLabel = 'Unsettled';
       if (allocated >= pendingAmount && pendingAmount > 0) {
         settlementStatus = 'Fully Settled';
         badgeLabel = 'Fully Settled';
       } else if (allocated > 0) {
         settlementStatus = 'Partially Settled';
-        badgeLabel = `Partially Settled - ${allocated.toLocaleString('en-PK')} PKR`;
+        badgeLabel = `Partially Settled - ${newRemainingBalance.toLocaleString('en-PK')} Remaining`;
       } else {
-        settlementStatus = 'Unpaid';
-        badgeLabel = 'Unpaid';
+        settlementStatus = 'Unsettled';
+        badgeLabel = 'Unsettled';
       }
 
       return {
@@ -220,6 +245,7 @@ export default function CollectPaymentModal({
         voucherNumber: voucher.voucherNumber || voucher.voucher_number || voucher.voucher_no || String(voucher.id).slice(-6),
         monthLabel,
         dueDate: voucher.due_date || voucher.dueDate || null,
+        baseAmount,
         originalAmount,
         alreadyPaid,
         pendingAmount,
@@ -268,7 +294,7 @@ export default function CollectPaymentModal({
   // Custom Allocation Controls
   const handleToggleFullAllocation = (voucher) => {
     setAllocationMode('custom');
-    const pending = Number(voucher.pending_amount ?? (voucher.net_amount || voucher.netAmount || voucher.amount || 0));
+    const pending = feePaymentService.getStandalonePendingAmount(voucher);
     const currentForThis = parseFloat(activeAllocationsMap[voucher.id]) || 0;
 
     const currentMap = { ...activeAllocationsMap };
@@ -282,7 +308,7 @@ export default function CollectPaymentModal({
 
   const handleApplyRemainingToVoucher = (voucher) => {
     setAllocationMode('custom');
-    const pending = Number(voucher.pending_amount ?? (voucher.net_amount || voucher.netAmount || voucher.amount || 0));
+    const pending = feePaymentService.getStandalonePendingAmount(voucher);
     const currentForThis = parseFloat(activeAllocationsMap[voucher.id]) || 0;
     const currentOtherSum = totalAllocatedNumber - currentForThis;
     const unallocated = Math.max(totalReceivedNumber - currentOtherSum, 0);
@@ -301,7 +327,7 @@ export default function CollectPaymentModal({
 
   const handleCustomAllocationChange = (voucher, value) => {
     setAllocationMode('custom');
-    const pending = Number(voucher.pending_amount ?? (voucher.net_amount || voucher.netAmount || voucher.amount || 0));
+    const pending = feePaymentService.getStandalonePendingAmount(voucher);
     const currentMap = { ...activeAllocationsMap };
 
     if (value === '' || value === null) {
@@ -392,7 +418,7 @@ export default function CollectPaymentModal({
     for (const alloc of allocationsList) {
       const v = availablePendingVouchers.find((item) => String(item.id) === String(alloc.voucherId));
       if (v) {
-        const pending = Number(v.pending_amount ?? (v.net_amount || v.netAmount || v.amount || 0));
+        const pending = feePaymentService.getStandalonePendingAmount(v);
         if (alloc.amountApplied > pending + 0.01) {
           toast.error(`Allocation for ${feePaymentService.formatMonthLabel(v)} (PKR ${alloc.amountApplied}) exceeds pending balance (PKR ${pending}).`);
           return;
@@ -546,9 +572,10 @@ export default function CollectPaymentModal({
                     <thead className="bg-slate-100/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">
                       <tr>
                         <th className="py-3 px-3.5">Fee Month & Year</th>
-                        <th className="py-3 px-3 text-right">Original Amount</th>
+                        <th className="py-3 px-3 text-right">Base Fee</th>
+                        <th className="py-3 px-3 text-right">Total Net Due</th>
                         <th className="py-3 px-3 text-right">Paid Amount</th>
-                        <th className="py-3 px-3 text-right">Current Pending</th>
+                        <th className="py-3 px-3 text-right">Pending Balance</th>
                         <th className="py-3 px-3 text-center">Live Settlement Badge</th>
                         <th className="py-3 px-3 text-right">Allocated Now</th>
                         <th className="py-3 px-3 text-right">Remaining Preview</th>
@@ -562,6 +589,7 @@ export default function CollectPaymentModal({
                           voucherId,
                           voucherNumber,
                           monthLabel,
+                          baseAmount,
                           originalAmount,
                           alreadyPaid,
                           pendingAmount,
@@ -600,8 +628,13 @@ export default function CollectPaymentModal({
                               </div>
                             </td>
 
-                            {/* Original Amount */}
-                            <td className="py-3 px-3 text-right font-medium text-slate-600 dark:text-slate-400">
+                            {/* Base Fee */}
+                            <td className="py-3 px-3 text-right font-semibold text-slate-700 dark:text-slate-300">
+                              PKR {baseAmount.toLocaleString('en-PK')}
+                            </td>
+
+                            {/* Total Net Due (with Arrears) */}
+                            <td className="py-3 px-3 text-right font-medium text-slate-500 dark:text-slate-400">
                               PKR {originalAmount.toLocaleString('en-PK')}
                             </td>
 
@@ -610,7 +643,7 @@ export default function CollectPaymentModal({
                               PKR {alreadyPaid.toLocaleString('en-PK')}
                             </td>
 
-                            {/* Current Pending Balance */}
+                            {/* Standalone Pending Balance */}
                             <td className="py-3 px-3 text-right font-bold text-orange-600 dark:text-orange-400">
                               PKR {pendingAmount.toLocaleString('en-PK')}
                             </td>
@@ -627,7 +660,7 @@ export default function CollectPaymentModal({
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                                  Unpaid
+                                  Unsettled
                                 </span>
                               )}
                             </td>

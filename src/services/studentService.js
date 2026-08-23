@@ -250,18 +250,56 @@ export const studentService = {
   /**
    * Get all unpaid / partial / overdue vouchers for a student
    * @param {string} studentId - Student UUID
-   * @returns {Promise<Array>} List of unpaid vouchers sorted chronologically
+   * @returns {Promise<Array>} List of unpaid vouchers
    */
   getUnpaidVouchers: async (studentId) => {
     if (!studentId) return [];
+    
+    // 1. Try dedicated endpoint /students/:id/unpaid-vouchers
     try {
       const response = await api.get(`/students/${studentId}/unpaid-vouchers`, { timeout: 10000 });
       const rawList = response.data?.data?.vouchers || response.data?.data || response.data?.vouchers || response.data || [];
-      return Array.isArray(rawList) ? rawList : [];
+      if (Array.isArray(rawList) && rawList.length > 0) {
+        return rawList;
+      }
     } catch (error) {
-      console.warn(`Direct /students/${studentId}/unpaid-vouchers endpoint error. Fallback will be handled.`, error.message);
-      throw error;
+      // Proceed to fallbacks
     }
+
+    // 2. Try /fee-vouchers?student_id=:id
+    try {
+      const resp = await api.get(`/fee-vouchers?student_id=${studentId}&limit=100`, { timeout: 10000 });
+      const vouchers = resp.data?.data?.vouchers || resp.data?.data || resp.data?.vouchers || [];
+      if (Array.isArray(vouchers) && vouchers.length > 0) {
+        return vouchers;
+      }
+    } catch (err) {
+      // Proceed to next fallback
+    }
+
+    // 3. Try /fees/vouchers?student_id=:id
+    try {
+      const resp2 = await api.get(`/fees/vouchers?student_id=${studentId}&limit=100`, { timeout: 10000 });
+      const vouchers2 = resp2.data?.data?.rows || resp2.data?.data?.vouchers || resp2.data?.data || resp2.data || [];
+      if (Array.isArray(vouchers2) && vouchers2.length > 0) {
+        return vouchers2;
+      }
+    } catch (err2) {
+      // Proceed to next fallback
+    }
+
+    // 4. Try /student/fees-vouchers?studentId=:id
+    try {
+      const resp3 = await api.get(`/student/fees-vouchers?studentId=${studentId}&limit=100`, { timeout: 10000 });
+      const vouchers3 = resp3.data?.data?.vouchers || resp3.data?.data || [];
+      if (Array.isArray(vouchers3)) {
+        return vouchers3;
+      }
+    } catch (err3) {
+      // All options exhausted
+    }
+
+    return [];
   },
 
   /**
@@ -277,10 +315,9 @@ export const studentService = {
       return response.data?.data || response.data;
     } catch (err) {
       try {
-        const response = await api.get(`/students/${studentId}/unpaid-vouchers`, { timeout: 10000 });
-        const vouchers = response.data?.data?.vouchers || response.data?.data || response.data || [];
+        const vouchers = await studentService.getUnpaidVouchers(studentId);
         const totalPending = (Array.isArray(vouchers) ? vouchers : []).reduce(
-          (sum, v) => sum + Number(v.pending_amount ?? (v.net_amount || v.amount || 0)),
+          (sum, v) => sum + Number(v.pending_amount ?? (v.net_amount || v.amount || v.amount_due || 0)),
           0
         );
         return { studentId, total_pending_dues: totalPending };

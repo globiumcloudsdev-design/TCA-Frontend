@@ -159,7 +159,7 @@ export default function FeesPage() {
   const [bulkDownloadMode, setBulkDownloadMode] = useState('class');
   const [bulkDownloadProgress, setBulkDownloadProgress] = useState({ current: 0, total: 0 });
 
-  // Filters
+  // Filters strictly bound to selected month
   const currentMonth = String(new Date().getMonth() + 1);
   const [voucherMonth, setVoucherMonth] = useState(currentMonth);
   const [voucherAcademicYearId, setVoucherAcademicYearId] = useState('');
@@ -1403,23 +1403,41 @@ const downloadReceipt = async (payment, voucher) => {
       },
       { accessorKey: 'month', header: 'Month', cell: ({ getValue }) => MONTH_OPTS.find(m => m.value === String(getValue()))?.label || getValue() },
       {
-        accessorKey: 'net_amount',
-        header: 'Amount / Balance',
+        accessorKey: 'base_amount',
+        header: 'Base Amount',
         cell: ({ row: { original: r } }) => {
-          const total = Number(r.net_amount || r.netAmount || r.amount || 0);
+          const base = Number(r.base_amount ?? r.baseAmount ?? r.amount ?? (r.net_amount || r.netAmount || 0));
+          return (
+            <div className="font-semibold text-slate-800 dark:text-slate-200">
+              PKR {base.toLocaleString('en-PK')}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'net_amount',
+        header: 'Net Amount / Total Dues',
+        cell: ({ row: { original: r } }) => {
+          const total = Number(r.net_amount || r.netAmount || r.amount_due || r.amount || 0);
           const paid = Number(r.paid_amount || 0);
           const remaining = Number(r.pending_amount ?? (total - paid));
+          const base = Number(r.base_amount ?? r.baseAmount ?? r.amount ?? total);
+          const priorArrears = Math.max(0, total - base);
           
           return (
             <div className="space-y-0.5">
               <div className="flex items-baseline gap-1.5">
                 <span className={cn("text-sm font-bold", remaining > 0 ? "text-orange-600" : "text-emerald-600")}>
-                  PKR {remaining.toLocaleString('en-PK')}
+                  PKR {total.toLocaleString('en-PK')}
                 </span>
-                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">Left</span>
+                {priorArrears > 0 && (
+                  <span className="text-[10px] text-amber-600 font-semibold">
+                    (+{priorArrears.toLocaleString('en-PK')} Arrears)
+                  </span>
+                )}
               </div>
               <div className="text-[11px] text-slate-500 font-medium">
-                Total: PKR {total.toLocaleString('en-PK')}
+                Balance: PKR {remaining.toLocaleString('en-PK')}
               </div>
               {paid > 0 && (
                 <div className="text-[10px] text-emerald-600 font-semibold italic">
@@ -1483,7 +1501,7 @@ const downloadReceipt = async (payment, voucher) => {
   );
 
   // Show permission denied message if user doesn't have read access
-  if (!hasPermission('fees.read') && currentInstitute?.id) {
+  if (mounted && !hasPermission('fees.read') && currentInstitute?.id) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] p-8 text-center">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
@@ -1615,7 +1633,7 @@ const downloadReceipt = async (payment, voucher) => {
             searchPlaceholder="Search Name, Reg #, Email or Voucher #..."
             emptyMessage="No vouchers found for selected filters"
             enableColumnVisibility
-            exportConfig={{ fileName: `fee-vouchers-${voucherMonth}` }}
+            exportConfig={{ fileName: `fee-vouchers-${voucherMonth || 'all'}` }}
             enableRowSelection={hasPermission('fees.delete')}
             onRowSelectionChange={setSelectedVouchers}
             selectionActions={

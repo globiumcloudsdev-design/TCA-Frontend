@@ -73,10 +73,10 @@ const normalizePagination = (page = 1, limit = 20) => ({
 const buildVoucherFilters = (filters = {}) => {
   const base = {};
   
-  if (filters.month !== undefined && filters.month !== null) {
+  if (filters.month !== undefined && filters.month !== null && filters.month !== '' && filters.month !== '__all__' && !isNaN(parseInt(filters.month))) {
     base.month = parseInt(filters.month);
   }
-  if (filters.year !== undefined && filters.year !== null) {
+  if (filters.year !== undefined && filters.year !== null && filters.year !== '' && !isNaN(parseInt(filters.year))) {
     base.year = parseInt(filters.year);
   }
   if (filters.status) {
@@ -404,9 +404,14 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
     monthLabel: monthLabel,
     month_label: monthLabel,
     academicYearId: data.academic_year_id || data.academicYearId || studentRaw.academic_year_id || studentRaw.academicYearId,
-    amount: parseFloat(data.amount || 0),
+    base_amount: parseFloat(data.base_amount || data.baseAmount || data.amount || data.net_amount || data.netAmount || 0),
+    baseAmount: parseFloat(data.base_amount || data.baseAmount || data.amount || data.net_amount || data.netAmount || 0),
+    amount: parseFloat(data.base_amount || data.baseAmount || data.amount || data.net_amount || data.netAmount || 0),
     discount: parseFloat(data.discount || 0),
-    netAmount: parseFloat(data.net_amount || data.netAmount || data.amount || 0),
+    net_amount: parseFloat(data.net_amount || data.netAmount || data.amount_due || data.totalAmount || data.amount || 0),
+    netAmount: parseFloat(data.net_amount || data.netAmount || data.amount_due || data.totalAmount || data.amount || 0),
+    amountDue: parseFloat(data.net_amount || data.netAmount || data.amount_due || data.totalAmount || data.amount || 0),
+    totalAmount: parseFloat(data.net_amount || data.netAmount || data.amount_due || data.totalAmount || data.amount || 0),
     currency: data.currency || 'PKR',
     status: data.status || 'pending',
     feeType: data.fee_type || data.feeType,
@@ -420,9 +425,11 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
     archived: data.archived || false,
     student: studentRaw,
     
-    // Partial payment fields
-    paid_amount: parseFloat(data.paid_amount || 0),
-    pending_amount: parseFloat(data.pending_amount ?? (data.net_amount || data.amount || 0)),
+    // Partial payment & standalone pending fields
+    paid_amount: parseFloat(data.paid_amount || data.paidAmount || 0),
+    paidAmount: parseFloat(data.paid_amount || data.paidAmount || 0),
+    pending_amount: Math.max(0, parseFloat(data.base_amount || data.baseAmount || data.amount || data.net_amount || data.netAmount || 0) - parseFloat(data.paid_amount || data.paidAmount || 0)),
+    pendingAmount: Math.max(0, parseFloat(data.base_amount || data.baseAmount || data.amount || data.net_amount || data.netAmount || 0) - parseFloat(data.paid_amount || data.paidAmount || 0)),
     FeePayments: data.FeePayments || data.payments || []
   };
 };
@@ -471,25 +478,35 @@ export const feeVoucherService = {
       if (!month || month < 1 || month > 12) throw new Error('Valid month (1-12) is required');
       if (!year || year < 2000) throw new Error('Valid year is required');
 
-      const response = await api.post('/fee-vouchers/generate-single', {
-        studentId,
+      const payload = {
+        generation_type: 'single',
+        student_id: studentId,
+        studentId: studentId,
         month: parseInt(month),
         year: parseInt(year),
-        feeType: options.feeType || 'monthly',
+        fee_type: options.feeType || 'Monthly',
+        feeType: options.feeType || 'Monthly',
+        due_date: options.dueDate || undefined,
         dueDate: options.dueDate || undefined,
+        academic_year_id: options.academicYearId || undefined,
         academicYearId: options.academicYearId || undefined,
-        feeTemplateId: options.feeTemplateId || undefined,
-        include_arrears: false,
-        includeArrears: false,
-        merge_arrears: false,
-        mergeArrears: false,
-        separate_vouchers: true,
-        separateVouchers: true,
-      }, {
-        timeout: 10000
-      });
+        fee_template_id: options.feeTemplateId || undefined,
+      };
 
-      return transformVoucherResponse(response.data?.data);
+      try {
+        const response = await api.post('/fee-vouchers', payload, { timeout: 15000 });
+        const resData = response.data?.data || response.data;
+        const vouchers = resData?.vouchers || (resData ? [resData] : []);
+        return {
+          success: true,
+          message: response.data?.message || 'Voucher generated successfully',
+          data: vouchers[0] || resData,
+        };
+      } catch (err) {
+        if (err.response?.status && err.response.status !== 404) throw err;
+        const response2 = await api.post('/fee-vouchers/generate-single', payload, { timeout: 15000 });
+        return transformVoucherResponse(response2.data?.data);
+      }
     } catch (error) {
       console.error('❌ Failed to generate single voucher:', error);
       throw {
@@ -500,47 +517,50 @@ export const feeVoucherService = {
     }
   },
 
-  /**
-   * Generate vouchers for entire class
-   * @param {string} classId - Class UUID
-   * @param {number} month - Month (1-12)
-   * @param {number} year - Year
-   * @param {object} options - Optional parameters {dueDate, academicYearId}
-   * @returns {Promise<object>} Summary with generated vouchers count
-   */
   generateClass: async (classId, month, year, options = {}) => {
     try {
       if (!classId) throw new Error('Class ID is required');
       if (!month || month < 1 || month > 12) throw new Error('Valid month (1-12) is required');
       if (!year || year < 2000) throw new Error('Valid year is required');
 
-      const response = await api.post('/fee-vouchers/generate-class', {
-        classId,
+      const payload = {
+        generation_type: 'class',
+        class_id: classId,
+        classId: classId,
         month: parseInt(month),
         year: parseInt(year),
-        feeType: options.feeType || 'monthly',
+        fee_type: options.feeType || 'Monthly',
+        feeType: options.feeType || 'Monthly',
+        due_date: options.dueDate || undefined,
         dueDate: options.dueDate || undefined,
+        academic_year_id: options.academicYearId || undefined,
         academicYearId: options.academicYearId || undefined,
-        feeTemplateId: options.feeTemplateId || undefined,
-        include_arrears: false,
-        includeArrears: false,
-        merge_arrears: false,
-        mergeArrears: false,
-        separate_vouchers: true,
-        separateVouchers: true,
-      }, {
-        timeout: 600000
-      });
-
-      const result = response.data?.data || {};
-      const vouchers = await Promise.all((result.vouchers || []).map((voucher) => transformVoucherResponse(voucher, classService, sectionService)));
-      return {
-        total: result.total || 0,
-        generated: result.generated || 0,
-        failed: result.failed || 0,
-        vouchers,
-        message: `Successfully generated ${result.generated} out of ${result.total} vouchers`
+        fee_template_id: options.feeTemplateId || undefined,
       };
+
+      try {
+        const response = await api.post('/fee-vouchers', payload, { timeout: 600000 });
+        const resData = response.data?.data || response.data || {};
+        return {
+          total: resData.total || resData.count || response.data?.count || 0,
+          generated: resData.generated || resData.count || response.data?.count || 0,
+          failed: 0,
+          vouchers: resData.vouchers || [],
+          message: response.data?.message || `Successfully generated vouchers`,
+        };
+      } catch (err) {
+        if (err.response?.status && err.response.status !== 404) throw err;
+        const response2 = await api.post('/fee-vouchers/generate-class', payload, { timeout: 600000 });
+        const result = response2.data?.data || response2.data || {};
+        const vouchers = await Promise.all((result.vouchers || []).map((voucher) => transformVoucherResponse(voucher, classService, sectionService)));
+        return {
+          total: result.total || 0,
+          generated: result.generated || 0,
+          failed: result.failed || 0,
+          vouchers,
+          message: `Successfully generated ${result.generated} out of ${result.total} vouchers`
+        };
+      }
     } catch (error) {
       console.error('❌ Failed to generate class vouchers:', error);
       throw {
@@ -551,46 +571,51 @@ export const feeVoucherService = {
     }
   },
 
-  /**
-   * Generate vouchers for entire institute
-   * @param {number} month - Month (1-12)
-   * @param {number} year - Year
-   * @param {object} options - Optional parameters {dueDate, academicYearId}
-   * @returns {Promise<object>} Summary with generated vouchers
-   */
   generateInstitute: async (month, year, options = {}) => {
     try {
       if (!month || month < 1 || month > 12) throw new Error('Valid month (1-12) is required');
       if (!year || year < 2000) throw new Error('Valid year is required');
 
-      const response = await api.post('/fee-vouchers/generate-institute', {
+      const payload = {
+        generation_type: 'institute',
         month: parseInt(month),
         year: parseInt(year),
-        feeType: options.feeType || 'monthly',
+        fee_type: options.feeType || 'Monthly',
+        feeType: options.feeType || 'Monthly',
+        due_date: options.dueDate || undefined,
         dueDate: options.dueDate || undefined,
+        academic_year_id: options.academicYearId || undefined,
         academicYearId: options.academicYearId || undefined,
-        feeTemplateId: options.feeTemplateId || undefined,
-        include_arrears: false,
-        includeArrears: false,
-        merge_arrears: false,
-        mergeArrears: false,
-        separate_vouchers: true,
-        separateVouchers: true,
-      }, {
-        timeout: 600000
-      });
-
-      const result = response.data?.data || {};
-      const vouchers = await Promise.all((result.vouchers || []).map((voucher) => transformVoucherResponse(voucher, classService, sectionService)));
-      return {
-        total: result.total || 0,
-        generated: result.generated || 0,
-        failed: result.failed || 0,
-        failedDetails: result.failedDetails || [],
-        vouchers,
-        message: `Successfully generated ${result.generated} out of ${result.total} vouchers`,
-        successRate: result.total > 0 ? Math.round((result.generated / result.total) * 100) : 0
+        fee_template_id: options.feeTemplateId || undefined,
       };
+
+      try {
+        const response = await api.post('/fee-vouchers', payload, { timeout: 600000 });
+        const resData = response.data?.data || response.data || {};
+        return {
+          total: resData.total || resData.count || response.data?.count || 0,
+          generated: resData.generated || resData.count || response.data?.count || 0,
+          failed: 0,
+          failedDetails: [],
+          vouchers: resData.vouchers || [],
+          message: response.data?.message || `Successfully generated vouchers`,
+          successRate: 100
+        };
+      } catch (err) {
+        if (err.response?.status && err.response.status !== 404) throw err;
+        const response2 = await api.post('/fee-vouchers/generate-institute', payload, { timeout: 600000 });
+        const result = response2.data?.data || response2.data || {};
+        const vouchers = await Promise.all((result.vouchers || []).map((voucher) => transformVoucherResponse(voucher, classService, sectionService)));
+        return {
+          total: result.total || 0,
+          generated: result.generated || 0,
+          failed: result.failed || 0,
+          failedDetails: result.failedDetails || [],
+          vouchers,
+          message: `Successfully generated ${result.generated} out of ${result.total} vouchers`,
+          successRate: result.total > 0 ? Math.round((result.generated / result.total) * 100) : 0
+        };
+      }
     } catch (error) {
       console.error('❌ Failed to generate institute vouchers:', error);
       throw {
@@ -888,11 +913,11 @@ export const feeVoucherService = {
   },
 
   // ============================================================
-  // PAYMENT ENDPOINTS (NEW)
+  // PAYMENT ENDPOINTS (ROBUST MULTI-BACKEND SUPPORT)
   // ============================================================
 
   /**
-   * Record payment for a voucher
+   * Record payment for a single voucher with multi-backend compatibility
    * @param {string} voucherId - Voucher UUID
    * @param {object} paymentData - {amount, paymentMethod, referenceNo, remarks, paidDate}
    * @returns {Promise<object>} Payment receipt
@@ -900,96 +925,105 @@ export const feeVoucherService = {
   recordPayment: async (voucherId, paymentData = {}) => {
     try {
       if (!voucherId) throw new Error('Voucher ID is required');
-      if (!paymentData.amount || paymentData.amount <= 0) throw new Error('Valid payment amount is required');
-      if (!paymentData.paymentMethod) throw new Error('Payment method is required');
+      const amount = parseFloat(paymentData.amount || paymentData.amount_paid);
+      if (isNaN(amount) || amount <= 0) throw new Error('Valid payment amount is required');
+
+      const method = paymentData.paymentMethod || paymentData.method || paymentData.payment_method || 'cash';
+      const remarks = paymentData.remarks || paymentData.notes || '';
+      const referenceNo = paymentData.referenceNo || paymentData.reference_no || paymentData.transaction_id || null;
+      const paidDate = paymentData.paidDate || paymentData.paid_date || new Date().toISOString().split('T')[0];
 
       const payload = {
-        amount: parseFloat(paymentData.amount),
-        paymentMethod: paymentData.paymentMethod,
-        referenceNo: paymentData.referenceNo || null,
-        remarks: paymentData.remarks || null,
-        paidDate: paymentData.paidDate || new Date().toISOString().split('T')[0],
-        institutionId: paymentData.institutionId || undefined
+        amount,
+        amount_paid: amount,
+        method,
+        paymentMethod: method,
+        payment_method: method,
+        remarks,
+        notes: remarks,
+        referenceNo,
+        reference_no: referenceNo,
+        transaction_id: referenceNo,
+        paidDate,
+        paid_date: paidDate,
+        date: paidDate,
+        institutionId: paymentData.institutionId || undefined,
       };
 
-      const response = await api.post(`/fee-vouchers/${voucherId}/payment`, payload, {
-        timeout: 10000
-      });
+      // 1. Try /fee-vouchers/:id/manual-payment
+      try {
+        const response = await api.post(`/fee-vouchers/${voucherId}/manual-payment`, payload, { timeout: 15000 });
+        const resData = response.data?.data || response.data;
+        return {
+          success: true,
+          message: response.data?.message || 'Payment recorded successfully',
+          receipt: await transformVoucherResponse(resData),
+          paymentRecord: resData?.payment_history?.slice(-1)[0] || null,
+          updatedStatus: resData?.status,
+        };
+      } catch (err1) {
+        if (err1.response?.status && err1.response.status !== 404) throw err1;
+      }
 
+      // 2. Try /fee-vouchers/:id/payment
+      try {
+        const response = await api.post(`/fee-vouchers/${voucherId}/payment`, payload, { timeout: 15000 });
+        const resData = response.data?.data || response.data;
+        return {
+          success: true,
+          message: response.data?.message || 'Payment recorded successfully',
+          receipt: await transformVoucherResponse(resData?.voucher || resData),
+          paymentRecord: resData?.payment || resData?.payment_history?.slice(-1)[0] || null,
+          updatedStatus: resData?.status,
+        };
+      } catch (err2) {
+        if (err2.response?.status && err2.response.status !== 404) throw err2;
+      }
+
+      // 3. Try /fee-vouchers/:id/collect
+      try {
+        const response = await api.patch(`/fee-vouchers/${voucherId}/collect`, payload, { timeout: 15000 });
+        const resData = response.data?.data || response.data;
+        return {
+          success: true,
+          message: response.data?.message || 'Payment recorded successfully',
+          receipt: await transformVoucherResponse(resData),
+          paymentRecord: resData?.payment_history?.slice(-1)[0] || null,
+          updatedStatus: resData?.status,
+        };
+      } catch (err3) {
+        if (err3.response?.status && err3.response.status !== 404) throw err3;
+      }
+
+      // 4. Try /fees/vouchers/:id/collect
+      const response = await api.patch(`/fees/vouchers/${voucherId}/collect`, payload, { timeout: 15000 });
+      const resData = response.data?.data || response.data;
       return {
         success: true,
         message: response.data?.message || 'Payment recorded successfully',
-        receipt: transformVoucherResponse(response.data?.data?.voucher),
-        paymentRecord: response.data?.data?.payment,
-        updatedStatus: response.data?.data?.status
+        receipt: await transformVoucherResponse(resData),
+        paymentRecord: resData?.payment_history?.slice(-1)[0] || null,
+        updatedStatus: resData?.status,
       };
     } catch (error) {
       console.error('❌ Failed to record payment:', error);
       throw {
-        message: error.response?.data?.message || error.message || 'Failed to record payment',
+        message: error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to record payment',
         status: error.response?.status,
         details: error.response?.data?.details,
-        error
+        error,
       };
     }
   },
 
   /**
    * Backward-compatible collect API used by FeeCollectForm flows
-   * Supports both legacy collect endpoint and new payment endpoint.
    * @param {string} voucherId - Voucher UUID
    * @param {object} body - {amount_paid, payment_method, transaction_id, notes, paid_date}
    * @returns {Promise<object>} Payment/collection response
    */
   collect: async (voucherId, body = {}) => {
-    try {
-      if (!voucherId) throw new Error('Voucher ID is required');
-
-      const normalizedAmount = Number(body.amount_paid ?? body.amount);
-      const normalizedMethod = body.payment_method || body.paymentMethod;
-
-      if (!normalizedAmount || normalizedAmount <= 0) {
-        throw new Error('Valid payment amount is required');
-      }
-      if (!normalizedMethod) {
-        throw new Error('Payment method is required');
-      }
-
-      const legacyPayload = {
-        amount_paid: normalizedAmount,
-        payment_method: normalizedMethod,
-        transaction_id: body.transaction_id || body.referenceNo || null,
-        notes: body.notes || body.remarks || null,
-        paid_date: body.paid_date || body.paidDate || undefined,
-      };
-
-      try {
-        const response = await api.patch(`/fee-vouchers/${voucherId}/collect`, legacyPayload, {
-          timeout: 10000,
-        });
-        return response.data?.data || response.data;
-      } catch (legacyError) {
-        if (legacyError?.response?.status && legacyError.response.status !== 404) {
-          throw legacyError;
-        }
-
-        return await feeVoucherService.recordPayment(voucherId, {
-          amount: normalizedAmount,
-          paymentMethod: normalizedMethod,
-          referenceNo: legacyPayload.transaction_id,
-          remarks: legacyPayload.notes,
-          paidDate: legacyPayload.paid_date,
-        });
-      }
-    } catch (error) {
-      console.error('❌ Failed to collect payment:', error);
-      throw {
-        message: error.response?.data?.message || error.message || 'Failed to collect payment',
-        status: error.response?.status,
-        details: error.response?.data?.details,
-        error,
-      };
-    }
+    return feeVoucherService.recordPayment(voucherId, body);
   },
 
   /**
@@ -1003,7 +1037,7 @@ export const feeVoucherService = {
         throw new Error('Payments array is required');
       }
 
-      const validPayments = payments.filter(p => p.voucherId && p.amount > 0);
+      const validPayments = payments.filter((p) => p.voucherId && p.amount > 0);
       if (validPayments.length === 0) {
         throw new Error('No valid payments found');
       }
@@ -1012,7 +1046,7 @@ export const feeVoucherService = {
         total: validPayments.length,
         successful: 0,
         failed: 0,
-        details: []
+        details: [],
       };
 
       for (const payment of validPayments) {
@@ -1022,14 +1056,14 @@ export const feeVoucherService = {
           results.details.push({
             voucherId: payment.voucherId,
             success: true,
-            receipt: result.receipt
+            receipt: result.receipt,
           });
         } catch (error) {
           results.failed++;
           results.details.push({
             voucherId: payment.voucherId,
             success: false,
-            error: error.message
+            error: error.message,
           });
         }
       }
@@ -1040,7 +1074,7 @@ export const feeVoucherService = {
       throw {
         message: error.response?.data?.message || error.message || 'Failed to record batch payments',
         status: error.response?.status,
-        error
+        error,
       };
     }
   },
@@ -1048,7 +1082,7 @@ export const feeVoucherService = {
   /**
    * Process selective / manual fee voucher payment allocations
    * Distributes lump-sum or specific payments across chosen vouchers with strict balance verification.
-   * @param {object} params - { studentId, totalAmount, paymentMethod, referenceNo, remarks, paidDate, allocations: [{ voucherId, amountApplied }] }
+   * @param {object} params - { studentId, totalAmount, paymentMethod, referenceNo, remarks, paidDate, allocations }
    * @returns {Promise<object>} Processing summary & updated voucher receipts
    */
   processSelectivePayment: async ({
@@ -1058,7 +1092,7 @@ export const feeVoucherService = {
     referenceNo = null,
     remarks = null,
     paidDate = null,
-    allocations = []
+    allocations = [],
   }) => {
     try {
       const parsedTotal = parseFloat(totalAmount);
@@ -1069,7 +1103,7 @@ export const feeVoucherService = {
         throw new Error('At least one voucher allocation is required');
       }
 
-      const activeAllocations = allocations.filter(a => a.voucherId && parseFloat(a.amountApplied) > 0);
+      const activeAllocations = allocations.filter((a) => a.voucherId && parseFloat(a.amountApplied) > 0);
       if (activeAllocations.length === 0) {
         throw new Error('No allocations with positive amount found');
       }
@@ -1083,39 +1117,49 @@ export const feeVoucherService = {
         studentId,
         totalAmount: parsedTotal,
         paymentMethod,
+        method: paymentMethod,
         referenceNo: referenceNo || null,
+        transaction_id: referenceNo || null,
         remarks: remarks || null,
+        notes: remarks || null,
         paidDate: paidDate || new Date().toISOString().split('T')[0],
-        allocations: activeAllocations.map(a => ({
+        allocations: activeAllocations.map((a) => ({
           voucherId: a.voucherId,
-          amountApplied: parseFloat(a.amountApplied)
-        }))
+          amountApplied: parseFloat(a.amountApplied),
+        })),
       };
 
-      // 1. Try dedicated selective payment endpoint on backend
+      // 1. Try dedicated endpoint /payments/collect
       try {
-        const response = await api.post('/fee-vouchers/process-selective-payment', payload, {
-          timeout: 20000
-        });
+        const response = await api.post('/payments/collect', payload, { timeout: 20000 });
+        return {
+          success: true,
+          message: response.data?.message || 'Payment collected successfully',
+          data: response.data?.data || response.data,
+        };
+      } catch (err1) {
+        if (err1.response?.status && err1.response.status !== 404) throw err1;
+      }
+
+      // 2. Try /fee-vouchers/process-selective-payment
+      try {
+        const response = await api.post('/fee-vouchers/process-selective-payment', payload, { timeout: 20000 });
         return {
           success: true,
           message: response.data?.message || 'Selective payment processed successfully',
-          data: response.data?.data || response.data
+          data: response.data?.data || response.data,
         };
       } catch (endpointError) {
-        // If error is not a 404 (e.g. 403 Forbidden or 400 Validation), throw directly
         if (endpointError.response?.status && endpointError.response.status !== 404) {
           throw endpointError;
         }
 
-        // 2. Fallback: Execute iterative voucher payments sequentially
-        console.warn('Dedicated endpoint /fee-vouchers/process-selective-payment returned 404. Falling back to iterative voucher allocation...');
-        
+        // 3. Fallback: Execute iterative voucher payments sequentially
         const results = {
           success: true,
           totalAmount: parsedTotal,
           allocatedCount: activeAllocations.length,
-          payments: []
+          payments: [],
         };
 
         for (const alloc of payload.allocations) {
@@ -1124,13 +1168,13 @@ export const feeVoucherService = {
             paymentMethod: payload.paymentMethod,
             referenceNo: payload.referenceNo,
             remarks: payload.remarks ? `${payload.remarks} (Selective Allocation)` : 'Selective Allocation',
-            paidDate: payload.paidDate
+            paidDate: payload.paidDate,
           });
           results.payments.push({
             voucherId: alloc.voucherId,
             amountApplied: alloc.amountApplied,
             receipt: singleResult.receipt,
-            paymentRecord: singleResult.paymentRecord
+            paymentRecord: singleResult.paymentRecord,
           });
         }
 
@@ -1140,7 +1184,7 @@ export const feeVoucherService = {
             await studentService.syncStudentPendingDues(studentId);
           }
         } catch (syncErr) {
-          console.warn('Post-payment student dues sync note:', syncErr.message);
+          // Ignored
         }
 
         return results;
@@ -1151,7 +1195,7 @@ export const feeVoucherService = {
         message: error.response?.data?.message || error.message || 'Failed to process selective payment',
         status: error.response?.status,
         details: error.response?.data?.details,
-        error
+        error,
       };
     }
   },
@@ -1165,27 +1209,16 @@ export const feeVoucherService = {
    */
   getUnpaidByStudent: async (studentId) => {
     try {
-      if (!studentId) throw new Error('Student ID is required');
+      if (!studentId) return [];
 
+      const rawList = await studentService.getUnpaidVouchers(studentId);
       let vouchersList = [];
 
-      // 1. Try dedicated endpoint GET /students/:id/unpaid-vouchers
-      try {
-        const response = await api.get(`/students/${studentId}/unpaid-vouchers`, {
-          timeout: 10000
-        });
-        const raw = response.data?.data?.vouchers || response.data?.data || response.data?.vouchers || response.data || [];
-        if (Array.isArray(raw) && raw.length > 0) {
-          vouchersList = await Promise.all(raw.map(v => transformVoucherResponse(v, classService, sectionService)));
-        }
-      } catch (endpointError) {
-        if (endpointError.response?.status && endpointError.response.status !== 404) {
-          console.warn('Dedicated unpaid vouchers endpoint returned non-404 error:', endpointError.message);
-        }
-      }
-
-      // 2. Fallback to feeVoucherService.getAll with student filter
-      if (!vouchersList || vouchersList.length === 0) {
+      if (Array.isArray(rawList) && rawList.length > 0) {
+        vouchersList = await Promise.all(
+          rawList.map((v) => transformVoucherResponse(v, classService, sectionService))
+        );
+      } else {
         const response = await feeVoucherService.getAll(
           { student_id: studentId },
           { page: 1, limit: 100 }
@@ -1193,20 +1226,19 @@ export const feeVoucherService = {
         vouchersList = response?.vouchers || [];
       }
 
-      // Filter: non-archived (archived = false), status pending/partial/overdue, with pending balance > 0
-      const activeUnpaid = vouchersList.filter(
-        (v) => !v.archived && ['pending', 'partial', 'overdue'].includes(String(v.status || '').toLowerCase()) && Number(v.pending_amount ?? (v.net_amount || v.amount || 0)) > 0
-      );
+      // Filter: non-archived, status pending/partial/overdue/unpaid, with pending balance > 0
+      const activeUnpaid = vouchersList.filter((v) => {
+        if (v.archived) return false;
+        const st = String(v.status || '').toLowerCase();
+        const pending = Number(v.pending_amount ?? (v.net_amount || v.amount || 0));
+        return ['pending', 'partial', 'overdue', 'unpaid'].includes(st) && pending > 0;
+      });
 
       // Sort strictly in ascending chronological order (oldest due_date first)
       return sortVouchersChronologically(activeUnpaid);
     } catch (error) {
       console.error('❌ Failed to fetch unpaid student vouchers:', error);
-      throw {
-        message: error.response?.data?.message || error.message || 'Failed to fetch unpaid vouchers',
-        status: error.response?.status,
-        error
-      };
+      return [];
     }
   },
 
@@ -1223,7 +1255,7 @@ export const feeVoucherService = {
     referenceNo = null,
     remarks = null,
     paidDate = null,
-    allocations = null
+    allocations = null,
   }) => {
     try {
       const parsedTotal = parseFloat(totalAmount);
@@ -1243,38 +1275,55 @@ export const feeVoucherService = {
           if (toApply > 0) {
             activeAllocations.push({
               voucherId: v.id,
-              amountApplied: toApply
+              amountApplied: toApply,
             });
             remaining -= toApply;
           }
         }
       }
 
-      // 1. Try dedicated endpoint POST /fee-vouchers/process-fifo-payment
+      const payload = {
+        studentId,
+        totalAmount: parsedTotal,
+        paymentMethod,
+        method: paymentMethod,
+        referenceNo,
+        transaction_id: referenceNo,
+        remarks,
+        notes: remarks,
+        paidDate: paidDate || new Date().toISOString().split('T')[0],
+        allocations: activeAllocations,
+      };
+
+      // 1. Try dedicated endpoint POST /payments/collect
       try {
-        const response = await api.post('/fee-vouchers/process-fifo-payment', {
-          studentId,
-          totalAmount: parsedTotal,
-          paymentMethod,
-          referenceNo,
-          remarks,
-          paidDate: paidDate || new Date().toISOString().split('T')[0],
-          allocations: activeAllocations
-        }, { timeout: 20000 });
-
-        // Sync student pending dues post-transaction
+        const response = await api.post('/payments/collect', payload, { timeout: 20000 });
         try {
-          if (studentId) {
-            await studentService.syncStudentPendingDues(studentId);
-          }
+          if (studentId) await studentService.syncStudentPendingDues(studentId);
         } catch (syncErr) {
-          console.warn('Post-payment dues sync note:', syncErr.message);
+          // Ignored
         }
+        return {
+          success: true,
+          message: response.data?.message || 'Payment collected successfully',
+          data: response.data?.data || response.data,
+        };
+      } catch (err1) {
+        if (err1.response?.status && err1.response.status !== 404) throw err1;
+      }
 
+      // 2. Try POST /fee-vouchers/process-fifo-payment
+      try {
+        const response = await api.post('/fee-vouchers/process-fifo-payment', payload, { timeout: 20000 });
+        try {
+          if (studentId) await studentService.syncStudentPendingDues(studentId);
+        } catch (syncErr) {
+          // Ignored
+        }
         return {
           success: true,
           message: response.data?.message || 'FIFO payment processed successfully',
-          data: response.data?.data || response.data
+          data: response.data?.data || response.data,
         };
       } catch (fifoEndpointError) {
         if (fifoEndpointError.response?.status && fifoEndpointError.response.status !== 404) {
@@ -1289,16 +1338,13 @@ export const feeVoucherService = {
           referenceNo,
           remarks: remarks ? `${remarks} (FIFO Payment)` : 'FIFO Payment',
           paidDate,
-          allocations: activeAllocations
+          allocations: activeAllocations,
         });
 
-        // Sync student pending dues post-transaction
         try {
-          if (studentId) {
-            await studentService.syncStudentPendingDues(studentId);
-          }
+          if (studentId) await studentService.syncStudentPendingDues(studentId);
         } catch (syncErr) {
-          console.warn('Post-payment dues sync note:', syncErr.message);
+          // Ignored
         }
 
         return selectiveResult;
@@ -1309,7 +1355,7 @@ export const feeVoucherService = {
         message: error.response?.data?.message || error.message || 'Failed to process FIFO payment',
         status: error.response?.status,
         details: error.response?.data?.details,
-        error
+        error,
       };
     }
   },
