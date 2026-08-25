@@ -21,7 +21,18 @@ export const feeService = {
     api.get(`/fees/vouchers${buildQuery(filters)}`).then((r) => r.data),
   create: (body) => api.post('/fees/vouchers', body).then((r) => r.data),
   update: (id, body) => api.put(`/fees/vouchers/${id}`, body).then((r) => r.data),
-  delete: (id) => api.delete(`/fees/vouchers/${id}`).then((r) => r.data),
+  delete: async (id) => {
+    try {
+      const res = await api.delete(`/fees/vouchers/${id}`);
+      return res.data;
+    } catch (err) {
+      if (err.response?.status === 404) {
+        const res = await api.delete(`/fee-vouchers/${id}`);
+        return res.data;
+      }
+      throw err;
+    }
+  },
   collect: (id, body) => api.patch(`/fees/vouchers/${id}/collect`, body).then((r) => r.data),
 
   getVoucherById: (id) =>

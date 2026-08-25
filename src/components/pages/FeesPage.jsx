@@ -634,15 +634,21 @@ const { data: bulkClasses = [] } = useQuery({
   const deleteVoucher = useMutation({
     mutationFn: (id) => feeVoucherService.delete(id),
     onSuccess: () => {
-      toast.success('Voucher deleted');
+      toast.success('Voucher deleted successfully');
       setDeletingVoucher(null);
       refetchVouchers();
+      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
+      qc.invalidateQueries({ queryKey: ['fees'] });
+      qc.invalidateQueries({ queryKey: ['fee-stats'] });
     },
     onError: (error) => {
-      if (error.response?.status === 403) {
+      setDeletingVoucher(null);
+      const status = error?.status || error?.response?.status || error?.error?.response?.status;
+      const message = error?.message || error?.response?.data?.message || error?.error?.response?.data?.message || 'Failed to delete voucher';
+      if (status === 403) {
         toast.error('Permission denied. Required: fees.delete');
       } else {
-        toast.error('Failed to delete voucher');
+        toast.error(message);
       }
     },
   });
@@ -656,21 +662,36 @@ const { data: bulkClasses = [] } = useQuery({
       setSelectedVouchers([]);
       refetchVouchers();
       qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
+      qc.invalidateQueries({ queryKey: ['fees'] });
+      qc.invalidateQueries({ queryKey: ['fee-stats'] });
     },
     onError: (err) => {
-      toast.error(err.message || 'Failed to delete selected vouchers');
+      const message = err?.message || err?.response?.data?.message || err?.error?.response?.data?.message || 'Failed to delete selected vouchers';
+      toast.error(message);
       setConfirmBulkDelete(false);
     }
   });
 
   const handleBulkDelete = () => {
-    const voucherIds = Array.isArray(selectedVouchers)
-      ? selectedVouchers.map(v => v.id).filter(Boolean)
-      : [];
+    const selectedList = Array.isArray(selectedVouchers) ? selectedVouchers : [];
+    const paidCount = selectedList.filter(v => v.status === 'paid' || (v.paid_amount > 0 && v.pending_amount === 0)).length;
+    const deletableVouchers = selectedList.filter(v => v.status !== 'paid' && !(v.paid_amount > 0 && v.pending_amount === 0));
+    const voucherIds = deletableVouchers.map(v => v.id).filter(Boolean);
+
     if (voucherIds.length === 0) {
-      toast.warning('No vouchers selected');
+      if (paidCount > 0) {
+        toast.error('Paid vouchers cannot be deleted. Please select pending or unpaid vouchers.');
+      } else {
+        toast.warning('No vouchers selected');
+      }
+      setConfirmBulkDelete(false);
       return;
     }
+
+    if (paidCount > 0) {
+      toast.info(`${paidCount} paid voucher(s) skipped. Deleting ${voucherIds.length} pending voucher(s)...`);
+    }
+
     bulkDeleteMutation.mutate(voucherIds);
   };
 
@@ -1460,41 +1481,59 @@ const downloadReceipt = async (payment, voucher) => {
       {
         id: 'actions',
         header: 'Actions',
-        cell: ({ row }) => (
-          <div className="flex items-center gap-1">
-            <button onClick={() => setViewingVoucher(row.original)} className="rounded p-1 hover:bg-accent" title="View Details">
-              <FileText size={14} />
-            </button>
-            {row.original.status !== 'paid' && hasPermission('fees.update') && (
-              <>
-                <button
-                  onClick={() => setRecordingPayment(row.original)}
-                  disabled={recordingPayment?.id === row.original.id}
-                  className="rounded p-1 hover:bg-blue-100 text-blue-700 hover:text-blue-800 disabled:opacity-50"
-                  title="Process Selective Payment"
-                >
-                  {recordingPayment?.id === row.original.id ? '⏳' : '💰'}
-                </button>
-                <button
-                  onClick={() => setMarkingAsPaid(row.original.id)}
-                  disabled={markingAsPaid === row.original.id}
-                  className="rounded p-1 hover:bg-green-100 text-green-700 hover:text-green-800 disabled:opacity-50"
-                  title="Mark as Paid"
-                >
-                  {markingAsPaid === row.original.id ? '⏳' : '✓'}
-                </button>
-              </>
-            )}
-            <button onClick={() => handlePrintVoucher(row.original)} className="rounded p-1 hover:bg-accent" title="Print Voucher">
-              <Printer size={14} />
-            </button>
-            {hasPermission('fees.delete') && (
-              <button onClick={() => setDeletingVoucher(row.original)} className="rounded p-1 text-destructive hover:bg-destructive/10" title="Delete">
-                <Trash2 size={14} />
+          const isPaid = String(row.original.status || '').toLowerCase() === 'paid' || 
+            (Number(row.original.paid_amount || 0) > 0 && Number(row.original.pending_amount || 0) === 0);
+
+          return (
+            <div className="flex items-center gap-1">
+              <button onClick={() => setViewingVoucher(row.original)} className="rounded p-1 hover:bg-accent" title="View Details">
+                <FileText size={14} />
               </button>
-            )}
-          </div>
-        ),
+              {!isPaid && hasPermission('fees.update') && (
+                <>
+                  <button
+                    onClick={() => setRecordingPayment(row.original)}
+                    disabled={recordingPayment?.id === row.original.id}
+                    className="rounded p-1 hover:bg-blue-100 text-blue-700 hover:text-blue-800 disabled:opacity-50"
+                    title="Process Selective Payment"
+                  >
+                    {recordingPayment?.id === row.original.id ? '⏳' : '💰'}
+                  </button>
+                  <button
+                    onClick={() => setMarkingAsPaid(row.original.id)}
+                    disabled={markingAsPaid === row.original.id}
+                    className="rounded p-1 hover:bg-green-100 text-green-700 hover:text-green-800 disabled:opacity-50"
+                    title="Mark as Paid"
+                  >
+                    {markingAsPaid === row.original.id ? '⏳' : '✓'}
+                  </button>
+                </>
+              )}
+              <button onClick={() => handlePrintVoucher(row.original)} className="rounded p-1 hover:bg-accent" title="Print Voucher">
+                <Printer size={14} />
+              </button>
+              {hasPermission('fees.delete') && (
+                <button
+                  onClick={() => {
+                    if (isPaid) {
+                      toast.error('Cannot delete paid voucher. Only pending or unpaid vouchers can be deleted.');
+                      return;
+                    }
+                    setDeletingVoucher(row.original);
+                  }}
+                  disabled={isPaid}
+                  className={`rounded p-1 ${
+                    isPaid
+                      ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-40'
+                      : 'text-destructive hover:bg-destructive/10'
+                  }`}
+                  title={isPaid ? 'Paid vouchers cannot be deleted' : 'Delete'}
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          );
       },
     ],
     [terms.student, hasPermission, setViewingVoucher, setDeletingVoucher, handlePrintVoucher, markingAsPaid, recordingPayment, setRecordingPayment]
@@ -2331,10 +2370,10 @@ const downloadReceipt = async (payment, voucher) => {
       <ConfirmDialog
         open={!!deletingVoucher}
         onClose={() => setDeletingVoucher(null)}
-        onConfirm={() => deleteVoucher.mutate(deletingVoucher.id)}
+        onConfirm={() => deletingVoucher?.id && deleteVoucher.mutate(deletingVoucher.id)}
         loading={deleteVoucher.isPending}
         title="Delete Voucher"
-        description={`Delete voucher ${deletingVoucher?.voucher_number}? This action cannot be undone.`}
+        description={`Delete voucher ${deletingVoucher?.voucher_number || deletingVoucher?.voucherNumber || deletingVoucher?.voucher_no || deletingVoucher?.id || ''}? This action cannot be undone.`}
         confirmLabel="Delete"
         variant="destructive"
       />

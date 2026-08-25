@@ -387,8 +387,10 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
   const monthLabel = computeVoucherMonthLabel(data);
 
   return {
-    id: data.id,
+    id: data.id || data._id || data.voucher_id || data.voucherId,
     voucherNumber: data.voucher_number || data.voucher_no || data.voucherNumber,
+    voucher_number: data.voucher_number || data.voucher_no || data.voucherNumber,
+    voucher_no: data.voucher_number || data.voucher_no || data.voucherNumber,
  
     studentId: studentId,
     studentName: studentRaw.first_name || studentRaw.full_name
@@ -413,7 +415,7 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
     amountDue: parseFloat(data.net_amount || data.netAmount || data.amount_due || data.totalAmount || data.amount || 0),
     totalAmount: parseFloat(data.net_amount || data.netAmount || data.amount_due || data.totalAmount || data.amount || 0),
     currency: data.currency || 'PKR',
-    status: data.status || 'pending',
+    status: String(data.status || 'pending').toLowerCase() === 'unpaid' ? 'pending' : String(data.status || 'pending').toLowerCase(),
     feeType: data.fee_type || data.feeType,
     feeTemplateId: data.fee_template_id || data.feeTemplateId,
     notes: data.notes,
@@ -706,22 +708,62 @@ export const feeVoucherService = {
     try {
       if (!voucherId) throw new Error('Voucher ID is required');
 
-      const response = await api.delete(`/fee-vouchers/${voucherId}`, {
-        timeout: 5000
-      });
+      let lastError = null;
 
-      return transformVoucherResponse(response.data?.data);
+      // 1. Try DELETE /fee-vouchers/:id
+      try {
+        const response = await api.delete(`/fee-vouchers/${voucherId}`, { timeout: 10000 });
+        return transformVoucherResponse(response.data?.data || response.data);
+      } catch (err1) {
+        lastError = err1;
+        const msg = err1.response?.data?.message || err1.response?.data?.error || '';
+        // If it's a definitive business validation from backend about payment, throw directly
+        if (err1.response?.status === 400 && /paid|payment|collected|partial/i.test(msg)) {
+          throw err1;
+        }
+      }
+
+      // 2. Try DELETE /fees/vouchers/:id
+      try {
+        const response = await api.delete(`/fees/vouchers/${voucherId}`, { timeout: 10000 });
+        return transformVoucherResponse(response.data?.data || response.data);
+      } catch (err2) {
+        lastError = err2;
+        const msg = err2.response?.data?.message || err2.response?.data?.error || '';
+        if (err2.response?.status === 400 && /paid|payment|collected|partial/i.test(msg)) {
+          throw err2;
+        }
+      }
+
+      // 3. Try POST /fee-vouchers/bulk-delete with { voucherIds: [voucherId] }
+      try {
+        const response = await api.post('/fee-vouchers/bulk-delete', { voucherIds: [voucherId], ids: [voucherId] }, { timeout: 10000 });
+        return response.data?.data || response.data;
+      } catch (err3) {
+        lastError = err3;
+      }
+
+      // 4. Try POST /fees/vouchers/bulk-delete
+      try {
+        const response = await api.post('/fees/vouchers/bulk-delete', { voucherIds: [voucherId], ids: [voucherId] }, { timeout: 10000 });
+        return response.data?.data || response.data;
+      } catch (err4) {
+        lastError = err4;
+      }
+
+      throw lastError;
     } catch (error) {
-      console.error('❌ Failed to delete voucher:', error);
+      console.error('❌ Failed to delete voucher:', error.response?.data || error.message || error);
+      const serverMessage = error.response?.data?.message || error.response?.data?.error || error.message;
       if (error.response?.status === 400) {
         throw {
-          message: 'Cannot delete paid voucher. Archive only applies to pending vouchers.',
+          message: serverMessage || 'Cannot delete paid or processed voucher. Archive/delete only applies to pending vouchers.',
           status: 400,
           error
         };
       }
       throw {
-        message: error.response?.data?.message || error.message || 'Failed to delete voucher',
+        message: serverMessage || 'Failed to delete voucher',
         status: error.response?.status,
         error
       };
@@ -1859,12 +1901,22 @@ feeVoucherService.bulkDelete = async (voucherIds) => {
     if (!Array.isArray(voucherIds) || voucherIds.length === 0) {
       throw new Error('Voucher IDs array is required');
     }
-    const response = await api.post('/fee-vouchers/bulk-delete', { voucherIds }, { timeout: 15000 });
+    let response;
+    try {
+      response = await api.post('/fee-vouchers/bulk-delete', { voucherIds }, { timeout: 15000 });
+    } catch (err1) {
+      if (err1.response?.status === 404) {
+        response = await api.post('/fees/vouchers/bulk-delete', { voucherIds, ids: voucherIds }, { timeout: 15000 });
+      } else {
+        throw err1;
+      }
+    }
     return response.data;
   } catch (error) {
     console.error('❌ Failed to bulk delete vouchers:', error);
+    const serverMessage = error.response?.data?.message || error.response?.data?.error || error.message;
     throw {
-      message: error.response?.data?.message || error.message || 'Failed to bulk delete vouchers',
+      message: serverMessage || 'Failed to bulk delete vouchers',
       status: error.response?.status,
       error
     };

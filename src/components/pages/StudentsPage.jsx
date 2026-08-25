@@ -699,30 +699,30 @@ export default function StudentsPage({ type }) {
     { key: 'nationality', label: 'Nationality', required: false, validation: 'text' },
 
     // Academic Information (Institute Type Specific)
-    { key: 'class_name', label: terms.primary_unit || 'Class', required: true, validation: 'text' },
-    { key: 'section_name', label: terms.grouping_unit || 'Section', required: false, validation: 'text' },
-    { key: 'roll_no', label: terms.roll_number || 'Roll Number', required: false, validation: 'text', types: ['school', 'coaching'] },
-    { key: 'academic_year_name', label: terms.academic_period || 'Academic Year', required: true, validation: 'text' },
+    { key: 'class_name', label: terms.primaryUnit || terms.primary_unit || 'Class', required: true, validation: 'text' },
+    { key: 'section_name', label: terms.groupingUnit || terms.grouping_unit || 'Section', required: false, validation: 'text' },
+    { key: 'roll_no', label: terms.rollNumber || terms.roll_number || 'Roll Number', required: false, validation: 'text', types: ['school', 'coaching'] },
+    { key: 'academic_year_name', label: terms.academicPeriod || terms.academic_period || 'Academic Year', required: true, validation: 'text' },
     { key: 'admission_date', label: 'Admission Date', required: false, validation: 'date' },
 
     // Coaching Specific
-    { key: 'course_name', label: terms.primary_unit || 'Course Name', required: false, validation: 'text', types: ['coaching'] },
-    { key: 'batch_name', label: terms.grouping_unit || 'Batch Name', required: false, validation: 'text', types: ['coaching'] },
+    { key: 'course_name', label: terms.primaryUnit || terms.primary_unit || 'Course Name', required: false, validation: 'text', types: ['coaching'] },
+    { key: 'batch_name', label: terms.groupingUnit || terms.grouping_unit || 'Batch Name', required: false, validation: 'text', types: ['coaching'] },
     { key: 'target_exam', label: 'Target Exam', required: false, validation: 'text', types: ['coaching'] },
     { key: 'current_module', label: 'Current Module', required: false, validation: 'text', types: ['coaching'] },
-    { key: 'candidate_id', label: terms.roll_number || 'Candidate ID', required: false, validation: 'text', types: ['coaching'] },
+    { key: 'candidate_id', label: terms.rollNumber || terms.roll_number || 'Candidate ID', required: false, validation: 'text', types: ['coaching'] },
 
     // College/University Specific
-    { key: 'department_name', label: type === 'college' ? terms.primary_unit : terms.grouping_unit, required: false, validation: 'text', types: ['college', 'university'] },
+    { key: 'department_name', label: type === 'college' ? (terms.primaryUnit || terms.primary_unit) : (terms.groupingUnit || terms.grouping_unit), required: false, validation: 'text', types: ['college', 'university'] },
     { key: 'program_name', label: 'Program Name', required: false, validation: 'text', types: ['college', 'university'] },
-    { key: 'semester_name', label: type === 'college' ? terms.grouping_unit : 'Semester Name', required: false, validation: 'text', types: ['college', 'university'] },
-    { key: 'cgpa', label: terms.grade_term || 'CGPA', required: false, validation: 'number', types: ['college', 'university'] },
-    { key: 'faculty_name', label: terms.primary_unit || 'Faculty', required: false, validation: 'text', types: ['university'] },
+    { key: 'semester_name', label: type === 'college' ? (terms.groupingUnit || terms.grouping_unit) : 'Semester Name', required: false, validation: 'text', types: ['college', 'university'] },
+    { key: 'cgpa', label: terms.gradeTerm || terms.grade_term || 'CGPA', required: false, validation: 'number', types: ['college', 'university'] },
+    { key: 'faculty_name', label: terms.primaryUnit || terms.primary_unit || 'Faculty', required: false, validation: 'text', types: ['university'] },
 
     // Academy Specific
-    { key: 'academy_program_name', label: terms.primary_unit || 'Academy Program', required: false, validation: 'text', types: ['academy'] },
-    { key: 'module_name', label: terms.tertiary_unit || 'Module Name', required: false, validation: 'text', types: ['academy'] },
-    { key: 'trainee_id', label: terms.roll_number || 'Trainee ID', required: false, validation: 'text', types: ['academy'] },
+    { key: 'academy_program_name', label: terms.primaryUnit || terms.primary_unit || 'Academy Program', required: false, validation: 'text', types: ['academy'] },
+    { key: 'module_name', label: terms.tertiaryUnit || terms.tertiary_unit || 'Module Name', required: false, validation: 'text', types: ['academy'] },
+    { key: 'trainee_id', label: terms.rollNumber || terms.roll_number || 'Trainee ID', required: false, validation: 'text', types: ['academy'] },
 
     // Guardian Information
     { key: 'guardian_name', label: 'Guardian Name', required: false, validation: 'text' },
