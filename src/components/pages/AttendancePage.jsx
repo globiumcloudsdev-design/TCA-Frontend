@@ -19,6 +19,7 @@ import {
   PieChart,
   ArrowLeft,
   Calendar,
+  Download,
 } from "lucide-react";
 import useInstituteConfig from "@/hooks/useInstituteConfig";
 import useAuthStore from "@/store/authStore";
@@ -29,6 +30,7 @@ import AppModal from "@/components/common/AppModal";
 import { cn } from "@/lib/utils";
 import MarkAttendanceModal from "@/components/attendance/MarkAttendanceModal";
 import AttendanceReport from "@/components/attendance/AttendanceReport";
+import DownloadAttendanceSheetModal from "@/components/attendance/DownloadAttendanceSheetModal";
 import {
   studentAttendanceService,
   classService,
@@ -72,6 +74,7 @@ export default function AttendancePage({ type }) {
   const [view, setView] = useState("list"); // 'list' or 'report'
   const [isMarkOpen, setIsMarkOpen] = useState({ open: false, mode: "class" });
   const [isHolidayOpen, setIsHolidayOpen] = useState(false);
+  const [isDownloadSheetOpen, setIsDownloadSheetOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -414,6 +417,18 @@ export default function AttendancePage({ type }) {
                   </Button>
                 </>
               )}
+
+              {mounted && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 sm:flex-none border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300 shadow-sm"
+                  onClick={() => setIsDownloadSheetOpen(true)}
+                >
+                  <Download className="mr-1.5 h-4 w-4" />
+                  Download Sheet
+                </Button>
+              )}
             </div>
           </div>
         }
@@ -579,6 +594,16 @@ export default function AttendancePage({ type }) {
           refetch();
           setIsHolidayOpen(false);
         }}
+      />
+
+      <DownloadAttendanceSheetModal
+        open={isDownloadSheetOpen}
+        onClose={() => setIsDownloadSheetOpen(false)}
+        initialClassId={filters.class_id}
+        initialSectionId={filters.section_id}
+        initialAcademicYearId={filters.academic_year_id}
+        type={type}
+        terms={terms}
       />
     </div>
   );
