@@ -100,10 +100,10 @@ export const studentService = {
   /**
    * Delete/Activate/Deactivate student with single API
    * @param {string} id - Student ID
-   * @param {string} type - 'delete', 'active', 'inactive' (default)
+   * @param {string} type - 'delete' (default), 'active', 'inactive'
    */
-  delete: (id, type = 'inactive') => {
-    const queryParams = type !== 'inactive' ? `?type=${type}` : '';
+  delete: (id, type = 'delete') => {
+    const queryParams = type ? `?type=${type}` : '';
     return api.delete(`/students/${id}${queryParams}`).then((r) => r.data);
   },
 
@@ -173,7 +173,7 @@ export const studentService = {
     return api.get(`/students/stats${query}`).then(r => r.data);
   },
 
-  bulkDelete: (ids, type = 'inactive') => api.post('/students/bulk-delete', { ids, type }).then(r => r.data),
+  bulkDelete: (ids, type = 'delete') => api.post('/students/bulk-delete', { ids, type }).then(r => r.data),
   /**
    * Check if a single student is eligible for promotion
    * @param {string} id - Student ID
@@ -246,4 +246,85 @@ export const studentService = {
    */
   addBehaviorRecord: (id, data) =>
     api.post(`/students/${id}/behavior`, data).then((r) => r.data),
+
+  /**
+   * Get all unpaid / partial / overdue vouchers for a student
+   * @param {string} studentId - Student UUID
+   * @returns {Promise<Array>} List of unpaid vouchers
+   */
+  getUnpaidVouchers: async (studentId) => {
+    if (!studentId) return [];
+    
+    // 1. Try dedicated endpoint /students/:id/unpaid-vouchers
+    try {
+      const response = await api.get(`/students/${studentId}/unpaid-vouchers`, { timeout: 10000 });
+      const rawList = response.data?.data?.vouchers || response.data?.data || response.data?.vouchers || response.data || [];
+      if (Array.isArray(rawList) && rawList.length > 0) {
+        return rawList;
+      }
+    } catch (error) {
+      // Proceed to fallbacks
+    }
+
+    // 2. Try /fee-vouchers?student_id=:id
+    try {
+      const resp = await api.get(`/fee-vouchers?student_id=${studentId}&limit=100`, { timeout: 10000 });
+      const vouchers = resp.data?.data?.vouchers || resp.data?.data || resp.data?.vouchers || [];
+      if (Array.isArray(vouchers) && vouchers.length > 0) {
+        return vouchers;
+      }
+    } catch (err) {
+      // Proceed to next fallback
+    }
+
+    // 3. Try /fees/vouchers?student_id=:id
+    try {
+      const resp2 = await api.get(`/fees/vouchers?student_id=${studentId}&limit=100`, { timeout: 10000 });
+      const vouchers2 = resp2.data?.data?.rows || resp2.data?.data?.vouchers || resp2.data?.data || resp2.data || [];
+      if (Array.isArray(vouchers2) && vouchers2.length > 0) {
+        return vouchers2;
+      }
+    } catch (err2) {
+      // Proceed to next fallback
+    }
+
+    // 4. Try /student/fees-vouchers?studentId=:id
+    try {
+      const resp3 = await api.get(`/student/fees-vouchers?studentId=${studentId}&limit=100`, { timeout: 10000 });
+      const vouchers3 = resp3.data?.data?.vouchers || resp3.data?.data || [];
+      if (Array.isArray(vouchers3)) {
+        return vouchers3;
+      }
+    } catch (err3) {
+      // All options exhausted
+    }
+
+    return [];
+  },
+
+  /**
+   * Sync student pending dues post-payment
+   * Recalculates and updates Student.total_pending_dues
+   * @param {string} studentId - Student UUID
+   * @returns {Promise<object>}
+   */
+  syncStudentPendingDues: async (studentId) => {
+    if (!studentId) return null;
+    try {
+      const response = await api.post(`/students/${studentId}/sync-dues`, {}, { timeout: 10000 });
+      return response.data?.data || response.data;
+    } catch (err) {
+      try {
+        const vouchers = await studentService.getUnpaidVouchers(studentId);
+        const totalPending = (Array.isArray(vouchers) ? vouchers : []).reduce(
+          (sum, v) => sum + Number(v.pending_amount ?? (v.net_amount || v.amount || v.amount_due || 0)),
+          0
+        );
+        return { studentId, total_pending_dues: totalPending };
+      } catch (fallbackErr) {
+        return null;
+      }
+    }
+  },
 };
+

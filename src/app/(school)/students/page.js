@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -23,7 +23,7 @@ import { StudentForm } from '@/components/forms';
 import { Button } from '@/components/ui/button';
 import { Badge }  from '@/components/ui/badge';
 
-const extractRows  = (d) => d?.data?.rows ?? d?.data ?? [];
+const extractRows  = (d) => Array.isArray(d) ? d : (d?.data?.rows ?? (Array.isArray(d?.data) ? d?.data : []));
 const extractPages = (d) => d?.data?.totalPages ?? 1;
 const toOptions    = (arr, labelFn) => (arr ?? []).map((x) => ({ value: x.id, label: labelFn(x) }));
 
@@ -108,7 +108,7 @@ export default function StudentsPage() {
 
   const { data: classesData } = useQuery({
     queryKey: ['classes-all'],
-    queryFn:  () => classService.getAll({ limit: 100 }),
+    queryFn:  () => classService.getAll({ limit: 500, fetchAll: true }),
   });
 
   const { data: yearsData } = useQuery({
@@ -136,9 +136,9 @@ export default function StudentsPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: ({ id }) => studentService.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['students'] }); toast.success('Student removed'); setDeleteTarget(null); },
-    onError: (e) => toast.error(e?.response?.data?.message ?? 'Failed'),
+    mutationFn: ({ id }) => studentService.delete(id, 'delete'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['students'] }); toast.success('Student removed successfully'); setDeleteTarget(null); },
+    onError: (e) => toast.error(e?.response?.data?.message ?? e?.message ?? 'Failed to remove student'),
   });
 
   const columns = useMemo(

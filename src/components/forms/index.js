@@ -12,6 +12,7 @@ export { default as SectionForm      } from './SectionForm';
 export { default as AcademicYearForm } from './AcademicYearForm';
 export { default as FeeVoucherForm   } from './FeeVoucherForm';
 export { default as FeeCollectForm   } from './FeeCollectForm';
+export { default as CollectPaymentModal } from '../common/CollectPaymentModal';
 export { default as ExamForm         } from './ExamForm';
 export { default as RoleForm         } from './RoleForm';
 export { default as UserForm         } from './UserForm';

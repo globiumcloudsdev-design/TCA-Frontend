@@ -6,13 +6,115 @@ import { buildQuery } from '@/lib/utils';
 
 export const classService = {
   /**
-   * Get all classes
+   * Get all classes (automatically resolves all pages for dropdowns/selectors)
    */
   getAll: async (params = {}) => {
     try {
-      const queryString = buildQuery(params);
+      const { page: explicitPage, fetchAll, all, limit: customLimit, ...restParams } = params;
+      const shouldFetchAll = fetchAll === true || all === true || (explicitPage === undefined && params.page === undefined);
+
+      const limit = customLimit || (shouldFetchAll ? 500 : 10);
+      const queryParams = shouldFetchAll 
+        ? { limit, pageSize: limit, per_page: limit, page: 1, ...restParams }
+        : { page: explicitPage || 1, limit, pageSize: limit, per_page: limit, ...restParams };
+
+      const queryString = buildQuery(queryParams);
       const response = await api.get(`/classes${queryString}`);
-      return response.data;
+      const resData = response.data;
+
+      // If the caller requested an explicit page without fetchAll, return as is
+      if (!shouldFetchAll) {
+        return resData;
+      }
+
+      // Check if backend paginated the response
+      const pagination = resData?.pagination || resData?.data?.pagination || resData?.meta?.pagination || resData?.meta || {};
+      const totalPages = Number(pagination?.totalPages || pagination?.total_pages || resData?.totalPages || resData?.total_pages || 1);
+      const currentPage = Number(pagination?.page || pagination?.current_page || resData?.page || 1);
+
+      const initialRows = Array.isArray(resData) 
+        ? resData 
+        : (Array.isArray(resData?.data?.rows) 
+          ? resData.data.rows 
+          : (Array.isArray(resData?.data) 
+            ? resData.data 
+            : (Array.isArray(resData?.rows) ? resData.rows : [])));
+
+      // If there are multiple pages, fetch remaining pages in parallel and combine all classes
+      if (totalPages > 1 && currentPage === 1) {
+        const remainingPagePromises = [];
+        for (let p = 2; p <= totalPages; p++) {
+          const nextQuery = buildQuery({ ...queryParams, page: p });
+          remainingPagePromises.push(
+            api.get(`/classes${nextQuery}`)
+              .then(r => {
+                const d = r.data;
+                return Array.isArray(d)
+                  ? d
+                  : (Array.isArray(d?.data?.rows)
+                    ? d.data.rows
+                    : (Array.isArray(d?.data)
+                      ? d.data
+                      : (Array.isArray(d?.rows) ? d.rows : [])));
+              })
+              .catch(err => {
+                console.warn(`Failed to fetch classes page ${p}:`, err);
+                return [];
+              })
+          );
+        }
+
+        const additionalPages = await Promise.all(remainingPagePromises);
+        const allRows = [initialRows, ...additionalPages].flat();
+
+        console.log(`📚 [classService.getAll] Loaded all ${allRows.length} classes across ${totalPages} pages.`);
+
+        const paginationPayload = {
+          ...pagination,
+          total: allRows.length,
+          count: allRows.length,
+          page: 1,
+          limit: allRows.length,
+          totalPages: 1,
+          total_pages: 1,
+        };
+
+        if (Array.isArray(resData)) {
+          return allRows;
+        }
+
+        if (Array.isArray(resData?.data)) {
+          return {
+            ...resData,
+            data: allRows,
+            rows: allRows,
+            pagination: paginationPayload,
+          };
+        }
+
+        if (resData?.data?.rows || resData?.rows) {
+          return {
+            ...resData,
+            data: {
+              ...(typeof resData.data === 'object' ? resData.data : {}),
+              rows: allRows,
+              count: allRows.length,
+              total: allRows.length,
+            },
+            rows: allRows,
+            pagination: paginationPayload,
+          };
+        }
+
+        return {
+          ...resData,
+          data: allRows,
+          rows: allRows,
+          pagination: paginationPayload,
+        };
+      }
+
+      return resData;
     } catch (error) {
       console.error('Error fetching classes:', error);
       throw error;
@@ -236,15 +338,71 @@ export const classService = {
   /**
    * Get class options for dropdown
    */
-  getOptions: async (instituteId, academicYearId) => {
+  getOptions: async (instituteIdOrParams, academicYearId) => {
     try {
-      const response = await api.get('/classes/options', {
-        params: { institute_id: instituteId, academic_year_id: academicYearId }
+      let params = {};
+      if (typeof instituteIdOrParams === 'object' && instituteIdOrParams !== null) {
+        params = { ...instituteIdOrParams };
+      } else {
+        if (instituteIdOrParams) params.institute_id = instituteIdOrParams;
+        if (academicYearId) params.academic_year_id = academicYearId;
+      }
+
+      // First try /classes/options endpoint
+      try {
+        const response = await api.get('/classes/options', { params });
+        const resData = response?.data;
+        const optionsList = Array.isArray(resData?.data)
+          ? resData.data
+          : (Array.isArray(resData?.data?.rows)
+            ? resData.data.rows
+            : (Array.isArray(resData) ? resData : []));
+
+        if (optionsList.length > 0) {
+          return {
+            data: optionsList.map(c => ({
+              value: String(c.value || c.id),
+              label: c.label || c.name || `Class ${c.id}`,
+              id: c.id || c.value,
+              name: c.name || c.label,
+              sections: c.sections || [],
+              ...c,
+            }))
+          };
+        }
+      } catch (err) {
+        console.warn('Backend /classes/options not available, falling back to getAll:', err?.message);
+      }
+
+      // Fallback: fetch all classes and transform into standard options format
+      const response = await classService.getAll({
+        ...params,
+        is_active: true,
+        limit: 500,
+        fetchAll: true,
       });
-      return response.data;
+
+      const list = Array.isArray(response)
+        ? response
+        : (Array.isArray(response?.data?.rows)
+          ? response.data.rows
+          : (Array.isArray(response?.data)
+            ? response.data
+            : (Array.isArray(response?.rows) ? response.rows : [])));
+
+      return {
+        data: list.map(c => ({
+          value: String(c.id || c.value),
+          label: c.name || c.label || `Class ${c.id}`,
+          id: c.id || c.value,
+          name: c.name || c.label,
+          sections: c.sections || [],
+          ...c,
+        }))
+      };
     } catch (error) {
       console.error('Error fetching class options:', error);
-      throw error;
+      return { data: [] };
     }
   }
 };

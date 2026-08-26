@@ -1,689 +1,16 @@
-// 'use client';
-
-// /**
-//  * ImportModal — Advanced Import with Column Mapping & Preview
-//  * Features:
-//  * - CSV/Excel file upload with drag-drop support
-//  * - Automatic column detection and mapping
-//  * - Preview table with editable data
-//  * - Column validation and error handling
-//  * - Progress indicator for large files
-//  */
-
-// import { useState, useCallback, useMemo } from 'react';
-// import {
-//   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-// } from '@/components/ui/dialog';
-// import { Button } from '@/components/ui/button';
-// import { Checkbox } from '@/components/ui/checkbox';
-// import { Label } from '@/components/ui/label';
-// import { Badge } from '@/components/ui/badge';
-// import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-// import { Progress } from '@/components/ui/progress';
-// import { ScrollArea } from '@/components/ui/scroll-area';
-// import {
-//   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-// } from '@/components/ui/select';
-// import {
-//   Table,
-//   TableBody,
-//   TableCell,
-//   TableHead,
-//   TableHeader,
-//   TableRow,
-// } from '@/components/ui/table';
-// import {
-//   Upload, FileSpreadsheet, FileJson, Loader2, CheckCircle2,
-//   AlertCircle, X, ArrowRight, MapPin, Edit2, Save, RefreshCw
-// } from 'lucide-react';
-// import { cn } from '@/lib/utils';
-// import * as XLSX from 'xlsx';
-// import Papa from 'papaparse';
-
-// // File upload area component
-// function FileUploadArea({ onFileSelect, accept, isProcessing }) {
-//   const [dragActive, setDragActive] = useState(false);
-//   const [fileName, setFileName] = useState(null);
-
-//   const handleDrag = (e) => {
-//     e.preventDefault();
-//     e.stopPropagation();
-//     if (e.type === 'dragenter' || e.type === 'dragover') {
-//       setDragActive(true);
-//     } else if (e.type === 'dragleave') {
-//       setDragActive(false);
-//     }
-//   };
-
-//   const handleDrop = (e) => {
-//     e.preventDefault();
-//     e.stopPropagation();
-//     setDragActive(false);
-
-//     const files = e.dataTransfer.files;
-//     if (files && files[0]) {
-//       setFileName(files[0].name);
-//       onFileSelect(files[0]);
-//     }
-//   };
-
-//   const handleChange = (e) => {
-//     const files = e.target.files;
-//     if (files && files[0]) {
-//       setFileName(files[0].name);
-//       onFileSelect(files[0]);
-//     }
-//   };
-
-//   return (
-//     <div
-//       className={cn(
-//         "border-2 border-dashed rounded-lg p-8 text-center transition-all cursor-pointer",
-//         dragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-muted/30",
-//         isProcessing && "opacity-50 pointer-events-none"
-//       )}
-//       onDragEnter={handleDrag}
-//       onDragLeave={handleDrag}
-//       onDragOver={handleDrag}
-//       onDrop={handleDrop}
-//       onClick={() => document.getElementById('file-input')?.click()}
-//     >
-//       <input
-//         id="file-input"
-//         type="file"
-//         className="hidden"
-//         accept={accept}
-//         onChange={handleChange}
-//         disabled={isProcessing}
-//       />
-//       <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
-//       <p className="text-sm font-medium">
-//         {fileName || "Click or drag file to upload"}
-//       </p>
-//       <p className="text-xs text-muted-foreground mt-1">
-//         Supported formats: CSV, Excel (.xlsx, .xls)
-//       </p>
-//       {fileName && (
-//         <Badge variant="secondary" className="mt-2">
-//           {fileName}
-//         </Badge>
-//       )}
-//     </div>
-//   );
-// }
-
-// // Column mapping row component
-// function ColumnMappingRow({ fileCol, dbCol, availableColumns, onMap, onSkip }) {
-//   return (
-//     <div className="flex items-center gap-3 p-2 border-b last:border-b-0">
-//       <div className="w-1/3">
-//         <Badge variant="outline" className="font-mono text-xs">
-//           {fileCol}
-//         </Badge>
-//       </div>
-//       <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-//       <div className="flex-1">
-//         <Select value={dbCol || 'skip'} onValueChange={onMap}>
-//           <SelectTrigger className="h-8 text-sm">
-//             <SelectValue placeholder="Map to column..." />
-//           </SelectTrigger>
-//           <SelectContent>
-//             <SelectItem value="skip">
-//               <span className="text-muted-foreground">— Skip this column —</span>
-//             </SelectItem>
-//             {availableColumns.map((col) => (
-//               <SelectItem key={col.key} value={col.key}>
-//                 <div className="flex items-center gap-2">
-//                   <span>{col.label}</span>
-//                   {col.required && (
-//                     <Badge variant="destructive" className="text-[8px] px-1">required</Badge>
-//                   )}
-//                 </div>
-//               </SelectItem>
-//             ))}
-//           </SelectContent>
-//         </Select>
-//       </div>
-//     </div>
-//   );
-// }
-
-// // Editable cell component for preview
-// function EditableCell({ value, onChange, isInvalid }) {
-//   const [isEditing, setIsEditing] = useState(false);
-//   const [editValue, setEditValue] = useState(String(value ?? ''));
-
-//   const handleSave = () => {
-//     onChange(editValue);
-//     setIsEditing(false);
-//   };
-
-//   const handleKeyDown = (e) => {
-//     if (e.key === 'Enter') handleSave();
-//     if (e.key === 'Escape') {
-//       setEditValue(String(value ?? ''));
-//       setIsEditing(false);
-//     }
-//   };
-
-//   if (isEditing) {
-//     return (
-//       <div className="flex items-center gap-1">
-//         <input
-//           type="text"
-//           value={editValue}
-//           onChange={(e) => setEditValue(e.target.value)}
-//           onKeyDown={handleKeyDown}
-//           className={cn(
-//             "w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1",
-//             isInvalid ? "border-red-500 focus:ring-red-500" : "border-input focus:ring-primary"
-//           )}
-//           autoFocus
-//         />
-//         <button
-//           onClick={handleSave}
-//           className="p-1 hover:bg-accent rounded"
-//           title="Save"
-//         >
-//           <Save className="h-3 w-3" />
-//         </button>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div className="flex items-center justify-between group">
-//       <span className={cn("text-sm", isInvalid && "text-red-500")}>
-//         {value !== null && value !== undefined ? String(value) : '—'}
-//       </span>
-//       <button
-//         onClick={() => setIsEditing(true)}
-//         className="opacity-0 group-hover:opacity-100 p-1 hover:bg-accent rounded transition-opacity"
-//         title="Edit"
-//       >
-//         <Edit2 className="h-3 w-3 text-muted-foreground" />
-//       </button>
-//     </div>
-//   );
-// }
-
-// export default function ImportModal({
-//   open,
-//   onClose,
-//   columns = [],           // Available columns for mapping: [{ key, label, required, validation }]
-//   onImport,               // (data: any[]) => Promise<void>
-//   fileName = 'import',
-//   accept = '.csv,.xlsx,.xls',
-//   sampleData = null,      // Optional sample data for preview
-// }) {
-//   const [step, setStep] = useState(1); // 1: upload, 2: mapping, 3: preview
-//   const [file, setFile] = useState(null);
-//   const [parsedData, setParsedData] = useState([]);
-//   const [fileHeaders, setFileHeaders] = useState([]);
-//   const [mapping, setMapping] = useState({});
-//   const [previewData, setPreviewData] = useState([]);
-//   const [errors, setErrors] = useState([]);
-//   const [importing, setImporting] = useState(false);
-//   const [importProgress, setImportProgress] = useState(0);
-//   const [importStatus, setImportStatus] = useState('idle');
-
-//   // Prepare available columns for mapping
-//   const availableColumns = useMemo(() => {
-//     return columns.filter(col => col.key !== 'select' && col.key !== 'actions');
-//   }, [columns]);
-
-//   // Required columns
-//   const requiredColumns = useMemo(() => {
-//     return availableColumns.filter(col => col.required).map(col => col.key);
-//   }, [availableColumns]);
-
-//   // Parse file based on extension
-//   const parseFile = useCallback(async (uploadedFile) => {
-//     const extension = uploadedFile.name.split('.').pop().toLowerCase();
-//     let headers = [];
-//     let rows = [];
-
-//     try {
-//       if (extension === 'csv') {
-//         const text = await uploadedFile.text();
-//         const result = Papa.parse(text, { header: true, skipEmptyLines: true });
-//         headers = result.meta.fields || [];
-//         rows = result.data;
-//       } else if (['xlsx', 'xls'].includes(extension)) {
-//         const buffer = await uploadedFile.arrayBuffer();
-//         const workbook = XLSX.read(buffer);
-//         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-//         const data = XLSX.utils.sheet_to_json(sheet);
-//         headers = Object.keys(data[0] || {});
-//         rows = data;
-//       }
-
-//       setFileHeaders(headers);
-//       setParsedData(rows);
-
-//       // Auto-map columns based on similarity
-//       const autoMapping = {};
-//       headers.forEach(fileCol => {
-//         const matchedCol = availableColumns.find(dbCol =>
-//           dbCol.label.toLowerCase() === fileCol.toLowerCase() ||
-//           dbCol.key.toLowerCase() === fileCol.toLowerCase() ||
-//           dbCol.label.toLowerCase().includes(fileCol.toLowerCase()) ||
-//           fileCol.toLowerCase().includes(dbCol.label.toLowerCase())
-//         );
-//         if (matchedCol) {
-//           autoMapping[fileCol] = matchedCol.key;
-//         } else {
-//           autoMapping[fileCol] = 'skip';
-//         }
-//       });
-//       setMapping(autoMapping);
-
-//       // Generate preview data
-//       generatePreview(rows, autoMapping);
-
-//       setStep(2);
-//     } catch (err) {
-//       console.error('Parse error:', err);
-//       setErrors([{ type: 'parse', message: 'Failed to parse file. Please check the format.' }]);
-//     }
-//   }, [availableColumns]);
-
-//   // Generate preview data based on mapping
-//   const generatePreview = (data, currentMapping) => {
-//     const preview = data.slice(0, 10).map(row => {
-//       const mappedRow = {};
-//       Object.entries(currentMapping).forEach(([fileCol, dbCol]) => {
-//         if (dbCol !== 'skip') {
-//           mappedRow[dbCol] = row[fileCol] ?? '';
-//         }
-//       });
-//       return mappedRow;
-//     });
-//     setPreviewData(preview);
-//   };
-
-//   // Update mapping for a column
-//   const updateMapping = (fileCol, dbCol) => {
-//     const newMapping = { ...mapping, [fileCol]: dbCol };
-//     setMapping(newMapping);
-//     generatePreview(parsedData, newMapping);
-
-//     // Validate required columns
-//     const mappedRequired = Object.values(newMapping).filter(v => v !== 'skip');
-//     const missingRequired = requiredColumns.filter(req => !mappedRequired.includes(req));
-//     if (missingRequired.length > 0) {
-//       setErrors([{ type: 'required', message: `Missing required columns: ${missingRequired.join(', ')}` }]);
-//     } else {
-//       setErrors([]);
-//     }
-//   };
-
-//   // Update a cell in preview data
-//   const updatePreviewCell = (rowIndex, colKey, value) => {
-//     const newPreview = [...previewData];
-//     newPreview[rowIndex] = { ...newPreview[rowIndex], [colKey]: value };
-//     setPreviewData(newPreview);
-//   };
-
-//   // Prepare all data for import (with edits)
-//   const prepareImportData = () => {
-//     const mappedRequired = Object.values(mapping).filter(v => v !== 'skip');
-//     const missingRequired = requiredColumns.filter(req => !mappedRequired.includes(req));
-//     if (missingRequired.length > 0) {
-//       setErrors([{ type: 'required', message: `Missing required columns: ${missingRequired.join(', ')}` }]);
-//       return null;
-//     }
-
-//     // Apply edits from preview to full dataset
-//     const fullData = parsedData.map((row, idx) => {
-//       const mappedRow = {};
-//       Object.entries(mapping).forEach(([fileCol, dbCol]) => {
-//         if (dbCol !== 'skip') {
-//           // Check if this row was edited in preview
-//           const previewRow = previewData[idx];
-//           if (previewRow && previewRow[dbCol] !== undefined) {
-//             mappedRow[dbCol] = previewRow[dbCol];
-//           } else {
-//             mappedRow[dbCol] = row[fileCol] ?? '';
-//           }
-//         }
-//       });
-//       return mappedRow;
-//     });
-
-//     return fullData;
-//   };
-
-//   // Handle import execution
-//   const handleImport = async () => {
-//     const importData = prepareImportData();
-//     if (!importData) return;
-
-//     setImporting(true);
-//     setImportProgress(0);
-//     setImportStatus('processing');
-
-//     try {
-//       // Simulate progress for better UX
-//       const total = importData.length;
-//       const batchSize = 10;
-
-//       for (let i = 0; i < total; i += batchSize) {
-//         const batch = importData.slice(i, i + batchSize);
-//         await onImport(batch);
-//         setImportProgress(Math.min(((i + batchSize) / total) * 100, 100));
-//       }
-
-//       setImportStatus('success');
-//       setTimeout(() => {
-//         onClose();
-//         resetState();
-//       }, 1500);
-//     } catch (err) {
-//       console.error('Import error:', err);
-//       setImportStatus('error');
-//       setErrors([{ type: 'import', message: err.message || 'Import failed. Please try again.' }]);
-//       setTimeout(() => setImportStatus('idle'), 3000);
-//     } finally {
-//       setTimeout(() => setImporting(false), 500);
-//     }
-//   };
-
-//   // Reset all state
-//   const resetState = () => {
-//     setStep(1);
-//     setFile(null);
-//     setParsedData([]);
-//     setFileHeaders([]);
-//     setMapping({});
-//     setPreviewData([]);
-//     setErrors([]);
-//     setImportProgress(0);
-//     setImportStatus('idle');
-//   };
-
-//   const handleClose = () => {
-//     resetState();
-//     onClose();
-//   };
-
-//   const totalRecords = parsedData.length;
-//   const mappedCount = Object.values(mapping).filter(v => v !== 'skip').length;
-//   const missingRequired = requiredColumns.filter(req =>
-//     !Object.values(mapping).includes(req)
-//   );
-
-//   return (
-//     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-//       <DialogContent className="max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-//         <DialogHeader>
-//           <DialogTitle className="flex items-center gap-2">
-//             <Upload className="h-5 w-5" />
-//             Import Data
-//             {step > 1 && (
-//               <Badge variant="secondary" className="ml-2">
-//                 {totalRecords} records
-//               </Badge>
-//             )}
-//           </DialogTitle>
-//         </DialogHeader>
-
-//         {/* Step indicator */}
-//         <div className="flex items-center justify-between px-8">
-//           {[1, 2, 3].map((s) => (
-//             <div key={s} className="flex items-center">
-//               <div className={cn(
-//                 "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all",
-//                 step >= s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-//               )}>
-//                 {s}
-//               </div>
-//               {s < 3 && (
-//                 <div className={cn(
-//                   "w-16 h-0.5 mx-2",
-//                   step > s ? "bg-primary" : "bg-muted"
-//                 )} />
-//               )}
-//             </div>
-//           ))}
-//         </div>
-
-//         <ScrollArea className="h-[400px] pr-4">
-//           {/* Step 1: File Upload */}
-//           {step === 1 && (
-//             <div className="space-y-4 py-4">
-//               <FileUploadArea
-//                 onFileSelect={(selectedFile) => {
-//                   setFile(selectedFile);
-//                   parseFile(selectedFile);
-//                 }}
-//                 accept={accept}
-//                 isProcessing={false}
-//               />
-
-//               {sampleData && (
-//                 <div className="rounded-lg border p-3 bg-muted/20">
-//                   <p className="text-xs font-medium mb-2">Sample Format</p>
-//                   <pre className="text-xs text-muted-foreground overflow-x-auto">
-//                     {JSON.stringify(sampleData, null, 2)}
-//                   </pre>
-//                 </div>
-//               )}
-//             </div>
-//           )}
-
-//           {/* Step 2: Column Mapping */}
-//           {step === 2 && (
-//             <div className="space-y-4 py-4">
-//               <div className="flex items-center justify-between">
-//                 <div>
-//                   <p className="text-sm font-medium">Map Columns</p>
-//                   <p className="text-xs text-muted-foreground">
-//                     Map file columns to database fields
-//                   </p>
-//                 </div>
-//                 <Badge variant={missingRequired.length === 0 ? "default" : "destructive"}>
-//                   {mappedCount} columns mapped
-//                 </Badge>
-//               </div>
-
-//               {errors.length > 0 && errors[0].type === 'required' && (
-//                 <div className="flex items-center gap-2 p-2 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-yellow-700 dark:text-yellow-300">
-//                   <AlertCircle className="h-4 w-4" />
-//                   <span className="text-sm">{errors[0].message}</span>
-//                 </div>
-//               )}
-
-//               <div className="rounded-lg border">
-//                 <div className="p-3 bg-muted/30 border-b">
-//                   <div className="grid grid-cols-3 gap-3 text-xs font-medium text-muted-foreground">
-//                     <div>File Column</div>
-//                     <div></div>
-//                     <div>Map to Field</div>
-//                   </div>
-//                 </div>
-//                 <div className="max-h-[400px] overflow-y-auto">
-//                   {fileHeaders.map((header) => (
-//                     <ColumnMappingRow
-//                       key={header}
-//                       fileCol={header}
-//                       dbCol={mapping[header]}
-//                       availableColumns={availableColumns}
-//                       onMap={(value) => updateMapping(header, value)}
-//                       onSkip={() => updateMapping(header, 'skip')}
-//                     />
-//                   ))}
-//                 </div>
-//               </div>
-
-//               {requiredColumns.length > 0 && (
-//                 <div className="rounded-lg border p-3 bg-blue-50 dark:bg-blue-950/20">
-//                   <p className="text-xs font-medium mb-2">Required Fields</p>
-//                   <div className="flex flex-wrap gap-2">
-//                     {requiredColumns.map(col => {
-//                       const isMapped = Object.values(mapping).includes(col);
-//                       return (
-//                         <Badge key={col} variant={isMapped ? "default" : "outline"}>
-//                           {availableColumns.find(c => c.key === col)?.label || col}
-//                           {!isMapped && " (missing)"}
-//                         </Badge>
-//                       );
-//                     })}
-//                   </div>
-//                 </div>
-//               )}
-//             </div>
-//           )}
-
-//           {/* Step 3: Preview & Edit */}
-//           {step === 3 && (
-//             <div className="space-y-4 py-4">
-//               <div className="flex items-center justify-between">
-//                 <div>
-//                   <p className="text-sm font-medium">Preview Data</p>
-//                   <p className="text-xs text-muted-foreground">
-//                     Showing first 10 rows • Click on any cell to edit
-//                   </p>
-//                 </div>
-//                 <Badge variant="outline">
-//                   {previewData.length} rows preview
-//                 </Badge>
-//               </div>
-
-//               <div className="rounded-lg border overflow-x-auto">
-//                 <Table className="min-w-[600px]">
-//                   <TableHeader>
-//                     <TableRow className="bg-muted/40">
-//                       {Object.keys(previewData[0] || {}).map((colKey) => {
-//                         const col = availableColumns.find(c => c.key === colKey);
-//                         return (
-//                           <TableHead key={colKey} className="whitespace-nowrap text-xs">
-//                             {col?.label || colKey}
-//                             {col?.required && (
-//                               <span className="ml-1 text-red-500">*</span>
-//                             )}
-//                           </TableHead>
-//                         );
-//                       })}
-//                     </TableRow>
-//                   </TableHeader>
-//                   <TableBody>
-//                     {previewData.map((row, rowIdx) => (
-//                       <TableRow key={rowIdx}>
-//                         {Object.entries(row).map(([colKey, value], colIdx) => (
-//                           <TableCell key={colIdx} className="p-2">
-//                             <EditableCell
-//                               value={value}
-//                               onChange={(newValue) => updatePreviewCell(rowIdx, colKey, newValue)}
-//                             />
-//                           </TableCell>
-//                         ))}
-//                       </TableRow>
-//                     ))}
-//                   </TableBody>
-//                 </Table>
-//               </div>
-
-//               {totalRecords > 10 && (
-//                 <p className="text-xs text-muted-foreground text-center">
-//                   + {totalRecords - 10} more records will be imported
-//                 </p>
-//               )}
-
-//               {/* Progress during import */}
-//               {importing && importStatus === 'processing' && (
-//                 <div className="space-y-2">
-//                   <Progress value={importProgress} className="h-2" />
-//                   <p className="text-xs text-muted-foreground text-center">
-//                     Importing... {Math.round(importProgress)}%
-//                   </p>
-//                 </div>
-//               )}
-
-//               {/* Success/Error messages */}
-//               {importStatus === 'success' && (
-//                 <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-950 rounded-lg text-green-700 dark:text-green-300">
-//                   <CheckCircle2 className="h-4 w-4" />
-//                   <span className="text-sm">Import completed successfully!</span>
-//                 </div>
-//               )}
-
-//               {importStatus === 'error' && errors.length > 0 && (
-//                 <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-950 rounded-lg text-red-700 dark:text-red-300">
-//                   <AlertCircle className="h-4 w-4" />
-//                   <span className="text-sm">{errors[errors.length - 1]?.message || 'Import failed'}</span>
-//                 </div>
-//               )}
-//             </div>
-//           )}
-//         </ScrollArea>
-
-//         <DialogFooter className="gap-2 mt-4">
-//           {step > 1 && step < 3 && (
-//             <Button variant="outline" onClick={() => setStep(step - 1)} disabled={importing}>
-//               Back
-//             </Button>
-//           )}
-
-//           <Button variant="outline" onClick={handleClose} disabled={importing}>
-//             Cancel
-//           </Button>
-
-//           {step === 1 && file && (
-//             <Button onClick={() => setStep(2)}>
-//               Continue
-//               <ArrowRight className="ml-2 h-4 w-4" />
-//             </Button>
-//           )}
-
-//           {step === 2 && (
-//             <Button
-//               onClick={() => setStep(3)}
-//               disabled={missingRequired.length > 0}
-//             >
-//               Preview & Edit
-//               <ArrowRight className="ml-2 h-4 w-4" />
-//             </Button>
-//           )}
-
-//           {step === 3 && (
-//             <Button
-//               onClick={handleImport}
-//               disabled={importing || missingRequired.length > 0}
-//               className="min-w-[100px]"
-//             >
-//               {importing ? (
-//                 <>
-//                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-//                   Importing...
-//                 </>
-//               ) : (
-//                 <>
-//                   <Upload className="mr-2 h-4 w-4" />
-//                   Import {totalRecords} Records
-//                 </>
-//               )}
-//             </Button>
-//           )}
-//         </DialogFooter>
-//       </DialogContent>
-//     </Dialog>
-//   );
-// }
-
-"use client";
+'use client';
 
 /**
- * ImportModal — Advanced Import with Column Mapping & Preview
+ * ImportModal — Advanced Multi-Format Import with Column Auto-Mapping & Preview
  * Features:
- * - CSV/Excel file upload with drag-drop support
- * - Automatic column detection and mapping
- * - Preview table with editable data
- * - Column validation and error handling
- * - Progress indicator for large files
+ * - Multi-Format File Reader (.xlsx, .xls, .csv) via arrayBuffer()
+ * - Unicode & control character stripping ([\u200B-\u200D\uFEFF\u200E\u200F\u00A0])
+ * - Intelligent fuzzy auto-mapping with comprehensive field synonyms
+ * - Robust data sanitization pipeline (ISO dates, placeholder stripping '---', booleans)
+ * - Large dataset handling with preview virtualization and smooth progress tracking
  */
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -691,21 +18,17 @@ import {
   DialogTitle,
   DialogFooter,
   DialogDescription,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
-import { ScrollArea } from "@/components/ui/scroll-area";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -713,36 +36,226 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from '@/components/ui/table';
 import {
   Upload,
   FileSpreadsheet,
-  FileJson,
   Loader2,
   CheckCircle2,
   AlertCircle,
-  X,
   ArrowRight,
-  MapPin,
+  ArrowLeft,
   Edit2,
   Save,
-  RefreshCw,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import * as XLSX from "xlsx";
-import { format } from "date-fns";
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import * as XLSX from 'xlsx';
 
-// File upload area component
-function FileUploadArea({ onFileSelect, accept, isProcessing }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// SANITIZATION & NORMALIZATION HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Strip non-printable / Unicode zero-width / direction control characters and trim whitespace.
+ * Also cleans placeholder strings ('---', 'null', 'N/A', etc.) into empty string ''.
+ */
+export function sanitizeStr(val) {
+  if (val === null || val === undefined) return '';
+  const str = String(val)
+    .replace(/[\u200B-\u200D\uFEFF\u200E\u200F\u00A0]/g, '')
+    .trim();
+
+  const lower = str.toLowerCase();
+  if (
+    str === '---' ||
+    str === '--' ||
+    str === '-' ||
+    lower === 'null' ||
+    lower === 'undefined' ||
+    lower === 'n/a' ||
+    lower === 'none'
+  ) {
+    return '';
+  }
+  return str;
+}
+
+/**
+ * Standardize varied date values (Excel serial numbers, DD-MM-YY, MM/DD/YYYY, ISO) into YYYY-MM-DD.
+ */
+export function parseToIsoDate(val) {
+  if (val === null || val === undefined) return '';
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const d = String(val.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  if (typeof val === 'number') {
+    // Excel date serial number (e.g. 44561)
+    const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+    if (!isNaN(d.getTime())) {
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+  }
+
+  const str = sanitizeStr(val);
+  if (!str) return '';
+
+  // 1. YYYY-MM-DD or YYYY/MM/DD
+  const isoMatch = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (isoMatch) {
+    const [, y, m, d] = isoMatch;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+
+  // 2. DD-MM-YY or DD-MM-YYYY or MM/DD/YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+  if (dmyMatch) {
+    let d = parseInt(dmyMatch[1], 10);
+    let m = parseInt(dmyMatch[2], 10);
+    let y = dmyMatch[3];
+    if (y.length === 2) {
+      const numY = parseInt(y, 10);
+      y = String(numY > 50 ? 1900 + numY : 2000 + numY);
+    }
+    // Swap if month was in the first slot (>12)
+    if (m > 12 && d <= 12) {
+      const temp = d;
+      d = m;
+      m = temp;
+    }
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+
+  // 3. Fallback native parse
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  return str;
+}
+
+/**
+ * Normalizes headers by removing control characters, spaces, and punctuation.
+ */
+function normalizeHeader(str) {
+  return String(str || '')
+    .replace(/[\u200B-\u200D\uFEFF\u200E\u200F\u00A0]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Comprehensive synonym dictionary for fuzzy auto-mapping file columns to target schema fields.
+ */
+const FIELD_SYNONYMS = {
+  first_name: ['firstname', 'first', 'studentname', 'studentfirstname', 'fullname', 'name', 'fname'],
+  last_name: ['lastname', 'last', 'surname', 'familyname', 'lname'],
+  email: ['email', 'emailaddress', 'studentemail'],
+  phone: ['phone', 'mobile', 'contact', 'contactno', 'phonenumber', 'mobilenumber', 'cell', 'cellno', 'studentphone'],
+  registration_no: ['registrationno', 'registrationnumber', 'regno', 'regnumber', 'registration', 'reg', 'grno', 'grnumber', 'gr', 'studentcode', 'studentid', 'admissionno'],
+  cnic: ['cnic', 'bform', 'cnicbform', 'bformno', 'cnicno', 'nationalid', 'idcard', 'identity', 'formb'],
+  dob: ['dob', 'dateofbirth', 'birthdate', 'birthofdate', 'dateofbirthdob'],
+  gender: ['gender', 'sex'],
+  blood_group: ['bloodgroup', 'bloodtype', 'blood'],
+  religion: ['religion'],
+  nationality: ['nationality', 'country'],
+  class_name: ['class', 'classname', 'grade', 'gradename', 'currentclass', 'standard', 'primaryunit', 'course', 'coursename'],
+  section_name: ['section', 'sectionname', 'group', 'batch', 'batchname', 'division', 'stream', 'groupingunit'],
+  roll_no: ['rollnumber', 'rollno', 'roll', 'candidateno', 'candidateid', 'traineeid', 'seatno'],
+  academic_year_name: ['academicyear', 'academicyearname', 'academicperiod', 'session', 'academicsession', 'schoolyear', 'batchyear', 'year'],
+  admission_date: ['admissiondate', 'dateofadmission', 'enrollmentdate', 'joiningdate', 'dateofjoining', 'doj'],
+  father_name: ['fathername', 'fathersname', 'father'],
+  father_phone: ['fatherphone', 'fathermobile', 'fathersphone', 'fathersmobile'],
+  father_cnic: ['fathercnic', 'fatherscnic', 'fathercnicno'],
+  father_occupation: ['fatheroccupation', 'fathersoccupation', 'occupation'],
+  mother_name: ['mothername', 'mothersname', 'mother'],
+  mother_phone: ['motherphone', 'mothermobile'],
+  mother_cnic: ['mothercnic', 'motherscnic'],
+  guardian_name: ['guardianname', 'guardian', 'parentname', 'parentsname'],
+  guardian_phone: ['guardianphone', 'guardianmobile', 'parentphone'],
+  guardian_cnic: ['guardiancnic', 'guardiancnicno', 'parentcnic'],
+  guardian_email: ['guardianemail', 'parentemail'],
+  guardian_relation: ['guardianrelation', 'relation', 'relationship'],
+  guardian_type: ['guardiantype'],
+  present_address: ['presentaddress', 'currentaddress', 'address', 'residentialaddress'],
+  permanent_address: ['permanentaddress'],
+  city: ['city', 'town'],
+  emergency_contact_name: ['emergencycontactperson', 'emergencycontactname', 'emergencycontact', 'emergencyperson'],
+  emergency_contact_relation: ['emergencycontactrelation', 'emergencyrelation'],
+  emergency_contact_phone: ['emergencycontactphone', 'emergencyphone', 'emergencymobile'],
+  monthly_fee: ['monthlyfee', 'tuitionfee', 'fee', 'basefee', 'schoolfee'],
+  admission_fee: ['admissionfee', 'registrationfee'],
+  concession_type: ['concessiontype', 'discounttype', 'concession'],
+  concession_percentage: ['concessionpercentage', 'discountpercentage', 'concession', 'discount'],
+  concession_reason: ['concessionreason', 'discountreason'],
+  medical_conditions: ['medicalconditions', 'medicalcondition', 'medicalhistory', 'medical'],
+  allergies: ['allergies', 'allergy'],
+  previous_school: ['previousschool', 'previousschoolcollege', 'lastschool'],
+  previous_class: ['previousclass', 'previousclassgrade', 'lastclass', 'previousgrade'],
+  is_active: ['activestatus', 'isactive', 'active', 'statusactive'],
+  status: ['status'],
+};
+
+/**
+ * Match a raw file header to an available schema column.
+ */
+function matchHeaderToColumn(fileCol, availableCols) {
+  const normFileCol = normalizeHeader(fileCol);
+  if (!normFileCol) return null;
+
+  // 1. Direct key match or exact label match
+  const direct = availableCols.find(
+    (c) => normalizeHeader(c.key) === normFileCol || normalizeHeader(c.label) === normFileCol
+  );
+  if (direct) return direct;
+
+  // 2. Synonyms dictionary lookup
+  for (const [key, synonyms] of Object.entries(FIELD_SYNONYMS)) {
+    if (synonyms.includes(normFileCol)) {
+      const col = availableCols.find((c) => c.key === key);
+      if (col) return col;
+    }
+  }
+
+  // 3. Substring / partial match
+  const partial = availableCols.find((c) => {
+    const k = normalizeHeader(c.key);
+    const l = normalizeHeader(c.label);
+    return (
+      (k.length > 3 && (normFileCol.includes(k) || k.includes(normFileCol))) ||
+      (l.length > 3 && (normFileCol.includes(l) || l.includes(normFileCol)))
+    );
+  });
+  if (partial) return partial;
+
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUB-COMPONENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function FileUploadArea({ onFileSelect, accept, isProcessing, fileName }) {
   const [dragActive, setDragActive] = useState(false);
-  const [fileName, setFileName] = useState(null);
 
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
+    if (e.type === 'dragenter' || e.type === 'dragover') {
       setDragActive(true);
-    } else if (e.type === "dragleave") {
+    } else if (e.type === 'dragleave') {
       setDragActive(false);
     }
   };
@@ -751,10 +264,8 @@ function FileUploadArea({ onFileSelect, accept, isProcessing }) {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-
     const files = e.dataTransfer.files;
     if (files && files[0]) {
-      setFileName(files[0].name);
       onFileSelect(files[0]);
     }
   };
@@ -762,7 +273,6 @@ function FileUploadArea({ onFileSelect, accept, isProcessing }) {
   const handleChange = (e) => {
     const files = e.target.files;
     if (files && files[0]) {
-      setFileName(files[0].name);
       onFileSelect(files[0]);
     }
   };
@@ -770,35 +280,37 @@ function FileUploadArea({ onFileSelect, accept, isProcessing }) {
   return (
     <div
       className={cn(
-        "border-2 border-dashed rounded-lg p-8 text-center transition-all cursor-pointer",
-        dragActive
-          ? "border-primary bg-primary/5"
-          : "border-border hover:border-primary/50 hover:bg-muted/30",
-        isProcessing && "opacity-50 pointer-events-none",
+        'border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer bg-card',
+        dragActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/30',
+        isProcessing && 'opacity-50 pointer-events-none'
       )}
       onDragEnter={handleDrag}
       onDragLeave={handleDrag}
       onDragOver={handleDrag}
       onDrop={handleDrop}
-      onClick={() => document.getElementById("file-input")?.click()}
+      onClick={() => document.getElementById('file-upload-input')?.click()}
     >
       <input
-        id="file-input"
+        id="file-upload-input"
         type="file"
         className="hidden"
         accept={accept}
         onChange={handleChange}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.target.value = null;
+        }}
         disabled={isProcessing}
       />
       <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
-      <p className="text-sm font-medium">
-        {fileName || "Click or drag file to upload"}
+      <p className="text-sm font-semibold text-foreground">
+        {fileName || 'Click or drag file to upload'}
       </p>
       <p className="text-xs text-muted-foreground mt-1">
-        Supported formats: CSV, Excel (.xlsx, .xls)
+        Supported formats: Excel (.xlsx, .xls) and CSV (.csv)
       </p>
       {fileName && (
-        <Badge variant="secondary" className="mt-2">
+        <Badge variant="secondary" className="mt-3 font-mono text-xs px-2.5 py-1">
           {fileName}
         </Badge>
       )}
@@ -806,33 +318,30 @@ function FileUploadArea({ onFileSelect, accept, isProcessing }) {
   );
 }
 
-// Column mapping row component
-function ColumnMappingRow({ fileCol, dbCol, availableColumns, onMap, onSkip }) {
+function ColumnMappingRow({ fileCol, dbCol, availableColumns, onMap }) {
   return (
-    <div className="flex items-center gap-3 p-2 border-b last:border-b-0">
-      <div className="w-1/3">
-        <Badge variant="outline" className="font-mono text-xs">
+    <div className="flex items-center gap-3 p-2.5 border-b last:border-b-0 hover:bg-muted/20 transition-colors">
+      <div className="w-1/3 min-w-0">
+        <Badge variant="outline" className="font-mono text-xs max-w-full truncate">
           {fileCol}
         </Badge>
       </div>
       <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
       <div className="flex-1">
-        <Select value={dbCol || "skip"} onValueChange={onMap}>
-          <SelectTrigger className="h-8 text-sm">
-            <SelectValue placeholder="Map to column..." />
+        <Select value={dbCol || 'skip'} onValueChange={onMap}>
+          <SelectTrigger className="h-8 text-xs bg-background">
+            <SelectValue placeholder="Map to field..." />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-[300px]">
             <SelectItem value="skip">
-              <span className="text-muted-foreground">
-                — Skip this column —
-              </span>
+              <span className="text-muted-foreground italic">— Skip this column —</span>
             </SelectItem>
             {availableColumns.map((col) => (
-              <SelectItem key={col.key} value={col.key}>
+              <SelectItem key={col.key} value={col.key} className="text-xs">
                 <div className="flex items-center gap-2">
                   <span>{col.label}</span>
                   {col.required && (
-                    <Badge variant="destructive" className="text-[8px] px-1">
+                    <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4">
                       required
                     </Badge>
                   )}
@@ -846,10 +355,9 @@ function ColumnMappingRow({ fileCol, dbCol, availableColumns, onMap, onSkip }) {
   );
 }
 
-// Editable cell component for preview
 function EditableCell({ value, onChange, isInvalid }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(String(value ?? ""));
+  const [editValue, setEditValue] = useState(String(value ?? ''));
 
   const handleSave = () => {
     onChange(editValue);
@@ -857,32 +365,30 @@ function EditableCell({ value, onChange, isInvalid }) {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter") handleSave();
-    if (e.key === "Escape") {
-      setEditValue(String(value ?? ""));
+    if (e.key === 'Enter') handleSave();
+    if (e.key === 'Escape') {
+      setEditValue(String(value ?? ''));
       setIsEditing(false);
     }
   };
 
   if (isEditing) {
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 min-w-[120px]">
         <input
           type="text"
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={handleKeyDown}
           className={cn(
-            "w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1",
-            isInvalid
-              ? "border-red-500 focus:ring-red-500"
-              : "border-input focus:ring-primary",
+            'w-full px-2 py-1 text-xs border rounded bg-background focus:outline-none focus:ring-1',
+            isInvalid ? 'border-red-500 focus:ring-red-500' : 'border-input focus:ring-primary'
           )}
           autoFocus
         />
         <button
           onClick={handleSave}
-          className="p-1 hover:bg-accent rounded"
+          className="p-1 hover:bg-accent rounded text-primary"
           title="Save"
         >
           <Save className="h-3 w-3" />
@@ -892,14 +398,14 @@ function EditableCell({ value, onChange, isInvalid }) {
   }
 
   return (
-    <div className="flex items-center justify-between group">
-      <span className={cn("text-sm", isInvalid && "text-red-500")}>
-        {value !== null && value !== undefined ? String(value) : "—"}
+    <div className="flex items-center justify-between group gap-2 min-w-[80px]">
+      <span className={cn('text-xs truncate max-w-[200px]', isInvalid && 'text-red-500 font-semibold')}>
+        {value !== null && value !== undefined && value !== '' ? String(value) : '—'}
       </span>
       <button
         onClick={() => setIsEditing(true)}
-        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-accent rounded transition-opacity"
-        title="Edit"
+        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-accent rounded transition-opacity shrink-0"
+        title="Edit cell"
       >
         <Edit2 className="h-3 w-3 text-muted-foreground" />
       </button>
@@ -907,21 +413,24 @@ function EditableCell({ value, onChange, isInvalid }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN IMPORT MODAL COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function ImportModal({
   open,
   onClose,
-  columns = [], // Available columns for mapping: [{ key, label, required, validation }]
-  onImport, // (data: any[]) => Promise<void>
-  fileName = "import",
-  accept = ".csv,.xlsx,.xls",
-  sampleData = null, // Optional sample data for preview
+  columns = [],
+  onImport,
+  fileName = 'import',
+  accept = '.csv,.xlsx,.xls',
+  sampleData = null,
 }) {
   const [step, setStep] = useState(1); // 1: upload, 2: mapping, 3: preview
   const [file, setFile] = useState(null);
-  const [workbook, setWorkbook] = useState(null);
   const [sheetNames, setSheetNames] = useState([]);
   const [selectedSheet, setSelectedSheet] = useState('');
-  const [parsedData, setParsedData] = useState([]);
+  const [rawRows, setRawRows] = useState([]);
   const [fileHeaders, setFileHeaders] = useState([]);
   const [mapping, setMapping] = useState({});
   const [previewData, setPreviewData] = useState([]);
@@ -930,200 +439,164 @@ export default function ImportModal({
   const [importProgress, setImportProgress] = useState(0);
   const [importStatus, setImportStatus] = useState('idle');
 
-  // Prepare available columns for mapping
+  // Filter columns available for mapping
   const availableColumns = useMemo(() => {
-    return columns.filter(
-      (col) => col.key !== "select" && col.key !== "actions",
-    );
+    return columns.filter((col) => col.key !== 'select' && col.key !== 'actions');
   }, [columns]);
 
-  // Required columns
+  // Required column keys
   const requiredColumns = useMemo(() => {
     return availableColumns.filter((col) => col.required).map((col) => col.key);
   }, [availableColumns]);
 
-  // Parse file based on extension
-  const parseFile = useCallback(
-    async (uploadedFile, sheetName = null) => {
-      const extension = uploadedFile.name.split(".").pop().toLowerCase();
-      let headers = [];
-      let rows = [];
+  // Transform a raw data row into a sanitized mapped row
+  const sanitizeMappedRow = useCallback((row, currentMapping) => {
+    const mapped = {};
+    Object.entries(currentMapping).forEach(([fileCol, dbCol]) => {
+      if (dbCol && dbCol !== 'skip') {
+        const rawVal = row[fileCol];
 
-      try {
-        if (["csv", "xlsx", "xls"].includes(extension)) {
-          let currentWorkbook = workbook;
-          if (!currentWorkbook) {
-            const buffer = await uploadedFile.arrayBuffer();
-            currentWorkbook = XLSX.read(buffer, { cellDates: true });
-          }
-
-          if (["xlsx", "xls"].includes(extension)) {
-            const names = currentWorkbook.SheetNames;
-            setSheetNames(names);
-            setWorkbook(currentWorkbook);
-
-            if (!sheetName && names.length > 1) {
-              // Let user select sheet
-              return;
-            }
-
-            const targetSheet = sheetName || names[0];
-            setSelectedSheet(targetSheet);
-            const sheet = currentWorkbook.Sheets[targetSheet];
-            const data = XLSX.utils.sheet_to_json(sheet, { raw: false, defval: "" });
-            headers = Object.keys(data[0] || {});
-            rows = data;
-          } else {
-            // CSV
-            const sheetName = currentWorkbook.SheetNames[0];
-            const sheet = currentWorkbook.Sheets[sheetName];
-            const data = XLSX.utils.sheet_to_json(sheet, { raw: false, defval: "" });
-            headers = Object.keys(data[0] || {});
-            rows = data;
-          }
-        }
-
-        if (rows.length > 500) {
-          setErrors([
-            {
-              type: "limit",
-              message: "Maximum 500 records can be imported at once. Please split your file.",
-            },
-          ]);
-          setParsedData([]);
-          setFileHeaders([]);
+        // 1. Date fields
+        if (dbCol === 'dob' || dbCol === 'admission_date' || dbCol === 'date_of_birth') {
+          mapped[dbCol] = parseToIsoDate(rawVal);
           return;
         }
 
-        setFileHeaders(headers);
-        setParsedData(rows);
-
-        // Auto-map columns based on similarity
-        const autoMapping = {};
-        headers.forEach((fileCol) => {
-          const normalizedFileCol = fileCol.toLowerCase().replace(/[^a-z0-9]/g, "");
-          
-          const matchedCol = availableColumns.find((dbCol) => {
-            const normalizedLabel = dbCol.label.toLowerCase().replace(/[^a-z0-9]/g, "");
-            const normalizedKey = dbCol.key.toLowerCase().replace(/[^a-z0-9]/g, "");
-            
-            // Special cases like DOB and Guardian details
-            const synonyms = {
-              dob: ["dob", "dateofbirth", "birthdate", "birth", "birthofdate"],
-              admission_date: ["admissiondate", "doj", "joiningdate", "enrollmentdate"],
-              registration_no: ["regno", "grno", "registration", "studentcode"],
-              cnic: ["cnic", "bform", "idcard", "identity"],
-              guardian_name: ["guardianname", "fathername", "parentname", "guardian"],
-              guardian_phone: ["guardianphone", "fatherphone", "parentphone", "guardianmobile", "mobile"],
-              guardian_cnic: ["guardiancnic", "fathercnic", "parentcnic"],
-              guardian_email: ["guardianemail", "fatheremail", "parentemail"],
-            };
-
-            if (synonyms.dob.includes(normalizedFileCol) && (normalizedKey === "dob" || normalizedKey === "dateofbirth")) return true;
-            if (synonyms.admission_date.includes(normalizedFileCol) && normalizedKey === "admission_date") return true;
-            if (synonyms.registration_no.includes(normalizedFileCol) && normalizedKey === "registration_no") return true;
-            if (synonyms.cnic.includes(normalizedFileCol) && normalizedKey === "cnic") return true;
-
-            // Flexible Guardian Matching
-            if (synonyms.guardian_name.includes(normalizedFileCol) && (normalizedKey === "guardian_name" || normalizedKey === "father_name")) return true;
-            if (synonyms.guardian_phone.includes(normalizedFileCol) && (normalizedKey === "guardian_phone" || normalizedKey === "father_phone")) return true;
-            if (synonyms.guardian_cnic.includes(normalizedFileCol) && (normalizedKey === "guardian_cnic" || normalizedKey === "father_cnic")) return true;
-            if (synonyms.guardian_email.includes(normalizedFileCol) && (normalizedKey === "guardian_email" || normalizedKey === "father_email")) return true;
-            
-            return (
-              normalizedLabel === normalizedFileCol ||
-              normalizedKey === normalizedFileCol ||
-              normalizedLabel.includes(normalizedFileCol) ||
-              normalizedFileCol.includes(normalizedLabel) ||
-              (normalizedFileCol === "dob" && normalizedKey === "dob")
-            );
-          });
-
-          if (matchedCol) {
-            autoMapping[fileCol] = matchedCol.key;
+        // 2. Boolean is_active
+        if (dbCol === 'is_active') {
+          if (rawVal === undefined || rawVal === null || rawVal === '') {
+            mapped[dbCol] = true;
           } else {
-            autoMapping[fileCol] = "skip";
+            const act = sanitizeStr(rawVal).toLowerCase();
+            mapped[dbCol] = !(act === 'false' || act === '0' || act === 'inactive' || act === 'no');
           }
+          return;
+        }
+
+        // 3. General string sanitization
+        mapped[dbCol] = sanitizeStr(rawVal);
+      }
+    });
+
+    // Default is_active to true if not mapped
+    if (mapped.is_active === undefined) {
+      mapped.is_active = true;
+    }
+
+    return mapped;
+  }, []);
+
+  // Generate preview dataset (first 50 rows for fast DOM rendering)
+  const generatePreview = useCallback(
+    (data, currentMapping) => {
+      const previewSlice = data.slice(0, 50);
+      const preview = previewSlice.map((row) => sanitizeMappedRow(row, currentMapping));
+      setPreviewData(preview);
+    },
+    [sanitizeMappedRow]
+  );
+
+  // Multi-Format File Reader & Parser (.xlsx, .xls, .csv)
+  const parseFile = useCallback(
+    async (uploadedFile, targetSheetName = null) => {
+      try {
+        setErrors([]);
+        const buffer = await uploadedFile.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, dense: true });
+
+        const names = workbook.SheetNames || [];
+        setSheetNames(names);
+
+        const sheetToRead = targetSheetName || names[0] || 'Sheet1';
+        setSelectedSheet(sheetToRead);
+
+        const sheet = workbook.Sheets[sheetToRead];
+        if (!sheet) {
+          throw new Error(`Sheet "${sheetToRead}" not found in file.`);
+        }
+
+        // 1. Extract raw header strings from Row 1 of sheet
+        const headerMatrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        const rawRow0 = headerMatrix[0] || [];
+        const cleanedHeaders = rawRow0
+          .map((h) => String(h || '').replace(/[\u200B-\u200D\uFEFF\u200E\u200F\u00A0]/g, '').trim())
+          .filter(Boolean);
+
+        // 2. Parse data rows to JSON array
+        const rawJson = XLSX.utils.sheet_to_json(sheet, {
+          raw: false,
+          defval: '',
+          blankrows: false,
         });
+
+        // 3. Filter out completely blank rows
+        const validRows = rawJson.filter((r) =>
+          Object.values(r).some((v) => sanitizeStr(v) !== '')
+        );
+
+        if (validRows.length === 0 || cleanedHeaders.length === 0) {
+          setErrors([
+            {
+              type: 'empty',
+              message: 'No data records or headers found in the selected sheet.',
+            },
+          ]);
+          setRawRows([]);
+          setFileHeaders([]);
+          setMapping({});
+          return;
+        }
+
+        // 4. Normalize rows to have cleaned header keys
+        const rawHeaderKeys = Object.keys(validRows[0] || {});
+        const cleanedRows = validRows.map((row) => {
+          const cleanRow = {};
+          cleanedHeaders.forEach((h, idx) => {
+            const originalKey = rawHeaderKeys[idx] || h;
+            cleanRow[h] = row[originalKey] !== undefined ? row[originalKey] : row[h];
+          });
+          return cleanRow;
+        });
+
+        setRawRows(cleanedRows);
+        setFileHeaders(cleanedHeaders);
+
+        // 5. Intelligent Fuzzy Auto-Mapping
+        const autoMapping = {};
+        cleanedHeaders.forEach((fileCol) => {
+          const matched = matchHeaderToColumn(fileCol, availableColumns);
+          autoMapping[fileCol] = matched ? matched.key : 'skip';
+        });
+
         setMapping(autoMapping);
-
-        // Generate preview data
-        generatePreview(rows, autoMapping);
-
+        generatePreview(cleanedRows, autoMapping);
         setStep(2);
       } catch (err) {
-        console.error("Parse error:", err);
+        console.error('File parsing error:', err);
         setErrors([
           {
-            type: "parse",
-            message: "Failed to parse file. Please check the format.",
+            type: 'parse',
+            message: err.message || 'Failed to parse file. Please verify format and contents.',
           },
         ]);
       }
     },
-    [availableColumns, workbook],
+    [availableColumns, generatePreview]
   );
 
-  // Generate preview data based on mapping
-  const generatePreview = (data, currentMapping) => {
-    const preview = data.map((row) => {
-      const mappedRow = {};
-      Object.entries(currentMapping).forEach(([fileCol, dbCol]) => {
-        if (dbCol !== "skip") {
-          let val = row[fileCol];
-          
-          // Handle potential Excel date number
-          if (typeof val === 'number' && (dbCol === 'dob' || dbCol === 'admission_date')) {
-             // Basic Excel date conversion if it's a number
-             const date = new Date((val - 25569) * 86400 * 1000);
-             if (!isNaN(date.getTime())) {
-               val = format(date, "yyyy-MM-dd");
-             }
-          }
-
-          if (val instanceof Date) {
-            mappedRow[dbCol] = format(val, "yyyy-MM-dd");
-          } else {
-            mappedRow[dbCol] = val ?? "";
-          }
-        }
-      });
-      // Ensure is_active is true by default if not mapped
-      // Ensure is_active is true by default if not explicitly false/inactive
-      if (mappedRow.is_active === undefined || mappedRow.is_active === null || mappedRow.is_active === "") {
-        mappedRow.is_active = true;
-      } else {
-        // Normalize string values from file
-        const act = String(mappedRow.is_active).toLowerCase();
-        if (act === 'false' || act === '0' || act === 'inactive' || act === 'no') {
-          mappedRow.is_active = false;
-        } else {
-          mappedRow.is_active = true;
-        }
-      }
-      return mappedRow;
-    });
-    setPreviewData(preview);
-  };
-
-  // Update mapping for a column
+  // Update a single column mapping
   const updateMapping = (fileCol, dbCol) => {
     const newMapping = { ...mapping, [fileCol]: dbCol };
     setMapping(newMapping);
-    generatePreview(parsedData, newMapping);
+    generatePreview(rawRows, newMapping);
 
-    // Validate required columns
-    const mappedRequired = Object.values(newMapping).filter(
-      (v) => v !== "skip",
-    );
-    const missingRequired = requiredColumns.filter(
-      (req) => !mappedRequired.includes(req),
-    );
-    if (missingRequired.length > 0) {
+    const mappedCols = Object.values(newMapping).filter((v) => v !== 'skip');
+    const missing = requiredColumns.filter((req) => !mappedCols.includes(req));
+    if (missing.length > 0) {
       setErrors([
         {
-          type: "required",
-          message: `Missing required columns: ${missingRequired.join(", ")}`,
+          type: 'required',
+          message: `Missing required columns: ${missing.join(', ')}`,
         },
       ]);
     } else {
@@ -1131,111 +604,77 @@ export default function ImportModal({
     }
   };
 
-  // Update a cell in preview data
+  // Update cell in preview table
   const updatePreviewCell = (rowIndex, colKey, value) => {
-    const newPreview = [...previewData];
-    newPreview[rowIndex] = { ...newPreview[rowIndex], [colKey]: value };
-    setPreviewData(newPreview);
+    const nextPreview = [...previewData];
+    nextPreview[rowIndex] = { ...nextPreview[rowIndex], [colKey]: value };
+    setPreviewData(nextPreview);
   };
 
-  // Prepare all data for import (with edits)
+  // Prepare full sanitized dataset for import
   const prepareImportData = () => {
-    const mappedRequired = Object.values(mapping).filter((v) => v !== "skip");
-    const missingRequired = requiredColumns.filter(
-      (req) => !mappedRequired.includes(req),
-    );
-    if (missingRequired.length > 0) {
+    const mappedCols = Object.values(mapping).filter((v) => v !== 'skip');
+    const missing = requiredColumns.filter((req) => !mappedCols.includes(req));
+    if (missing.length > 0) {
       setErrors([
         {
-          type: "required",
-          message: `Missing required columns: ${missingRequired.join(", ")}`,
+          type: 'required',
+          message: `Missing required columns: ${missing.join(', ')}`,
         },
       ]);
       return null;
     }
 
-    // Apply edits from preview to full dataset
-    const fullData = parsedData.map((row, idx) => {
-      const mappedRow = {};
-      Object.entries(mapping).forEach(([fileCol, dbCol]) => {
-        if (dbCol !== "skip") {
-          // Check if this row was edited in preview
-          const previewRow = previewData[idx];
-          if (previewRow && previewRow[dbCol] !== undefined) {
-            mappedRow[dbCol] = previewRow[dbCol];
-          } else {
-            let val = row[fileCol];
-
-            // Handle potential Excel date number in final preparation
-            if (typeof val === 'number' && (dbCol === 'dob' || dbCol === 'admission_date')) {
-               const date = new Date((val - 25569) * 86400 * 1000);
-               if (!isNaN(date.getTime())) {
-                 val = format(date, "yyyy-MM-dd");
-               }
-            }
-
-            if (val instanceof Date) {
-              mappedRow[dbCol] = format(val, "yyyy-MM-dd");
-            } else {
-              mappedRow[dbCol] = val ?? "";
-            }
-          }
-        }
-      });
-      return mappedRow;
+    return rawRows.map((row, idx) => {
+      const sanitized = sanitizeMappedRow(row, mapping);
+      const previewOverride = previewData[idx];
+      if (previewOverride) {
+        return { ...sanitized, ...previewOverride };
+      }
+      return sanitized;
     });
-
-    return fullData;
   };
 
-  // Handle import execution
+  // Execute import process
   const handleImport = async () => {
     const importData = prepareImportData();
-    if (!importData) return;
+    if (!importData || importData.length === 0) return;
 
     setImporting(true);
     setImportProgress(0);
-    setImportStatus("processing");
+    setImportStatus('processing');
 
     try {
-      // Simulate progress for better UX
-      const total = importData.length;
-      const batchSize = 10;
+      // Execute import handler
+      await onImport(importData);
+      setImportProgress(100);
+      setImportStatus('success');
 
-      for (let i = 0; i < total; i += batchSize) {
-        const batch = importData.slice(i, i + batchSize);
-        await onImport(batch);
-        setImportProgress(Math.min(((i + batchSize) / total) * 100, 100));
-      }
-
-      setImportStatus("success");
       setTimeout(() => {
-        onClose();
-        resetState();
-      }, 1500);
+        handleClose();
+      }, 1200);
     } catch (err) {
-      console.error("Import error:", err);
-      setImportStatus("error");
+      console.error('Import execution error:', err);
+      setImportStatus('error');
       setErrors([
         {
-          type: "import",
-          message: err.message || "Import failed. Please try again.",
+          type: 'import',
+          message: err.message || 'Import failed. Please review errors and try again.',
         },
       ]);
-      setTimeout(() => setImportStatus("idle"), 3000);
+      setTimeout(() => setImportStatus('idle'), 4000);
     } finally {
-      setTimeout(() => setImporting(false), 500);
+      setImporting(false);
     }
   };
 
-  // Reset all state
+  // Reset modal state
   const resetState = () => {
     setStep(1);
     setFile(null);
-    setWorkbook(null);
     setSheetNames([]);
     setSelectedSheet('');
-    setParsedData([]);
+    setRawRows([]);
     setFileHeaders([]);
     setMapping({});
     setPreviewData([]);
@@ -1249,61 +688,82 @@ export default function ImportModal({
     onClose();
   };
 
-  const totalRecords = parsedData.length;
-  const mappedCount = Object.values(mapping).filter((v) => v !== "skip").length;
-  const missingRequired = requiredColumns.filter(
-    (req) => !Object.values(mapping).includes(req),
-  );
+  const totalRecords = rawRows.length;
+  const mappedCount = Object.values(mapping).filter((v) => v !== 'skip').length;
+  const mappedKeys = Object.values(mapping);
+  const missingRequired = requiredColumns.filter((req) => !mappedKeys.includes(req));
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="max-w-5xl w-full max-h-[100vh] h-[105vh] flex flex-col p-0">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
-          <DialogTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
+      <DialogContent className="max-w-4xl w-full max-h-[92vh] h-[90vh] flex flex-col p-0">
+        {/* Modal Header */}
+        <DialogHeader className="px-6 pt-5 pb-4 border-b shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-lg">
+            <Upload className="h-5 w-5 text-primary" />
             Import Data
-            {step > 1 && (
-              <Badge variant="secondary" className="ml-2">
-                {totalRecords} records
+            {totalRecords > 0 && (
+              <Badge variant="secondary" className="ml-2 font-mono text-xs">
+                {totalRecords.toLocaleString()} records
               </Badge>
             )}
           </DialogTitle>
-          <DialogDescription>
-            Upload a CSV or Excel file and map columns to import records in bulk
+          <DialogDescription className="text-xs">
+            Upload Excel (.xlsx, .xls) or CSV (.csv) file to import records in bulk.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Step indicator */}
-        <div className="flex items-center justify-between px-8 py-4 shrink-0">
-          {[1, 2, 3].map((s) => (
-            <div key={s} className="flex items-center">
-              <div
-                className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all",
-                  step >= s
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground",
-                )}
-              >
-                {s}
-              </div>
-              {s < 3 && (
-                <div
+        {/* Step Indicator */}
+        <div className="flex items-center justify-center gap-3 px-6 py-3 border-b bg-muted/20 shrink-0">
+          {[
+            { num: 1, label: 'Upload' },
+            { num: 2, label: 'Map Columns' },
+            { num: 3, label: 'Preview & Import' },
+          ].map((s, idx) => {
+            const isClickable = s.num < step || (s.num === 2 && file && rawRows.length > 0) || (s.num === 3 && rawRows.length > 0 && missingRequired.length === 0);
+            return (
+              <div key={s.num} className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!isClickable || importing}
+                  onClick={() => {
+                    if (s.num === 3) generatePreview(rawRows, mapping);
+                    setStep(s.num);
+                  }}
                   className={cn(
-                    "w-16 h-0.5 mx-2",
-                    step > s ? "bg-primary" : "bg-muted",
+                    'flex items-center gap-2 rounded-lg p-1 transition-all focus:outline-none',
+                    isClickable && !importing ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
                   )}
-                />
-              )}
-            </div>
-          ))}
+                >
+                  <div
+                    className={cn(
+                      'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all',
+                      step >= s.num
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-muted text-muted-foreground'
+                    )}
+                  >
+                    {s.num}
+                  </div>
+                  <span
+                    className={cn(
+                      'text-xs font-medium',
+                      step === s.num ? 'text-foreground font-semibold' : step > s.num ? 'text-foreground' : 'text-muted-foreground'
+                    )}
+                  >
+                    {s.label}
+                  </span>
+                </button>
+                {idx < 2 && <div className="w-8 h-0.5 bg-border mx-1" />}
+              </div>
+            );
+          })}
         </div>
 
-        {/* Content area with both scrolls */}
+        {/* Content Area */}
         <div className="flex-1 min-h-0 overflow-hidden px-6">
-          {/* Step 1: File Upload */}
+          {/* STEP 1: File Upload */}
           {step === 1 && (
-            <div className="h-full overflow-y-auto py-4">
+            <div className="h-full overflow-y-auto py-6 space-y-4">
               <FileUploadArea
                 onFileSelect={(selectedFile) => {
                   setFile(selectedFile);
@@ -1311,30 +771,31 @@ export default function ImportModal({
                 }}
                 accept={accept}
                 isProcessing={false}
+                fileName={file?.name}
               />
 
               {sheetNames.length > 1 && (
-                <div className="mt-6 p-4 border rounded-lg bg-primary/5 border-primary/20 space-y-3">
-                  <div className="flex items-center gap-2 text-primary">
-                    <FileSpreadsheet className="h-5 w-5" />
-                    <span className="text-sm font-semibold">Multiple Sheets Detected</span>
+                <div className="p-4 border rounded-xl bg-primary/5 border-primary/20 space-y-2">
+                  <div className="flex items-center gap-2 text-primary text-sm font-semibold">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    <span>Multiple Sheets Detected</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    This file contains multiple sheets. Please select the one you want to import data from:
+                    Select the worksheet containing the student data:
                   </p>
                   <Select
                     value={selectedSheet}
                     onValueChange={(val) => {
                       setSelectedSheet(val);
-                      parseFile(file, val);
+                      if (file) parseFile(file, val);
                     }}
                   >
-                    <SelectTrigger className="w-full bg-background">
-                      <SelectValue placeholder="Select a sheet..." />
+                    <SelectTrigger className="w-full bg-background text-xs h-9">
+                      <SelectValue placeholder="Select sheet..." />
                     </SelectTrigger>
                     <SelectContent>
                       {sheetNames.map((name) => (
-                        <SelectItem key={name} value={name}>
+                        <SelectItem key={name} value={name} className="text-xs">
                           {name}
                         </SelectItem>
                       ))}
@@ -1343,10 +804,17 @@ export default function ImportModal({
                 </div>
               )}
 
+              {errors.length > 0 && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg text-red-700 dark:text-red-300 text-xs">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{errors[0].message}</span>
+                </div>
+              )}
+
               {sampleData && (
-                <div className="rounded-lg border p-3 bg-muted/20 mt-4">
-                  <p className="text-xs font-medium mb-2">Sample Format</p>
-                  <pre className="text-xs text-muted-foreground overflow-x-auto">
+                <div className="rounded-xl border p-3.5 bg-muted/20 mt-4">
+                  <p className="text-xs font-semibold mb-2 text-foreground">Sample Structure</p>
+                  <pre className="text-[11px] text-muted-foreground overflow-x-auto font-mono">
                     {JSON.stringify(sampleData, null, 2)}
                   </pre>
                 </div>
@@ -1354,41 +822,35 @@ export default function ImportModal({
             </div>
           )}
 
-          {/* Step 2: Column Mapping */}
+          {/* STEP 2: Column Mapping */}
           {step === 2 && (
             <div className="h-full overflow-y-auto py-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">Map Columns</p>
+                  <p className="text-sm font-semibold text-foreground">Map Columns</p>
                   <p className="text-xs text-muted-foreground">
-                    Map file columns to database fields
+                    Match the columns from your uploaded file to the system database fields.
                   </p>
                 </div>
-                <Badge
-                  variant={
-                    missingRequired.length === 0 ? "default" : "destructive"
-                  }
-                >
-                  {mappedCount} columns mapped
+                <Badge variant="outline" className="text-xs">
+                  {mappedCount} of {fileHeaders.length} columns mapped
                 </Badge>
               </div>
 
-              {errors.length > 0 && errors[0].type === "required" && (
-                <div className="flex items-center gap-2 p-2 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-yellow-700 dark:text-yellow-300">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm">{errors[0].message}</span>
+              {errors.length > 0 && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg text-red-700 dark:text-red-300 text-xs">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{errors[0].message}</span>
                 </div>
               )}
 
-              <div className="rounded-lg border">
-                <div className="p-3 bg-muted/30 border-b">
-                  <div className="grid grid-cols-3 gap-3 text-xs font-medium text-muted-foreground">
-                    <div>File Column</div>
-                    <div></div>
-                    <div>Map to Field</div>
-                  </div>
+              <div className="rounded-xl border overflow-hidden bg-card">
+                <div className="bg-muted/50 p-3 grid grid-cols-12 gap-2 text-xs font-semibold border-b text-muted-foreground">
+                  <div className="col-span-5">File Column (Header)</div>
+                  <div className="col-span-2 text-center">Map To</div>
+                  <div className="col-span-5">Database Field</div>
                 </div>
-                <div className="max-h-[400px] overflow-y-auto">
+                <div className="divide-y max-h-[42vh] overflow-y-auto">
                   {fileHeaders.map((header) => (
                     <ColumnMappingRow
                       key={header}
@@ -1396,26 +858,26 @@ export default function ImportModal({
                       dbCol={mapping[header]}
                       availableColumns={availableColumns}
                       onMap={(value) => updateMapping(header, value)}
-                      onSkip={() => updateMapping(header, "skip")}
                     />
                   ))}
                 </div>
               </div>
 
               {requiredColumns.length > 0 && (
-                <div className="rounded-lg border p-3 bg-blue-50 dark:bg-blue-950/20">
-                  <p className="text-xs font-medium mb-2">Required Fields</p>
-                  <div className="flex flex-wrap gap-2">
-                    {requiredColumns.map((col) => {
-                      const isMapped = Object.values(mapping).includes(col);
+                <div className="rounded-xl border p-3 bg-muted/20">
+                  <p className="text-xs font-semibold mb-2 text-foreground">Required Fields Status</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {requiredColumns.map((colKey) => {
+                      const isMapped = mappedKeys.includes(colKey);
+                      const colDef = availableColumns.find((c) => c.key === colKey);
                       return (
                         <Badge
-                          key={col}
-                          variant={isMapped ? "default" : "outline"}
+                          key={colKey}
+                          variant={isMapped ? 'default' : 'destructive'}
+                          className="text-[11px] font-medium"
                         >
-                          {availableColumns.find((c) => c.key === col)?.label ||
-                            col}
-                          {!isMapped && " (missing)"}
+                          {colDef?.label || colKey}
+                          {isMapped ? ' (mapped)' : ' (missing)'}
                         </Badge>
                       );
                     })}
@@ -1425,40 +887,34 @@ export default function ImportModal({
             </div>
           )}
 
-          {/* Step 3: Preview & Edit - BOTH SCROLLS WORKING */}
+          {/* STEP 3: Preview & Import */}
           {step === 3 && (
-            <div className="h-full flex flex-col py-4 gap-4">
+            <div className="h-full flex flex-col py-4 gap-3">
               <div className="flex items-center justify-between shrink-0">
                 <div>
-                  <p className="text-sm font-medium">Preview Data</p>
+                  <p className="text-sm font-semibold text-foreground">Preview Sanitized Data</p>
                   <p className="text-xs text-muted-foreground">
-                    Click on any cell to edit data before importing
+                    Review and double-click any cell to make live edits before importing
                   </p>
                 </div>
-                <Badge variant="outline">
-                  {previewData.length} rows preview
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">
+                    Showing first {previewData.length} of {totalRecords.toLocaleString()} rows
+                  </Badge>
+                </div>
               </div>
 
-              {/* Table wrapper with BOTH horizontal AND vertical scroll */}
-              <div className="flex-1 min-h-0 border rounded-lg overflow-auto">
+              <div className="flex-1 min-h-0 border rounded-xl overflow-auto bg-card">
                 <div className="min-w-max">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-muted/40 sticky top-0">
+                      <TableRow className="bg-muted/50 sticky top-0">
                         {Object.keys(previewData[0] || {}).map((colKey) => {
-                          const col = availableColumns.find(
-                            (c) => c.key === colKey,
-                          );
+                          const col = availableColumns.find((c) => c.key === colKey);
                           return (
-                            <TableHead
-                              key={colKey}
-                              className="whitespace-nowrap text-xs"
-                            >
+                            <TableHead key={colKey} className="whitespace-nowrap text-xs py-2">
                               {col?.label || colKey}
-                              {col?.required && (
-                                <span className="ml-1 text-red-500">*</span>
-                              )}
+                              {col?.required && <span className="ml-1 text-red-500">*</span>}
                             </TableHead>
                           );
                         })}
@@ -1466,22 +922,15 @@ export default function ImportModal({
                     </TableHeader>
                     <TableBody>
                       {previewData.map((row, rowIdx) => (
-                        <TableRow key={rowIdx}>
-                          {Object.entries(row).map(
-                            ([colKey, value], colIdx) => (
-                              <TableCell
-                                key={colIdx}
-                                className="p-2 whitespace-nowrap"
-                              >
-                                <EditableCell
-                                  value={value}
-                                  onChange={(newValue) =>
-                                    updatePreviewCell(rowIdx, colKey, newValue)
-                                  }
-                                />
-                              </TableCell>
-                            ),
-                          )}
+                        <TableRow key={rowIdx} className="hover:bg-muted/30">
+                          {Object.entries(row).map(([colKey, value], colIdx) => (
+                            <TableCell key={colIdx} className="p-2 whitespace-nowrap">
+                              <EditableCell
+                                value={value}
+                                onChange={(newValue) => updatePreviewCell(rowIdx, colKey, newValue)}
+                              />
+                            </TableCell>
+                          ))}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -1489,13 +938,9 @@ export default function ImportModal({
                 </div>
               </div>
 
-              <p className="text-[10px] text-muted-foreground text-center shrink-0 italic">
-                Scroll to view all {totalRecords} records. Review carefully before finalizing.
-              </p>
-
-              {/* Progress during import */}
-              {importing && importStatus === "processing" && (
-                <div className="space-y-2 shrink-0">
+              {/* Import Progress & Status */}
+              {importing && (
+                <div className="space-y-1.5 shrink-0 pt-2">
                   <Progress value={importProgress} className="h-2" />
                   <p className="text-xs text-muted-foreground text-center">
                     Importing... {Math.round(importProgress)}%
@@ -1503,45 +948,50 @@ export default function ImportModal({
                 </div>
               )}
 
-              {/* Success/Error messages */}
-              {importStatus === "success" && (
-                <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-950 rounded-lg text-green-700 dark:text-green-300 shrink-0">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span className="text-sm">
-                    Import completed successfully!
-                  </span>
+              {importStatus === 'success' && (
+                <div className="flex items-center gap-2 p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-lg text-emerald-700 dark:text-emerald-300 text-xs shrink-0">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>Import completed successfully!</span>
                 </div>
               )}
 
-              {importStatus === "error" && errors.length > 0 && (
-                <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-950 rounded-lg text-red-700 dark:text-red-300 shrink-0">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm">
-                    {errors[errors.length - 1]?.message || "Import failed"}
-                  </span>
+              {importStatus === 'error' && errors.length > 0 && (
+                <div className="flex items-center gap-2 p-2.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg text-red-700 dark:text-red-300 text-xs shrink-0">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{errors[errors.length - 1]?.message || 'Import failed'}</span>
                 </div>
               )}
             </div>
           )}
         </div>
 
-        <DialogFooter className="gap-2 px-6 py-4 border-t mt-auto shrink-0">
-          {step > 1 && step < 3 && (
+        {/* Modal Footer Actions */}
+        <DialogFooter className="gap-2 px-6 py-4 border-t mt-auto shrink-0 bg-muted/10">
+          {step > 1 && (
             <Button
+              type="button"
               variant="outline"
-              onClick={() => setStep(step - 1)}
+              size="sm"
+              onClick={() => setStep((prev) => prev - 1)}
               disabled={importing}
+              className="gap-1.5"
             >
+              <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
           )}
 
-          <Button variant="outline" onClick={handleClose} disabled={importing}>
+          <Button type="button" variant="outline" size="sm" onClick={handleClose} disabled={importing}>
             Cancel
           </Button>
 
-          {step === 1 && file && (
-            <Button onClick={() => setStep(2)}>
+          {step === 1 && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setStep(2)}
+              disabled={!file || rawRows.length === 0}
+            >
               Continue
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
@@ -1549,7 +999,12 @@ export default function ImportModal({
 
           {step === 2 && (
             <Button
-              onClick={() => setStep(3)}
+              type="button"
+              size="sm"
+              onClick={() => {
+                generatePreview(rawRows, mapping);
+                setStep(3);
+              }}
               disabled={missingRequired.length > 0}
             >
               Preview & Edit
@@ -1559,9 +1014,10 @@ export default function ImportModal({
 
           {step === 3 && (
             <Button
+              size="sm"
               onClick={handleImport}
               disabled={importing || missingRequired.length > 0}
-              className="min-w-[100px]"
+              className="min-w-[140px]"
             >
               {importing ? (
                 <>
@@ -1571,7 +1027,7 @@ export default function ImportModal({
               ) : (
                 <>
                   <Upload className="mr-2 h-4 w-4" />
-                  Import {totalRecords} Records
+                  Import {totalRecords.toLocaleString()} Records
                 </>
               )}
             </Button>

@@ -19,6 +19,14 @@ export const metadata = {
     template: "%s | The Clouds Academy",
   },
   description: "Institute Management System",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/logos/TCA APP Icon.png", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/logos/TCA APP Icon.png",
+  },
 };
 
 export default function RootLayout({ children }) {

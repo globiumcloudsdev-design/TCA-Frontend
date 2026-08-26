@@ -187,12 +187,16 @@ export default function StudentForm({
   const { data: classes = [] } = useQuery({
     queryKey: ['classes', instituteId, selectedAcademicYear],
     queryFn: async () => {
-      if (!selectedAcademicYear) return [];
-      const response = await classService.getAll({ academic_year_id: selectedAcademicYear, include_sections: true });
-      const data = response.data || response || [];
-      return Array.isArray(data.rows) ? data.rows : (Array.isArray(data) ? data : []);
+      const response = await classService.getAll({
+        academic_year_id: selectedAcademicYear || undefined,
+        include_sections: true,
+        limit: 500,
+        fetchAll: true,
+      });
+      const data = response?.data?.rows || response?.rows || (Array.isArray(response?.data) ? response.data : []) || (Array.isArray(response) ? response : []);
+      return Array.isArray(data) ? data : [];
     },
-    enabled: !!selectedAcademicYear,
+    enabled: true,
   });
 
   const selectedClassData = useMemo(() => {

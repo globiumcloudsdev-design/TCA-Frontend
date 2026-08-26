@@ -11,13 +11,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, DollarSign, AlertCircle, FileText, Filter, Download, Trash2 } from 'lucide-react';
+import { Plus, DollarSign, AlertCircle, FileText, Filter, Download, Trash2, Printer, CheckCircle, AlertTriangle, Check as CheckIcon, RotateCcw, CreditCard, Coins, RefreshCw, ChevronDown } from 'lucide-react';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
+import CollectPaymentModal from '@/components/common/CollectPaymentModal';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import SelectField from '@/components/common/SelectField';
 import DatePickerField from '@/components/common/DatePickerField';
@@ -28,7 +29,6 @@ import { downloadBlob } from '@/lib/download';
 import { generateBulkFeeVouchersPdfBlob, generateFeeVoucherPdfBlob, generateFeeReceiptPdfBlob, generateStudentAccountStatementPdfBlob } from '@/lib/pdf/feeVoucherPdf';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { feeVoucherService, academicYearService, classService, sectionService, studentService } from '@/services';
-import { Check, ChevronDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Command,
@@ -114,7 +114,7 @@ function SearchableSingleSelect({ label, value, onChange, options = [], placehol
                     }}
                   >
                     <span className="flex-1">{option.label}</span>
-                    {String(option.value) === String(value) ? <Check className="h-4 w-4" /> : null}
+                    {String(option.value) === String(value) ? <CheckIcon className="h-4 w-4" /> : null}
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -149,7 +149,6 @@ export default function FeesPage() {
   const [voucherPageSize, setVoucherPageSize] = useState(20);
   const [markingAsPaid, setMarkingAsPaid] = useState(null);
   const [recordingPayment, setRecordingPayment] = useState(null);
-  const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'cash', referenceNo: '', remarks: '' });
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -160,7 +159,7 @@ export default function FeesPage() {
   const [bulkDownloadMode, setBulkDownloadMode] = useState('class');
   const [bulkDownloadProgress, setBulkDownloadProgress] = useState({ current: 0, total: 0 });
 
-  // Filters
+  // Filters strictly bound to selected month
   const currentMonth = String(new Date().getMonth() + 1);
   const [voucherMonth, setVoucherMonth] = useState(currentMonth);
   const [voucherAcademicYearId, setVoucherAcademicYearId] = useState('');
@@ -635,15 +634,21 @@ const { data: bulkClasses = [] } = useQuery({
   const deleteVoucher = useMutation({
     mutationFn: (id) => feeVoucherService.delete(id),
     onSuccess: () => {
-      toast.success('Voucher deleted');
+      toast.success('Voucher deleted successfully');
       setDeletingVoucher(null);
       refetchVouchers();
+      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
+      qc.invalidateQueries({ queryKey: ['fees'] });
+      qc.invalidateQueries({ queryKey: ['fee-stats'] });
     },
     onError: (error) => {
-      if (error.response?.status === 403) {
+      setDeletingVoucher(null);
+      const status = error?.status || error?.response?.status || error?.error?.response?.status;
+      const message = error?.message || error?.response?.data?.message || error?.error?.response?.data?.message || 'Failed to delete voucher';
+      if (status === 403) {
         toast.error('Permission denied. Required: fees.delete');
       } else {
-        toast.error('Failed to delete voucher');
+        toast.error(message);
       }
     },
   });
@@ -657,21 +662,36 @@ const { data: bulkClasses = [] } = useQuery({
       setSelectedVouchers([]);
       refetchVouchers();
       qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
+      qc.invalidateQueries({ queryKey: ['fees'] });
+      qc.invalidateQueries({ queryKey: ['fee-stats'] });
     },
     onError: (err) => {
-      toast.error(err.message || 'Failed to delete selected vouchers');
+      const message = err?.message || err?.response?.data?.message || err?.error?.response?.data?.message || 'Failed to delete selected vouchers';
+      toast.error(message);
       setConfirmBulkDelete(false);
     }
   });
 
   const handleBulkDelete = () => {
-    const voucherIds = Array.isArray(selectedVouchers)
-      ? selectedVouchers.map(v => v.id).filter(Boolean)
-      : [];
+    const selectedList = Array.isArray(selectedVouchers) ? selectedVouchers : [];
+    const paidCount = selectedList.filter(v => v.status === 'paid' || (v.paid_amount > 0 && v.pending_amount === 0)).length;
+    const deletableVouchers = selectedList.filter(v => v.status !== 'paid' && !(v.paid_amount > 0 && v.pending_amount === 0));
+    const voucherIds = deletableVouchers.map(v => v.id).filter(Boolean);
+
     if (voucherIds.length === 0) {
-      toast.warning('No vouchers selected');
+      if (paidCount > 0) {
+        toast.error('Paid vouchers cannot be deleted. Please select pending or unpaid vouchers.');
+      } else {
+        toast.warning('No vouchers selected');
+      }
+      setConfirmBulkDelete(false);
       return;
     }
+
+    if (paidCount > 0) {
+      toast.info(`${paidCount} paid voucher(s) skipped. Deleting ${voucherIds.length} pending voucher(s)...`);
+    }
+
     bulkDeleteMutation.mutate(voucherIds);
   };
 
@@ -696,38 +716,6 @@ const { data: bulkClasses = [] } = useQuery({
     },
   });
 
-  // Record partial payment
-  const recordPaymentMutation = useMutation({
-    mutationFn: (paymentData) => feeVoucherService.recordPayment(paymentData.voucherId, {
-      amount: parseFloat(paymentData.amount),
-      paymentMethod: paymentData.method,
-      referenceNo: paymentData.referenceNo || null,
-      remarks: paymentData.remarks || null
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
-      toast.success('Payment recorded successfully');
-      setPaymentForm({ amount: '', method: 'cash', referenceNo: '', remarks: '' });
-      setRecordingPayment(null);
-      if (viewingVoucher) setViewingVoucher(null);
-      refetchVouchers();
-    },
-    onError: (err) => {
-      if (err.response?.status === 403) {
-        toast.error('Permission denied. Required: fees.update');
-      } else {
-        toast.error(err.message || 'Failed to record payment');
-      }
-    },
-  });
-
-  const handleRecordPayment = async (voucherId) => {
-    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
-      toast.error('Please enter a valid payment amount');
-      return;
-    }
-    recordPaymentMutation.mutate({ voucherId, ...paymentForm });
-  };
   // Bulk download vouchers as PDF 
 const handleBulkDownload = async () => {
   // Check permission first
@@ -1211,6 +1199,136 @@ const handleDownloadVoucher = async (voucher) => {
   }
 };
 
+// Direct Print single voucher PDF workflow
+const handlePrintVoucher = async (voucher) => {
+  if (!hasPermission('fees.read')) {
+    toast.error('You need fees.read permission to print vouchers');
+    return;
+  }
+
+  try {
+    toast.info(`Preparing voucher ${voucher.voucherNumber || voucher.voucher_number || ''} for printing...`);
+    
+    let className = '';
+    let sectionName = '';
+    
+    // Try to get from student record with full details
+    const targetStudentId = voucher.studentId || voucher.student_id || voucher.Student?.id;
+    if (targetStudentId) {
+      try {
+        const studentResponse = await studentService.getById(targetStudentId, { 
+          params: { institute_type: currentInstitute?.type, include: 'class,section' } 
+        });
+        const student = studentResponse?.data || studentResponse;
+        
+        className = 
+          student.class_name ||
+          student.Class?.name ||
+          student.class?.name ||
+          student.current_class?.name ||
+          student.enrolled_class?.name ||
+          (student.classes && student.classes[0]?.name) ||
+          (student.currentClass?.name) ||
+          '';
+        
+        sectionName = 
+          student.section_name ||
+          student.Section?.name ||
+          student.section?.name ||
+          student.current_section?.name ||
+          student.enrolled_section?.name ||
+          (student.sections && student.sections[0]?.name) ||
+          (student.currentSection?.name) ||
+          '';
+      } catch (studentErr) {
+        console.error('Failed to fetch student:', studentErr);
+      }
+    }
+    
+    const { classNameById, sectionNameById } = buildClassSectionMaps();
+    
+    const cid = voucher.classId || voucher.class_id;
+    if (cid && (!className || className === '')) {
+      className = classNameById.get(String(cid)) || normalizeDisplayValue(voucher.className || voucher.class_name);
+    }
+    
+    const sid = voucher.sectionId || voucher.section_id;
+    if (sid && (!sectionName || sectionName === '')) {
+      sectionName = sectionNameById.get(String(sid)) || normalizeDisplayValue(voucher.sectionName || voucher.section_name);
+    }
+    
+    className = normalizeDisplayValue(className) || 'N/A';
+    sectionName = normalizeDisplayValue(sectionName) || 'N/A';
+    
+    const studentData = {
+      className: className,
+      sectionName: sectionName,
+      name: voucher.studentName || 'Student',
+      registrationNo: voucher.registrationNo || 'N/A',
+      class: className,
+      section: sectionName
+    };
+    
+    const enrichedVoucher = {
+      ...voucher,
+      className: className,
+      class_name: className,
+      sectionName: sectionName,
+      section_name: sectionName,
+      student: studentData
+    };
+    
+    const blob = await generateFeeVoucherPdfBlob({
+      voucher: enrichedVoucher,
+      student: studentData,
+      instituteName: currentInstitute?.name || 'School Management System',
+      logoUrl: currentInstitute?.logo_url
+    });
+    
+    const blobUrl = URL.createObjectURL(blob);
+    
+    // Create temporary hidden iframe for seamless direct print
+    const printIframe = document.createElement('iframe');
+    printIframe.style.position = 'fixed';
+    printIframe.style.right = '0';
+    printIframe.style.bottom = '0';
+    printIframe.style.width = '0';
+    printIframe.style.height = '0';
+    printIframe.style.border = '0';
+    printIframe.src = blobUrl;
+    document.body.appendChild(printIframe);
+    
+    printIframe.onload = () => {
+      setTimeout(() => {
+        try {
+          printIframe.contentWindow?.focus();
+          printIframe.contentWindow?.print();
+        } catch (e) {
+          const printWindow = window.open(blobUrl, '_blank');
+          if (printWindow) {
+            printWindow.focus();
+            printWindow.print();
+          }
+        }
+      }, 300);
+      
+      setTimeout(() => {
+        try {
+          if (document.body.contains(printIframe)) {
+            document.body.removeChild(printIframe);
+          }
+          URL.revokeObjectURL(blobUrl);
+        } catch (err) {}
+      }, 60000);
+    };
+    
+    toast.success('Print dialog opened');
+  } catch (error) {
+    console.error('Failed to print voucher PDF:', error);
+    toast.error('Failed to print voucher: ' + (error.message || 'Unknown error'));
+  }
+};
+
 const handleDownloadStatement = async () => {
   if (!selectedLedgerStudentId) return;
   const student = allStudentsData.find(s => String(s.id) === String(selectedLedgerStudentId));
@@ -1306,23 +1424,41 @@ const downloadReceipt = async (payment, voucher) => {
       },
       { accessorKey: 'month', header: 'Month', cell: ({ getValue }) => MONTH_OPTS.find(m => m.value === String(getValue()))?.label || getValue() },
       {
-        accessorKey: 'net_amount',
-        header: 'Amount / Balance',
+        accessorKey: 'base_amount',
+        header: 'Base Amount',
         cell: ({ row: { original: r } }) => {
-          const total = Number(r.net_amount || r.netAmount || r.amount || 0);
+          const base = Number(r.base_amount ?? r.baseAmount ?? r.amount ?? (r.net_amount || r.netAmount || 0));
+          return (
+            <div className="font-semibold text-slate-800 dark:text-slate-200">
+              PKR {base.toLocaleString('en-PK')}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'net_amount',
+        header: 'Net Amount / Total Dues',
+        cell: ({ row: { original: r } }) => {
+          const total = Number(r.net_amount || r.netAmount || r.amount_due || r.amount || 0);
           const paid = Number(r.paid_amount || 0);
           const remaining = Number(r.pending_amount ?? (total - paid));
+          const base = Number(r.base_amount ?? r.baseAmount ?? r.amount ?? total);
+          const priorArrears = Math.max(0, total - base);
           
           return (
             <div className="space-y-0.5">
               <div className="flex items-baseline gap-1.5">
                 <span className={cn("text-sm font-bold", remaining > 0 ? "text-orange-600" : "text-emerald-600")}>
-                  PKR {remaining.toLocaleString('en-PK')}
+                  PKR {total.toLocaleString('en-PK')}
                 </span>
-                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">Left</span>
+                {priorArrears > 0 && (
+                  <span className="text-[10px] text-amber-600 font-semibold">
+                    (+{priorArrears.toLocaleString('en-PK')} Arrears)
+                  </span>
+                )}
               </div>
               <div className="text-[11px] text-slate-500 font-medium">
-                Total: PKR {total.toLocaleString('en-PK')}
+                Balance: PKR {remaining.toLocaleString('en-PK')}
               </div>
               {paid > 0 && (
                 <div className="text-[10px] text-emerald-600 font-semibold italic">
@@ -1345,57 +1481,68 @@ const downloadReceipt = async (payment, voucher) => {
       {
         id: 'actions',
         header: 'Actions',
-        cell: ({ row }) => (
-          <div className="flex items-center gap-1">
-            <button onClick={() => setViewingVoucher(row.original)} className="rounded p-1 hover:bg-accent" title="View Details">
-              <FileText size={14} />
-            </button>
-            {row.original.status !== 'paid' && hasPermission('fees.update') && (
-              <>
-                <button
-                  onClick={() => { 
-                    setRecordingPayment(row.original); 
-                    const initialAmount = row.original.pending_amount ?? (row.original.net_amount || row.original.netAmount || 0);
-                    setPaymentForm({ 
-                      amount: String(Number(initialAmount).toFixed(2)), 
-                      method: 'cash', 
-                      referenceNo: '', 
-                      remarks: '' 
-                    }); 
-                  }}
-                  disabled={recordingPayment?.id === row.original.id}
-                  className="rounded p-1 hover:bg-blue-100 text-blue-700 hover:text-blue-800 disabled:opacity-50"
-                  title="Record Payment"
-                >
-                  {recordingPayment?.id === row.original.id ? '⏳' : '💰'}
-                </button>
-                <button
-                  onClick={() => setMarkingAsPaid(row.original.id)}
-                  disabled={markingAsPaid === row.original.id}
-                  className="rounded p-1 hover:bg-green-100 text-green-700 hover:text-green-800 disabled:opacity-50"
-                  title="Mark as Paid"
-                >
-                  {markingAsPaid === row.original.id ? '⏳' : '✓'}
-                </button>
-              </>
-            )}
-            <button onClick={() => handleDownloadVoucher(row.original)} className="rounded p-1 hover:bg-accent" title="Download">
-              <Download size={14} />
-            </button>
-            {hasPermission('fees.delete') && (
-              <button onClick={() => setDeletingVoucher(row.original)} className="rounded p-1 text-destructive hover:bg-destructive/10" title="Delete">
-                <Trash2 size={14} />
+        cell: ({ row }) => {
+          const isPaid = String(row.original.status || '').toLowerCase() === 'paid' || 
+            (Number(row.original.paid_amount || 0) > 0 && Number(row.original.pending_amount || 0) === 0);
+
+          return (
+            <div className="flex items-center gap-1">
+              <button onClick={() => setViewingVoucher(row.original)} className="rounded p-1 hover:bg-accent" title="View Details">
+                <FileText size={14} />
               </button>
-            )}
-          </div>
-        ),
+              {!isPaid && hasPermission('fees.update') && (
+                <>
+                  <button
+                    onClick={() => setRecordingPayment(row.original)}
+                    disabled={recordingPayment?.id === row.original.id}
+                    className="rounded p-1 hover:bg-blue-100 text-blue-700 hover:text-blue-800 disabled:opacity-50"
+                    title="Process Selective Payment"
+                  >
+                    {recordingPayment?.id === row.original.id ? '⏳' : '💰'}
+                  </button>
+                  <button
+                    onClick={() => setMarkingAsPaid(row.original.id)}
+                    disabled={markingAsPaid === row.original.id}
+                    className="rounded p-1 hover:bg-green-100 text-green-700 hover:text-green-800 disabled:opacity-50"
+                    title="Mark as Paid"
+                  >
+                    {markingAsPaid === row.original.id ? '⏳' : '✓'}
+                  </button>
+                </>
+              )}
+              <button onClick={() => handlePrintVoucher(row.original)} className="rounded p-1 hover:bg-accent" title="Print Voucher">
+                <Printer size={14} />
+              </button>
+              {hasPermission('fees.delete') && (
+                <button
+                  onClick={() => {
+                    if (isPaid) {
+                      toast.error('Cannot delete paid voucher. Only pending or unpaid vouchers can be deleted.');
+                      return;
+                    }
+                    setDeletingVoucher(row.original);
+                  }}
+                  disabled={isPaid}
+                  className={`rounded p-1 ${
+                    isPaid
+                      ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-40'
+                      : 'text-destructive hover:bg-destructive/10'
+                  }`}
+                  title={isPaid ? 'Paid vouchers cannot be deleted' : 'Delete'}
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          );
+        },
       },
     ],
-    [terms.student, hasPermission, setViewingVoucher, setDeletingVoucher, handleDownloadVoucher, markingAsPaid, recordingPayment, setRecordingPayment, setPaymentForm]
+    [terms.student, hasPermission, setViewingVoucher, setDeletingVoucher, handlePrintVoucher, markingAsPaid, recordingPayment, setRecordingPayment]
   );
 
   // Show permission denied message if user doesn't have read access
-  if (!hasPermission('fees.read') && currentInstitute?.id) {
+  if (mounted && !hasPermission('fees.read') && currentInstitute?.id) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] p-8 text-center">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
@@ -1527,7 +1674,7 @@ const downloadReceipt = async (payment, voucher) => {
             searchPlaceholder="Search Name, Reg #, Email or Voucher #..."
             emptyMessage="No vouchers found for selected filters"
             enableColumnVisibility
-            exportConfig={{ fileName: `fee-vouchers-${voucherMonth}` }}
+            exportConfig={{ fileName: `fee-vouchers-${voucherMonth || 'all'}` }}
             enableRowSelection={hasPermission('fees.delete')}
             onRowSelectionChange={setSelectedVouchers}
             selectionActions={
@@ -1956,7 +2103,7 @@ const downloadReceipt = async (payment, voucher) => {
               </div>
             ) : !defaultersData.length ? (
               <div className="text-center py-16 bg-emerald-50/20 border border-dashed border-emerald-200 rounded-2xl text-emerald-600 space-y-2">
-                <Check size={48} className="mx-auto text-emerald-500 stroke-[1.5] animate-bounce" />
+                <CheckIcon size={48} className="mx-auto text-emerald-500 stroke-[1.5] animate-bounce" />
                 <h5 className="font-extrabold text-emerald-800 text-base">All Clear! No Defaulters</h5>
                 <p className="text-xs text-emerald-600 font-medium">All students have outstanding balances of less than 2 months. Keep up the great collections!</p>
               </div>
@@ -2225,10 +2372,10 @@ const downloadReceipt = async (payment, voucher) => {
       <ConfirmDialog
         open={!!deletingVoucher}
         onClose={() => setDeletingVoucher(null)}
-        onConfirm={() => deleteVoucher.mutate(deletingVoucher.id)}
+        onConfirm={() => deletingVoucher?.id && deleteVoucher.mutate(deletingVoucher.id)}
         loading={deleteVoucher.isPending}
         title="Delete Voucher"
-        description={`Delete voucher ${deletingVoucher?.voucher_number}? This action cannot be undone.`}
+        description={`Delete voucher ${deletingVoucher?.voucher_number || deletingVoucher?.voucherNumber || deletingVoucher?.voucher_no || deletingVoucher?.id || ''}? This action cannot be undone.`}
         confirmLabel="Delete"
         variant="destructive"
       />
@@ -2245,97 +2392,13 @@ const downloadReceipt = async (payment, voucher) => {
         variant="destructive"
       />
 
-      {/* Record Payment Modal */}
-      <AppModal open={!!recordingPayment} onClose={() => setRecordingPayment(null)} title={`Record Payment - ${recordingPayment?.voucherNumber}`} size="md">
-        {recordingPayment && (
-          <div className="space-y-4">
-            {/* Amount Info */}
-            <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
-              <div>
-                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Total Net Amount</p>
-                <p className="font-bold text-lg text-blue-600">PKR {(Number(recordingPayment.net_amount || recordingPayment.netAmount || 0)).toLocaleString('en-PK')}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider text-orange-600">Pending Outstanding</p>
-                <p className="font-bold text-lg text-orange-600">PKR {(Number(recordingPayment.pending_amount ?? (recordingPayment.net_amount || recordingPayment.netAmount || 0))).toLocaleString('en-PK')}</p>
-              </div>
-            </div>
-
-            {/* Payment Form */}
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-semibold flex justify-between">
-                  <span>Payment Amount *</span>
-                  <span className="text-xs text-muted-foreground">Max: PKR {(Number(recordingPayment.pending_amount ?? (recordingPayment.net_amount || recordingPayment.netAmount || 0))).toLocaleString('en-PK')}</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max={Number(recordingPayment.pending_amount ?? (recordingPayment.net_amount || recordingPayment.netAmount || 0))}
-                  step="0.01"
-                  value={paymentForm.amount}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const max = Number(recordingPayment.pending_amount ?? (recordingPayment.net_amount || recordingPayment.netAmount || 0));
-                    if (parseFloat(val) > max) {
-                      setPaymentForm({ ...paymentForm, amount: String(max.toFixed(2)) });
-                      toast.warning(`Amount capped at outstanding balance: PKR ${max.toFixed(2)}`);
-                    } else {
-                      setPaymentForm({ ...paymentForm, amount: val });
-                    }
-                  }}
-                  placeholder="Enter payment amount"
-                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                />
-              </div>
-
-              <SelectField
-                label="Payment Method"
-                required
-                options={PAYMENT_METHOD_OPTS}
-                value={paymentForm.method}
-                onChange={(val) => setPaymentForm({ ...paymentForm, method: val })}
-              />
-
-              <div>
-                <label className="text-sm font-semibold">Reference No. (Optional)</label>
-                <input
-                  type="text"
-                  value={paymentForm.referenceNo}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, referenceNo: e.target.value })}
-                  placeholder="e.g., Check #, Transaction ID"
-                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold">Remarks (Optional)</label>
-                <textarea
-                  value={paymentForm.remarks}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, remarks: e.target.value })}
-                  placeholder="Additional notes..."
-                  rows="2"
-                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-2 justify-end pt-4 border-t">
-              <button onClick={() => setRecordingPayment(null)} className="rounded-md border px-4 py-2 text-sm">
-                Cancel
-              </button>
-              <button
-                onClick={() => handleRecordPayment(recordingPayment.id)}
-                disabled={recordPaymentMutation.isPending}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {recordPaymentMutation.isPending ? '⏳ Recording...' : '💾 Record Payment'}
-              </button>
-            </div>
-          </div>
-        )}
-      </AppModal>
+      {/* Selective / Manual Fee Voucher Payment Processing Modal */}
+      <CollectPaymentModal
+        open={!!recordingPayment}
+        onClose={() => setRecordingPayment(null)}
+        target={recordingPayment}
+        onSuccess={() => refetchVouchers()}
+      />
 
       {/* Voucher Detail View Modal */}
       <AppModal open={!!viewingVoucher} onClose={() => setViewingVoucher(null)} title="Voucher Details" size="lg">
@@ -2461,7 +2524,7 @@ const downloadReceipt = async (payment, voucher) => {
                           <div key={payment.id || idx} className="flex justify-between items-center p-3 rounded-xl bg-white border border-slate-100 shadow-sm hover:border-emerald-200 transition-all">
                             <div className="flex items-center gap-3">
                               <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
-                                <Check size={18} />
+                                <CheckIcon size={18} />
                               </div>
                               <div className="space-y-0.5">
                                 <p className="font-bold text-slate-900">PKR {Number(payment.amount_paid || payment.amount || 0).toLocaleString('en-PK')}</p>
@@ -2504,10 +2567,10 @@ const downloadReceipt = async (payment, voucher) => {
             <div className="flex gap-2 justify-end pt-4 border-t">
               <Button variant="outline" onClick={() => setViewingVoucher(null)}>Close</Button>
               <Button 
-                onClick={() => handleDownloadVoucher(viewingVoucher)} 
+                onClick={() => handlePrintVoucher(viewingVoucher)} 
                 className="bg-primary text-white flex items-center gap-2 font-bold"
               >
-                <Download size={16} /> Download Fee Voucher
+                <Printer size={16} /> Print Fee Voucher
               </Button>
             </div>
           </div>

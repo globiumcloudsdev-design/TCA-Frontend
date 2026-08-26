@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbo",
+    "clean": "node -e \"const fs = require('fs'); fs.rmSync('.next', { recursive: true, force: true });\"",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -79,6 +80,7 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",
+    "caniuse-lite": "^1.0.30001809",
     "eslint": "^9.0.0",
     "eslint-config-next": "^15.2.0",
     "postcss": "^8.5.1",

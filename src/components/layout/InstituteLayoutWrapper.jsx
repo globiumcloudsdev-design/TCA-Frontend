@@ -322,8 +322,9 @@ export default function InstituteLayoutWrapper({ children }) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const getDashPath = useAuthStore((s) => s.dashboardPath);
-  const dashboardPath = getDashPath() || "/";
-  const instituteType = user?.institute?.institute_type;
+  const { typeDefinition, nav: rawNav, dashboardPath: configDashboardPath } = useInstituteConfig();
+  const dashboardPath = configDashboardPath || (user ? getDashPath() : "/school/dashboard");
+  const instituteType = user?.institute?.institute_type || typeDefinition?.type || "school";
 
   // Initialize and keep real-time Socket.io active across all school pages
   useSocket();
@@ -424,7 +425,6 @@ export default function InstituteLayoutWrapper({ children }) {
     }
   };
 
-  const { typeDefinition } = useInstituteConfig();
   const allNavItems = useInstituteNav();
   const navItems = mounted ? allNavItems : [];
 
@@ -441,8 +441,8 @@ export default function InstituteLayoutWrapper({ children }) {
   // Dynamic breadcrumb label from UI store
   const breadcrumbLabel = useUIStore((s) => s.breadcrumbLabel);
 
-  // Auto-build breadcrumb from current pathname
-  const breadcrumbItems = useBreadcrumbs(navItems, pathname, dashboardPath, breadcrumbLabel);
+  // Auto-build breadcrumb from current pathname using static and dynamic nav mapping
+  const breadcrumbItems = useBreadcrumbs(rawNav || allNavItems, pathname, dashboardPath, breadcrumbLabel);
 
   const handleLogout = useCallback(async () => {
     try {

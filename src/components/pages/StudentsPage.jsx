@@ -17,7 +17,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import { 
@@ -211,23 +211,32 @@ export default function StudentsPage({ type }) {
     }
   }, [academicYearsData?.data]);
 
-  // Fetch classes
-  const { data: classesData } = useQuery({
-    queryKey: ['classes', academicYearId, type],
+  // Fetch all available classes
+  const { data: classesData, isLoading: isClassesLoading } = useQuery({
+    queryKey: ['classes-all', academicYearId, type, currentInstitute?.id],
     queryFn: () => classService.getAll({
-      academic_year_id: academicYearId,
+      academic_year_id: academicYearId || undefined,
+      institute_id: currentInstitute?.id,
       is_active: true,
-      institute_type: type
+      institute_type: type,
+      limit: 500,
+      fetchAll: true,
     }),
-    enabled: !!academicYearId,
   });
+
+  // Extract raw classes list safely across all potential data formats
+  const rawClassesList = useMemo(() => {
+    const data = classesData?.data || classesData;
+    const list = data?.rows || (Array.isArray(data) ? data : (Array.isArray(classesData?.rows) ? classesData.rows : []));
+    return Array.isArray(list) ? list : [];
+  }, [classesData]);
 
   // Extract sections
   const sections = useMemo(() => {
-    if (!classId || !classesData?.data) return [];
-    const selectedClass = classesData.data.find(c => String(c.id) === String(classId));
+    if (!classId || !rawClassesList.length) return [];
+    const selectedClass = rawClassesList.find(c => String(c.id) === String(classId));
     return selectedClass?.sections || [];
-  }, [classId, classesData?.data]);
+  }, [classId, rawClassesList]);
 
   // Reset filters
   useEffect(() => {
@@ -258,15 +267,16 @@ export default function StudentsPage({ type }) {
       }
       
       toast.success(message);
-      qc.invalidateQueries({ queryKey: ['students', type] });
-      qc.invalidateQueries({ queryKey: ['student-stats', type] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['student-stats'] });
       setConfirmDialog(null);
     },
     onError: (error, variables) => {
       console.error('API Error:', error);
       const action = variables.actionType === 'active' ? 'activate' : 
                      variables.actionType === 'delete' ? 'delete' : 'deactivate';
-      toast.error(error.message || `Failed to ${action} ${terms.student}`);
+      const errorMsg = error?.response?.data?.message || error?.message || `Failed to ${action} ${terms.student}`;
+      toast.error(errorMsg);
       setConfirmDialog(null);
     }
   });
@@ -364,12 +374,13 @@ export default function StudentsPage({ type }) {
         setIsBulkDeleting(true);
         try {
           const res = await studentService.bulkDelete(ids, actionType);
-          toast.success(res.message || `${res.deletedCount} records processed successfully`);
-          qc.invalidateQueries({ queryKey: ['students', type] });
-          qc.invalidateQueries({ queryKey: ['student-stats', type] });
+          toast.success(res.message || `${res.deletedCount || ids.length} records processed successfully`);
+          qc.invalidateQueries({ queryKey: ['students'] });
+          qc.invalidateQueries({ queryKey: ['student-stats'] });
           setSelectedIds([]);
         } catch (error) {
-          toast.error(error.message || 'Failed to process bulk operation');
+          const errorMsg = error?.response?.data?.message || error?.message || 'Failed to process bulk operation';
+          toast.error(errorMsg);
         } finally {
           setIsBulkDeleting(false);
           setConfirmDialog(null);
@@ -565,12 +576,12 @@ export default function StudentsPage({ type }) {
   }, [academicYearsData?.data]);
 
   const classOptions = useMemo(() => {
-    if (!classesData?.data) return [];
-    return classesData.data.map(cls => ({
+    if (!rawClassesList.length) return [];
+    return rawClassesList.map(cls => ({
       value: cls.id,
       label: cls.name
     }));
-  }, [classesData?.data]);
+  }, [rawClassesList]);
 
   const sectionOptions = useMemo(() => {
     return sections.map(s => ({
@@ -699,30 +710,30 @@ export default function StudentsPage({ type }) {
     { key: 'nationality', label: 'Nationality', required: false, validation: 'text' },
 
     // Academic Information (Institute Type Specific)
-    { key: 'class_name', label: terms.primary_unit || 'Class', required: true, validation: 'text' },
-    { key: 'section_name', label: terms.grouping_unit || 'Section', required: false, validation: 'text' },
-    { key: 'roll_no', label: terms.roll_number || 'Roll Number', required: false, validation: 'text', types: ['school', 'coaching'] },
-    { key: 'academic_year_name', label: terms.academic_period || 'Academic Year', required: true, validation: 'text' },
+    { key: 'class_name', label: terms.primaryUnit || terms.primary_unit || 'Class', required: true, validation: 'text' },
+    { key: 'section_name', label: terms.groupingUnit || terms.grouping_unit || 'Section', required: false, validation: 'text' },
+    { key: 'roll_no', label: terms.rollNumber || terms.roll_number || 'Roll Number', required: false, validation: 'text', types: ['school', 'coaching'] },
+    { key: 'academic_year_name', label: terms.academicPeriod || terms.academic_period || 'Academic Year', required: true, validation: 'text' },
     { key: 'admission_date', label: 'Admission Date', required: false, validation: 'date' },
 
     // Coaching Specific
-    { key: 'course_name', label: terms.primary_unit || 'Course Name', required: false, validation: 'text', types: ['coaching'] },
-    { key: 'batch_name', label: terms.grouping_unit || 'Batch Name', required: false, validation: 'text', types: ['coaching'] },
+    { key: 'course_name', label: terms.primaryUnit || terms.primary_unit || 'Course Name', required: false, validation: 'text', types: ['coaching'] },
+    { key: 'batch_name', label: terms.groupingUnit || terms.grouping_unit || 'Batch Name', required: false, validation: 'text', types: ['coaching'] },
     { key: 'target_exam', label: 'Target Exam', required: false, validation: 'text', types: ['coaching'] },
     { key: 'current_module', label: 'Current Module', required: false, validation: 'text', types: ['coaching'] },
-    { key: 'candidate_id', label: terms.roll_number || 'Candidate ID', required: false, validation: 'text', types: ['coaching'] },
+    { key: 'candidate_id', label: terms.rollNumber || terms.roll_number || 'Candidate ID', required: false, validation: 'text', types: ['coaching'] },
 
     // College/University Specific
-    { key: 'department_name', label: type === 'college' ? terms.primary_unit : terms.grouping_unit, required: false, validation: 'text', types: ['college', 'university'] },
+    { key: 'department_name', label: type === 'college' ? (terms.primaryUnit || terms.primary_unit) : (terms.groupingUnit || terms.grouping_unit), required: false, validation: 'text', types: ['college', 'university'] },
     { key: 'program_name', label: 'Program Name', required: false, validation: 'text', types: ['college', 'university'] },
-    { key: 'semester_name', label: type === 'college' ? terms.grouping_unit : 'Semester Name', required: false, validation: 'text', types: ['college', 'university'] },
-    { key: 'cgpa', label: terms.grade_term || 'CGPA', required: false, validation: 'number', types: ['college', 'university'] },
-    { key: 'faculty_name', label: terms.primary_unit || 'Faculty', required: false, validation: 'text', types: ['university'] },
+    { key: 'semester_name', label: type === 'college' ? (terms.groupingUnit || terms.grouping_unit) : 'Semester Name', required: false, validation: 'text', types: ['college', 'university'] },
+    { key: 'cgpa', label: terms.gradeTerm || terms.grade_term || 'CGPA', required: false, validation: 'number', types: ['college', 'university'] },
+    { key: 'faculty_name', label: terms.primaryUnit || terms.primary_unit || 'Faculty', required: false, validation: 'text', types: ['university'] },
 
     // Academy Specific
-    { key: 'academy_program_name', label: terms.primary_unit || 'Academy Program', required: false, validation: 'text', types: ['academy'] },
-    { key: 'module_name', label: terms.tertiary_unit || 'Module Name', required: false, validation: 'text', types: ['academy'] },
-    { key: 'trainee_id', label: terms.roll_number || 'Trainee ID', required: false, validation: 'text', types: ['academy'] },
+    { key: 'academy_program_name', label: terms.primaryUnit || terms.primary_unit || 'Academy Program', required: false, validation: 'text', types: ['academy'] },
+    { key: 'module_name', label: terms.tertiaryUnit || terms.tertiary_unit || 'Module Name', required: false, validation: 'text', types: ['academy'] },
+    { key: 'trainee_id', label: terms.rollNumber || terms.roll_number || 'Trainee ID', required: false, validation: 'text', types: ['academy'] },
 
     // Guardian Information
     { key: 'guardian_name', label: 'Guardian Name', required: false, validation: 'text' },
@@ -893,7 +904,6 @@ export default function StudentsPage({ type }) {
               onChange={setClassId}
               options={classOptions}
               placeholder={`Select ${terms.primary_unit || 'Class'}`}
-              disabled={!academicYearId}
             />
 
             {/* Grouping Unit Filter */}

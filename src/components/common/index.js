@@ -24,6 +24,7 @@ export { default as AppPagination }     from './AppPagination';
 export { default as ConfirmDialog }     from './ConfirmDialog';
 export { default as AppModal }          from './AppModal';
 export { default as ExportModal }       from './ExportModal';
+export { default as CollectPaymentModal } from './CollectPaymentModal';
 
 // Form Fields
 export { default as InputField }        from './InputField';

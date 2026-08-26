@@ -193,18 +193,25 @@ export default function DataTable({
   
   const [exportOpen, setExportOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isRowSelectionEnabled = mounted && Boolean(enableRowSelection);
 
   // Prepend selection column when enabled
   const finalColumns = useMemo(
-    () => (enableRowSelection ? [SELECTION_COLUMN, ...columns] : columns),
-    [columns, enableRowSelection],
+    () => (isRowSelectionEnabled ? [SELECTION_COLUMN, ...columns] : columns),
+    [columns, isRowSelectionEnabled],
   );
 
   const table = useReactTable({
     data,
     columns: finalColumns,
     state: { sorting, rowSelection, columnVisibility },
-    enableRowSelection,
+    enableRowSelection: isRowSelectionEnabled,
     onSortingChange: setSorting,
     onRowSelectionChange: setRowSelection,
     onColumnVisibilityChange: setColumnVisibility,

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Coins } from 'lucide-react';
+import { Plus, Coins, Printer, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { feeService, studentService } from '@/services';
@@ -12,9 +12,9 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import {
   PageHeader, DataTable,
   AvatarWithInitials, StatusBadge, TableRowActions,
-  ConfirmDialog, AppModal,
+  ConfirmDialog, AppModal, CollectPaymentModal,
 } from '@/components/common';
-import { FeeVoucherForm, FeeCollectForm } from '@/components/forms';
+import { FeeVoucherForm } from '@/components/forms';
 import { Button } from '@/components/ui/button';
 
 const extractRows  = (d) => d?.data?.rows ?? d?.data ?? [];
@@ -26,7 +26,7 @@ const FEE_STATUS_OPTIONS = (FEE_STATUS ?? []).map(({ value, label }) => ({ value
 
 const MONTH_OPTIONS = (MONTHS ?? []).map(({ value, label }) => ({ value: String(value), label }));
 
-const buildColumns = (onEdit, onDelete, onCollect) => [
+const buildColumns = (onEdit, onDelete, onCollect, onPrint) => [
   {
     id: 'student', header: 'Student',
     cell: ({ row }) => {
@@ -68,9 +68,14 @@ const buildColumns = (onEdit, onDelete, onCollect) => [
     id: 'actions', header: '', enableHiding: false,
     cell: ({ row }) => {
       const f = row.original;
-      const extraActions = onCollect && f.status !== 'paid' ? [
-        { label: 'Collect Payment', icon: Coins, onClick: () => onCollect(f.id) },
-      ] : [];
+      const extraActions = [
+        ...(onCollect && f.status !== 'paid' ? [
+          { label: 'Collect Payment', icon: Coins, onClick: () => onCollect(f) },
+        ] : []),
+        ...(onPrint ? [
+          { label: 'Print Voucher', icon: Printer, onClick: () => onPrint(f) },
+        ] : []),
+      ];
       return <TableRowActions onEdit={onEdit ? () => onEdit(f) : undefined} onDelete={onDelete ? () => onDelete(f) : undefined} extraActions={extraActions} />;
     },
   },
@@ -143,11 +148,16 @@ export default function FeesPage() {
     onError: (e) => toast.error(e?.response?.data?.message ?? 'Failed'),
   });
 
+  const handlePrint = (voucher) => {
+    window.print();
+  };
+
   const columns = useMemo(
     () => buildColumns(
       setEditTarget,
       canDelete ? setDeleteTarget : null,
       setCollectTarget,
+      handlePrint,
     ),
     [canDelete],
   );
@@ -184,26 +194,14 @@ export default function FeesPage() {
         <FeeVoucherForm defaultValues={editTarget ?? {}} onSubmit={(body) => updateMutation.mutate({ id: editTarget.id, body })} onCancel={() => setEditTarget(null)} loading={updateMutation.isPending} studentOptions={studentOptions} isEdit />
       </AppModal>
 
-      <AppModal open={!!collectTarget} onClose={() => setCollectTarget(null)} title="Collect Payment" size="md">
-        {isLoadingVoucher ? (
-          <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading payment details...
-          </div>
-        ) : (
-          <FeeCollectForm
-            defaultValues={{
-              amount_paid: collectTargetOutstanding ?? '',
-              payment_method: 'cash',
-              transaction_id: '',
-              notes: '',
-            }}
-            maxAmount={collectTargetOutstanding}
-            onSubmit={(body) => collectMutation.mutate({ id: collectTarget, body })}
-            onCancel={() => setCollectTarget(null)}
-            loading={collectMutation.isPending}
-          />
-        )}
-      </AppModal>
+      <CollectPaymentModal
+        open={!!collectTarget}
+        onClose={() => setCollectTarget(null)}
+        target={collectTarget}
+        onSuccess={() => {
+          qc.invalidateQueries({ queryKey: ['fees'] });
+        }}
+      />
 
       <ConfirmDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={() => deleteMutation.mutate(deleteTarget)} loading={deleteMutation.isPending} title="Delete Fee" description="Delete this fee voucher? This action is irreversible." confirmLabel="Delete" variant="destructive" />
     </div>

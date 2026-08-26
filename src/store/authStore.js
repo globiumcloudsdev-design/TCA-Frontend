@@ -215,7 +215,7 @@ export const useAuthStore = create(
       
       isMasterAdmin: () => {
         const u = get().user;
-        const role = (u?.role_code || u?.user_type || u?.role?.code || '').toUpperCase();
+        const role = (u?.role_code || u?.user_type || u?.role?.code || u?.role?.name || '').toUpperCase();
         const MASTER_ROLES = ['MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPPORT_STAFF', 'MASTER_STAFF', 'MASTER_SUPPORT', 'SUPER_ADMIN', 'ADMIN', 'MASTER'];
         return MASTER_ROLES.includes(role);
       },
@@ -228,20 +228,76 @@ export const useAuthStore = create(
       canDo: (permissionCode) => {
         const u = get().user;
         if (!u) return false;
-        // if (get().isMasterAdmin()) return true;
-        const perms = u.permissions || [];
-        if (!Array.isArray(perms)) return false;
-        if (perms.includes("ALL")) return true;
-        return perms.includes(permissionCode);
+        
+        // Master admin roles have full access
+        if (get().isMasterAdmin()) return true;
+
+        // Institute and Branch admin roles have full administrative permissions
+        const role = (u?.role_code || u?.user_type || u?.role?.code || u?.role?.name || '').toUpperCase();
+        if (role === 'INSTITUTE_ADMIN' || role === 'BRANCH_ADMIN' || role === 'SCHOOL_ADMIN' || role === 'SUPER_ADMIN' || role === 'ADMIN') {
+          return true;
+        }
+
+        const rawPerms = u.permissions || u.role?.permissions || [];
+        if (!Array.isArray(rawPerms)) return false;
+        
+        // Normalize permissions to string array
+        const perms = rawPerms.map((p) => (typeof p === 'string' ? p : p?.code || p?.name || ''));
+        
+        if (perms.includes('ALL') || perms.includes('*')) return true;
+        if (perms.includes(permissionCode)) return true;
+
+        // Check singular <-> plural aliases across all modules
+        if (typeof permissionCode === 'string') {
+          const aliasPairs = [
+            ['student.', 'students.'],
+            ['teacher.', 'teachers.'],
+            ['parent.', 'parents.'],
+            ['class.', 'classes.'],
+            ['section.', 'sections.'],
+            ['subject.', 'subjects.'],
+            ['fee.', 'fees.'],
+            ['fee_template.', 'fee_templates.'],
+            ['exam.', 'exams.'],
+            ['exam_result.', 'exam_results.'],
+            ['notice.', 'notices.'],
+            ['notification.', 'notifications.'],
+            ['role.', 'roles.'],
+            ['user.', 'users.'],
+            ['branch.', 'branches.'],
+            ['academic_year.', 'academic_years.'],
+            ['expense.', 'expenses.'],
+            ['policy.', 'policies.'],
+            ['report.', 'reports.'],
+          ];
+
+          for (const [singular, plural] of aliasPairs) {
+            if (permissionCode.startsWith(plural)) {
+              const singularCode = permissionCode.replace(plural, singular);
+              if (perms.includes(singularCode)) return true;
+            } else if (permissionCode.startsWith(singular)) {
+              const pluralCode = permissionCode.replace(singular, plural);
+              if (perms.includes(pluralCode)) return true;
+            }
+          }
+        }
+
+        return false;
+      },
+
+      hasPermission: (permissionCode) => {
+        return get().canDo(permissionCode);
       },
 
       canDoAny: (codes = []) => {
         const u = get().user;
         if (!u) return false;
-        // if (get().isMasterAdmin()) return true;
-        const perms = u.permissions || [];
-        if (perms.includes("ALL")) return true;
-        return codes.some((code) => perms.includes(code));
+        if (get().isMasterAdmin()) return true;
+        const role = (u?.role_code || u?.user_type || u?.role?.code || u?.role?.name || '').toUpperCase();
+        if (role === 'INSTITUTE_ADMIN' || role === 'BRANCH_ADMIN' || role === 'SCHOOL_ADMIN' || role === 'SUPER_ADMIN' || role === 'ADMIN') {
+          return true;
+        }
+        return codes.some((code) => get().canDo(code));
       },
 
       schoolHasBranches: () => {
