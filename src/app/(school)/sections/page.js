@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-const extractRows  = (d) => d?.data?.rows ?? d?.data ?? [];
+const extractRows  = (d) => Array.isArray(d) ? d : (d?.data?.rows ?? (Array.isArray(d?.data) ? d?.data : []));
 const extractPages = (d) => d?.data?.totalPages ?? 1;
 
 const buildColumns = (onEdit, onDelete, canDelete) => [
@@ -111,7 +111,7 @@ export default function SectionsPage() {
 
   const { data: classesData } = useQuery({
     queryKey: ['classes-all'],
-    queryFn:  () => classService.getAll({ limit: 100 }),
+    queryFn:  () => classService.getAll({ limit: 500, fetchAll: true }),
   });
 
   const sections   = extractRows(data);

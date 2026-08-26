@@ -44,6 +44,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowRight,
+  ArrowLeft,
   Edit2,
   Save,
 } from 'lucide-react';
@@ -717,29 +718,45 @@ export default function ImportModal({
             { num: 1, label: 'Upload' },
             { num: 2, label: 'Map Columns' },
             { num: 3, label: 'Preview & Import' },
-          ].map((s, idx) => (
-            <div key={s.num} className="flex items-center gap-2">
-              <div
-                className={cn(
-                  'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all',
-                  step >= s.num
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'bg-muted text-muted-foreground'
-                )}
-              >
-                {s.num}
+          ].map((s, idx) => {
+            const isClickable = s.num < step || (s.num === 2 && file && rawRows.length > 0) || (s.num === 3 && rawRows.length > 0 && missingRequired.length === 0);
+            return (
+              <div key={s.num} className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!isClickable || importing}
+                  onClick={() => {
+                    if (s.num === 3) generatePreview(rawRows, mapping);
+                    setStep(s.num);
+                  }}
+                  className={cn(
+                    'flex items-center gap-2 rounded-lg p-1 transition-all focus:outline-none',
+                    isClickable && !importing ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all',
+                      step >= s.num
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-muted text-muted-foreground'
+                    )}
+                  >
+                    {s.num}
+                  </div>
+                  <span
+                    className={cn(
+                      'text-xs font-medium',
+                      step === s.num ? 'text-foreground font-semibold' : step > s.num ? 'text-foreground' : 'text-muted-foreground'
+                    )}
+                  >
+                    {s.label}
+                  </span>
+                </button>
+                {idx < 2 && <div className="w-8 h-0.5 bg-border mx-1" />}
               </div>
-              <span
-                className={cn(
-                  'text-xs font-medium',
-                  step >= s.num ? 'text-foreground' : 'text-muted-foreground'
-                )}
-              >
-                {s.label}
-              </span>
-              {idx < 2 && <div className="w-8 h-0.5 bg-border mx-1" />}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Content Area */}
@@ -810,42 +827,30 @@ export default function ImportModal({
             <div className="h-full overflow-y-auto py-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Column Mapping</p>
+                  <p className="text-sm font-semibold text-foreground">Map Columns</p>
                   <p className="text-xs text-muted-foreground">
-                    Confirm how file headers correspond to database fields
+                    Match the columns from your uploaded file to the system database fields.
                   </p>
                 </div>
-                <Badge
-                  variant={missingRequired.length === 0 ? 'default' : 'destructive'}
-                  className="text-xs"
-                >
-                  {mappedCount} columns mapped
+                <Badge variant="outline" className="text-xs">
+                  {mappedCount} of {fileHeaders.length} columns mapped
                 </Badge>
               </div>
 
-              {missingRequired.length > 0 && (
-                <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-lg text-amber-700 dark:text-amber-300 text-xs">
+              {errors.length > 0 && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg text-red-700 dark:text-red-300 text-xs">
                   <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>
-                    Missing required fields:{' '}
-                    <strong>
-                      {missingRequired
-                        .map((k) => availableColumns.find((c) => c.key === k)?.label || k)
-                        .join(', ')}
-                    </strong>
-                  </span>
+                  <span>{errors[0].message}</span>
                 </div>
               )}
 
-              <div className="rounded-xl border overflow-hidden">
-                <div className="p-3 bg-muted/40 border-b">
-                  <div className="grid grid-cols-3 gap-3 text-xs font-semibold text-muted-foreground">
-                    <div>File Header</div>
-                    <div />
-                    <div>Target Schema Field</div>
-                  </div>
+              <div className="rounded-xl border overflow-hidden bg-card">
+                <div className="bg-muted/50 p-3 grid grid-cols-12 gap-2 text-xs font-semibold border-b text-muted-foreground">
+                  <div className="col-span-5">File Column (Header)</div>
+                  <div className="col-span-2 text-center">Map To</div>
+                  <div className="col-span-5">Database Field</div>
                 </div>
-                <div className="max-h-[360px] overflow-y-auto divide-y">
+                <div className="divide-y max-h-[42vh] overflow-y-auto">
                   {fileHeaders.map((header) => (
                     <ColumnMappingRow
                       key={header}
@@ -964,21 +969,25 @@ export default function ImportModal({
         <DialogFooter className="gap-2 px-6 py-4 border-t mt-auto shrink-0 bg-muted/10">
           {step > 1 && (
             <Button
+              type="button"
               variant="outline"
               size="sm"
-              onClick={() => setStep(step - 1)}
+              onClick={() => setStep((prev) => prev - 1)}
               disabled={importing}
+              className="gap-1.5"
             >
+              <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
           )}
 
-          <Button variant="outline" size="sm" onClick={handleClose} disabled={importing}>
+          <Button type="button" variant="outline" size="sm" onClick={handleClose} disabled={importing}>
             Cancel
           </Button>
 
           {step === 1 && (
             <Button
+              type="button"
               size="sm"
               onClick={() => setStep(2)}
               disabled={!file || rawRows.length === 0}
@@ -990,8 +999,12 @@ export default function ImportModal({
 
           {step === 2 && (
             <Button
+              type="button"
               size="sm"
-              onClick={() => setStep(3)}
+              onClick={() => {
+                generatePreview(rawRows, mapping);
+                setStep(3);
+              }}
               disabled={missingRequired.length > 0}
             >
               Preview & Edit

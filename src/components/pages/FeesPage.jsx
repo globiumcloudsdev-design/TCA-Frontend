@@ -1481,6 +1481,7 @@ const downloadReceipt = async (payment, voucher) => {
       {
         id: 'actions',
         header: 'Actions',
+        cell: ({ row }) => {
           const isPaid = String(row.original.status || '').toLowerCase() === 'paid' || 
             (Number(row.original.paid_amount || 0) > 0 && Number(row.original.pending_amount || 0) === 0);
 
@@ -1534,6 +1535,7 @@ const downloadReceipt = async (payment, voucher) => {
               )}
             </div>
           );
+        },
       },
     ],
     [terms.student, hasPermission, setViewingVoucher, setDeletingVoucher, handlePrintVoucher, markingAsPaid, recordingPayment, setRecordingPayment]

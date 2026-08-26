@@ -800,10 +800,16 @@ export default function StudentPromotePage({ type }) {
     queryFn: () => classService.getAll({
       academic_year_id: academicYearId,
       is_active: true,
-      institute_type: type
+      institute_type: type,
+      limit: 500
     }),
     enabled: !!academicYearId,
   });
+
+  const sourceClassesList = useMemo(() => {
+    const list = classesData?.data?.rows || classesData?.rows || (Array.isArray(classesData?.data) ? classesData.data : []) || (Array.isArray(classesData) ? classesData : []);
+    return Array.isArray(list) ? list : [];
+  }, [classesData]);
 
   // ── 3. Classes for target ─────────────────────────────────
   const { data: targetClassesData } = useQuery({
@@ -811,24 +817,30 @@ export default function StudentPromotePage({ type }) {
     queryFn: () => classService.getAll({
       academic_year_id: targetAcademicYearId,
       is_active: true,
-      institute_type: type
+      institute_type: type,
+      limit: 500
     }),
     enabled: !!targetAcademicYearId,
   });
 
+  const targetClassesList = useMemo(() => {
+    const list = targetClassesData?.data?.rows || targetClassesData?.rows || (Array.isArray(targetClassesData?.data) ? targetClassesData.data : []) || (Array.isArray(targetClassesData) ? targetClassesData : []);
+    return Array.isArray(list) ? list : [];
+  }, [targetClassesData]);
+
   // Sections for source class
   const sourceSections = useMemo(() => {
-    if (!classId || !classesData?.data) return [];
-    const cls = classesData.data.find(c => String(c.id) === String(classId));
+    if (!classId || !sourceClassesList.length) return [];
+    const cls = sourceClassesList.find(c => String(c.id) === String(classId));
     return cls?.sections || [];
-  }, [classId, classesData]);
+  }, [classId, sourceClassesList]);
 
   // Sections for target class
   const targetSections = useMemo(() => {
-    if (!targetClassId || !targetClassesData?.data) return [];
-    const cls = targetClassesData.data.find(c => String(c.id) === String(targetClassId));
+    if (!targetClassId || !targetClassesList.length) return [];
+    const cls = targetClassesList.find(c => String(c.id) === String(targetClassId));
     return cls?.sections || [];
-  }, [targetClassId, targetClassesData]);
+  }, [targetClassId, targetClassesList]);
 
   // Reset selections when source class changes
   useEffect(() => {
@@ -1120,12 +1132,12 @@ export default function StudentPromotePage({ type }) {
     [academicYearsData]
   );
   const classOptions = useMemo(() => 
-    classesData?.data?.map(c => ({ value: c.id, label: c.name })) || [],
-    [classesData]
+    sourceClassesList.map(c => ({ value: c.id, label: c.name })) || [],
+    [sourceClassesList]
   );
   const targetClassOptions = useMemo(() => 
-    targetClassesData?.data?.map(c => ({ value: c.id, label: c.name })) || [],
-    [targetClassesData]
+    targetClassesList.map(c => ({ value: c.id, label: c.name })) || [],
+    [targetClassesList]
   );
   const sourceSectionOptions = useMemo(() => 
     sourceSections.map(s => ({ value: s.id, label: s.name })) || [],

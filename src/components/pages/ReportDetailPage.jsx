@@ -1250,7 +1250,8 @@ export default function ReportDetailPage() {
       classService.getAll({
         institute_id: currentInstitute?.id,
         academic_year_id: filters.academic_year_id,
-        limit: 100,
+        limit: 500,
+        fetchAll: true,
       }),
     enabled: !!currentInstitute?.id && !!filters.academic_year_id,
   });
@@ -1304,6 +1305,7 @@ export default function ReportDetailPage() {
     let list = [];
     const raw = classesData?.data || classesData;
     if (Array.isArray(raw)) list = raw;
+    else if (raw?.rows && Array.isArray(raw.rows)) list = raw.rows;
     else if (raw?.items && Array.isArray(raw.items)) list = raw.items;
 
     // FOR EXAM REPORT: Filter classes to only show those assigned to the selected exam

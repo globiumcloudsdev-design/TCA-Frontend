@@ -117,7 +117,7 @@ const schema = z.object({
   }
 });
 
-const extractRows = (d) => d?.data?.rows ?? d?.data ?? [];
+const extractRows = (d) => Array.isArray(d) ? d : (d?.data?.rows ?? (Array.isArray(d?.data) ? d?.data : []));
 const extractPages = (d) => d?.data?.totalPages ?? 1;
 
 export default function EventsPage({ type }) {
@@ -216,7 +216,7 @@ export default function EventsPage({ type }) {
 
   const { data: classesData } = useQuery({
     queryKey: ['event-class-options'],
-    queryFn: () => classService.getAll({ page: 1, limit: 200 }),
+    queryFn: () => classService.getAll({ limit: 500, fetchAll: true }),
     enabled: createOpen || !!editing,
   });
 

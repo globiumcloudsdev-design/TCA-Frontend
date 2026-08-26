@@ -25,6 +25,7 @@
  */
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { Controller } from 'react-hook-form';
 import {
   Select,
@@ -36,6 +37,46 @@ import {
 import StatusBadge from '@/components/common/StatusBadge';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+
+const PollingTripwire = ({ onReachBottom, isFetchingNextPage }) => {
+  const tripwireRef = useRef(null);
+
+  useEffect(() => {
+    if (!onReachBottom || isFetchingNextPage) return;
+
+    const checkVisibility = () => {
+      const tripwire = tripwireRef.current;
+      if (!tripwire) return;
+
+      // Find the Radix viewport bounding box dynamically
+      const viewport = tripwire.closest('[data-radix-select-viewport]');
+      if (!viewport) return;
+
+      const vRect = viewport.getBoundingClientRect();
+      const tRect = tripwire.getBoundingClientRect();
+
+      // True screen coordinate math: is the top of the tripwire inside the bottom of the viewport?
+      if (tRect.top <= vRect.bottom + 20 && tRect.bottom >= vRect.top) {
+        console.log("DOM Tripwire touched! Fetching...");
+        onReachBottom();
+      }
+    };
+
+    // Poll every 250ms (only runs while dropdown is open)
+    const intervalId = setInterval(checkVisibility, 250);
+    return () => clearInterval(intervalId);
+  }, [onReachBottom, isFetchingNextPage]);
+
+  return (
+    <div ref={tripwireRef} className="flex w-full justify-center py-2 mt-1">
+      {isFetchingNextPage ? (
+        <span className="text-xs text-muted-foreground italic">Loading...</span>
+      ) : (
+        <div className="h-1 w-full" />
+      )}
+    </div>
+  );
+};
 
 export default function SelectField({
   label,
@@ -51,6 +92,9 @@ export default function SelectField({
   disabled,
   className,
   rules,
+  onReachBottom,
+  hasMore = false,
+  isLoadingMore = false,
 }) {
   // Ensure options is always an array, even if it's an object or other type
   const optionsArray = Array.isArray(options) 
@@ -59,10 +103,23 @@ export default function SelectField({
       ? Object.values(options)
       : [];
 
-  const normalizedOptions = (optionsArray || []).filter((opt) => {
-    const val = String(opt?.value ?? '').trim();
-    return val !== '';
-  });
+  const normalizedOptions = (optionsArray || [])
+    .map((opt) => {
+      if (typeof opt === 'string' || typeof opt === 'number') {
+        return { value: String(opt), label: String(opt) };
+      }
+      if (typeof opt === 'object' && opt !== null) {
+        const val = opt.value !== undefined ? opt.value : (opt.id !== undefined ? opt.id : '');
+        const lbl = opt.label !== undefined ? opt.label : (opt.name !== undefined ? opt.name : String(val));
+        return {
+          ...opt,
+          value: String(val ?? ''),
+          label: String(lbl ?? ''),
+        };
+      }
+      return null;
+    })
+    .filter((opt) => opt && String(opt.value).trim() !== '');
 
   return (
     <div className={cn('space-y-1.5', className)}>
@@ -104,6 +161,11 @@ export default function SelectField({
                     No options found
                   </div>
                 )}
+
+                {/* Inject the Polling Tripwire here */}
+                {onReachBottom && (
+                  <PollingTripwire isFetchingNextPage={isLoadingMore} onReachBottom={onReachBottom} />
+                )}
               </SelectContent>
             </Select>
           )}
@@ -133,6 +195,11 @@ export default function SelectField({
               <div className="p-4 text-[11px] text-slate-400 text-center italic">
                 No options found
               </div>
+            )}
+
+            {/* Inject the Polling Tripwire here */}
+            {onReachBottom && (
+              <PollingTripwire isFetchingNextPage={isLoadingMore} onReachBottom={onReachBottom} />
             )}
           </SelectContent>
         </Select>

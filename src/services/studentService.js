@@ -100,10 +100,10 @@ export const studentService = {
   /**
    * Delete/Activate/Deactivate student with single API
    * @param {string} id - Student ID
-   * @param {string} type - 'delete', 'active', 'inactive' (default)
+   * @param {string} type - 'delete' (default), 'active', 'inactive'
    */
-  delete: (id, type = 'inactive') => {
-    const queryParams = type !== 'inactive' ? `?type=${type}` : '';
+  delete: (id, type = 'delete') => {
+    const queryParams = type ? `?type=${type}` : '';
     return api.delete(`/students/${id}${queryParams}`).then((r) => r.data);
   },
 
@@ -173,7 +173,7 @@ export const studentService = {
     return api.get(`/students/stats${query}`).then(r => r.data);
   },
 
-  bulkDelete: (ids, type = 'inactive') => api.post('/students/bulk-delete', { ids, type }).then(r => r.data),
+  bulkDelete: (ids, type = 'delete') => api.post('/students/bulk-delete', { ids, type }).then(r => r.data),
   /**
    * Check if a single student is eligible for promotion
    * @param {string} id - Student ID

@@ -762,14 +762,17 @@ export default function TimetablePage({ type }) {
     queryFn: () => classService.getAll({
       institute_id: currentInstitute?.id,
       academic_year_id: selectedAcademicYear,
-      is_active: true
+      is_active: true,
+      limit: 500,
+      fetchAll: true,
     }),
     enabled: !!currentInstitute?.id && !!selectedAcademicYear,
   });
 
   useEffect(() => {
-    if (classesData?.data) {
-      setClasses(classesData.data);
+    if (classesData) {
+      const rows = classesData?.data?.rows || classesData?.rows || (Array.isArray(classesData?.data) ? classesData.data : []) || (Array.isArray(classesData) ? classesData : []);
+      setClasses(Array.isArray(rows) ? rows : []);
     }
   }, [classesData]);
 

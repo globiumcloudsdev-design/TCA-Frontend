@@ -21,7 +21,7 @@ import { toast } from 'sonner';
 import FeeVoucherForm from '@/components/forms/FeeVoucherForm';
 import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
 import useInstituteStore from '@/store/instituteStore';
-import { FileText, Download, Eye, CreditCard } from 'lucide-react';
+import { FileText, Download, Eye, CreditCard, Trash2 } from 'lucide-react';
 import useUIStore from '@/store/uiStore';
 import ResultCard from '@/components/cards/ResultCard';
 import { DataTable, StatsCard, AppModal, ConfirmDialog, InputField, SelectField, TextareaField, FormSubmitButton } from '@/components/common';
@@ -616,6 +616,7 @@ export default function StudentDetailPage({ type, id }) {
   const [voucherOpen, setVoucherOpen] = useState(false);
   const [slcConfirmOpen, setSlcConfirmOpen] = useState(false);
   const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['student', type, id],
@@ -632,6 +633,22 @@ export default function StudentDetailPage({ type, id }) {
   });
 
   const student = data?.data ?? DUMMY_FLAT_STUDENTS[0];
+
+  const studentLabel = terms?.student ?? (type === 'coaching' ? 'Candidate' : type === 'academy' ? 'Trainee' : 'Student');
+
+  const deleteStudentMutation = useMutation({
+    mutationFn: () => studentService.delete(student.id, 'delete'),
+    onSuccess: () => {
+      toast.success(`${studentLabel} permanently deleted successfully`);
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['student-stats'] });
+      router.push(`/${type}/students`);
+    },
+    onError: (err) => {
+      const errorMsg = err?.response?.data?.message || err?.message || `Failed to delete ${studentLabel.toLowerCase()}`;
+      toast.error(errorMsg);
+    }
+  });
 
   // Set breadcrumb label
   useEffect(() => {
@@ -724,7 +741,6 @@ export default function StudentDetailPage({ type, id }) {
     },
   });
 
-  const studentLabel = terms?.student ?? (type === 'coaching' ? 'Candidate' : type === 'academy' ? 'Trainee' : 'Student');
   const rollNo = student.registration_no || student.roll_number || student.candidate_id || student.trainee_id || student.reg_number;
 
   const voucherDefaultValues = {
@@ -829,6 +845,16 @@ export default function StudentDetailPage({ type, id }) {
             </button>
           )}
 
+          {canDo('students.delete') && (
+            <button
+              onClick={() => setDeleteConfirmOpen(true)}
+              disabled={deleteStudentMutation.isPending}
+              className="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-100 transition-colors"
+            >
+              <Trash2 size={14} /> Delete
+            </button>
+          )}
+
           {/* {canDo('students.update') && (
             <button
               onClick={() => router.push(`/${type}/students/${id}/edit`)}
@@ -888,6 +914,20 @@ export default function StudentDetailPage({ type, id }) {
         description="This will reactivate the student's account and restore their active status. Are you sure?"
         confirmLabel="Yes, Restore Student"
         variant="default"
+      />
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={() => {
+          setDeleteConfirmOpen(false);
+          deleteStudentMutation.mutate();
+        }}
+        loading={deleteStudentMutation.isPending}
+        title={`Permanently Delete ${studentLabel}`}
+        description={`Are you sure you want to permanently delete "${student.first_name} ${student.last_name || ''}". This action cannot be undone. All related records will be removed.`}
+        confirmLabel="Permanently Delete"
+        variant="destructive"
       />
     </div>
   );

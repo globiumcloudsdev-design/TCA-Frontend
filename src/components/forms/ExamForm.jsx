@@ -158,11 +158,14 @@ export default function ExamForm({
       try {
         const [yearsRes, classesRes] = await Promise.all([
           academicYearService.getAll({ institute_id: instituteId, is_active: true }),
-          classService.getAll({ institute_id: instituteId, is_active: true })
+          classService.getAll({ institute_id: instituteId, is_active: true, limit: 500, fetchAll: true })
         ]);
 
-        setAcademicYears(yearsRes?.data || []);
-        setClasses(classesRes?.data || []);
+        const rawYears = yearsRes?.data?.rows || yearsRes?.rows || (Array.isArray(yearsRes?.data) ? yearsRes.data : []) || (Array.isArray(yearsRes) ? yearsRes : []);
+        const rawClasses = classesRes?.data?.rows || classesRes?.rows || (Array.isArray(classesRes?.data) ? classesRes.data : []) || (Array.isArray(classesRes) ? classesRes : []);
+
+        setAcademicYears(Array.isArray(rawYears) ? rawYears : []);
+        setClasses(Array.isArray(rawClasses) ? rawClasses : []);
       } catch (error) {
         console.error('Error fetching data:', error);
       }

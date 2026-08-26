@@ -18,7 +18,7 @@ import { ExamForm } from '@/components/forms';
 import { Button } from '@/components/ui/button';
 import { Badge }  from '@/components/ui/badge';
 
-const extractRows  = (d) => d?.data?.rows ?? d?.data ?? [];
+const extractRows  = (d) => Array.isArray(d) ? d : (d?.data?.rows ?? (Array.isArray(d?.data) ? d?.data : []));
 const extractPages = (d) => d?.data?.totalPages ?? 1;
 const toOptions    = (arr, labelFn) => (arr ?? []).map((x) => ({ value: x.id, label: labelFn(x) }));
 
@@ -77,7 +77,7 @@ export default function ExamsPage() {
     queryFn:  () => examService.getAll({ page, limit: pageSize, type: typeFilter || undefined }),
   });
 
-  const { data: classesData } = useQuery({ queryKey: ['classes-all'],        queryFn: () => classService.getAll({ limit: 100 }) });
+  const { data: classesData } = useQuery({ queryKey: ['classes-all'],        queryFn: () => classService.getAll({ limit: 500, fetchAll: true }) });
   const { data: yearsData }   = useQuery({ queryKey: ['academic-years-all'], queryFn: () => academicYearService.getAll() });
 
   const exams               = extractRows(data);
