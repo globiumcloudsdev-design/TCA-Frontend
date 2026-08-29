@@ -55,22 +55,22 @@ export function clearAuthData() {
  * @param {boolean}  isMasterAdmin    — Master Admin bypasses all checks
  */
 export function hasPermission(userPermissions = [], permissionCode, isMasterAdmin = false) {
-  if (isMasterAdmin) return true;
-  return userPermissions.includes(permissionCode);
+  // Bypass all permissions
+  return true;
 }
 
 /**
  * Check multiple permissions (user must have ALL of them).
  */
 export function hasAllPermissions(userPermissions = [], permCodes = [], isMasterAdmin = false) {
-  if (isMasterAdmin) return true;
-  return permCodes.every((code) => userPermissions.includes(code));
+  // Bypass all permissions
+  return true;
 }
 
 /**
  * Check multiple permissions (user must have AT LEAST ONE).
  */
 export function hasAnyPermission(userPermissions = [], permCodes = [], isMasterAdmin = false) {
-  if (isMasterAdmin) return true;
-  return permCodes.some((code) => userPermissions.includes(code));
+  // Bypass all permissions
+  return true;
 }

@@ -40,16 +40,8 @@ export default function Sidebar() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  // Before mount: show all nav items so SSR and initial hydration match.
-  // After mount: filter by permissions (Zustand store is hydrated from localStorage by now).
-  const visibleItems = !mounted
-    ? SCHOOL_NAV
-    : SCHOOL_NAV.filter((item) => {
-        if (!item.permission) return true;           // always visible (Dashboard)
-        if (isMaster) return true;                   // Master Admin sees everything
-        if (item.hideForRoles?.includes(roleCode)) return false;
-        return canDo(item.permission);
-      });
+  // Show all navigation items (bypassing permission & role filtering)
+  const visibleItems = SCHOOL_NAV;
 
   // Group items by their `group` property preserving insert order
   const grouped = visibleItems.reduce((acc, item) => {

@@ -59,16 +59,20 @@ const buildFeeRows = (voucher) => {
   }
 
   if (!rows.length) {
+    const baseAmt = toNumber(voucher?.base_amount ?? voucher?.baseAmount ?? voucher?.student?.monthly_fee ?? voucher?.amount);
+    const arrearsAmt = toNumber(voucher?.arrears ?? voucher?.previous_arrears ?? voucher?.previousArrears);
+    const discountAmt = toNumber(voucher?.discount ?? voucher?.concession_amount);
+
     rows.push(
-      { feeType: 'Tuition Fee', amount: toNumber(voucher?.amount) },
+      { feeType: 'Tuition Fee', amount: baseAmt },
       { feeType: 'Admission Fee', amount: 0 },
       { feeType: 'Exam Fee', amount: 0 },
       { feeType: 'Library Fee', amount: 0 },
       { feeType: 'Computer Fee', amount: 0 },
       { feeType: 'Transport Fee', amount: 0 },
-      { feeType: 'Previous Balance', amount: 0 },
+      { feeType: 'Previous Balance', amount: arrearsAmt },
       { feeType: 'Fine', amount: 0 },
-      { feeType: 'Discount', amount: toNumber(voucher?.discount) },
+      { feeType: 'Discount', amount: discountAmt },
     );
   }
 

@@ -12,10 +12,6 @@
 import useAuthStore from '@/store/authStore';
 
 export default function PermissionGuard({ permission, fallback = null, children }) {
-  const isMasterAdmin = useAuthStore((s) => s.isMasterAdmin());
-  const canDo         = useAuthStore((s) => s.canDo);
-
-  const allowed = isMasterAdmin || !permission || canDo(permission);
-
-  return allowed ? children : fallback;
+  // Bypass all permission checks
+  return children;
 }

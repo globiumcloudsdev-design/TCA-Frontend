@@ -54,7 +54,10 @@ import {
 } from 'recharts';
 import { generateAndDownloadSLC } from '@/lib/pdf/slcPdf';
 import { generateAcademicProfile } from '@/lib/pdf/academicProfilePdf';
+import { generateAndDownloadFeeVoucherPdf } from '@/lib/pdf/feeVoucherPdf';
 import { studentService } from '@/services/studentService';
+import { feeVoucherService, decomposeVouchersForPayment, computeVoucherMonthLabel } from '@/services/feeVoucherService';
+import { feePaymentService } from '@/services/feePaymentService';
 
 const TABS = ['Overview', 'Attendance', 'Fees', 'Exams', 'Documents', 'Behavioral'];
 
@@ -271,38 +274,266 @@ function AttendanceTab({ student }) {
 }
 
 // ========== FEES TAB ==========
-function FeesTab({ student }) {
-  const vouchers = student.feeVouchers || [];
-  const totalPaid = vouchers.filter(v => v.status === 'paid').reduce((acc, v) => acc + Number(v.net_amount || v.amount || 0), 0);
-  const totalPending = vouchers.filter(v => v.status !== 'paid').reduce((acc, v) => acc + Number(v.net_amount || v.amount || 0), 0);
+function FeesTab({ student, currentInstitute, onGenerateVoucher }) {
+  const { data: voucherData, isLoading: loadingVouchers } = useQuery({
+    queryKey: ['student-vouchers', student?.id],
+    queryFn: async () => {
+      if (!student?.id) return [];
+      const vouchersMap = new Map();
+
+      const addVouchers = (list) => {
+        if (!Array.isArray(list)) return;
+        for (const item of list) {
+          if (!item) continue;
+          const id = item.id || item.voucher_id || item.voucherId;
+          const key = id ? String(id) : `${item.year || ''}-${item.month || ''}-${item.voucher_number || item.voucherNumber || ''}`;
+          if (!vouchersMap.has(key)) {
+            vouchersMap.set(key, item);
+          }
+        }
+      };
+
+      // 1. Initial student.feeVouchers
+      if (Array.isArray(student.feeVouchers)) {
+        addVouchers(student.feeVouchers);
+      }
+
+      // 2. Fetch from feeVoucherService
+      try {
+        const res = await feeVoucherService.getAll(
+          { student_id: student.id, studentId: student.id, include_all: true, limit: 1000 },
+          { page: 1, limit: 1000 }
+        );
+        if (Array.isArray(res?.vouchers)) addVouchers(res.vouchers);
+      } catch (err) {}
+
+      // 3. Fetch from studentService
+      try {
+        const unpaid = await studentService.getUnpaidVouchers(student.id);
+        if (Array.isArray(unpaid)) addVouchers(unpaid);
+      } catch (err) {}
+
+      const rawList = Array.from(vouchersMap.values());
+      const decomposed = decomposeVouchersForPayment(rawList);
+      return feePaymentService.sortChronologically(decomposed);
+    },
+    enabled: !!student?.id,
+  });
+
+  const { data: paymentReceipts = [], isLoading: loadingPayments } = useQuery({
+    queryKey: ['student-payment-receipts', student?.id],
+    queryFn: async () => {
+      if (!student?.id) return [];
+      try {
+        const { feeService } = await import('@/services');
+        const res = await feeService.getPayments({ student_id: student.id });
+        const list = res?.data?.rows || res?.data?.payments || res?.data || res?.rows || (Array.isArray(res) ? res : []);
+        return Array.isArray(list) ? list : [];
+      } catch (e) {
+        return [];
+      }
+    },
+    enabled: !!student?.id,
+  });
+
+  const vouchers = Array.isArray(voucherData) && voucherData.length > 0
+    ? voucherData
+    : (student.feeVouchers || []);
+
+  const totalPaid = vouchers.reduce(
+    (acc, v) => acc + Number(v.paid_amount || v.paidAmount || (v.status === 'paid' ? (v.net_amount || v.amount || 0) : 0)),
+    0
+  );
+  const totalPending = feePaymentService.calculateTotalPendingDues(vouchers);
 
   const feeColumns = [
-    { accessorKey: 'voucher_number', header: 'Voucher #', cell: ({ row }) => row.original.voucher_number || row.original.voucher_no || '—' },
-    { accessorKey: 'month', header: 'Period', cell: ({ row }) => row.original.month ? `${row.original.month}/${row.original.year}` : '—' },
-    { accessorKey: 'net_amount', header: 'Net Amount', cell: ({ row }) => `Rs. ${Number(row.original.net_amount || row.original.amount).toLocaleString()}` },
+    {
+      accessorKey: 'voucher_number',
+      header: 'Voucher #',
+      cell: ({ row }) => (
+        <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+          {row.original.voucher_number || row.original.voucherNumber || row.original.voucher_no || '—'}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'month',
+      header: 'Period',
+      cell: ({ row }) => {
+        const r = row.original;
+        const monthName = r.monthLabel || computeVoucherMonthLabel(r, { withSuffix: true }) || (r.month ? `${r.month}/${r.year || ''}` : '—');
+        return <span className="font-semibold text-slate-900 dark:text-slate-100">{monthName}</span>;
+      },
+    },
+    {
+      accessorKey: 'base_amount',
+      header: 'Base Fee',
+      cell: ({ row }) => {
+        const r = row.original;
+        const base = feePaymentService.getStandaloneBaseAmount(r);
+        return <span className="font-medium text-slate-700 dark:text-slate-300">PKR {base.toLocaleString('en-PK')}</span>;
+      },
+    },
+    {
+      accessorKey: 'arrears',
+      header: 'Prior Arrears',
+      cell: ({ row }) => {
+        const r = row.original;
+        const base = feePaymentService.getStandaloneBaseAmount(r);
+        const net = Number(r.net_amount ?? r.netAmount ?? r.amount ?? 0);
+        const rawArrears = Number(r.arrears ?? r.previous_arrears ?? r.previousArrears ?? 0);
+        const arrears = rawArrears > 0 ? rawArrears : (base > 0 && net > base ? Math.max(0, net - base) : 0);
+        return (
+          <span className={cn("font-medium", arrears > 0 ? "text-amber-600 dark:text-amber-400 font-bold" : "text-slate-400")}>
+            {arrears > 0 ? `+PKR ${arrears.toLocaleString('en-PK')}` : '—'}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: 'net_amount',
+      header: 'Net Total',
+      cell: ({ row }) => {
+        const r = row.original;
+        const net = Number(r.net_amount || r.netAmount || r.amount || 0);
+        const paid = Number(r.paid_amount || r.paidAmount || 0);
+        const remaining = Number(r.pending_amount ?? Math.max(0, net - paid));
+        return (
+          <div className="space-y-0.5">
+            <span className="font-bold text-slate-900 dark:text-slate-100">PKR {net.toLocaleString('en-PK')}</span>
+            {remaining > 0 ? (
+              <p className="text-[11px] text-orange-600 font-semibold">Bal: PKR {remaining.toLocaleString('en-PK')}</p>
+            ) : (
+              <p className="text-[11px] text-emerald-600 font-semibold">Fully Settled</p>
+            )}
+          </div>
+        );
+      },
+    },
     {
       accessorKey: 'status',
       header: 'Status',
-      cell: ({ row }) => (
-        <span className={cn(
-          'rounded-full px-3 py-1 text-[10px] font-bold uppercase border',
-          row.original.status === 'paid' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-red-100 text-red-700 border-red-200'
-        )}>
-          {row.original.status}
-        </span>
-      )
+      cell: ({ row }) => {
+        const st = String(row.original.status || 'pending').toLowerCase();
+        return (
+          <span className={cn(
+            'rounded-full px-3 py-1 text-[10px] font-bold uppercase border',
+            st === 'paid' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+            st === 'partial' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+            'bg-rose-100 text-rose-700 border-rose-200'
+          )}>
+            {st}
+          </span>
+        );
+      },
     },
-    { accessorKey: 'due_date', header: 'Due Date', cell: ({ row }) => row.original.due_date ? formatDate(row.original.due_date) : '—' }
+    {
+      accessorKey: 'due_date',
+      header: 'Due Date',
+      cell: ({ row }) => row.original.due_date ? formatDate(row.original.due_date) : '—',
+    },
+    {
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5 text-xs"
+          onClick={() => {
+            generateAndDownloadFeeVoucherPdf({
+              voucher: row.original,
+              student,
+              instituteName: currentInstitute?.name || 'Academy',
+            });
+          }}
+        >
+          <Download size={13} /> PDF
+        </Button>
+      ),
+    },
+  ];
+
+  const paymentColumns = [
+    {
+      accessorKey: 'receipt_number',
+      header: 'Receipt #',
+      cell: ({ row }) => (
+        <span className="font-mono font-semibold text-slate-800">
+          {row.original.receipt_number || row.original.receiptNo || `#REC-${String(row.original.id || '').slice(-6)}`}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'payment_date',
+      header: 'Payment Date',
+      cell: ({ row }) => formatDate(row.original.payment_date || row.original.createdAt),
+    },
+    {
+      accessorKey: 'payment_method',
+      header: 'Method',
+      cell: ({ row }) => (
+        <span className="capitalize font-medium text-slate-700">
+          {row.original.payment_method || row.original.method || 'Cash'}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'amount_paid',
+      header: 'Amount Paid',
+      cell: ({ row }) => (
+        <span className="font-bold text-emerald-600">
+          PKR {Number(row.original.amount_paid || row.original.amount || 0).toLocaleString('en-PK')}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'reference_no',
+      header: 'Reference #',
+      cell: ({ row }) => row.original.reference_no || row.original.transaction_id || '—',
+    },
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatsCard label="Total Paid" value={`Rs. ${totalPaid.toLocaleString()}`} />
-        <StatsCard label="Total Pending" value={`Rs. ${totalPending.toLocaleString()}`} />
-        <StatsCard label="Vouchers" value={`${vouchers.filter(v => v.status === 'paid').length} / ${vouchers.length}`} />
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700">Fee Vouchers History (All Months)</h3>
+          {onGenerateVoucher && (
+            <Button
+              size="sm"
+              className="h-8 gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm"
+              onClick={onGenerateVoucher}
+            >
+              <Receipt size={14} /> Generate Voucher
+            </Button>
+          )}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatsCard label="Total Paid" value={`PKR ${totalPaid.toLocaleString('en-PK')}`} icon={<DollarSign size={18} />} />
+          <StatsCard label="Total Outstanding Dues" value={`PKR ${totalPending.toLocaleString('en-PK')}`} icon={<AlertCircle size={18} />} />
+          <StatsCard label="Vouchers Count" value={`${vouchers.filter(v => v.status === 'paid').length} Paid / ${vouchers.length} Total`} icon={<Receipt size={18} />} />
+        </div>
+        <DataTable
+          columns={feeColumns}
+          data={vouchers}
+          loading={loadingVouchers}
+          emptyMessage="No fee vouchers found for this student."
+        />
       </div>
-      <DataTable columns={feeColumns} data={vouchers} emptyMessage="No fee vouchers found." />
+
+      {/* Payment Receipts Table */}
+      {paymentReceipts.length > 0 && (
+        <div className="space-y-3 pt-2">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700">Payment Receipts History</h3>
+          <DataTable
+            columns={paymentColumns}
+            data={paymentReceipts}
+            loading={loadingPayments}
+            emptyMessage="No payment receipts recorded yet."
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -728,13 +959,28 @@ export default function StudentDetailPage({ type, id }) {
 
   const createVoucher = useMutation({
     mutationFn: async (body) => {
-      const { feeService } = await import('@/services');
-      return feeService.create(body);
+      const month = parseInt(body.month, 10);
+      const year = parseInt(body.year, 10);
+      return feeVoucherService.generateSingle(student.id, month, year, {
+        academicYearId: body.academic_year_id || student.academic_year_id,
+        dueDate: body.due_date,
+        feeType: body.fee_type || 'Monthly',
+        baseAmount: body.base_amount || body.amount,
+        monthly_fee: student.monthly_fee,
+        discount: body.discount,
+        arrears: body.arrears,
+        preserve_previous_vouchers: true,
+        include_arrears: true,
+        carry_forward_arrears: true,
+      });
     },
     onSuccess: () => {
       toast.success('Fee voucher generated successfully');
       setVoucherOpen(false);
       qc.invalidateQueries({ queryKey: ['fees'] });
+      qc.invalidateQueries({ queryKey: ['student-vouchers', student.id] });
+      qc.invalidateQueries({ queryKey: ['student-unpaid-vouchers', student.id] });
+      qc.invalidateQueries({ queryKey: ['student', type, id] });
     },
     onError: (error) => {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to generate fee voucher');
@@ -888,11 +1134,29 @@ export default function StudentDetailPage({ type, id }) {
       <div className="min-h-[300px]">
         {activeTab === 'Overview'    && <OverviewTab    student={student} terms={{ ...terms, type }} currentInstitute={currentInstitute} />}
         {activeTab === 'Attendance'  && <AttendanceTab  student={student} />}
-        {activeTab === 'Fees'        && <FeesTab        student={student} />}
+        {activeTab === 'Fees'        && <FeesTab        student={student} currentInstitute={currentInstitute} onGenerateVoucher={() => setVoucherOpen(true)} />}
         {activeTab === 'Exams'       && <ExamsTab       student={student} />}
         {activeTab === 'Documents'   && <DocumentsTab   student={student} />}
         {activeTab === 'Behavioral'  && <BehavioralTab  student={student} type={type} id={id} />}
       </div>
+
+      {/* Generate Fee Voucher Modal */}
+      <AppModal
+        open={voucherOpen}
+        onClose={() => setVoucherOpen(false)}
+        title={`Generate Fee Voucher — ${student.first_name} ${student.last_name || ''}`}
+        className="max-w-lg"
+      >
+        <div className="pt-2">
+          <FeeVoucherForm
+            defaultValues={voucherDefaultValues}
+            studentOptions={voucherStudentOptions}
+            onSubmit={(formData) => createVoucher.mutate(formData)}
+            onCancel={() => setVoucherOpen(false)}
+            loading={createVoucher.isPending}
+          />
+        </div>
+      </AppModal>
 
       <ConfirmDialog
         open={slcConfirmOpen}

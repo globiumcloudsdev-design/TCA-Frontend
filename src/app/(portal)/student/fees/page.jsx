@@ -128,10 +128,14 @@ const buildVoucherView = (voucher = {}, profile = {}, institute = {}) => {
     }
   };
 
+  const baseMonthly = voucher.base_amount ?? voucher.baseAmount ?? voucher.student?.monthly_fee ?? voucher.Student?.monthly_fee ?? feeBreakdown.monthlyFee ?? feeBreakdown.monthly_fee ?? voucher.monthly_fee ?? amount;
+  const arrearsAmount = voucher.arrears ?? voucher.previous_arrears ?? voucher.previousArrears ?? feeBreakdown.arrears ?? 0;
+
+  addRow('Monthly Fee', baseMonthly);
   addRow('Lab Charges', feeBreakdown.labCharges ?? feeBreakdown.lab_charges ?? voucher.lab_charges);
-  addRow('Monthly Fee', feeBreakdown.monthlyFee ?? feeBreakdown.monthly_fee ?? voucher.monthly_fee ?? amount);
   addRow('Annual Charges', feeBreakdown.annualCharges ?? feeBreakdown.annual_charges ?? voucher.annual_charges);
   addRow('Admission Charges', feeBreakdown.admissionCharges ?? feeBreakdown.admission_charges ?? voucher.admission_charges);
+  addRow('Previous Balance / Arrears', arrearsAmount);
   addRow('Concession Percentage', voucher.concession_percentage ?? voucher.concessionPercent);
   addRow('Discount', discount);
   addRow('Total Amount', netAmount);

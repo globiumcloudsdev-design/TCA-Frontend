@@ -59,6 +59,11 @@ const MONTH_OPTS = Array.from({ length: 12 }, (_, i) => ({
   label: new Date(2026, i).toLocaleString('default', { month: 'long' }),
 }));
 
+const MONTH_FILTER_OPTS = [
+  { value: '__all__', label: 'All Months' },
+  ...MONTH_OPTS,
+];
+
 const FEE_TYPE_OPTS = [
   { value: 'monthly', label: 'Monthly Fee' },
   { value: 'annual', label: 'Annual Fee' },
@@ -159,7 +164,7 @@ export default function FeesPage() {
   const [bulkDownloadMode, setBulkDownloadMode] = useState('class');
   const [bulkDownloadProgress, setBulkDownloadProgress] = useState({ current: 0, total: 0 });
 
-  // Filters strictly bound to selected month
+  // Filters default to current month as requested
   const currentMonth = String(new Date().getMonth() + 1);
   const [voucherMonth, setVoucherMonth] = useState(currentMonth);
   const [voucherAcademicYearId, setVoucherAcademicYearId] = useState('');
@@ -210,13 +215,17 @@ const [bulkFilters, setBulkFilters] = useState({
     }));
   }, [allStudentsData]);
 
+  const parsedFilterMonth = voucherMonth && voucherMonth !== '__all__' && !isNaN(parseInt(voucherMonth, 10))
+    ? parseInt(voucherMonth, 10)
+    : undefined;
+
   const { data: voucherStatsBackend = null, isLoading: statsLoading } = useQuery({
     queryKey: ['voucher-stats', currentInstitute?.id, voucherMonth, voucherAcademicYearId],
     queryFn: async () => {
       if (!currentInstitute?.id || !voucherAcademicYearId || !hasPermission('fees.read')) return null;
       try {
         const response = await feeVoucherService.getStats({
-          month: voucherMonth ? parseInt(voucherMonth) : undefined,
+          month: parsedFilterMonth,
           academic_year_id: voucherAcademicYearId || undefined,
         });
         return response || null;
@@ -234,7 +243,7 @@ const [bulkFilters, setBulkFilters] = useState({
       if (!currentInstitute?.id || !voucherAcademicYearId || !hasPermission('fees.read')) return [];
       try {
         const response = await feeVoucherService.getAll({
-          month: voucherMonth ? parseInt(voucherMonth) : undefined,
+          month: parsedFilterMonth,
           academic_year_id: voucherAcademicYearId || undefined,
         }, { page: 1, limit: 5000 });
         return response?.vouchers || [];
@@ -586,7 +595,7 @@ const { data: bulkClasses = [] } = useQuery({
       }
       
       const filters = {
-        month: voucherMonth ? parseInt(voucherMonth) : undefined,
+        month: parsedFilterMonth,
         academic_year_id: voucherAcademicYearId || undefined,
         status: voucherStatus || undefined,
         search: voucherSearch || undefined,
@@ -608,7 +617,33 @@ const { data: bulkClasses = [] } = useQuery({
     enabled: !!currentInstitute?.id && !!voucherAcademicYearId && hasPermission('fees.read'),
   });
 
-  const vouchers = voucherData?.vouchers || [];
+  const vouchers = useMemo(() => {
+    const rawList = voucherData?.vouchers || [];
+    if (!voucherMonth || voucherMonth === '__all__') {
+      return rawList;
+    }
+    const targetMonthNum = parseInt(voucherMonth, 10);
+    return rawList.filter((v) => {
+      const vm = Number(v.month || 0);
+      if (vm > 0) {
+        return vm === targetMonthNum;
+      }
+      const rawMonthStr = String(v.fee_month || v.feeMonth || v.monthLabel || v.month_label || '').toLowerCase();
+      const monthObj = MONTH_OPTS.find((m) => m.value === String(targetMonthNum));
+      if (monthObj && rawMonthStr.includes(monthObj.label.toLowerCase())) {
+        return true;
+      }
+      const dStr = v.dueDate || v.due_date || v.issuedDate || v.issue_date || v.createdAt;
+      if (dStr) {
+        const d = new Date(dStr);
+        if (!isNaN(d.getTime())) {
+          return d.getMonth() + 1 === targetMonthNum;
+        }
+      }
+      return false;
+    });
+  }, [voucherData?.vouchers, voucherMonth]);
+
   const voucherPagination = voucherData?.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 };
 
   // Stats calculated using lightweight backend aggregated endpoint
@@ -1422,12 +1457,30 @@ const downloadReceipt = async (payment, voucher) => {
           </div>
         ),
       },
-      { accessorKey: 'month', header: 'Month', cell: ({ getValue }) => MONTH_OPTS.find(m => m.value === String(getValue()))?.label || getValue() },
+      {
+        accessorKey: 'month',
+        header: 'Billing Month',
+        cell: ({ row: { original: r } }) => {
+          const label = r.monthLabel || (MONTH_OPTS.find(m => m.value === String(r.month))?.label ? `${MONTH_OPTS.find(m => m.value === String(r.month))?.label} ${r.year || ''}`.trim() : r.month);
+          return <span className="font-semibold text-slate-900 dark:text-slate-100">{label}</span>;
+        }
+      },
       {
         accessorKey: 'base_amount',
-        header: 'Base Amount',
+        header: 'Base Fee',
         cell: ({ row: { original: r } }) => {
-          const base = Number(r.base_amount ?? r.baseAmount ?? r.amount ?? (r.net_amount || r.netAmount || 0));
+          const studentMonthlyFee = Number(r.student?.monthly_fee || r.Student?.monthly_fee || r.monthly_fee || 0);
+          const arrears = Number(r.arrears ?? r.previous_arrears ?? r.previousArrears ?? 0);
+          const discount = Number(r.discount ?? r.concession_amount ?? 0);
+          const net = Number(r.net_amount || r.netAmount || r.amount_due || r.amount || 0);
+          const base = Number(
+            r.base_amount ??
+            r.baseAmount ??
+            (studentMonthlyFee > 0 ? studentMonthlyFee : null) ??
+            (net > 0 && arrears > 0 ? Math.max(0, net - arrears + discount) : null) ??
+            r.amount ??
+            net
+          );
           return (
             <div className="font-semibold text-slate-800 dark:text-slate-200">
               PKR {base.toLocaleString('en-PK')}
@@ -1436,14 +1489,27 @@ const downloadReceipt = async (payment, voucher) => {
         },
       },
       {
+        accessorKey: 'arrears',
+        header: 'Arrears',
+        cell: ({ row: { original: r } }) => {
+          const studentMonthlyFee = Number(r.student?.monthly_fee || r.Student?.monthly_fee || r.monthly_fee || 0);
+          const total = Number(r.net_amount || r.netAmount || r.amount_due || r.amount || 0);
+          const base = Number(r.base_amount ?? r.baseAmount ?? (studentMonthlyFee > 0 ? studentMonthlyFee : total));
+          const arrears = Number(r.arrears ?? r.previous_arrears ?? r.previousArrears ?? Math.max(0, total - base));
+          return (
+            <div className={cn("font-medium", arrears > 0 ? "text-amber-600 dark:text-amber-400 font-bold" : "text-slate-400")}>
+              {arrears > 0 ? `PKR ${arrears.toLocaleString('en-PK')}` : 'PKR 0'}
+            </div>
+          );
+        },
+      },
+      {
         accessorKey: 'net_amount',
-        header: 'Net Amount / Total Dues',
+        header: 'Net Total',
         cell: ({ row: { original: r } }) => {
           const total = Number(r.net_amount || r.netAmount || r.amount_due || r.amount || 0);
           const paid = Number(r.paid_amount || 0);
-          const remaining = Number(r.pending_amount ?? (total - paid));
-          const base = Number(r.base_amount ?? r.baseAmount ?? r.amount ?? total);
-          const priorArrears = Math.max(0, total - base);
+          const remaining = Number(r.pending_amount ?? Math.max(0, total - paid));
           
           return (
             <div className="space-y-0.5">
@@ -1451,11 +1517,6 @@ const downloadReceipt = async (payment, voucher) => {
                 <span className={cn("text-sm font-bold", remaining > 0 ? "text-orange-600" : "text-emerald-600")}>
                   PKR {total.toLocaleString('en-PK')}
                 </span>
-                {priorArrears > 0 && (
-                  <span className="text-[10px] text-amber-600 font-semibold">
-                    (+{priorArrears.toLocaleString('en-PK')} Arrears)
-                  </span>
-                )}
               </div>
               <div className="text-[11px] text-slate-500 font-medium">
                 Balance: PKR {remaining.toLocaleString('en-PK')}
@@ -1650,7 +1711,7 @@ const downloadReceipt = async (payment, voucher) => {
               <Filter size={16} className="text-muted-foreground" />
             </div>
             <div className="grid gap-4 sm:grid-cols-3">
-              <SelectField label="Month" options={MONTH_OPTS} value={voucherMonth} onChange={setVoucherMonth} />
+              <SelectField label="Month" options={MONTH_FILTER_OPTS} value={voucherMonth} onChange={setVoucherMonth} />
               <SelectField label="Academic Year" options={academicYearsData.map(ay => ({ value: ay.id, label: ay.name }))} value={voucherAcademicYearId} onChange={setVoucherAcademicYearId} />
               <SelectField label="Status" options={[{ value: '', label: 'All Statuses' }, ...STATUS_OPTS]} value={voucherStatus} onChange={setVoucherStatus} />
             </div>
@@ -2488,13 +2549,14 @@ const downloadReceipt = async (payment, voucher) => {
                           {[
                             { label: 'Student', value: `${studentName} (${regNo})` },
                             { label: 'Fee Category', value: v.fee_type || 'Monthly' },
-                            // { label: 'Structure Type', value: v.feeTemplate?.name || 'Standard' },
-                            { label: 'Base Amount', value: `PKR ${Number(v.amount || 0).toLocaleString()}` },
-                            { label: 'Concession Type', value: v.concession_type },
-                            { label: 'Concession', value: Number(v.concession_amount) > 0 ? `PKR ${Number(v.concession_amount).toLocaleString()}` : null },
-                            { label: 'Concession Detail', value: v.concession_reason },
-                            { label: 'Total Amount Due', value: `PKR ${total.toLocaleString()}` },
-                            { label: 'Billing Period', value: `${MONTH_OPTS.find(m => String(m.value) === String(v.month))?.label} ${v.year}` },
+                            { label: 'Base Fee (Monthly)', value: `PKR ${Number(v.base_amount || v.baseAmount || v.student?.monthly_fee || v.Student?.monthly_fee || (v.net_amount && v.arrears ? Number(v.net_amount) - Number(v.arrears) : v.amount) || 0).toLocaleString('en-PK')}` },
+                            { label: 'Concession / Discount', value: Number(v.discount || v.concession_amount || 0) > 0 ? `PKR ${Number(v.discount || v.concession_amount).toLocaleString('en-PK')}` : null },
+                            { label: 'Previous Charges (Arrears)', value: Number(v.arrears || v.previous_arrears || 0) > 0 ? `PKR ${Number(v.arrears || v.previous_arrears).toLocaleString('en-PK')}` : null },
+                            { label: 'Concession Reason', value: v.concession_reason },
+                            { label: 'Total Amount Due', value: `PKR ${total.toLocaleString('en-PK')}` },
+                            { label: 'Paid Amount', value: paid > 0 ? `PKR ${paid.toLocaleString('en-PK')}` : null },
+                            { label: 'Outstanding Balance', value: `PKR ${remaining.toLocaleString('en-PK')}` },
+                            { label: 'Billing Period', value: `${MONTH_OPTS.find(m => String(m.value) === String(v.month))?.label || v.month} ${v.year || ''}`.trim() },
                             { label: 'Due Date', value: v.dueDate ? new Date(v.dueDate).toLocaleDateString('en-PK') : (v.due_date ? new Date(v.due_date).toLocaleDateString('en-PK') : null) },
                             { label: 'Issue Date', value: v.issuedDate ? new Date(v.issuedDate).toLocaleDateString('en-PK') : null }
                           ].filter(item => {

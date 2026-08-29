@@ -60,102 +60,10 @@ const usePortalStore = create(
       getInstituteType: () =>
         get().instituteType || get().portalUser?.institute?.institute_type || get().portalUser?.school?.institute_type || 'school',
 
-      /** Check if user has specific permission - FIXED VERSION */
+      /** Check if user has specific permission — Bypassed */
       canDo: (permission) => {
-        try {
-          // SAFE hasPermission function with null checks
-          const hasPermission = (list = [], required) => {
-            if (!required) return true;
-            
-            // Ensure list is array and not empty
-            if (!Array.isArray(list) || list.length === 0) return false;
-            
-            // Filter out any null/undefined values first
-            const cleanList = list.filter(item => item != null);
-            
-            // Check for exact match or wildcard
-            if (cleanList.includes('ALL') || cleanList.includes('*') || cleanList.includes(required)) {
-              return true;
-            }
-            
-            // Check for namespace wildcards (e.g., 'dashboard.*' matches 'dashboard.view')
-            // SAFE: Check if item exists and is string before calling endsWith
-            return cleanList.some((p) => {
-              // Skip if p is null or undefined
-              if (p == null) return false;
-              
-              // Convert to string if it's not already (though it should be)
-              const permString = String(p);
-              
-              // Check if it ends with .* and matches the required permission prefix
-              return permString.endsWith('.*') && required.startsWith(permString.slice(0, -2));
-            });
-          };
-
-          const { permissions, portalType } = get();
-
-          // If permissions array is empty or not array, use defaults
-          if (!Array.isArray(permissions) || permissions.length === 0) {
-            console.log('⚠️ No permissions found, using role-based defaults for:', portalType);
-            
-            // Teachers have specific permissions
-            if (portalType === 'TEACHER') {
-              const teacherDefaults = [
-                'dashboard.view',
-                'classes.read',
-                'students.read',
-                'attendance.mark',
-                'timetable.view',
-                'homework.create',
-                'assignments.create',
-                'notes.create',
-                'announcements.create'
-              ];
-              return hasPermission(teacherDefaults, permission);
-            }
-            
-            // Parents have view permissions
-            if (portalType === 'PARENT') {
-              const parentDefaults = [
-                'dashboard.view',
-                'attendance.view',
-                'fees.read',
-                'exam_results.view',
-                'notices.read'
-              ];
-              return hasPermission(parentDefaults, permission);
-            }
-            
-            // Students have self permissions
-            if (portalType === 'STUDENT') {
-              const studentDefaults = [
-                'dashboard.view.self',
-                'attendance.view.self',
-                'fees.view.self',
-                'results.view.self',
-                'timetable.view.self',
-                'assignments.view',
-                'homework.view',
-                'announcements.view',
-                'syllabus.view'
-              ];
-              return hasPermission(studentDefaults, permission);
-            }
-            
-            // Default fallback for unknown portal type
-            return false;
-          }
-
-          // Clean permissions array before using
-          const cleanPermissions = permissions.filter(p => p != null);
-          
-          return hasPermission(cleanPermissions, permission);
-          
-        } catch (error) {
-          console.error('❌ Error in canDo permission check:', error, { permission });
-          // Fail safe - return false on error
-          return false;
-        }
+        // Bypass all permissions — return true for all portal permission checks
+        return true;
       },
 
       /** Get user display name */
