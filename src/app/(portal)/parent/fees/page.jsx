@@ -149,10 +149,11 @@ const resolveInstituteForVoucher = (portalInstitute = {}, storeInstitute = {}, a
 
 // Helper function to map parent voucher data for FeeVoucher component
 function mapParentVoucherViewData(voucher, child, instituteData) {
-  const amount = toNumber(voucher?.amount);
+  const baseMonthly = toNumber(voucher?.base_amount ?? voucher?.baseAmount ?? voucher?.student?.monthly_fee ?? child?.monthly_fee ?? voucher?.amount);
+  const arrears = toNumber(voucher?.arrears ?? voucher?.previous_arrears ?? voucher?.previousArrears);
   const discount = toNumber(voucher?.discount);
   const fine = toNumber(voucher?.fine);
-  const netAmount = toNumber(voucher?.net_amount || amount - discount + fine);
+  const netAmount = toNumber(voucher?.net_amount ?? (baseMonthly - discount + fine + arrears));
   const paidAmount = toNumber(voucher?.paid_amount);
 
   const monthIndex = Number(voucher?.month);
@@ -165,7 +166,8 @@ function mapParentVoucherViewData(voucher, child, instituteData) {
     }
   };
 
-  addRow('Fee Amount', amount);
+  addRow('Monthly Fee', baseMonthly);
+  if (arrears > 0) addRow('Previous Charges / Arrears', arrears);
   addRow('Discount', discount);
   addRow('Fine', fine);
   addRow('Paid Amount', paidAmount);

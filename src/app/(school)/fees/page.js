@@ -50,12 +50,31 @@ const buildColumns = (onEdit, onDelete, onCollect, onPrint) => [
       return <span className="text-sm text-muted-foreground">{f.month ? MONTH_OPTIONS[Number(f.month) - 1]?.label : ''} {f.year}</span>;
     },
   },
-  { accessorKey: 'amount',   header: 'Amount',   cell: ({ getValue }) => <span className="text-sm font-medium">{formatCurrency(getValue())}</span> },
+  {
+    id: 'base_fee', header: 'Base Fee',
+    cell: ({ row }) => {
+      const f = row.original;
+      const base = Number(f.base_amount ?? f.baseAmount ?? f.student?.monthly_fee ?? f.amount ?? 0);
+      return <span className="text-sm font-medium">{formatCurrency(base)}</span>;
+    },
+  },
+  {
+    id: 'arrears', header: 'Arrears',
+    cell: ({ row }) => {
+      const f = row.original;
+      const arrears = Number(f.arrears ?? f.previous_arrears ?? f.previousArrears ?? 0);
+      return <span className={`text-sm ${arrears > 0 ? 'text-amber-600 font-semibold' : 'text-muted-foreground'}`}>{formatCurrency(arrears)}</span>;
+    },
+  },
   { accessorKey: 'discount', header: 'Discount', cell: ({ getValue }) => <span className="text-sm text-muted-foreground">{formatCurrency(getValue() ?? 0)}</span> },
   {
-    id: 'net', header: 'Net',
+    id: 'net', header: 'Net Total',
     cell: ({ row }) => {
-      const net = (row.original.amount ?? 0) - (row.original.discount ?? 0);
+      const f = row.original;
+      const base = Number(f.base_amount ?? f.baseAmount ?? f.student?.monthly_fee ?? f.amount ?? 0);
+      const arrears = Number(f.arrears ?? f.previous_arrears ?? 0);
+      const discount = Number(f.discount ?? 0);
+      const net = Number(f.net_amount ?? f.netAmount ?? (base - discount + arrears));
       return <span className="text-sm font-semibold">{formatCurrency(net)}</span>;
     },
   },

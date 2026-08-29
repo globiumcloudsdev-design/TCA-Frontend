@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,6 +48,7 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
   const currentInstitute = useInstituteStore((s) => s.currentInstitute);
   const instituteId = propInstituteId || currentInstitute?.id;
   
+  const qc = useQueryClient();
   const [selectedMode, setSelectedMode] = useState('single');
   const [submitting, setSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -188,6 +189,38 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
     label: `${s.first_name || ''} ${s.last_name || ''} (${s.registration_no || 'N/A'})`
   })) : [];
 
+  const selectedStudent = Array.isArray(classStudents) ? classStudents.find(s => String(s.id) === String(selectedStudentId)) : null;
+
+  // Fetch unpaid prior vouchers for selected student to calculate previous charges/arrears
+  const { data: studentUnpaidVouchers = [] } = useQuery({
+    queryKey: ['student-unpaid-vouchers-gen', selectedStudentId],
+    queryFn: async () => {
+      if (!selectedStudentId) return [];
+      try {
+        const vouchers = await studentService.getUnpaidVouchers(selectedStudentId);
+        return vouchers || [];
+      } catch (err) {
+        return [];
+      }
+    },
+    enabled: !!selectedStudentId && selectedMode === 'single'
+  });
+
+  const studentBaseMonthlyFee = Number(selectedStudent?.monthly_fee || selectedStudent?.monthlyFee || 0);
+  const concessionType = selectedStudent?.concession_type || selectedStudent?.discount_type;
+  const concessionPercentage = Number(selectedStudent?.concession_percentage || 0);
+  const concessionAmount = concessionType === 'percentage' && concessionPercentage > 0
+    ? (studentBaseMonthlyFee * concessionPercentage / 100)
+    : Number(selectedStudent?.concession_amount || selectedStudent?.discount || 0);
+  const previousArrears = (studentUnpaidVouchers || []).reduce(
+    (sum, v) => sum + Number(v.pending_amount ?? (v.net_amount || v.amount || 0)),
+    0
+  );
+  const estimatedNetTotal = Math.max(
+    0,
+    (selectedTemplate ? Number(selectedTemplate.total_amount || 0) : studentBaseMonthlyFee) - concessionAmount
+  ) + previousArrears;
+
   const handleGenerateClick = (data) => {
     // Validate based on mode
     if (selectedMode === 'single' && (!data.studentId || !data.classId)) {
@@ -230,7 +263,13 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
       }
 
       const month = parseInt(confirmData.month, 10);
-      const year = academicYear.end_year || new Date().getFullYear();
+      const currentCalendarYear = new Date().getFullYear();
+      let year = currentCalendarYear;
+      if (academicYear.start_year && academicYear.end_year) {
+        year = month >= 6 ? (academicYear.start_year || currentCalendarYear) : (academicYear.end_year || currentCalendarYear);
+      } else {
+        year = academicYear.start_year || academicYear.end_year || currentCalendarYear;
+      }
       const dueDate = confirmData.dueDate; // Use the selected due date from DatePickerField
 
       let response;
@@ -244,7 +283,11 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
             academicYearId: confirmData.academicYearId, 
             dueDate,
             feeType: confirmData.feeType,
-            feeTemplateId: confirmData.feeTemplateId || undefined
+            feeTemplateId: confirmData.feeTemplateId || undefined,
+            baseAmount: selectedTemplate ? Number(selectedTemplate.total_amount || 0) : studentBaseMonthlyFee,
+            monthly_fee: studentBaseMonthlyFee,
+            discount: concessionAmount,
+            arrears: previousArrears,
           }
         );
       } else if (confirmData.mode === 'class') {
@@ -274,6 +317,12 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
 
       setResult(response);
       toast.success(response.message || `Vouchers generated successfully!`);
+      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
+      qc.invalidateQueries({ queryKey: ['fees'] });
+      qc.invalidateQueries({ queryKey: ['student-vouchers'] });
+      qc.invalidateQueries({ queryKey: ['student-unpaid-vouchers'] });
+      qc.invalidateQueries({ queryKey: ['student-unpaid-vouchers-gen'] });
+      qc.invalidateQueries({ queryKey: ['student-stats'] });
       reset();
       setShowConfirm(false);
       onSuccess?.();

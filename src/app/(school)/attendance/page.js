@@ -5,12 +5,12 @@ import { useQuery } from '@tanstack/react-query';
 import { attendanceService, classService } from '@/services';
 import useAuthStore from '@/store/authStore';
 import { PERMISSIONS } from '@/constants';
-import { QrCode, CheckSquare, Users } from 'lucide-react';
+import { QrCode, CheckSquare, Users, Download, LayoutGrid, BarChart3 } from 'lucide-react';
 import AttendanceFilter from '@/components/attendance/AttendanceFilter';
 import MarkAttendanceModal from '@/components/attendance/MarkAttendanceModal';
 import AttendanceReport from '@/components/attendance/AttendanceReport';
+import DownloadAttendanceSheetModal from '@/components/attendance/DownloadAttendanceSheetModal';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
-import { LayoutGrid, BarChart3 } from 'lucide-react';
 
 export default function AttendancePage() {
   const canMark = useAuthStore((s) => s.canDo(PERMISSIONS.ATTENDANCE_MARK) || s.canDo('attendance.mark'));
@@ -19,6 +19,7 @@ export default function AttendancePage() {
 
   const [view, setView] = useState('daily'); // 'daily' or 'report'
   const [modalState, setModalState] = useState({ open: false, mode: 'class' });
+  const [isDownloadSheetOpen, setIsDownloadSheetOpen] = useState(false);
 
   const today = new Date().toISOString().split('T')[0];
   const [filters, setFilters] = useState({
@@ -76,6 +77,13 @@ export default function AttendancePage() {
               Manual / Bulk Mark
             </button>
           )}
+          <button
+            onClick={() => setIsDownloadSheetOpen(true)}
+            className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300 transition-all shadow-sm"
+          >
+            <Download className="h-4 w-4" />
+            Download Sheet
+          </button>
         </div>
       </div>
 
@@ -85,6 +93,17 @@ export default function AttendancePage() {
         onClose={() => setModalState({ open: false, mode: 'class' })} 
         defaultMode={modalState.mode} 
         type="school" 
+      />
+
+      {/* Download Blank Attendance Sheet Modal */}
+      <DownloadAttendanceSheetModal
+        open={isDownloadSheetOpen}
+        onClose={() => setIsDownloadSheetOpen(false)}
+        initialClassId={filters.class_id}
+        initialSectionId={filters.section_id}
+        initialAcademicYearId={filters.academic_year_id}
+        type="school"
+        terms={terms}
       />
 
       {view === 'daily' ? (

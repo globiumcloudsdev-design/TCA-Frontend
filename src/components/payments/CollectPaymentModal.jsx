@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import AppModal from '@/components/common/AppModal';
 import SelectField from '@/components/common/SelectField';
-import { feePaymentService } from '@/services';
+import { feePaymentService, decomposeVouchersForPayment } from '@/services';
 import useAuthStore from '@/store/authStore';
 import { cn } from '@/lib/utils';
 
@@ -70,22 +70,49 @@ export default function CollectPaymentModal({
     return target.studentId || target.student_id || target.student?.id || target.Student?.id || target.id;
   }, [target]);
 
+  // Hydrate full student details if metadata is missing
+  const { data: hydratedStudent = null } = useQuery({
+    queryKey: ['student-details-collect-modal', studentId],
+    queryFn: async () => {
+      if (!studentId) return null;
+      try {
+        const res = await studentService.getById(studentId);
+        return res?.data?.data || res?.data || res || null;
+      } catch (e) {
+        return null;
+      }
+    },
+    enabled: !!studentId && !!open,
+  });
+
   const studentName = useMemo(() => {
-    if (!target) return 'Student';
-    if (target.studentName) return target.studentName;
-    if (target.student?.first_name) {
+    if (target?.studentName && target.studentName !== 'Student' && target.studentName !== 'Unknown Student') {
+      return target.studentName;
+    }
+    if (target?.student?.first_name || target?.student?.last_name) {
       return `${target.student.first_name || ''} ${target.student.last_name || ''}`.trim();
     }
-    if (target.first_name) {
+    if (target?.Student?.first_name || target?.Student?.last_name) {
+      return `${target.Student.first_name || ''} ${target.Student.last_name || ''}`.trim();
+    }
+    if (target?.first_name || target?.last_name) {
       return `${target.first_name || ''} ${target.last_name || ''}`.trim();
     }
-    return 'Student';
-  }, [target]);
+    if (hydratedStudent?.first_name || hydratedStudent?.last_name) {
+      return `${hydratedStudent.first_name || ''} ${hydratedStudent.last_name || ''}`.trim();
+    }
+    if (hydratedStudent?.full_name) return hydratedStudent.full_name;
+    return target?.student_name || target?.name || 'Student';
+  }, [target, hydratedStudent]);
 
   const registrationNo = useMemo(() => {
-    if (!target) return 'N/A';
-    return target.registrationNo || target.registration_no || target.student?.registration_no || target.student?.registrationNo || 'N/A';
-  }, [target]);
+    const direct = target?.registrationNo || target?.registration_no || target?.student?.registration_no || target?.student?.registrationNo || target?.Student?.registration_no;
+    if (direct && direct !== 'N/A') return direct;
+    if (hydratedStudent?.registration_no || hydratedStudent?.registrationNo) {
+      return hydratedStudent.registration_no || hydratedStudent.registrationNo;
+    }
+    return 'N/A';
+  }, [target, hydratedStudent]);
 
   // Query ALL active non-archived pending/partial/overdue vouchers for the student (sorted due_date ASC)
   const { data: rawStudentPendingVouchers = [], isLoading: loadingVouchers } = useQuery({
@@ -104,44 +131,56 @@ export default function CollectPaymentModal({
   });
 
   const className = useMemo(() => {
-    if (!target) return 'N/A';
     const directClass =
-      target.class_name ||
-      target.className ||
-      target.Class?.name ||
-      target.class?.name ||
-      target.student?.class_name ||
-      target.student?.className ||
-      target.student?.Class?.name ||
-      target.student?.class?.name ||
-      target.student?.details?.academic_info?.class_name ||
-      target.student?.details?.academic_info?.class?.name;
+      target?.class_name ||
+      target?.className ||
+      target?.Class?.name ||
+      target?.class?.name ||
+      target?.student?.class_name ||
+      target?.student?.className ||
+      target?.student?.Class?.name ||
+      target?.student?.class?.name ||
+      target?.Student?.Class?.name ||
+      target?.Student?.class_name ||
+      target?.student?.details?.academic_info?.class_name ||
+      target?.student?.details?.academic_info?.class?.name;
 
     if (directClass && directClass !== 'N/A') return directClass;
 
-    const vWithClass = (rawStudentPendingVouchers || []).find((v) => v.class_name || v.className);
+    if (hydratedStudent) {
+      const hClass = hydratedStudent.class_name || hydratedStudent.className || hydratedStudent.Class?.name || hydratedStudent.class?.name || hydratedStudent.details?.academic_info?.class_name || hydratedStudent.details?.academic_info?.class?.name;
+      if (hClass && hClass !== 'N/A') return hClass;
+    }
+
+    const vWithClass = (rawStudentPendingVouchers || []).find((v) => (v.class_name && v.class_name !== 'N/A') || (v.className && v.className !== 'N/A'));
     return vWithClass?.class_name || vWithClass?.className || 'N/A';
-  }, [target, rawStudentPendingVouchers]);
+  }, [target, hydratedStudent, rawStudentPendingVouchers]);
 
   const sectionName = useMemo(() => {
-    if (!target) return 'N/A';
     const directSection =
-      target.section_name ||
-      target.sectionName ||
-      target.Section?.name ||
-      target.section?.name ||
-      target.student?.section_name ||
-      target.student?.sectionName ||
-      target.student?.Section?.name ||
-      target.student?.section?.name ||
-      target.student?.details?.academic_info?.section_name ||
-      target.student?.details?.academic_info?.section?.name;
+      target?.section_name ||
+      target?.sectionName ||
+      target?.Section?.name ||
+      target?.section?.name ||
+      target?.student?.section_name ||
+      target?.student?.sectionName ||
+      target?.student?.Section?.name ||
+      target?.student?.section?.name ||
+      target?.Student?.Section?.name ||
+      target?.Student?.section_name ||
+      target?.student?.details?.academic_info?.section_name ||
+      target?.student?.details?.academic_info?.section?.name;
 
     if (directSection && directSection !== 'N/A') return directSection;
 
-    const vWithSec = (rawStudentPendingVouchers || []).find((v) => v.section_name || v.sectionName);
+    if (hydratedStudent) {
+      const hSec = hydratedStudent.section_name || hydratedStudent.sectionName || hydratedStudent.Section?.name || hydratedStudent.section?.name || hydratedStudent.details?.academic_info?.section_name || hydratedStudent.details?.academic_info?.section?.name;
+      if (hSec && hSec !== 'N/A') return hSec;
+    }
+
+    const vWithSec = (rawStudentPendingVouchers || []).find((v) => (v.section_name && v.section_name !== 'N/A') || (v.sectionName && v.sectionName !== 'N/A'));
     return vWithSec?.section_name || vWithSec?.sectionName || 'N/A';
-  }, [target, rawStudentPendingVouchers]);
+  }, [target, hydratedStudent, rawStudentPendingVouchers]);
 
   // Mode: 'fifo' (auto real-time calculation) vs 'custom' (manual per-voucher adjustments)
   const [allocationMode, setAllocationMode] = useState('fifo');
@@ -155,17 +194,15 @@ export default function CollectPaymentModal({
     paidDate: new Date().toISOString().split('T')[0],
   });
 
-  // Ensure target voucher is in the list and sort chronologically by due_date ASC
+  // Ensure target voucher is in the list and decompose merged arrears into distinct monthly vouchers
   const availablePendingVouchers = useMemo(() => {
-    if (!target) return [];
-    const list = [...rawStudentPendingVouchers];
-    if (target.id && !list.some((v) => String(v.id) === String(target.id))) {
-      const pendingOfTarget = feePaymentService.getStandalonePendingAmount(target);
-      if (!target.archived && target.status !== 'paid' && target.status !== 'cancelled' && pendingOfTarget > 0) {
-        list.unshift(target);
-      }
+    if (!target && (!rawStudentPendingVouchers || rawStudentPendingVouchers.length === 0)) return [];
+    const list = [...(rawStudentPendingVouchers || [])];
+    if (target?.id && !list.some((v) => String(v.id) === String(target.id))) {
+      list.unshift(target);
     }
-    return feePaymentService.sortChronologically(list);
+    const decomposed = decomposeVouchersForPayment(list);
+    return feePaymentService.sortChronologically(decomposed);
   }, [rawStudentPendingVouchers, target]);
 
   // Total student pending dues across all pending vouchers
@@ -175,20 +212,22 @@ export default function CollectPaymentModal({
 
   // Initial pre-population when modal opens
   useEffect(() => {
-    if (open && target) {
-      const initialPending = feePaymentService.getStandalonePendingAmount(target);
-      const defaultAmount = initialPending > 0 ? initialPending : totalStudentPendingDues;
-      setPaymentForm({
-        totalReceived: String(defaultAmount || ''),
+    if (open) {
+      const defaultAmount = totalStudentPendingDues > 0
+        ? totalStudentPendingDues
+        : (target ? feePaymentService.getStandalonePendingAmount(target, availablePendingVouchers) : 0);
+      setPaymentForm((prev) => ({
+        ...prev,
+        totalReceived: defaultAmount > 0 ? String(defaultAmount) : '',
         method: 'cash',
         referenceNo: '',
         remarks: '',
         paidDate: new Date().toISOString().split('T')[0],
-      });
+      }));
       setAllocationMode('fifo');
       setCustomAllocations({});
     }
-  }, [open, target, totalStudentPendingDues]);
+  }, [open, totalStudentPendingDues]);
 
   const totalReceivedNumber = parseFloat(paymentForm.totalReceived) || 0;
 
@@ -212,11 +251,10 @@ export default function CollectPaymentModal({
   // Display Itemized Rows with combined live metrics
   const itemizedVoucherRows = useMemo(() => {
     return availablePendingVouchers.map((voucher) => {
-      const baseAmount = Number(
-        voucher.base_amount ?? voucher.baseAmount ?? voucher.amount ?? voucher.net_amount ?? 0
-      );
+      const baseAmount = feePaymentService.getStandaloneBaseAmount(voucher);
+      const arrearsAmount = Number(voucher.arrears ?? voucher.previous_arrears ?? voucher.previousArrears ?? 0);
       const originalAmount = Number(
-        voucher.net_amount || voucher.netAmount || voucher.amount_due || baseAmount
+        voucher.net_amount || voucher.netAmount || voucher.amount_due || (baseAmount + arrearsAmount)
       );
       const alreadyPaid = Number(voucher.paid_amount || voucher.paidAmount || 0);
       const pendingAmount = feePaymentService.getStandalonePendingAmount(voucher);
@@ -246,6 +284,7 @@ export default function CollectPaymentModal({
         monthLabel,
         dueDate: voucher.due_date || voucher.dueDate || null,
         baseAmount,
+        arrearsAmount,
         originalAmount,
         alreadyPaid,
         pendingAmount,
@@ -266,7 +305,7 @@ export default function CollectPaymentModal({
   }, [activeAllocationsMap]);
 
   const remainingToAllocate = useMemo(() => {
-    return totalReceivedNumber - totalAllocatedNumber;
+    return Math.round((totalReceivedNumber - totalAllocatedNumber) * 100) / 100;
   }, [totalReceivedNumber, totalAllocatedNumber]);
 
   const isAllocationBalanced = useMemo(() => {
@@ -402,28 +441,31 @@ export default function CollectPaymentModal({
       return;
     }
 
-    const allocationsList = Object.entries(activeAllocationsMap)
-      .filter(([_, amt]) => parseFloat(amt) > 0)
-      .map(([voucherId, amt]) => ({
-        voucherId,
-        amountApplied: parseFloat(amt),
-      }));
+    // Sort allocations strictly in ascending chronological order (oldest month first)
+    const chronologicalSortedVouchers = feePaymentService.sortChronologically(availablePendingVouchers);
+    const allocationsList = [];
+
+    for (const v of chronologicalSortedVouchers) {
+      const amt = parseFloat(activeAllocationsMap[v.id]) || 0;
+      if (amt > 0) {
+        const pending = feePaymentService.getStandalonePendingAmount(v);
+        if (amt > pending + 0.01) {
+          toast.error(`Allocation for ${feePaymentService.formatMonthLabel(v)} (PKR ${amt}) exceeds pending balance (PKR ${pending}).`);
+          return;
+        }
+        const realVoucherId = String(v.id).includes('_historical_m') ? String(v.id).split('_historical_m')[0] : v.id;
+        allocationsList.push({
+          voucherId: realVoucherId,
+          amountApplied: amt,
+          month: v.month,
+          year: v.year,
+        });
+      }
+    }
 
     if (allocationsList.length === 0) {
       toast.error('No vouchers have been allocated an amount.');
       return;
-    }
-
-    // Safety verification: ensure no allocation exceeds pending balance
-    for (const alloc of allocationsList) {
-      const v = availablePendingVouchers.find((item) => String(item.id) === String(alloc.voucherId));
-      if (v) {
-        const pending = feePaymentService.getStandalonePendingAmount(v);
-        if (alloc.amountApplied > pending + 0.01) {
-          toast.error(`Allocation for ${feePaymentService.formatMonthLabel(v)} (PKR ${alloc.amountApplied}) exceeds pending balance (PKR ${pending}).`);
-          return;
-        }
-      }
     }
 
     const payload = {
@@ -573,10 +615,11 @@ export default function CollectPaymentModal({
                       <tr>
                         <th className="py-3 px-3.5">Fee Month & Year</th>
                         <th className="py-3 px-3 text-right">Base Fee</th>
-                        <th className="py-3 px-3 text-right">Total Net Due</th>
-                        <th className="py-3 px-3 text-right">Paid Amount</th>
-                        <th className="py-3 px-3 text-right">Pending Balance</th>
-                        <th className="py-3 px-3 text-center">Live Settlement Badge</th>
+                        <th className="py-3 px-3 text-right">Prior Arrears</th>
+                        <th className="py-3 px-3 text-right">Net Amount</th>
+                        <th className="py-3 px-3 text-right">Paid</th>
+                        <th className="py-3 px-3 text-right">Pending Due</th>
+                        <th className="py-3 px-3 text-center">Live Status</th>
                         <th className="py-3 px-3 text-right">Allocated Now</th>
                         <th className="py-3 px-3 text-right">Remaining Preview</th>
                         <th className="py-3 px-3.5 text-center">Quick Adjust</th>
@@ -590,6 +633,7 @@ export default function CollectPaymentModal({
                           voucherNumber,
                           monthLabel,
                           baseAmount,
+                          arrearsAmount,
                           originalAmount,
                           alreadyPaid,
                           pendingAmount,
@@ -633,8 +677,13 @@ export default function CollectPaymentModal({
                               PKR {baseAmount.toLocaleString('en-PK')}
                             </td>
 
-                            {/* Total Net Due (with Arrears) */}
-                            <td className="py-3 px-3 text-right font-medium text-slate-500 dark:text-slate-400">
+                            {/* Prior Arrears */}
+                            <td className="py-3 px-3 text-right font-medium text-amber-600 dark:text-amber-400">
+                              {arrearsAmount > 0 ? `+PKR ${arrearsAmount.toLocaleString('en-PK')}` : '—'}
+                            </td>
+
+                            {/* Total Net Due */}
+                            <td className="py-3 px-3 text-right font-bold text-slate-800 dark:text-slate-200">
                               PKR {originalAmount.toLocaleString('en-PK')}
                             </td>
 

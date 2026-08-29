@@ -75,12 +75,59 @@ const loadLogo = async (url) => {
 // --------------------------------------------------------------------------------
 
 const buildFeeRows = (voucher) => {
-  const feeType = formatFeeType(voucher?.fee_type || voucher?.feeType);
-  const netAmount = Number(voucher?.net_amount || voucher?.netAmount || voucher?.amount || 0);
-  const safeAmount = isNaN(netAmount) ? 0 : netAmount;
+  const rows = [];
+  const baseAmount = Number(
+    voucher?.base_amount ??
+    voucher?.baseAmount ??
+    voucher?.student?.monthly_fee ??
+    voucher?.student?.monthlyFee ??
+    voucher?.monthly_fee ??
+    voucher?.monthlyFee ??
+    0
+  );
+  const discount = Number(
+    voucher?.discount ??
+    voucher?.concession_amount ??
+    voucher?.concessionAmount ??
+    0
+  );
+  const arrears = Number(
+    voucher?.arrears ??
+    voucher?.previous_arrears ??
+    voucher?.previousArrears ??
+    0
+  );
+  const rawNet = Number(voucher?.net_amount ?? voucher?.netAmount ?? voucher?.amount ?? 0);
+  const calculatedNet = baseAmount > 0 ? (baseAmount - discount + arrears) : rawNet;
+  const netAmount = rawNet > 0 ? rawNet : calculatedNet;
 
-  // Return strictly the main fee type and amount as requested
-  return [[feeType, safeAmount.toFixed(2)]];
+  const feeTypeLabel = formatFeeType(voucher?.fee_type || voucher?.feeType);
+
+  // 1. Base Fee row (Monthly Fee / Tuition Fee)
+  if (baseAmount > 0) {
+    rows.push([feeTypeLabel, baseAmount.toFixed(2)]);
+  } else if (netAmount > 0 && arrears > 0) {
+    rows.push([feeTypeLabel, Math.max(0, netAmount - arrears + discount).toFixed(2)]);
+  } else {
+    rows.push([feeTypeLabel, netAmount.toFixed(2)]);
+  }
+
+  // 2. Concession / Discount row (if any)
+  if (discount > 0) {
+    rows.push(['CONCESSION / DISCOUNT', `-${discount.toFixed(2)}`]);
+  }
+
+  // 3. Previous Charges / Arrears row (if any)
+  if (arrears > 0) {
+    rows.push(['PREVIOUS CHARGES / ARREARS', arrears.toFixed(2)]);
+  }
+
+  // Fallback if empty
+  if (rows.length === 0) {
+    rows.push([feeTypeLabel, '0.00']);
+  }
+
+  return rows;
 };
 
 /**
@@ -227,6 +274,22 @@ export const generateFeeVoucherPdfBlob = async ({ voucher, student, instituteNam
   const logoImg = await loadLogo(logoUrl);
   renderVoucherPage(doc, { voucher, student, instituteName, logoImg });
   return doc.output('blob');
+};
+
+export const generateAndDownloadFeeVoucherPdf = async ({ voucher, student, instituteName, logoUrl }) => {
+  try {
+    const blob = await generateFeeVoucherPdfBlob({ voucher, student, instituteName, logoUrl });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fee-voucher-${voucher?.voucher_number || voucher?.voucherNumber || 'voucher'}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Error generating and downloading fee voucher PDF:', err);
+  }
 };
 
 export const generateBulkFeeVouchersPdfBlob = async ({ vouchers, instituteName, logoUrl }) => {

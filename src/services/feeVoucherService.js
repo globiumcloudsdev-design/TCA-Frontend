@@ -82,26 +82,26 @@ const buildVoucherFilters = (filters = {}) => {
   if (filters.status) {
     base.status = filters.status;
   }
-  if (filters.student_id) {
-    base.student_id = filters.student_id;
+  if (filters.student_id || filters.studentId) {
+    base.student_id = filters.student_id || filters.studentId;
   }
- if (Array.isArray(filters.student_ids) && filters.student_ids.length > 0) {
-   base.student_ids = filters.student_ids;
- }
-  if (filters.class_id) {
-    base.class_id = filters.class_id;
+  if (Array.isArray(filters.student_ids || filters.studentIds) && (filters.student_ids || filters.studentIds).length > 0) {
+    base.student_ids = filters.student_ids || filters.studentIds;
   }
-  if (filters.section_id) {
-    base.section_id = filters.section_id;
+  if (filters.class_id || filters.classId) {
+    base.class_id = filters.class_id || filters.classId;
   }
-  if (filters.fee_type) {
-    base.fee_type = filters.fee_type;
+  if (filters.section_id || filters.sectionId) {
+    base.section_id = filters.section_id || filters.sectionId;
   }
-  if (filters.fee_template_id) {
-    base.fee_template_id = filters.fee_template_id;
+  if (filters.fee_type || filters.feeType) {
+    base.fee_type = filters.fee_type || filters.feeType;
   }
-  if (filters.academic_year_id) {
-    base.academic_year_id = filters.academic_year_id;
+  if (filters.fee_template_id || filters.feeTemplateId) {
+    base.fee_template_id = filters.fee_template_id || filters.feeTemplateId;
+  }
+  if (filters.academic_year_id || filters.academicYearId) {
+    base.academic_year_id = filters.academic_year_id || filters.academicYearId;
   }
   if (filters.search) {
     base.search = filters.search;
@@ -215,12 +215,175 @@ export const sortVouchersChronologically = (vouchers = []) => {
   });
 };
 
+/**
+ * Decomposes any merged vouchers into distinct, individual monthly vouchers
+ * so that each unpaid month (July, August, September, etc.) is preserved and itemized as its own row.
+ * Ensures past unpaid months are NEVER hidden or merged into a single voucher.
+ * 
+ * @param {Array} vouchers - Array of transformed voucher objects
+ * @returns {Array} List of distinct, itemized monthly vouchers
+ */
+const computePriorMonthDueDate = (origDueDate, y, priorM) => {
+  if (origDueDate) {
+    const origD = new Date(origDueDate);
+    if (!isNaN(origD.getTime())) {
+      const origDay = origD.getDate();
+      const lastDayOfPriorMonth = new Date(y, priorM, 0).getDate();
+      const dueDay = Math.min(origDay, lastDayOfPriorMonth);
+      return `${y}-${String(priorM).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
+    }
+  }
+  const lastDay = new Date(y, priorM, 0).getDate();
+  return `${y}-${String(priorM).padStart(2, '0')}-${String(Math.min(10, lastDay)).padStart(2, '0')}`;
+};
+
+const formatUnbundledVoucherNo = (origNo, y, priorM) => {
+  if (!origNo) return `VOU-${y}${String(priorM).padStart(2, '0')}`;
+  const str = String(origNo);
+  // Match standard institute voucher pattern like TCA-202609-0014 or #TCA-202609-0014
+  const standardPattern = /^([#]?[A-Za-z0-9]+-)?(\d{4})(\d{2})(-\d+.*)$/;
+  if (standardPattern.test(str)) {
+    return str.replace(standardPattern, `$1$2${String(priorM).padStart(2, '0')}$4`);
+  }
+  return `${str}-M${String(priorM).padStart(2, '0')}`;
+};
+
+export const decomposeVouchersForPayment = (vouchers = []) => {
+  if (!Array.isArray(vouchers) || vouchers.length === 0) return [];
+
+  const distinctMonthlyVouchers = [];
+  const existingStudentMonthKeys = new Set();
+
+  // 1. Identify all student-month pairs already explicitly present in the voucher list
+  for (const v of vouchers) {
+    if (!v) continue;
+    const sId = String(v.studentId || v.student_id || v.student?.id || v.Student?.id || '');
+    const m = Number(v.month || 0);
+    const y = Number(v.year || new Date().getFullYear());
+    if (m > 0 && y > 0) {
+      existingStudentMonthKeys.add(`${sId}-${y}-${m}`);
+    }
+  }
+
+  for (const v of vouchers) {
+    if (!v) continue;
+    const sId = String(v.studentId || v.student_id || v.student?.id || v.Student?.id || '');
+    const m = Number(v.month || 0);
+    const y = Number(v.year || new Date().getFullYear());
+    const studentMonthlyFee = Number(v.student?.monthly_fee || v.Student?.monthly_fee || v.monthly_fee || 0);
+    const baseAmt = Number(
+      v.base_amount ??
+      v.baseAmount ??
+      (studentMonthlyFee > 0 ? studentMonthlyFee : null) ??
+      v.amount ??
+      0
+    );
+    const rawArrears = Number(v.arrears ?? v.previous_arrears ?? v.previousArrears ?? 0);
+    const discountAmt = Number(v.discount ?? v.concession_amount ?? 0);
+    const netAmt = Number(v.net_amount ?? v.netAmount ?? (baseAmt + rawArrears - discountAmt));
+    const paidAmt = Number(v.paid_amount ?? v.paidAmount ?? 0);
+
+    // Accurately compute arrears carrying forward from previous months
+    const arrearsAmt = rawArrears > 0
+      ? rawArrears
+      : (baseAmt > 0 && netAmt > baseAmt ? Math.max(0, netAmt - baseAmt + discountAmt) : 0);
+
+    let unbundledArrearsTotal = 0;
+
+    // If this voucher carries arrears for earlier months that are missing for this student in the database,
+    // synthesize each missing prior monthly voucher so that every month is distinctly represented!
+    if (arrearsAmt > 0 && baseAmt > 0 && m > 1) {
+      const impliedPriorMonthsCount = Math.max(1, Math.min(Math.round(arrearsAmt / baseAmt), m - 1));
+      let remainingArrears = arrearsAmt;
+      for (let i = impliedPriorMonthsCount; i >= 1; i--) {
+        const priorMonthNum = m - i;
+        const priorKey = `${sId}-${y}-${priorMonthNum}`;
+        if (priorMonthNum >= 1 && !existingStudentMonthKeys.has(priorKey) && remainingArrears > 0) {
+          const priorMonthAmt = Math.min(baseAmt, remainingArrears);
+          remainingArrears -= priorMonthAmt;
+          unbundledArrearsTotal += priorMonthAmt;
+          existingStudentMonthKeys.add(priorKey);
+
+          const rawVNum = v.voucherNumber || v.voucher_number || v.voucher_no || '';
+          const unbundledVNum = formatUnbundledVoucherNo(rawVNum, y, priorMonthNum);
+          const unbundledDueDate = computePriorMonthDueDate(v.due_date || v.dueDate, y, priorMonthNum);
+
+          const priorMonthObj = {
+            ...v,
+            id: `${v.id}_historical_m${priorMonthNum}`,
+            voucherNumber: unbundledVNum,
+            voucher_number: unbundledVNum,
+            voucher_no: unbundledVNum,
+            month: priorMonthNum,
+            year: y,
+            fee_month: `${y}-${String(priorMonthNum).padStart(2, '0')}`,
+            feeMonth: `${y}-${String(priorMonthNum).padStart(2, '0')}`,
+            monthLabel: computeVoucherMonthLabel({ month: priorMonthNum, year: y }, { withSuffix: true }),
+            month_label: computeVoucherMonthLabel({ month: priorMonthNum, year: y }, { withSuffix: true }),
+            base_amount: priorMonthAmt,
+            baseAmount: priorMonthAmt,
+            amount: priorMonthAmt,
+            arrears: 0,
+            previous_arrears: 0,
+            previousArrears: 0,
+            discount: 0,
+            net_amount: priorMonthAmt,
+            netAmount: priorMonthAmt,
+            paid_amount: 0,
+            paidAmount: 0,
+            pending_amount: priorMonthAmt,
+            pendingAmount: priorMonthAmt,
+            status: 'pending',
+            due_date: unbundledDueDate,
+            dueDate: unbundledDueDate,
+            is_historical_unbundled: true,
+          };
+          distinctMonthlyVouchers.push(priorMonthObj);
+        }
+      }
+    }
+
+    // Current month standalone voucher (deducting any unbundled arrears so the last voucher never double counts!)
+    const remainingArrearsOnCurrent = Math.max(0, arrearsAmt - unbundledArrearsTotal);
+    const standaloneBase = baseAmt > 0 ? baseAmt : Math.max(0, netAmt - arrearsAmt);
+    const standaloneNet = Math.max(0, standaloneBase + remainingArrearsOnCurrent - discountAmt);
+    const standalonePending = Math.max(0, standaloneNet - paidAmt);
+
+    const standaloneVoucher = {
+      ...v,
+      month: m,
+      year: y,
+      fee_month: `${y}-${String(m).padStart(2, '0')}`,
+      feeMonth: `${y}-${String(m).padStart(2, '0')}`,
+      monthLabel: computeVoucherMonthLabel({ month: m, year: y }, { withSuffix: true }),
+      month_label: computeVoucherMonthLabel({ month: m, year: y }, { withSuffix: true }),
+      base_amount: standaloneBase,
+      baseAmount: standaloneBase,
+      amount: standaloneBase,
+      arrears: remainingArrearsOnCurrent,
+      previous_arrears: remainingArrearsOnCurrent,
+      previousArrears: remainingArrearsOnCurrent,
+      discount: discountAmt,
+      net_amount: standaloneNet,
+      netAmount: standaloneNet,
+      paid_amount: paidAmt,
+      paidAmount: paidAmt,
+      pending_amount: standalonePending,
+      pendingAmount: standalonePending,
+      status: standalonePending === 0 && standaloneNet > 0 ? 'paid' : (paidAmt > 0 ? 'partial' : (v.status || 'pending')),
+    };
+    distinctMonthlyVouchers.push(standaloneVoucher);
+  }
+
+  return sortVouchersChronologically(distinctMonthlyVouchers);
+};
+
 const studentMetaCache = new Map();
 
 /**
  * Transform API response for consistent structure
  */
-const transformVoucherResponse = async (data, classServiceInstance = null, sectionServiceInstance = null) => {
+export const transformVoucherResponse = async (data, classServiceInstance = null, sectionServiceInstance = null) => {
   if (!data) return null;
   
   // Extract student record for deeper resolution
@@ -384,63 +547,192 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
   // Final fallbacks
   className = normalizeText(className) || 'N/A';
   sectionName = normalizeText(sectionName) || 'N/A';
-  const monthLabel = computeVoucherMonthLabel(data);
+
+  // Extract month and year cleanly
+  let resolvedMonth = null;
+  let resolvedYear = null;
+
+  if (data.month !== undefined && data.month !== null && !isNaN(parseInt(data.month, 10))) {
+    resolvedMonth = parseInt(data.month, 10);
+  }
+  if (data.year !== undefined && data.year !== null && !isNaN(parseInt(data.year, 10))) {
+    resolvedYear = parseInt(data.year, 10);
+  }
+
+  const rawFeeMonth = String(data.fee_month || data.feeMonth || data.billing_month || '').trim();
+  if (rawFeeMonth) {
+    if (/^\d{4}-\d{1,2}/.test(rawFeeMonth)) {
+      const parts = rawFeeMonth.split('-');
+      if (!resolvedYear) resolvedYear = parseInt(parts[0], 10);
+      if (!resolvedMonth) resolvedMonth = parseInt(parts[1], 10);
+    } else {
+      MONTH_NAMES_LIST.forEach((name, idx) => {
+        if (rawFeeMonth.toLowerCase().includes(name.toLowerCase())) {
+          if (!resolvedMonth) resolvedMonth = idx + 1;
+        }
+      });
+      const yearMatch = rawFeeMonth.match(/\b(20\d{2})\b/);
+      if (yearMatch && !resolvedYear) {
+        resolvedYear = parseInt(yearMatch[1], 10);
+      }
+    }
+  }
+
+  const rawDateStr = data.due_date || data.dueDate || data.issued_date || data.issuedDate || data.issue_date || data.created_at || data.createdAt;
+  if (rawDateStr) {
+    const d = new Date(rawDateStr);
+    if (!isNaN(d.getTime())) {
+      if (!resolvedMonth) resolvedMonth = d.getMonth() + 1;
+      if (!resolvedYear) resolvedYear = d.getFullYear();
+    }
+  }
+
+  if (!resolvedYear) resolvedYear = new Date().getFullYear();
+  if (!resolvedMonth) resolvedMonth = new Date().getMonth() + 1;
+
+  const monthLabel = computeVoucherMonthLabel({ ...data, month: resolvedMonth, year: resolvedYear });
+
+  const studentMonthlyFee = parseFloat(
+    studentRaw.monthly_fee ||
+    studentRaw.monthlyFee ||
+    studentRaw.base_fee ||
+    studentRaw.tuition_fee ||
+    data.monthly_fee ||
+    data.monthlyFee ||
+    0
+  );
+
+  const arrearsVal = parseFloat(
+    data.arrears ||
+    data.previous_arrears ||
+    data.previousArrears ||
+    data.prior_arrears ||
+    data.previous_balance ||
+    data.previousBalance ||
+    0
+  );
+
+  const discountVal = parseFloat(
+    data.discount ||
+    data.concession_amount ||
+    data.concessionAmount ||
+    studentRaw.concession_amount ||
+    0
+  );
+
+  const rawNetVal = parseFloat(
+    data.net_amount ||
+    data.netAmount ||
+    data.amount_due ||
+    data.amountDue ||
+    data.totalAmount ||
+    data.total_amount ||
+    0
+  );
+
+  const rawAmount = parseFloat(data.amount || 0);
+
+  let baseVal = 0;
+  if (data.base_amount !== undefined && data.base_amount !== null && parseFloat(data.base_amount) > 0) {
+    baseVal = parseFloat(data.base_amount);
+  } else if (data.baseAmount !== undefined && data.baseAmount !== null && parseFloat(data.baseAmount) > 0) {
+    baseVal = parseFloat(data.baseAmount);
+  } else if (studentMonthlyFee > 0) {
+    baseVal = studentMonthlyFee;
+  } else if (rawNetVal > 0 && arrearsVal > 0) {
+    baseVal = Math.max(0, rawNetVal - arrearsVal + discountVal);
+  } else if (rawAmount > 0 && arrearsVal > 0 && rawAmount > arrearsVal) {
+    baseVal = Math.max(0, rawAmount - arrearsVal + discountVal);
+  } else if (rawAmount > 0) {
+    baseVal = rawAmount;
+  } else if (rawNetVal > 0) {
+    baseVal = rawNetVal;
+  }
+
+  // Calculate net payable amount: Base Fee + Arrears - Discount
+  let netVal = rawNetVal > 0 ? rawNetVal : (baseVal + arrearsVal - discountVal);
+  if (rawNetVal > 0 && arrearsVal > 0 && Math.abs(rawNetVal - baseVal) < 1) {
+    netVal = baseVal + arrearsVal - discountVal;
+  }
+
+  const paidVal = parseFloat(data.paid_amount || data.paidAmount || 0);
+  const pendingVal = Math.max(0, netVal - paidVal);
 
   return {
-    id: data.id || data._id || data.voucher_id || data.voucherId,
-    voucherNumber: data.voucher_number || data.voucher_no || data.voucherNumber,
-    voucher_number: data.voucher_number || data.voucher_no || data.voucherNumber,
-    voucher_no: data.voucher_number || data.voucher_no || data.voucherNumber,
- 
-    studentId: studentId,
-    studentName: studentRaw.first_name || studentRaw.full_name
-      ? `${studentRaw.first_name || ''} ${studentRaw.last_name || ''}`.trim() || studentRaw.full_name
-      : data.student_name || data.studentName || 'N/A',
-    registrationNo: studentRaw.registration_no || studentRaw.registrationNo || data.registration_no || data.registrationNo,
-    classId: classId,
-    class_name: className,
-    sectionId: sectionId,
-    section_name: sectionName,
-    month: data.month,
-    year: data.year,
-    monthLabel: monthLabel,
-    month_label: monthLabel,
-    academicYearId: data.academic_year_id || data.academicYearId || studentRaw.academic_year_id || studentRaw.academicYearId,
-    base_amount: parseFloat(data.base_amount || data.baseAmount || data.amount || data.net_amount || data.netAmount || 0),
-    baseAmount: parseFloat(data.base_amount || data.baseAmount || data.amount || data.net_amount || data.netAmount || 0),
-    amount: parseFloat(data.base_amount || data.baseAmount || data.amount || data.net_amount || data.netAmount || 0),
-    discount: parseFloat(data.discount || 0),
-    net_amount: parseFloat(data.net_amount || data.netAmount || data.amount_due || data.totalAmount || data.amount || 0),
-    netAmount: parseFloat(data.net_amount || data.netAmount || data.amount_due || data.totalAmount || data.amount || 0),
-    amountDue: parseFloat(data.net_amount || data.netAmount || data.amount_due || data.totalAmount || data.amount || 0),
-    totalAmount: parseFloat(data.net_amount || data.netAmount || data.amount_due || data.totalAmount || data.amount || 0),
-    currency: data.currency || 'PKR',
-    status: String(data.status || 'pending').toLowerCase() === 'unpaid' ? 'pending' : String(data.status || 'pending').toLowerCase(),
-    feeType: data.fee_type || data.feeType,
-    feeTemplateId: data.fee_template_id || data.feeTemplateId,
-    notes: data.notes,
-    feeBreakdown: data.fee_breakdown || data.feeBreakdown || {},
-    issuedDate: data.issued_date || data.issuedDate,
-    dueDate: data.due_date || data.dueDate,
-    createdAt: data.created_at || data.createdAt,
-    updatedAt: data.updated_at || data.updatedAt,
-    archived: data.archived || false,
-    student: studentRaw,
-    
-    // Partial payment & standalone pending fields
-    paid_amount: parseFloat(data.paid_amount || data.paidAmount || 0),
-    paidAmount: parseFloat(data.paid_amount || data.paidAmount || 0),
-    pending_amount: Math.max(0, parseFloat(data.base_amount || data.baseAmount || data.amount || data.net_amount || data.netAmount || 0) - parseFloat(data.paid_amount || data.paidAmount || 0)),
-    pendingAmount: Math.max(0, parseFloat(data.base_amount || data.baseAmount || data.amount || data.net_amount || data.netAmount || 0) - parseFloat(data.paid_amount || data.paidAmount || 0)),
-    FeePayments: data.FeePayments || data.payments || []
+      id: data.id || data._id || data.voucher_id || data.voucherId,
+      voucherNumber: data.voucher_number || data.voucher_no || data.voucherNumber,
+      voucher_number: data.voucher_number || data.voucher_no || data.voucherNumber,
+      voucher_no: data.voucher_number || data.voucher_no || data.voucherNumber,
+   
+      studentId: studentId,
+      studentName: studentRaw.first_name || studentRaw.full_name
+        ? `${studentRaw.first_name || ''} ${studentRaw.last_name || ''}`.trim() || studentRaw.full_name
+        : data.student_name || data.studentName || 'N/A',
+      registrationNo: studentRaw.registration_no || studentRaw.registrationNo || data.registration_no || data.registrationNo,
+      classId: classId,
+      class_name: className,
+      sectionId: sectionId,
+      section_name: sectionName,
+      month: resolvedMonth,
+      year: resolvedYear,
+      fee_month: `${resolvedYear}-${String(resolvedMonth).padStart(2, '0')}`,
+      feeMonth: `${resolvedYear}-${String(resolvedMonth).padStart(2, '0')}`,
+      monthLabel: monthLabel,
+      month_label: monthLabel,
+      academicYearId: data.academic_year_id || data.academicYearId || studentRaw.academic_year_id || studentRaw.academicYearId,
+      
+      // Explicit Financial Fields
+      base_amount: baseVal,
+      baseAmount: baseVal,
+      amount: baseVal,
+      arrears: arrearsVal,
+      previous_arrears: arrearsVal,
+      previousArrears: arrearsVal,
+      discount: discountVal,
+      net_amount: netVal,
+      netAmount: netVal,
+      amountDue: netVal,
+      totalAmount: netVal,
+      currency: data.currency || 'PKR',
+      status: String(data.status || 'pending').toLowerCase() === 'unpaid' ? 'pending' : String(data.status || 'pending').toLowerCase(),
+      feeType: data.fee_type || data.feeType,
+      feeTemplateId: data.fee_template_id || data.feeTemplateId,
+      notes: data.notes,
+      feeBreakdown: data.fee_breakdown || data.feeBreakdown || {},
+      issuedDate: data.issued_date || data.issuedDate,
+      dueDate: data.due_date || data.dueDate,
+      createdAt: data.created_at || data.createdAt,
+      updatedAt: data.updated_at || data.updatedAt,
+      archived: data.archived || false,
+      student: studentRaw,
+      
+      // Partial payment & standalone pending fields
+      paid_amount: paidVal,
+      paidAmount: paidVal,
+      pending_amount: pendingVal,
+      pendingAmount: pendingVal,
+      FeePayments: data.FeePayments || data.payments || []
+    };
   };
-};
 
 /**
  * Transform list response with batch processing for class/section names
  */
 const transformVouchersList = async (response, classServiceInstance = null, sectionServiceInstance = null) => {
-  const vouchersRaw = response.data?.vouchers || response.data || [];
+  let vouchersRaw = [];
+  if (Array.isArray(response?.data?.vouchers)) {
+    vouchersRaw = response.data.vouchers;
+  } else if (Array.isArray(response?.data?.rows)) {
+    vouchersRaw = response.data.rows;
+  } else if (Array.isArray(response?.data)) {
+    vouchersRaw = response.data;
+  } else if (Array.isArray(response?.vouchers)) {
+    vouchersRaw = response.vouchers;
+  } else if (Array.isArray(response?.rows)) {
+    vouchersRaw = response.rows;
+  } else if (Array.isArray(response)) {
+    vouchersRaw = response;
+  }
   
   // Process vouchers in batches to avoid overwhelming the API
   const batchSize = 20;
@@ -454,13 +746,18 @@ const transformVouchersList = async (response, classServiceInstance = null, sect
     enrichedVouchers.push(...batchResults);
   }
   
+  const totalCount = response?.data?.pagination?.total || response?.data?.count || response?.pagination?.total || response?.count || enrichedVouchers.length;
+  const currentPage = response?.data?.pagination?.page || response?.pagination?.page || 1;
+  const currentLimit = response?.data?.pagination?.limit || response?.pagination?.limit || 20;
+  const totalPages = Math.max(1, Math.ceil(totalCount / currentLimit));
+
   return {
     vouchers: enrichedVouchers,
-    pagination: response.data?.pagination || response.pagination || {
-      total: vouchersRaw.length,
-      page: 1,
-      limit: vouchersRaw.length || 20,
-      totalPages: 1
+    pagination: {
+      total: totalCount,
+      page: currentPage,
+      limit: currentLimit,
+      totalPages: totalPages
     }
   };
 };
@@ -480,12 +777,15 @@ export const feeVoucherService = {
       if (!month || month < 1 || month > 12) throw new Error('Valid month (1-12) is required');
       if (!year || year < 2000) throw new Error('Valid year is required');
 
+      const feeMonthStr = `${year}-${String(month).padStart(2, '0')}`;
       const payload = {
         generation_type: 'single',
         student_id: studentId,
         studentId: studentId,
         month: parseInt(month),
         year: parseInt(year),
+        fee_month: feeMonthStr,
+        feeMonth: feeMonthStr,
         fee_type: options.feeType || 'Monthly',
         feeType: options.feeType || 'Monthly',
         due_date: options.dueDate || undefined,
@@ -493,6 +793,33 @@ export const feeVoucherService = {
         academic_year_id: options.academicYearId || undefined,
         academicYearId: options.academicYearId || undefined,
         fee_template_id: options.feeTemplateId || undefined,
+        base_amount: options.baseAmount || options.monthly_fee || undefined,
+        baseAmount: options.baseAmount || options.monthly_fee || undefined,
+        monthly_fee: options.monthly_fee || options.baseAmount || undefined,
+        discount: options.discount || options.concession_amount || undefined,
+        arrears: options.arrears || options.previous_arrears || undefined,
+        // Critical Business Rules:
+        // 1. Maintain separate, distinct vouchers for every single month.
+        // 2. Manage and track previous charges/arrears seamlessly without overwriting past vouchers.
+        // 3. Never delete, overwrite, cancel, or archive historical unpaid vouchers.
+        include_arrears: true,
+        carry_forward_arrears: true,
+        manage_previous_charges: true,
+        merge_arrears: false,
+        merge_unpaid: false,
+        consolidate: false,
+        consolidate_vouchers: false,
+        archive_previous: false,
+        archive_unpaid: false,
+        cancel_previous: false,
+        overwrite: false,
+        preserve_previous_vouchers: true,
+        preserve_history: true,
+        distinct_vouchers: true,
+        standalone: true,
+        standalone_monthly: true,
+        keep_historical: true,
+        auto_archive: false,
       };
 
       try {
@@ -525,12 +852,15 @@ export const feeVoucherService = {
       if (!month || month < 1 || month > 12) throw new Error('Valid month (1-12) is required');
       if (!year || year < 2000) throw new Error('Valid year is required');
 
+      const feeMonthStr = `${year}-${String(month).padStart(2, '0')}`;
       const payload = {
         generation_type: 'class',
         class_id: classId,
         classId: classId,
         month: parseInt(month),
         year: parseInt(year),
+        fee_month: feeMonthStr,
+        feeMonth: feeMonthStr,
         fee_type: options.feeType || 'Monthly',
         feeType: options.feeType || 'Monthly',
         due_date: options.dueDate || undefined,
@@ -538,6 +868,25 @@ export const feeVoucherService = {
         academic_year_id: options.academicYearId || undefined,
         academicYearId: options.academicYearId || undefined,
         fee_template_id: options.feeTemplateId || undefined,
+        // Critical Business Rules:
+        include_arrears: true,
+        carry_forward_arrears: true,
+        manage_previous_charges: true,
+        merge_arrears: false,
+        merge_unpaid: false,
+        consolidate: false,
+        consolidate_vouchers: false,
+        archive_previous: false,
+        archive_unpaid: false,
+        cancel_previous: false,
+        overwrite: false,
+        preserve_previous_vouchers: true,
+        preserve_history: true,
+        distinct_vouchers: true,
+        standalone: true,
+        standalone_monthly: true,
+        keep_historical: true,
+        auto_archive: false,
       };
 
       try {
@@ -578,10 +927,13 @@ export const feeVoucherService = {
       if (!month || month < 1 || month > 12) throw new Error('Valid month (1-12) is required');
       if (!year || year < 2000) throw new Error('Valid year is required');
 
+      const feeMonthStr = `${year}-${String(month).padStart(2, '0')}`;
       const payload = {
         generation_type: 'institute',
         month: parseInt(month),
         year: parseInt(year),
+        fee_month: feeMonthStr,
+        feeMonth: feeMonthStr,
         fee_type: options.feeType || 'Monthly',
         feeType: options.feeType || 'Monthly',
         due_date: options.dueDate || undefined,
@@ -589,6 +941,25 @@ export const feeVoucherService = {
         academic_year_id: options.academicYearId || undefined,
         academicYearId: options.academicYearId || undefined,
         fee_template_id: options.feeTemplateId || undefined,
+        // Critical Business Rules:
+        include_arrears: true,
+        carry_forward_arrears: true,
+        manage_previous_charges: true,
+        merge_arrears: false,
+        merge_unpaid: false,
+        consolidate: false,
+        consolidate_vouchers: false,
+        archive_previous: false,
+        archive_unpaid: false,
+        cancel_previous: false,
+        overwrite: false,
+        preserve_previous_vouchers: true,
+        preserve_history: true,
+        distinct_vouchers: true,
+        standalone: true,
+        standalone_monthly: true,
+        keep_historical: true,
+        auto_archive: false,
       };
 
       try {
@@ -638,24 +1009,56 @@ export const feeVoucherService = {
     try {
       const { page, limit } = normalizePagination(pagination.page, pagination.limit);
       const voucherFilters = buildVoucherFilters(filters);
-      const timeout = Number.isFinite(requestOptions?.timeout) ? requestOptions.timeout : 10000;
+      const timeout = Number.isFinite(requestOptions?.timeout) ? requestOptions.timeout : 15000;
       
       const queryParams = {
         ...voucherFilters,
+        include_archived: true,
+        include_all: true,
+        show_archived: true,
+        with_archived: true,
         page,
-        limit
+        limit: Math.max(limit, 1000)
       };
+      // Do not constrain backend query to single month so that unbundled historical months (e.g. June, July) are not dropped by SQL
+      delete queryParams.month;
 
       const queryString = buildQuery(queryParams);
-      const response = await api.get(`/fee-vouchers${queryString}`, {
-        timeout
-      });
+      let rawData;
+      try {
+        const response = await api.get(`/fee-vouchers${queryString}`, { timeout });
+        rawData = response?.data;
+      } catch (err1) {
+        if (err1.response?.status && err1.response.status !== 404) throw err1;
+        const response2 = await api.get(`/fees/vouchers${queryString}`, { timeout });
+        rawData = response2?.data;
+      }
 
       // Use provided services or import defaults
       let classSvc = classServiceInstance || classService;
       let sectionSvc = sectionServiceInstance || sectionService;
       
-      return transformVouchersList(response.data, classSvc, sectionSvc);
+      const transformed = await transformVouchersList(rawData, classSvc, sectionSvc);
+
+      // Decompose any merged vouchers so that past unpaid months NEVER disappear
+      let allDecomposed = decomposeVouchersForPayment(transformed.vouchers || []);
+
+      // If specific month was requested:
+      let filteredVouchers = allDecomposed;
+      if (filters.month !== undefined && filters.month !== null && filters.month !== '' && filters.month !== '__all__') {
+        const targetMonthNum = parseInt(filters.month, 10);
+        if (!isNaN(targetMonthNum)) {
+          filteredVouchers = allDecomposed.filter((v) => Number(v.month) === targetMonthNum);
+        }
+      }
+
+      return {
+        vouchers: filteredVouchers,
+        pagination: {
+          ...transformed.pagination,
+          total: filteredVouchers.length
+        }
+      };
     } catch (error) {
       console.error('❌ Failed to fetch vouchers:', error);
       throw {
@@ -687,6 +1090,31 @@ export const feeVoucherService = {
         status: error.response?.status,
         error
       };
+    }
+  },
+
+  /**
+   * Get all unpaid / pending vouchers for a specific student
+   * @param {string} studentId - Student UUID
+   * @returns {Promise<Array>} List of unpaid vouchers
+   */
+  getUnpaidByStudent: async (studentId) => {
+    if (!studentId) return [];
+    try {
+      const res = await feeVoucherService.getAll(
+        { student_id: studentId, studentId: studentId, include_all: true, include_archived: true, limit: 1000 },
+        { page: 1, limit: 1000 }
+      );
+      const vouchers = res?.vouchers || [];
+      const unpaid = vouchers.filter((v) => {
+        const st = String(v.status || '').toLowerCase();
+        const pending = Number(v.pending_amount ?? v.pendingAmount ?? 0);
+        return (st !== 'paid' && st !== 'cancelled') || pending > 0;
+      });
+      return unpaid.length > 0 ? unpaid : vouchers;
+    } catch (err) {
+      console.warn('feeVoucherService.getUnpaidByStudent error:', err);
+      return [];
     }
   },
 
@@ -1254,30 +1682,24 @@ export const feeVoucherService = {
       if (!studentId) return [];
 
       const rawList = await studentService.getUnpaidVouchers(studentId);
-      let vouchersList = [];
+      let vouchersList = await Promise.all(
+        (rawList || []).map((v) => transformVoucherResponse(v, classService, sectionService))
+      );
 
-      if (Array.isArray(rawList) && rawList.length > 0) {
-        vouchersList = await Promise.all(
-          rawList.map((v) => transformVoucherResponse(v, classService, sectionService))
-        );
-      } else {
-        const response = await feeVoucherService.getAll(
-          { student_id: studentId },
-          { page: 1, limit: 100 }
-        );
-        vouchersList = response?.vouchers || [];
-      }
-
-      // Filter: non-archived, status pending/partial/overdue/unpaid, with pending balance > 0
-      const activeUnpaid = vouchersList.filter((v) => {
-        if (v.archived) return false;
+      // Filter: status not paid and pending balance > 0 (do not drop archived if unpaid)
+      const activeUnpaid = (vouchersList || []).filter((v) => {
+        if (!v) return false;
         const st = String(v.status || '').toLowerCase();
-        const pending = Number(v.pending_amount ?? (v.net_amount || v.amount || 0));
-        return ['pending', 'partial', 'overdue', 'unpaid'].includes(st) && pending > 0;
+        if (st === 'paid' || st === 'cancelled') return false;
+        const pending = Number(v.pending_amount ?? (v.base_amount || v.net_amount || v.amount || 0));
+        return pending > 0;
       });
 
-      // Sort strictly in ascending chronological order (oldest due_date first)
-      return sortVouchersChronologically(activeUnpaid);
+      // Decompose any merged vouchers into distinct individual monthly vouchers
+      const decomposed = decomposeVouchersForPayment(activeUnpaid);
+
+      // Sort strictly in ascending chronological order (oldest month/due date first)
+      return sortVouchersChronologically(decomposed);
     } catch (error) {
       console.error('❌ Failed to fetch unpaid student vouchers:', error);
       return [];
@@ -1341,7 +1763,10 @@ export const feeVoucherService = {
       try {
         const response = await api.post('/payments/collect', payload, { timeout: 20000 });
         try {
-          if (studentId) await studentService.syncStudentPendingDues(studentId);
+          if (studentId) {
+            await feeVoucherService.syncStudentVoucherArrears(studentId);
+            await studentService.syncStudentPendingDues(studentId);
+          }
         } catch (syncErr) {
           // Ignored
         }
@@ -1358,7 +1783,10 @@ export const feeVoucherService = {
       try {
         const response = await api.post('/fee-vouchers/process-fifo-payment', payload, { timeout: 20000 });
         try {
-          if (studentId) await studentService.syncStudentPendingDues(studentId);
+          if (studentId) {
+            await feeVoucherService.syncStudentVoucherArrears(studentId);
+            await studentService.syncStudentPendingDues(studentId);
+          }
         } catch (syncErr) {
           // Ignored
         }
@@ -1384,7 +1812,10 @@ export const feeVoucherService = {
         });
 
         try {
-          if (studentId) await studentService.syncStudentPendingDues(studentId);
+          if (studentId) {
+            await feeVoucherService.syncStudentVoucherArrears(studentId);
+            await studentService.syncStudentPendingDues(studentId);
+          }
         } catch (syncErr) {
           // Ignored
         }
@@ -1399,6 +1830,33 @@ export const feeVoucherService = {
         details: error.response?.data?.details,
         error,
       };
+    }
+  },
+
+  /**
+   * Recalculates arrears on subsequent open/newer vouchers for a student
+   * when older vouchers are paid off, ensuring student total debt is synced
+   * and preventing double-charging.
+   * @param {string} studentId - Student UUID
+   */
+  syncStudentVoucherArrears: async (studentId) => {
+    if (!studentId) return null;
+    try {
+      try {
+        const res = await api.post(`/fee-vouchers/sync-arrears/${studentId}`, {}, { timeout: 10000 });
+        return res.data?.data || res.data;
+      } catch (e1) {
+        if (e1.response?.status && e1.response.status !== 404) throw e1;
+        try {
+          const res2 = await api.post(`/students/${studentId}/sync-dues`, {}, { timeout: 10000 });
+          return res2.data?.data || res2.data;
+        } catch (e2) {
+          return null;
+        }
+      }
+    } catch (err) {
+      console.warn('Sync student voucher arrears notice:', err?.message || err);
+      return null;
     }
   },
 
