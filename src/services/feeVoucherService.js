@@ -291,12 +291,13 @@ export const decomposeVouchersForPayment = (vouchers = []) => {
     let unbundledArrearsTotal = 0;
 
     // If this voucher carries arrears for earlier months that are missing for this student in the database,
-    // synthesize each missing prior monthly voucher so that every month is distinctly represented!
+    // synthesize each missing prior monthly voucher so that every month is distinctly represented with accurate historical cumulative figures!
     if (arrearsAmt > 0 && baseAmt > 0 && m > 1) {
       const impliedPriorMonthsCount = Math.max(1, Math.min(Math.round(arrearsAmt / baseAmt), m - 1));
       let remainingArrears = arrearsAmt;
       for (let i = impliedPriorMonthsCount; i >= 1; i--) {
         const priorMonthNum = m - i;
+        const idxFromOldest = impliedPriorMonthsCount - i + 1; // 1 for oldest, 2 for next, etc.
         const priorKey = `${sId}-${y}-${priorMonthNum}`;
         if (priorMonthNum >= 1 && !existingStudentMonthKeys.has(priorKey) && remainingArrears > 0) {
           const priorMonthAmt = Math.min(baseAmt, remainingArrears);
@@ -307,6 +308,10 @@ export const decomposeVouchersForPayment = (vouchers = []) => {
           const rawVNum = v.voucherNumber || v.voucher_number || v.voucher_no || '';
           const unbundledVNum = formatUnbundledVoucherNo(rawVNum, y, priorMonthNum);
           const unbundledDueDate = computePriorMonthDueDate(v.due_date || v.dueDate, y, priorMonthNum);
+
+          // Cumulative arrears at this specific prior month point in time
+          const cumulativeArrearsAtPriorMonth = (idxFromOldest - 1) * baseAmt;
+          const priorNetAmt = priorMonthAmt + cumulativeArrearsAtPriorMonth;
 
           const priorMonthObj = {
             ...v,
@@ -323,16 +328,16 @@ export const decomposeVouchersForPayment = (vouchers = []) => {
             base_amount: priorMonthAmt,
             baseAmount: priorMonthAmt,
             amount: priorMonthAmt,
-            arrears: 0,
-            previous_arrears: 0,
-            previousArrears: 0,
+            arrears: cumulativeArrearsAtPriorMonth,
+            previous_arrears: cumulativeArrearsAtPriorMonth,
+            previousArrears: cumulativeArrearsAtPriorMonth,
             discount: 0,
-            net_amount: priorMonthAmt,
-            netAmount: priorMonthAmt,
+            net_amount: priorNetAmt,
+            netAmount: priorNetAmt,
             paid_amount: 0,
             paidAmount: 0,
-            pending_amount: priorMonthAmt,
-            pendingAmount: priorMonthAmt,
+            pending_amount: priorNetAmt,
+            pendingAmount: priorNetAmt,
             status: 'pending',
             due_date: unbundledDueDate,
             dueDate: unbundledDueDate,
@@ -343,13 +348,13 @@ export const decomposeVouchersForPayment = (vouchers = []) => {
       }
     }
 
-    // Current month standalone voucher (deducting any unbundled arrears so the last voucher never double counts!)
-    const remainingArrearsOnCurrent = Math.max(0, arrearsAmt - unbundledArrearsTotal);
+    // Current month voucher with its active base, arrears, and cumulative net total
     const standaloneBase = baseAmt > 0 ? baseAmt : Math.max(0, netAmt - arrearsAmt);
-    const standaloneNet = Math.max(0, standaloneBase + remainingArrearsOnCurrent - discountAmt);
-    const standalonePending = Math.max(0, standaloneNet - paidAmt);
+    const currentArrears = arrearsAmt;
+    const currentNet = Math.max(0, standaloneBase + currentArrears - discountAmt);
+    const currentPending = Math.max(0, currentNet - paidAmt);
 
-    const standaloneVoucher = {
+    const currentVoucher = {
       ...v,
       month: m,
       year: y,
@@ -360,19 +365,19 @@ export const decomposeVouchersForPayment = (vouchers = []) => {
       base_amount: standaloneBase,
       baseAmount: standaloneBase,
       amount: standaloneBase,
-      arrears: remainingArrearsOnCurrent,
-      previous_arrears: remainingArrearsOnCurrent,
-      previousArrears: remainingArrearsOnCurrent,
+      arrears: currentArrears,
+      previous_arrears: currentArrears,
+      previousArrears: currentArrears,
       discount: discountAmt,
-      net_amount: standaloneNet,
-      netAmount: standaloneNet,
+      net_amount: currentNet,
+      netAmount: currentNet,
       paid_amount: paidAmt,
       paidAmount: paidAmt,
-      pending_amount: standalonePending,
-      pendingAmount: standalonePending,
-      status: standalonePending === 0 && standaloneNet > 0 ? 'paid' : (paidAmt > 0 ? 'partial' : (v.status || 'pending')),
+      pending_amount: currentPending,
+      pendingAmount: currentPending,
+      status: currentPending === 0 && currentNet > 0 ? 'paid' : (paidAmt > 0 ? 'partial' : (v.status || 'pending')),
     };
-    distinctMonthlyVouchers.push(standaloneVoucher);
+    distinctMonthlyVouchers.push(currentVoucher);
   }
 
   return sortVouchersChronologically(distinctMonthlyVouchers);
