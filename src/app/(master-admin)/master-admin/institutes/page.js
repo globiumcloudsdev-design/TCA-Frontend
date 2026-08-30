@@ -515,10 +515,11 @@ function InstituteFormModal({ open, onClose, institute, onSubmit, loading, typeO
     orientation:          inst?.settings?.print_settings?.orientation ?? 'portrait',
     color_mode:           inst?.settings?.print_settings?.color_mode ?? 'color',
     show_border:          inst?.settings?.print_settings?.show_border ?? true,
+    voucher_format:       inst?.settings?.print_settings?.voucher_format ?? inst?.settings?.voucher_format ?? 'three_part',
 
     // Conditional switch state
     show_subscription_settings: false,
-  });
+  });0
 
   const [logoFile,    setLogoFile]    = useState(null);
   const [logoPreview, setLogoPreview] = useState('');
@@ -625,7 +626,9 @@ function InstituteFormModal({ open, onClose, institute, onSubmit, loading, typeO
         orientation: data.orientation,
         color_mode: data.color_mode,
         show_border: data.show_border,
-      }
+        voucher_format: data.voucher_format,
+      },
+      voucher_format: data.voucher_format,
     };
 
     // Remove individual settings fields from main data
@@ -647,6 +650,7 @@ function InstituteFormModal({ open, onClose, institute, onSubmit, loading, typeO
       orientation,
       color_mode,
       show_border,
+      voucher_format,
       show_subscription_settings,
       ...mainData 
     } = data;
@@ -1004,6 +1008,19 @@ function InstituteFormModal({ open, onClose, institute, onSubmit, loading, typeO
             <SectionLabel>Print &amp; Printer Layouts</SectionLabel>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <SelectField
+                label="Voucher Print Format *"
+                name="voucher_format"
+                control={control}
+                error={errors.voucher_format}
+                options={[
+                  { value: 'three_part', label: 'Classic Three-Part Slip (Bank, School & Parent Copies - A4)' },
+                  { value: 'compact', label: 'Compact Receipt (Small Shop Receipt - Thermal / A5)' }
+                ]}
+                placeholder="Select voucher print format"
+                hint="Default voucher layout used when printing or downloading fee vouchers for this school"
+                required
+              />
+              <SelectField
                 label="Printer Type *" name="printer_type" control={control} error={errors.printer_type}
                 options={[
                   { value: 'regular', label: 'Laser Printer (Standard A4/A5/Letter)' },
@@ -1011,6 +1028,9 @@ function InstituteFormModal({ open, onClose, institute, onSubmit, loading, typeO
                 ]}
                 placeholder="Select printer type" required
               />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <SelectField
                 label="Color Mode" name="color_mode" control={control}
                 options={[

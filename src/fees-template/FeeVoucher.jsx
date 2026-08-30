@@ -4,6 +4,7 @@ import VoucherHeader from './VoucherHeader';
 import StudentInfoSection from './StudentInfoSection';
 import FeeTable from './FeeTable';
 import VoucherFooter from './VoucherFooter';
+import CompactFeeVoucher from './CompactFeeVoucher';
 
 const A4_WIDTH_MM = '210mm';
 const A4_HEIGHT_MM = '297mm';
@@ -15,8 +16,31 @@ export default function FeeVoucher({
   voucherMeta = {},
   theme,
   copyMode = 'single',
+  format,
   className = '',
 }) {
+  const resolvedFormat =
+    format ||
+    voucherMeta?.voucher_format ||
+    voucherMeta?.voucherFormat ||
+    voucherMeta?.format ||
+    instituteData?.settings?.print_settings?.voucher_format ||
+    instituteData?.settings?.voucher_format ||
+    instituteData?.voucher_format ||
+    'three_part';
+
+  if (resolvedFormat === 'compact' || resolvedFormat === 'compact_receipt') {
+    return (
+      <CompactFeeVoucher
+        studentData={studentData}
+        feeStructure={feeStructure}
+        instituteData={instituteData}
+        voucherMeta={voucherMeta}
+        className={className}
+      />
+    );
+  }
+
   const copyLabels =
     copyMode === 'triple'
       ? ['BANK COPY', 'SCHOOL COPY', 'PARENT COPY']
@@ -30,7 +54,7 @@ export default function FeeVoucher({
       style={{
         width: A4_WIDTH_MM,
         minHeight: A4_HEIGHT_MM,
-        color: theme.colors.text,
+        color: theme?.colors?.text || '#0f172a',
         backgroundColor: '#ffffff',
         padding: '4mm',
       }}
@@ -42,7 +66,7 @@ export default function FeeVoucher({
             className="flex flex-1 flex-col border p-2"
             style={{
               borderColor: '#8a8a8a',
-              borderBottom: index === copyLabels.length - 1 ? 'none' : `1px dashed ${theme.colors.border}`,
+              borderBottom: index === copyLabels.length - 1 ? 'none' : `1px dashed ${theme?.colors?.border || '#cbd5e1'}`,
               paddingBottom: index === copyLabels.length - 1 ? '8px' : '10px',
             }}
           >

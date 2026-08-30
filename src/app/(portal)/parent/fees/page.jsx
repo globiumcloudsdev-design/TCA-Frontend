@@ -144,6 +144,16 @@ const resolveInstituteForVoucher = (portalInstitute = {}, storeInstitute = {}, a
       portalInstitute?.contact_email,
       'N/A'
     ),
+    voucher_format: pickFirst(
+      storeInstitute?.settings?.print_settings?.voucher_format,
+      storeInstitute?.voucher_format,
+      authInstitute?.settings?.print_settings?.voucher_format,
+      authInstitute?.voucher_format,
+      portalInstitute?.settings?.print_settings?.voucher_format,
+      portalInstitute?.voucher_format,
+      'three_part'
+    ),
+    settings: storeInstitute?.settings || authInstitute?.settings || portalInstitute?.settings || {},
   };
 };
 
@@ -445,7 +455,7 @@ export default function ParentFeesPage() {
     }
   };
 
-  const handleDownloadVoucher = (voucher) => {
+  const handleDownloadVoucher = async (voucher) => {
     if (!voucher) {
       toast.error('Voucher data not found');
       return;
@@ -454,7 +464,7 @@ export default function ParentFeesPage() {
     try {
       setDownloadingVoucherId(voucher.id);
 
-      const voucherBlob = generateFeeVoucherPdfBlob({
+      const voucherBlob = await generateFeeVoucherPdfBlob({
         voucher,
         student: {
           name: child?.name,
@@ -463,12 +473,16 @@ export default function ParentFeesPage() {
           section: child?.section,
           gender: child?.gender
         },
-        instituteName: selectedInstitute?.name || selectedInstitute?.title || parent?.institute_name || 'ABC School'
+        instituteName: selectedInstitute?.name || selectedInstitute?.title || parent?.institute_name || voucherInstituteData?.name || 'ABC School',
+        logoUrl: voucherInstituteData?.logo,
+        institute: currentInstitute || selectedInstitute || voucherInstituteData,
       });
 
-      const voucherRef = voucher?.voucher_number || voucher?.id || 'receipt';
-      downloadBlob(voucherBlob, `fee-voucher-${voucherRef}.pdf`);
-      toast.success('Voucher downloaded successfully');
+      const voucherRef = voucher?.voucher_number || voucher?.id || 'voucher';
+      const isCompact = voucherInstituteData?.voucher_format === 'compact';
+      const fileName = isCompact ? `compact-receipt-${voucherRef}.pdf` : `fee-voucher-${voucherRef}.pdf`;
+      downloadBlob(voucherBlob, fileName);
+      toast.success(`${isCompact ? 'Compact receipt' : 'Voucher'} downloaded successfully`);
     } catch (error) {
       console.error('Failed to download voucher PDF:', error);
       toast.error('Failed to download voucher');

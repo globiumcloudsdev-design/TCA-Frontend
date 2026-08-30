@@ -26,7 +26,7 @@ import StatsCard from '@/components/common/StatsCard';
 import BulkVoucherGenerator from '@/components/forms/BulkVoucherGenerator';
 import { cn } from '@/lib/utils';
 import { downloadBlob } from '@/lib/download';
-import { generateBulkFeeVouchersPdfBlob, generateFeeVoucherPdfBlob, generateFeeReceiptPdfBlob, generateStudentAccountStatementPdfBlob } from '@/lib/pdf/feeVoucherPdf';
+import { generateBulkFeeVouchersPdfBlob, generateFeeVoucherPdfBlob, generateFeeReceiptPdfBlob, generateStudentAccountStatementPdfBlob, getInstituteVoucherFormat } from '@/lib/pdf/feeVoucherPdf';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { feeVoucherService, academicYearService, classService, sectionService, studentService } from '@/services';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -1081,10 +1081,14 @@ const handleBulkDownload = async () => {
       return sortLabel(left.studentName).localeCompare(sortLabel(right.studentName));
     });
 
+    const voucherFormat = getInstituteVoucherFormat(currentInstitute, vouchersForPdfSorted[0]);
+
     const blob = await generateBulkFeeVouchersPdfBlob({
       vouchers: vouchersForPdfSorted,
       instituteName: currentInstitute?.name || 'School Management System',
-      logoUrl: currentInstitute?.logo_url
+      logoUrl: currentInstitute?.logo_url,
+      voucherFormat,
+      institute: currentInstitute,
     });
 
     const safeName = `class-fee-vouchers-${selectedClassLabel}-${selectedSectionLabel}-${bulkFilters.month || 'all'}-${enrolledStudentIds.length}students`
@@ -1217,16 +1221,21 @@ const handleDownloadVoucher = async (voucher) => {
       sectionName: enrichedVoucher.sectionName
     });
     
+    const voucherFormat = getInstituteVoucherFormat(currentInstitute, enrichedVoucher);
+
     const blob = await generateFeeVoucherPdfBlob({
       voucher: enrichedVoucher,
       student: studentData,
       instituteName: currentInstitute?.name || 'School Management System',
-      logoUrl: currentInstitute?.logo_url
+      logoUrl: currentInstitute?.logo_url,
+      voucherFormat,
+      institute: currentInstitute,
     });
     
-    const safeName = `fee-voucher-${enrichedVoucher.voucherNumber || enrichedVoucher.voucher_number || 'unknown'}.pdf`;
+    const prefix = voucherFormat === 'compact' ? 'compact-receipt' : 'fee-voucher';
+    const safeName = `${prefix}-${enrichedVoucher.voucherNumber || enrichedVoucher.voucher_number || 'unknown'}.pdf`;
     downloadBlob(blob, safeName);
-    toast.success('Voucher PDF downloaded');
+    toast.success(`${voucherFormat === 'compact' ? 'Compact receipt' : 'Voucher'} PDF downloaded`);
     
   } catch (error) {
     console.error('Failed to download voucher PDF:', error);
@@ -1313,11 +1322,15 @@ const handlePrintVoucher = async (voucher) => {
       student: studentData
     };
     
+    const voucherFormat = getInstituteVoucherFormat(currentInstitute, enrichedVoucher);
+
     const blob = await generateFeeVoucherPdfBlob({
       voucher: enrichedVoucher,
       student: studentData,
       instituteName: currentInstitute?.name || 'School Management System',
-      logoUrl: currentInstitute?.logo_url
+      logoUrl: currentInstitute?.logo_url,
+      voucherFormat,
+      institute: currentInstitute,
     });
     
     const blobUrl = URL.createObjectURL(blob);
@@ -1411,10 +1424,13 @@ const handleDownloadStatement = async () => {
 const openVoucherInNewTab = async (voucher) => {
   if (!voucher?.id) return;
   try {
+    const voucherFormat = getInstituteVoucherFormat(currentInstitute, voucher);
     const blob = await generateFeeVoucherPdfBlob({ 
       voucher, 
       instituteName: currentInstitute?.name || 'School Management System',
-      logoUrl: currentInstitute?.logo_url
+      logoUrl: currentInstitute?.logo_url,
+      voucherFormat,
+      institute: currentInstitute,
     });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');

@@ -159,6 +159,20 @@ export const useInstituteStore = create(
         };
       },
 
+      // Get voucher print format ('three_part' or 'compact')
+      voucherFormat: () => {
+        const inst = get().currentInstitute || {};
+        const settings = inst.settings || {};
+        const printSettings = settings.print_settings || {};
+        const feeSettings = settings.fee || settings.fee_settings || {};
+        const raw =
+          printSettings.voucher_format ||
+          settings.voucher_format ||
+          feeSettings.voucher_format ||
+          inst.voucher_format;
+        return raw === 'compact' || raw === 'compact_receipt' ? 'compact' : 'three_part';
+      },
+
       // Get exam settings
       examSettings: () => {
         const settings = get().currentInstitute?.settings?.exam || {};
