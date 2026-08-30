@@ -108,6 +108,14 @@ const normalizeInstitute = (storeInstitute = {}, authUser = {}, profile = {}) =>
       studentProfile.email,
       'N/A'
     ),
+    voucher_format: pickFirst(
+      institute?.settings?.print_settings?.voucher_format,
+      institute?.voucher_format,
+      authInstitute?.settings?.print_settings?.voucher_format,
+      authInstitute?.voucher_format,
+      'three_part'
+    ),
+    settings: institute.settings || authInstitute.settings || {},
   };
 };
 
@@ -200,7 +208,7 @@ export default function StudentFeesPage() {
     setIsVoucherOpen(true);
   };
 
-  const handleQuickDownload = (voucher) => {
+  const handleQuickDownload = async (voucher) => {
     if (!voucher) {
       toast.error('Voucher data not found');
       return;
@@ -208,7 +216,7 @@ export default function StudentFeesPage() {
 
     try {
       setQuickDownloadVoucherId(voucher.id);
-      const voucherBlob = generateFeeVoucherPdfBlob({
+      const voucherBlob = await generateFeeVoucherPdfBlob({
         voucher,
         student: {
           name: profile?.name,
@@ -217,12 +225,16 @@ export default function StudentFeesPage() {
           section: profile?.section_name,
           gender: profile?.gender
         },
-        instituteName: institute?.name || 'ABC School'
+        instituteName: institute?.name || 'ABC School',
+        logoUrl: institute?.logo,
+        institute: currentInstitute || authUser?.institute || authUser?.school || institute,
       });
 
-      const voucherRef = voucher?.voucher_number || voucher?.id || 'receipt';
-      downloadBlob(voucherBlob, `fee-voucher-${voucherRef}.pdf`);
-      toast.success('Voucher downloaded successfully');
+      const voucherRef = voucher?.voucher_number || voucher?.id || 'voucher';
+      const isCompact = institute?.voucher_format === 'compact';
+      const fileName = isCompact ? `compact-receipt-${voucherRef}.pdf` : `fee-voucher-${voucherRef}.pdf`;
+      downloadBlob(voucherBlob, fileName);
+      toast.success(`${isCompact ? 'Compact receipt' : 'Voucher'} downloaded successfully`);
     } catch (error) {
       console.error('Failed to download voucher PDF:', error);
       toast.error('Failed to download voucher');

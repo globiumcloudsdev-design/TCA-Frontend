@@ -9,7 +9,7 @@ import {
   Building2, Mail, Phone, MapPin, Globe, Calendar, Upload, Trash2, Save,
   Settings as SettingsIcon, Shield, CreditCard, Bell, Palette, Lock, Database,
   RefreshCw, CheckCircle, Loader2, Download, Facebook, Instagram, Twitter,
-  Linkedin, Youtube, Clock, DollarSign, Smartphone, Eye, EyeOff, Moon, Sun
+  Linkedin, Youtube, Clock, DollarSign, Smartphone, Eye, EyeOff, Moon, Sun, Printer
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
@@ -97,7 +97,8 @@ export default function SettingsPage() {
       instagram_url: currentSettings.instagram_url || '',
       twitter_url: currentSettings.twitter_url || '',
       linkedin_url: currentSettings.linkedin_url || '',
-      youtube_url: currentSettings.youtube_url || ''
+      youtube_url: currentSettings.youtube_url || '',
+      voucher_format: currentSettings.voucher_format || user?.institute?.settings?.print_settings?.voucher_format || user?.institute?.voucher_format || 'three_part'
     }
   });
 
@@ -119,7 +120,8 @@ export default function SettingsPage() {
       instagram_url: currentSettings.instagram_url || '',
       twitter_url: currentSettings.twitter_url || '',
       linkedin_url: currentSettings.linkedin_url || '',
-      youtube_url: currentSettings.youtube_url || ''
+      youtube_url: currentSettings.youtube_url || '',
+      voucher_format: currentSettings.voucher_format || user?.institute?.settings?.print_settings?.voucher_format || user?.institute?.voucher_format || 'three_part'
     });
   }, [currentInstituteName, currentSettings, user?.institute, generalReset]);
 
@@ -483,6 +485,27 @@ export default function SettingsPage() {
                         error={generalErrors.youtube_url}
                         type="url"
                         placeholder="https://youtube.com/..."
+                      />
+                    </div>
+                  </div>
+
+                  {/* Print & Voucher Layout Preferences */}
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+                      <Printer size={18} />
+                      Fee Voucher Print Format
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <SelectField
+                        label="Default Voucher Layout"
+                        name="voucher_format"
+                        control={generalControl}
+                        options={[
+                          { value: 'three_part', label: 'Classic Three-Part Slip (Bank, School & Parent Copies - Full A4)' },
+                          { value: 'compact', label: 'Compact Receipt (Small Shop Receipt - Thermal / A5 Slip)' }
+                        ]}
+                        placeholder="Select layout"
+                        hint="Choose whether fee vouchers default to a three-part slip or a compact shop receipt"
                       />
                     </div>
                   </div>

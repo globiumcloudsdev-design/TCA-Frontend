@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -455,6 +455,7 @@ function InstituteFormModal({ open, onClose, institute, onSubmit, loading, typeO
     subscription_status:  inst?.subscription_status  ?? 'trial',
     is_active:            inst?.is_active             ?? true,
     has_branches:         inst?.settings?.has_branches ?? false,
+    voucher_format:       inst?.settings?.print_settings?.voucher_format ?? inst?.settings?.voucher_format ?? inst?.voucher_format ?? 'three_part',
   });
 
   const { register, control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
@@ -719,6 +720,19 @@ function InstituteFormModal({ open, onClose, institute, onSubmit, loading, typeO
 
         {/* ── Settings & Status ── */}
         <SectionLabel>Settings &amp; Status</SectionLabel>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 mb-3">
+          <SelectField
+            label="Voucher Print Format *"
+            name="voucher_format"
+            control={control}
+            options={[
+              { value: 'three_part', label: 'Classic Three-Part Slip (Bank, School & Parent Copies - A4)' },
+              { value: 'compact', label: 'Compact Receipt (Small Shop Receipt - Thermal / A5)' }
+            ]}
+            placeholder="Select voucher print format"
+            hint="Choose default voucher print format for this school"
+          />
+        </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <SwitchField label="Is Active"    name="is_active"    control={control} hint="Inactive institutes cannot log in" />
           <SwitchField label="Has Branches" name="has_branches" control={control} hint="Institute operates from multiple branches" />

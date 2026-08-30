@@ -6,6 +6,32 @@ import autoTable from 'jspdf-autotable';
 // UTILS
 // --------------------------------------------------------------------------------
 
+export const getInstituteVoucherFormat = (institute, voucher) => {
+  const explicitFormat = voucher?.voucher_format || voucher?.voucherFormat || voucher?.format;
+  if (explicitFormat === 'compact' || explicitFormat === 'compact_receipt') return 'compact';
+  if (explicitFormat === 'three_part' || explicitFormat === 'three_part_slip' || explicitFormat === 'classic') return 'three_part';
+
+  const inst = institute || {};
+  const settings = inst.settings || {};
+  const printSettings = settings.print_settings || {};
+  const feeSettings = settings.fee || settings.fee_settings || {};
+
+  const raw =
+    printSettings.voucher_format ||
+    printSettings.voucher_print_format ||
+    settings.voucher_format ||
+    settings.voucher_print_format ||
+    feeSettings.voucher_format ||
+    feeSettings.voucher_print_format ||
+    inst.voucher_format ||
+    inst.voucher_print_format;
+
+  if (raw === 'compact' || raw === 'compact_receipt') {
+    return 'compact';
+  }
+  return 'three_part';
+};
+
 const formatDate = (date) => {
   if (!date) return 'N/A';
   try {
@@ -131,7 +157,7 @@ const buildFeeRows = (voucher) => {
 };
 
 /**
- * Render 3 copies (Bank, School, Parent) on a single page
+ * Render 3 copies (Bank, School, Parent) on a single A4 page
  */
 const renderVoucherPage = (doc, { voucher, student, instituteName, logoImg }) => {
   const sectionWidth = 190;
@@ -142,7 +168,7 @@ const renderVoucherPage = (doc, { voucher, student, instituteName, logoImg }) =>
   const { className, sectionName } = extractStudentMeta(voucher, student);
   const studentName = voucher?.studentName || student?.name || 'Student';
   const registrationNo = voucher?.registrationNo || voucher?.registration_no || student?.registrationNo || 'N/A';
-  const voucherNo = voucher?.voucherNumber || voucher?.voucher_number || 'N/A';
+  const voucherNo = voucher?.voucherNumber || voucher?.voucher_number || voucher?.voucher_no || voucher?.id || 'N/A';
   const dueDate = formatDate(voucher?.dueDate || voucher?.due_date);
   const monthName = formatMonth(voucher);
   const netAmount = Number(voucher?.net_amount || voucher?.netAmount || voucher?.amount || 0);
@@ -265,24 +291,237 @@ const renderVoucherPage = (doc, { voucher, student, instituteName, logoImg }) =>
   });
 };
 
+/**
+ * Render New Compact Receipt layout on A5 or thermal-size page
+ */
+const renderCompactReceiptPage = (doc, { voucher, student, instituteName, logoImg }) => {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 12;
+  const contentWidth = pageWidth - (margin * 2);
+  let y = 14;
+
+  const { className, sectionName } = extractStudentMeta(voucher, student);
+  const studentName = voucher?.studentName || student?.name || (student?.first_name ? `${student.first_name} ${student.last_name || ''}`.trim() : 'Student');
+  const registrationNo = voucher?.registrationNo || voucher?.registration_no || student?.registrationNo || student?.registration_no || null;
+  const voucherNo = voucher?.voucherNumber || voucher?.voucher_number || voucher?.voucher_no || voucher?.id || 'N/A';
+  const paymentDate = formatDate(voucher?.paymentDate || voucher?.payment_date || voucher?.issuedDate || voucher?.issue_date || voucher?.dueDate || voucher?.due_date || new Date());
+  const monthName = formatMonth(voucher);
+  
+  const baseAmount = Number(voucher?.base_amount ?? voucher?.baseAmount ?? voucher?.student?.monthly_fee ?? voucher?.monthly_fee ?? 0);
+  const discount = Number(voucher?.discount ?? voucher?.concession_amount ?? voucher?.concessionAmount ?? 0);
+  const arrears = Number(voucher?.arrears ?? voucher?.previous_arrears ?? voucher?.previousArrears ?? 0);
+  const netAmount = Number(voucher?.net_amount ?? voucher?.netAmount ?? voucher?.amount ?? 0);
+  const safeTotal = netAmount > 0 ? netAmount : Math.max(0, baseAmount - discount + arrears);
+  
+  const paidAmount = Number(voucher?.paid_amount ?? voucher?.paidAmount ?? voucher?.amount_paid ?? (String(voucher?.status).toLowerCase() === 'paid' ? safeTotal : 0));
+  const remainingBalance = Number(voucher?.pending_amount ?? voucher?.remaining_amount ?? Math.max(0, safeTotal - paidAmount));
+
+  // Outer border / frame for receipt
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(margin - 4, 8, contentWidth + 8, pageHeight - 16, 2, 2);
+
+  // 1. Header: School's actual name at the top
+  if (logoImg) {
+    try {
+      doc.addImage(logoImg, 'PNG', (pageWidth / 2) - 6, y, 12, 12);
+      y += 15;
+    } catch (e) {
+      y += 2;
+    }
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(15, 23, 42);
+  doc.text(instituteName.toUpperCase(), pageWidth / 2, y, { align: 'center' });
+  y += 5;
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(71, 85, 105);
+  doc.text('FEE VOUCHER / RECEIPT', pageWidth / 2, y, { align: 'center' });
+  y += 5;
+
+  // Dotted divider
+  doc.setLineDash([1, 1]);
+  doc.setDrawColor(148, 163, 184);
+  doc.line(margin, y, pageWidth - margin, y);
+  doc.setLineDash([]);
+  y += 5;
+
+  // 2. Transaction Details (Date and explicitly "Voucher No")
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(71, 85, 105);
+  doc.text('Date:', margin, y);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(15, 23, 42);
+  doc.text(String(paymentDate), margin + 12, y);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(71, 85, 105);
+  doc.text('Voucher No:', pageWidth - margin - 50, y);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(String(voucherNo), pageWidth - margin, y, { align: 'right' });
+  y += 6;
+
+  // Dotted divider
+  doc.setLineDash([1, 1]);
+  doc.line(margin, y, pageWidth - margin, y);
+  doc.setLineDash([]);
+  y += 5;
+
+  // 3. Student Information (Full name, class and section)
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(71, 85, 105);
+  doc.text('Student:', margin, y);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(String(studentName), margin + 18, y);
+  y += 5;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(71, 85, 105);
+  doc.text('Class & Section:', margin, y);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(15, 23, 42);
+  doc.text(`${className} - ${sectionName}`, margin + 28, y);
+
+  if (registrationNo && registrationNo !== 'N/A') {
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(71, 85, 105);
+    doc.text('Reg #:', pageWidth - margin - 35, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(15, 23, 42);
+    doc.text(String(registrationNo), pageWidth - margin, y, { align: 'right' });
+  }
+  y += 6;
+
+  // Dotted divider
+  doc.setLineDash([1, 1]);
+  doc.line(margin, y, pageWidth - margin, y);
+  doc.setLineDash([]);
+  y += 5;
+
+  // 4. Paid Details Section (Month covered, total fee amount, exact amount paid today)
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(71, 85, 105);
+  doc.text('Fee Month:', margin, y);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(String(monthName), margin + 20, y);
+  y += 5;
+
+  // Small breakdown table
+  const feeRows = buildFeeRows(voucher);
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    head: [['Description', 'Amount (PKR)']],
+    body: feeRows,
+    theme: 'plain',
+    styles: { fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
+    headStyles: {
+      fillColor: [241, 245, 249],
+      textColor: [51, 65, 85],
+      fontStyle: 'bold',
+      fontSize: 8,
+      cellPadding: 2
+    },
+    columnStyles: {
+      0: { cellWidth: contentWidth * 0.65 },
+      1: { cellWidth: contentWidth * 0.35, halign: 'right', fontStyle: 'bold' }
+    }
+  });
+
+  y = (doc.lastAutoTable?.finalY || y + 25) + 3;
+
+  // Solid line for totals
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.3);
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 5;
+
+  // Total Fee Amount
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(30, 41, 59);
+  doc.text('Total Fee Amount:', margin, y);
+  doc.text(`PKR ${safeTotal.toFixed(2)}`, pageWidth - margin, y, { align: 'right' });
+  y += 5.5;
+
+  // Amount Paid Today
+  doc.setFillColor(240, 253, 244);
+  doc.rect(margin, y - 4, contentWidth, 6, 'F');
+  doc.setTextColor(21, 128, 61);
+  doc.text('Amount Paid:', margin + 2, y);
+  doc.text(`PKR ${paidAmount.toFixed(2)}`, pageWidth - margin - 2, y, { align: 'right' });
+  y += 8;
+
+  // 5. Unpaid Balance Section (Small, separate area showing remaining unpaid balance)
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(remainingBalance > 0 ? 252 : 203, remainingBalance > 0 ? 165 : 213, remainingBalance > 0 ? 165 : 225);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(margin, y, contentWidth, 11, 1.5, 1.5, 'FD');
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(51, 65, 85);
+  doc.text('Unpaid Balance:', margin + 4, y + 7);
+
+  if (remainingBalance > 0) {
+    doc.setTextColor(225, 29, 72);
+    doc.text(`PKR ${remainingBalance.toFixed(2)}`, pageWidth - margin - 4, y + 7, { align: 'right' });
+  } else {
+    doc.setTextColor(22, 101, 52);
+    doc.text('PKR 0.00 (Fully Settled)', pageWidth - margin - 4, y + 7, { align: 'right' });
+  }
+  y += 18;
+
+  // 6. Footer (Exact text: Powered by TCA The Clouds Academy | 03352778488)
+  const footerY = pageHeight - 12;
+  doc.setLineDash([1, 1]);
+  doc.setDrawColor(148, 163, 184);
+  doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
+  doc.setLineDash([]);
+
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(71, 85, 105);
+  doc.text('Powered by TCA The Clouds Academy | 03352778488', pageWidth / 2, footerY, { align: 'center' });
+};
+
 // --------------------------------------------------------------------------------
 // EXPORTS
 // --------------------------------------------------------------------------------
 
-export const generateFeeVoucherPdfBlob = async ({ voucher, student, instituteName, logoUrl }) => {
-  const doc = new jsPDF();
+export const generateFeeVoucherPdfBlob = async ({ voucher, student, instituteName, logoUrl, voucherFormat, institute }) => {
+  const formatType = voucherFormat || getInstituteVoucherFormat(institute || { name: instituteName }, voucher);
   const logoImg = await loadLogo(logoUrl);
+
+  if (formatType === 'compact' || formatType === 'compact_receipt') {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
+    renderCompactReceiptPage(doc, { voucher, student, instituteName, logoImg });
+    return doc.output('blob');
+  }
+
+  const doc = new jsPDF();
   renderVoucherPage(doc, { voucher, student, instituteName, logoImg });
   return doc.output('blob');
 };
 
-export const generateAndDownloadFeeVoucherPdf = async ({ voucher, student, instituteName, logoUrl }) => {
+export const generateAndDownloadFeeVoucherPdf = async ({ voucher, student, instituteName, logoUrl, voucherFormat, institute }) => {
   try {
-    const blob = await generateFeeVoucherPdfBlob({ voucher, student, instituteName, logoUrl });
+    const formatType = voucherFormat || getInstituteVoucherFormat(institute || { name: instituteName }, voucher);
+    const blob = await generateFeeVoucherPdfBlob({ voucher, student, instituteName, logoUrl, voucherFormat: formatType, institute });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `fee-voucher-${voucher?.voucher_number || voucher?.voucherNumber || 'voucher'}.pdf`;
+    const prefix = formatType === 'compact' ? 'compact-receipt' : 'fee-voucher';
+    a.download = `${prefix}-${voucher?.voucher_number || voucher?.voucherNumber || 'voucher'}.pdf`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -292,15 +531,24 @@ export const generateAndDownloadFeeVoucherPdf = async ({ voucher, student, insti
   }
 };
 
-export const generateBulkFeeVouchersPdfBlob = async ({ vouchers, instituteName, logoUrl }) => {
-  const doc = new jsPDF();
+export const generateBulkFeeVouchersPdfBlob = async ({ vouchers, instituteName, logoUrl, voucherFormat, institute }) => {
+  const formatType = voucherFormat || (vouchers?.length > 0 ? getInstituteVoucherFormat(institute || { name: instituteName }, vouchers[0]) : 'three_part');
   const logoImg = await loadLogo(logoUrl);
+
+  const isCompact = formatType === 'compact' || formatType === 'compact_receipt';
+  const doc = isCompact
+    ? new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' })
+    : new jsPDF();
 
   for (let i = 0; i < vouchers.length; i++) {
     if (i > 0) doc.addPage();
     const v = vouchers[i];
     const s = v.student || v;
-    renderVoucherPage(doc, { voucher: v, student: s, instituteName, logoImg });
+    if (isCompact) {
+      renderCompactReceiptPage(doc, { voucher: v, student: s, instituteName, logoImg });
+    } else {
+      renderVoucherPage(doc, { voucher: v, student: s, instituteName, logoImg });
+    }
   }
 
   return doc.output('blob');

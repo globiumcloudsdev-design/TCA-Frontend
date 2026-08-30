@@ -445,6 +445,8 @@ function FeesTab({ student, currentInstitute, onGenerateVoucher }) {
               voucher: row.original,
               student,
               instituteName: currentInstitute?.name || 'Academy',
+              logoUrl: currentInstitute?.logo_url,
+              institute: currentInstitute,
             });
           }}
         >
