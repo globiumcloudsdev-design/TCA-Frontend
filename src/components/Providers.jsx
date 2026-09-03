@@ -11,6 +11,17 @@ import MaintenanceProvider from "./MaintenanceProvider";
 import { useEffect } from "react";
 import { useTheme } from "next-themes";
 
+// Suppress React 19 next-themes false-positive <script> warning in development
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  const origError = console.error;
+  console.error = (...args) => {
+    if (typeof args[0] === 'string' && args[0].includes('Encountered a script tag while rendering React component')) {
+      return;
+    }
+    origError.apply(console, args);
+  };
+}
+
 function ForceLightMode() {
   const { setTheme } = useTheme();
   

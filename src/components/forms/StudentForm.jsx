@@ -22,7 +22,8 @@ import {
   TextareaField,
   DatePickerField,
   FormSubmitButton,
-  SwitchField
+  SwitchField,
+  BranchSelectField,
 } from '@/components/common';
 import PhoneInputField from '@/components/common/PhoneInput';
 import CnicInput from '@/components/common/CnicInput';
@@ -373,9 +374,9 @@ export default function StudentForm({
 
   const onSubmitForm = (data) => {
     const formData = new FormData();
-    const editableKeys = ['first_name', 'last_name', 'email', 'phone', 'registration_no', 'dob', 'gender', 'blood_group', 'religion', 'nationality', 'cnic', 'academic_year_id', 'class_id', 'section_id', 'roll_no', 'admission_date', 'present_address', 'permanent_address', 'city', 'monthly_fee', 'admission_fee', 'discount_type', 'lab_charges', 'annual_charges', 'concession_type', 'concession_percentage', 'concession_reason', 'medical_conditions', 'allergies', 'previous_school', 'previous_class', 'is_active'];
+    const editableKeys = ['first_name', 'last_name', 'email', 'phone', 'registration_no', 'dob', 'gender', 'blood_group', 'religion', 'nationality', 'cnic', 'branch_id', 'academic_year_id', 'class_id', 'section_id', 'roll_no', 'admission_date', 'present_address', 'permanent_address', 'city', 'monthly_fee', 'admission_fee', 'discount_type', 'lab_charges', 'annual_charges', 'concession_type', 'concession_percentage', 'concession_reason', 'medical_conditions', 'allergies', 'previous_school', 'previous_class', 'is_active'];
     
-    editableKeys.forEach(key => { if (data[key] !== undefined) formData.append(key, data[key]); });
+    editableKeys.forEach(key => { if (data[key] !== undefined && data[key] !== null) formData.append(key, data[key]); });
     if (data.avatar_file instanceof File) formData.append('photo', data.avatar_file);
     
     const normalizedGuardians = (data.guardians || []).map(g => ({ ...g, type: g.type || 'father', relation: g.relation || g.type || 'father' }));
@@ -469,6 +470,7 @@ export default function StudentForm({
           <TabsContent value="academic">
             <Card><CardContent className="p-4 sm:p-6 space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <BranchSelectField control={control} error={errors.branch_id} setValue={setValue} watch={watch} required />
                 <SelectField label="Academic Year" name="academic_year_id" control={control} options={academicYears} required placeholder="Select year" />
                 <SelectField label={getTerm('class')} name="class_id" control={control} options={classes.map(c => ({ value: c.id, label: c.name }))} required placeholder={`Select ${getTerm('class')}`} />
                 <SelectField label={getTerm('section')} name="section_id" control={control} options={sections.map(s => ({ value: s.id, label: s.name }))} required placeholder="Select section" />

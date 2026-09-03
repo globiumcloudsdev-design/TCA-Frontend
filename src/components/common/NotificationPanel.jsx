@@ -54,8 +54,8 @@ export const NotificationPanel = () => {
       }
 
       const { data } = await notificationService.getAll(filters);
-
-      setNotifications(data?.notifications || []);
+      const rawList = Array.isArray(data) ? data : (data?.notifications || data?.rows || data?.data || []);
+      setNotifications(Array.isArray(rawList) ? rawList : []);
       setPage(pageNum);
     } catch (error) {
       console.error('Failed to fetch notifications:', error);

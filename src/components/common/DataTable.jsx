@@ -57,6 +57,9 @@ import {
 import ExportModal from './ExportModal';
 import ImportModal from './ImportModal';
 import { toast } from 'sonner';
+import useAuthStore from '@/store/authStore';
+import useUIStore from '@/store/uiStore';
+import { isBranchAdmin as checkIsBranchAdmin, schoolHasBranches } from '@/lib/auth';
 import {
   Table,
   TableBody,
@@ -199,13 +202,88 @@ export default function DataTable({
     setMounted(true);
   }, []);
 
-  const isRowSelectionEnabled = mounted && Boolean(enableRowSelection);
+  const isRowSelectionEnabled = enableRowSelection || !!selectionActions;
 
-  // Prepend selection column when enabled
-  const finalColumns = useMemo(
-    () => (isRowSelectionEnabled ? [SELECTION_COLUMN, ...columns] : columns),
-    [columns, isRowSelectionEnabled],
-  );
+  const user = useAuthStore((s) => s.user);
+  const activeBranchId = useUIStore((s) => s.activeBranchId);
+  const isBranchAdmin = checkIsBranchAdmin(user);
+  const isSuperAdmin = !isBranchAdmin;
+  const hasBranches = schoolHasBranches(user);
+
+  // Dynamic Branch column rule:
+  // Super Admin + "All Branches" (no activeBranchId) + multi-branch → show Branch column
+  // Branch Admin OR specific branch selected → hide Branch column
+  const shouldShowBranchColumn = isSuperAdmin && !activeBranchId && hasBranches;
+
+  // Process columns with selection and dynamic branch column
+  const finalColumns = useMemo(() => {
+    let cols = [...columns];
+
+    const isBranchColumn = (c) => {
+      const colId = String(c.id || c.accessorKey || '').toLowerCase();
+      const colHeader = typeof c.header === 'string' ? c.header.toLowerCase() : '';
+      return (
+        colId === 'branch' ||
+        colId === 'branch_name' ||
+        colId === 'branch_id' ||
+        colId === 'branch.name' ||
+        colHeader === 'branch' ||
+        colHeader === 'campus'
+      );
+    };
+
+    const hasExplicitBranchCol = cols.some(isBranchColumn);
+
+    if (shouldShowBranchColumn) {
+      if (!hasExplicitBranchCol) {
+        const branchCol = {
+          id: 'branch',
+          header: 'Branch',
+          accessorFn: (row) =>
+            row.branch?.name ||
+            row.branch_name ||
+            row.branch?.code ||
+            row.student?.branch?.name ||
+            row.student?.branch_name ||
+            (row.branch_id ? `Branch ${row.branch_id}` : '—'),
+          cell: ({ row }) => {
+            const r = row.original;
+            const bName =
+              r.branch?.name ||
+              r.branch_name ||
+              r.branch?.code ||
+              r.student?.branch?.name ||
+              r.student?.branch_name ||
+              (r.branch_id ? `Branch ${r.branch_id}` : null);
+            if (!bName) return <span className="text-muted-foreground">—</span>;
+            return (
+              <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 px-2 py-0.5 text-xs font-medium whitespace-nowrap">
+                {bName}
+              </span>
+            );
+          },
+          size: 130,
+        };
+
+        // Insert before actions column if present, otherwise append
+        const actionsIndex = cols.findIndex(
+          (c) => c.id === 'actions' || c.accessorKey === 'actions' || c.header === 'Actions'
+        );
+        if (actionsIndex !== -1) {
+          cols.splice(actionsIndex, 0, branchCol);
+        } else {
+          cols.push(branchCol);
+        }
+      }
+    } else {
+      // If branch column is present but we shouldn't show it (Branch Admin or scoped branch), filter it out
+      if (hasExplicitBranchCol) {
+        cols = cols.filter((c) => !isBranchColumn(c));
+      }
+    }
+
+    return isRowSelectionEnabled ? [SELECTION_COLUMN, ...cols] : cols;
+  }, [columns, shouldShowBranchColumn, isRowSelectionEnabled]);
 
   const table = useReactTable({
     data,

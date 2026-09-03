@@ -205,7 +205,11 @@ export default function SelectField({
         </Select>
       )}
 
-      {error && <p className="text-xs text-destructive">{error.message}</p>}
+      {error && (
+        <p className="text-xs text-destructive">
+          {typeof error === 'string' ? error : error.message}
+        </p>
+      )}
     </div>
   );
 }

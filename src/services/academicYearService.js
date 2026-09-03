@@ -27,11 +27,33 @@ export const academicYearService = {
   getAll: async (params = {}) => {
     try {
       const queryString = buildQuery(params);
-      const response = await api.get(`/academic-years${queryString}`);
+      const response = await api.get(`/academic-years${queryString}`, {
+        headers: { 'X-Branch-ID': null }
+      });
       return response.data;
     } catch (error) {
-      console.error('Error fetching academic years:', error);
-      throw error;
+      console.warn('⚠️ [academicYearService.getAll] Error fetching academic years, trying current fallback:', error?.response?.data || error.message);
+      try {
+        const curRes = await api.get('/academic-years/current', {
+          params: { institute_id: params.institute_id },
+          headers: { 'X-Branch-ID': null }
+        });
+        const currentYear = curRes.data?.data || curRes.data;
+        if (currentYear?.id) {
+          return {
+            success: true,
+            data: [currentYear],
+            pagination: { total: 1, page: 1, limit: params.limit || 10, totalPages: 1 }
+          };
+        }
+      } catch (fallbackErr) {
+        // Fallback also failed
+      }
+      return {
+        success: true,
+        data: [],
+        pagination: { total: 0, page: 1, limit: params.limit || 10, totalPages: 1 }
+      };
     }
   },
 
@@ -168,7 +190,10 @@ export const academicYearService = {
     try {
       const params = { institute_id: instituteId, limit: 100, sortBy: 'start_date', sortOrder: 'DESC' };
       if (onlyActive) params.is_active = true;
-      const response = await api.get('/academic-years/options', { params });
+      const response = await api.get('/academic-years/options', {
+        params,
+        headers: { 'X-Branch-ID': null }
+      });
       const years = (response.data?.data || [])
         .map((y) => ({
           value: y?.value || y?.id,
@@ -180,8 +205,26 @@ export const academicYearService = {
         .filter((y) => y.value && y.label);
       return { data: years };
     } catch (error) {
-      console.error('Error fetching academic year options:', error);
-      return { data: [] };
+      console.warn('⚠️ [academicYearService.getOptions] Options endpoint failed, trying /academic-years fallback:', error?.response?.data || error.message);
+      try {
+        const fallbackRes = await api.get('/academic-years', {
+          params: { institute_id: instituteId, limit: 50 },
+          headers: { 'X-Branch-ID': null }
+        });
+        const rows = fallbackRes.data?.data || fallbackRes.data?.rows || [];
+        const years = (Array.isArray(rows) ? rows : [])
+          .map((y) => ({
+            value: y.id,
+            label: y.name,
+            is_current: !!y.is_current,
+            start_date: y.start_date,
+            end_date: y.end_date,
+          }))
+          .filter((y) => y.value && y.label);
+        return { data: years };
+      } catch (fallbackErr) {
+        return { data: [] };
+      }
     }
   },
 

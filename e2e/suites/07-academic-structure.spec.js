@@ -15,19 +15,19 @@ test.describe('07. Academic Structure & Timetable Suite', () => {
     await classesPage.navigateSections('school');
 
     await expect(schoolAdminPage).toHaveURL(/.*\/sections/);
-    await expect(schoolAdminPage.locator('h1, h2, text=Section').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Section/i }).first()).toBeVisible();
   });
 
   test('Academic Years setup page displays list and active year', async ({ schoolAdminPage }) => {
     await schoolAdminPage.goto('/school/academic-years');
     await expect(schoolAdminPage).toHaveURL(/.*\/academic-years/);
-    await expect(schoolAdminPage.locator('h1, h2, text=Academic Year').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Academic Year/i }).first()).toBeVisible();
   });
 
   test('Subjects page displays list of curriculum subjects', async ({ schoolAdminPage }) => {
     await schoolAdminPage.goto('/school/subjects');
     await expect(schoolAdminPage).toHaveURL(/.*\/subjects/);
-    await expect(schoolAdminPage.locator('h1, h2, text=Subject').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Subject/i }).first()).toBeVisible();
   });
 
   test('Timetable schedule view renders grid slots', async ({ schoolAdminPage }) => {
@@ -35,6 +35,6 @@ test.describe('07. Academic Structure & Timetable Suite', () => {
     await timetable.navigate('school');
 
     await expect(schoolAdminPage).toHaveURL(/.*\/timetable/);
-    await expect(schoolAdminPage.locator('h1, h2, text=Timetable').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Timetable/i }).first()).toBeVisible();
   });
 });

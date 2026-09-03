@@ -27,6 +27,7 @@ import {
   StatusBadge,
   TextareaField,
   FormSubmitButton,
+  BranchSelectField,
 } from '@/components/common';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -84,6 +85,7 @@ const sectionSchema = z.object({
 const classSchema = z.object({
   name: z.string().min(1, 'Class name is required'),
   description: z.string().optional().default(''),
+  branch_id: z.string().optional(),
   academic_year_id: z.string().min(1, 'Academic year is required'),
   active: z.boolean().default(true),
   sections: z.array(sectionSchema).default([]),
@@ -430,6 +432,16 @@ export default function ClassForm({
                 </p>
                 
                 <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
+                  <div className="col-span-1 md:col-span-2">
+                    <BranchSelectField
+                      control={control}
+                      error={errors.branch_id}
+                      setValue={setValue}
+                      watch={watch}
+                      required
+                    />
+                  </div>
+
                   <InputField
                     label={`${getTerm('class')} Name`}
                     name="name"

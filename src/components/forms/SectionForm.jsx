@@ -18,6 +18,7 @@ import {
   InputField,
   SelectField,
   FormSubmitButton,
+  BranchSelectField,
 } from '@/components/common';
 import { Button } from '@/components/ui/button';
 
@@ -35,11 +36,18 @@ export default function SectionForm({
     register,
     control,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm({ defaultValues });
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <BranchSelectField
+        control={control}
+        error={errors.branch_id}
+        setValue={setValue}
+        required
+      />
       <InputField
         label="Section Name"
         name="name"

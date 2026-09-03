@@ -25,6 +25,7 @@ import InputField from '@/components/common/InputField';
 import DatePickerField from '@/components/common/DatePickerField';
 import TimePickerField from '@/components/common/TimePickerField';
 import SwitchField from '@/components/common/SwitchField';
+import BranchSelectField from '@/components/common/BranchSelectField';
 
 import { examService } from '@/services/examService';
 import { classService } from '@/services/classService';
@@ -57,6 +58,7 @@ const step1Schema = z.object({
   name: z.string().min(3, 'Exam name required (min 3 chars)'),
   code: z.string().optional(),
   description: z.string().optional(),
+  branch_id: z.string().optional(),
   type: z.string().min(1, 'Exam type required'),
   category: z.string().min(1, 'Category required'),
   entity_type: z.string().min(1, 'Entity type required'),
@@ -366,6 +368,13 @@ export default function ExamForm({
             <CardTitle>Basic Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <BranchSelectField
+              control={control}
+              error={errors.branch_id}
+              setValue={setValue}
+              watch={watch}
+              required
+            />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <InputField
                 label="Exam Name *"

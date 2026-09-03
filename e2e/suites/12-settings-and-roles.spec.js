@@ -7,7 +7,7 @@ test.describe('12. Institute Settings, Roles & Branches Suite', () => {
     await settings.navigate('school');
 
     await expect(schoolAdminPage).toHaveURL(/.*\/settings/);
-    await expect(schoolAdminPage.locator('h1, h2, text=Setting').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Setting/i }).first()).toBeVisible();
 
     // Verify tabs
     await expect(schoolAdminPage.locator('[role="tab"], button:has-text("General"), button:has-text("Academic")').first()).toBeVisible();
@@ -18,7 +18,7 @@ test.describe('12. Institute Settings, Roles & Branches Suite', () => {
     await settings.navigateRoles('school');
 
     await expect(schoolAdminPage).toHaveURL(/.*\/roles/);
-    await expect(schoolAdminPage.locator('h1, h2, text=Role').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Role/i }).first()).toBeVisible();
   });
 
   test('Branches management page renders multi-branch list', async ({ schoolAdminPage }) => {
@@ -26,12 +26,12 @@ test.describe('12. Institute Settings, Roles & Branches Suite', () => {
     await settings.navigateBranches('school');
 
     await expect(schoolAdminPage).toHaveURL(/.*\/branches/);
-    await expect(schoolAdminPage.locator('h1, h2, text=Branch').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Branch/i }).first()).toBeVisible();
   });
 
   test('User accounts page renders staff system users', async ({ schoolAdminPage }) => {
     await schoolAdminPage.goto('/school/users');
     await expect(schoolAdminPage).toHaveURL(/.*\/users/);
-    await expect(schoolAdminPage.locator('h1, h2, text=User').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /User/i }).first()).toBeVisible();
   });
 });

@@ -17,6 +17,7 @@ import {
   InputField,
   SelectField,
   FormSubmitButton,
+  BranchSelectField,
 } from '@/components/common';
 import { Button } from '@/components/ui/button';
 
@@ -33,6 +34,7 @@ export default function UserForm({
     register,
     control,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm({ defaultValues });
 
@@ -98,16 +100,13 @@ export default function UserForm({
         required
       />
 
-      {branchOptions.length > 0 && (
-        <SelectField
-          label="Branch"
-          name="branch_id"
-          control={control}
-          error={errors.branch_id}
-          options={branchOptions}
-          placeholder="Select branch (optional)"
-        />
-      )}
+      <BranchSelectField
+        control={control}
+        error={errors.branch_id}
+        setValue={setValue}
+        branches={branchOptions}
+        required={false}
+      />
 
       <div className="flex justify-end gap-3 pt-2">
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>

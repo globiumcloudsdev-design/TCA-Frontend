@@ -13,6 +13,7 @@ import {
     CheckboxField,      // ✅ Added
     SwitchField,        // ✅ Added
     FormSubmitButton,   // ✅ Added
+    BranchSelectField,
 } from '@/components/common';
 import MultiSelectField from '@/components/common/MultiSelectField';
 import { Button } from '@/components/ui/button';
@@ -816,23 +817,20 @@ export default function FeeTemplateForm({
                                 />
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {/* ✅ FIX: Branch Select - ONLY SHOW IF hasBranches = TRUE - ✅ Using SelectField */}
-                                    {hasBranches() && (
-                                        <SelectField
-                                            label="Branch"
-                                            name="branch_id"
-                                            control={control}
-                                            options={[
-                                                { value: '', label: 'All Branches' },
-                                                ...branches.map(b => ({ value: b.value, label: b.label }))
-                                            ]}
-                                            placeholder="Select Branch"
-                                            hint="Leave empty for All Branches"
-                                        />
-                                    )}
+                                    {/* Branch Select Field */}
+                                    <BranchSelectField
+                                        control={control}
+                                        error={errors.branch_id}
+                                        setValue={setValue}
+                                        watch={watch}
+                                        required={false}
+                                        branches={branches}
+                                        placeholder="Select Branch (Optional)"
+                                        hint="Select branch or leave for All Branches"
+                                    />
 
                                     {/* Academic Year Select - REQUIRED - ✅ Using SelectField */}
-                                    <div className={cn(!hasBranches() && "md:col-span-2")}>
+                                    <div>
                                         <SelectField
                                             label="Academic Year"
                                             name="academic_year_id"

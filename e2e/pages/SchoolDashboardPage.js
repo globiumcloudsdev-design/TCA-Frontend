@@ -13,8 +13,8 @@ export class SchoolDashboardPage extends BasePage {
   }
 
   async expectStatsVisible() {
-    await expect(this.page.locator('text=Total Students, text=Students, text=Active Students').first()).toBeVisible();
-    await expect(this.page.locator('text=Total Teachers, text=Teachers').first()).toBeVisible();
+    await expect(this.page.getByText(/Total Students|Students/i).first()).toBeVisible();
+    await expect(this.page.getByText(/Total Teachers|Teachers/i).first()).toBeVisible();
   }
 
   async expectChartsVisible() {

@@ -7,7 +7,7 @@ test.describe('08. Attendance System Suite', () => {
     await attendance.navigateStudentAttendance('school');
 
     await expect(schoolAdminPage).toHaveURL(/.*\/attendance/);
-    await expect(schoolAdminPage.locator('h1, h2, text=Attendance').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Attendance/i }).first()).toBeVisible();
   });
 
   test('Attendance QR Scanner interface loads camera container / scan UI', async ({ schoolAdminPage }) => {
@@ -15,7 +15,7 @@ test.describe('08. Attendance System Suite', () => {
     await attendance.navigateScan('school');
 
     await expect(schoolAdminPage).toHaveURL(/.*\/attendance\/scan/);
-    await expect(schoolAdminPage.locator('text=Scan, text=QR, text=Camera, video, [data-scanner]').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('body').filter({ hasText: /Scan|QR|Camera/i }).first()).toBeVisible();
   });
 
   test('Staff Attendance page renders staff member list', async ({ schoolAdminPage }) => {
@@ -23,6 +23,6 @@ test.describe('08. Attendance System Suite', () => {
     await attendance.navigateStaffAttendance('school');
 
     await expect(schoolAdminPage).toHaveURL(/.*\/staff-attendance/);
-    await expect(schoolAdminPage.locator('h1, h2, text=Staff Attendance').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Staff Attendance/i }).first()).toBeVisible();
   });
 });

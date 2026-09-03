@@ -19,6 +19,7 @@ import AppModal from '@/components/common/AppModal';
 import SelectField from '@/components/common/SelectField';
 import DatePickerField from '@/components/common/DatePickerField';
 import StatsCard from '@/components/common/StatsCard';
+import BranchSelectField from '@/components/common/BranchSelectField';
 import { cn } from '@/lib/utils';
 import { DUMMY_ADMISSIONS } from '@/data/dummyData';
 
@@ -34,6 +35,7 @@ const schema = z.object({
   last_name:     z.string().min(2, 'Required'),
   email:         z.string().email('Invalid email'),
   phone:         z.string().min(10, 'Required'),
+  branch_id:     z.string().optional(),
   applying_for:  z.string().min(1, 'Required'),
   status:        z.string().min(1, 'Required'),
   applied_date:  z.string().optional(),
@@ -59,7 +61,7 @@ export default function AdmissionsPage({ type }) {
   const [editing, setEditing] = useState(null);
   const [deleting,setDeleting]= useState(null);
 
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, control, setValue, reset, formState: { errors } } = useForm({
     resolver: zodResolver(schema), defaultValues: { status: 'pending' },
   });
 
@@ -176,6 +178,12 @@ export default function AdmissionsPage({ type }) {
         </>}
       >
         <form id="admission-form" onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4">
+          <BranchSelectField
+            control={control}
+            error={errors.branch_id}
+            setValue={setValue}
+            required
+          />
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">First Name *</label>

@@ -350,7 +350,9 @@ export default function AcademicYearsPage({ type }) {
       />
 
       {/* Error Alert */}
-      <ErrorAlert message={error?.message} />
+      {error && error?.response?.status !== 403 && error?.response?.status !== 404 && (
+        <ErrorAlert message={error?.message} onRetry={refetch} />
+      )}
 
       {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

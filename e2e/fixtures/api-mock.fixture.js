@@ -16,7 +16,7 @@ import {
 
 export async function setupApiMocks(page) {
   // ── Auth Endpoints ────────────────────────────────────────────────
-  await page.route('**/auth/login', async (route) => {
+  await page.route('**/api/**/auth/login', async (route) => {
     const postData = route.request().postDataJSON() || {};
     const email = postData.email?.toLowerCase();
 
@@ -46,7 +46,7 @@ export async function setupApiMocks(page) {
     });
   });
 
-  await page.route('**/auth/portal-login', async (route) => {
+  await page.route('**/api/**/auth/portal-login', async (route) => {
     const postData = route.request().postDataJSON() || {};
     const type = postData.type || 'STUDENT';
     const user =
@@ -68,7 +68,7 @@ export async function setupApiMocks(page) {
     });
   });
 
-  await page.route('**/auth/forgot-password', async (route) => {
+  await page.route('**/api/**/auth/forgot-password', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -79,7 +79,7 @@ export async function setupApiMocks(page) {
     });
   });
 
-  await page.route('**/auth/reset-password/**', async (route) => {
+  await page.route('**/api/**/auth/reset-password/**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -90,7 +90,7 @@ export async function setupApiMocks(page) {
     });
   });
 
-  await page.route('**/auth/logout', async (route) => {
+  await page.route('**/api/**/auth/logout', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -99,7 +99,7 @@ export async function setupApiMocks(page) {
   });
 
   // ── Dashboard & Stats Endpoints ────────────────────────────────────
-  await page.route('**/dashboard/institute**', async (route) => {
+  await page.route('**/api/**/dashboard/institute**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -110,7 +110,7 @@ export async function setupApiMocks(page) {
     });
   });
 
-  await page.route('**/dashboard/master-admin**', async (route) => {
+  await page.route('**/api/**/dashboard/master-admin**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -131,7 +131,7 @@ export async function setupApiMocks(page) {
   });
 
   // ── Students Endpoints ─────────────────────────────────────────────
-  await page.route('**/students**', async (route) => {
+  await page.route('**/api/**/students**', async (route) => {
     const method = route.request().method();
     if (method === 'POST') {
       const data = route.request().postDataJSON() || {};
@@ -153,6 +153,7 @@ export async function setupApiMocks(page) {
         body: JSON.stringify({
           success: true,
           data: {
+            rows: MOCK_STUDENTS,
             students: MOCK_STUDENTS,
             total: MOCK_STUDENTS.length,
             page: 1,
@@ -164,7 +165,7 @@ export async function setupApiMocks(page) {
   });
 
   // ── Teachers Endpoints ─────────────────────────────────────────────
-  await page.route('**/teachers**', async (route) => {
+  await page.route('**/api/**/teachers**', async (route) => {
     const method = route.request().method();
     if (method === 'POST') {
       const data = route.request().postDataJSON() || {};
@@ -186,6 +187,7 @@ export async function setupApiMocks(page) {
         body: JSON.stringify({
           success: true,
           data: {
+            rows: MOCK_TEACHERS,
             teachers: MOCK_TEACHERS,
             total: MOCK_TEACHERS.length,
           },
@@ -194,8 +196,36 @@ export async function setupApiMocks(page) {
     }
   });
 
+  // ── Staff Endpoints ───────────────────────────────────────────────
+  await page.route('**/api/**/staff**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          rows: [
+            {
+              id: 'staff-1',
+              first_name: 'John',
+              last_name: 'Staff',
+              email: 'john.staff@school.com',
+              phone: '1234567890',
+              staff_type: 'ADMINISTRATIVE',
+              is_active: true,
+              role_name: 'Clerk',
+            }
+          ],
+          total: 1,
+          page: 1,
+          totalPages: 1,
+        },
+      }),
+    });
+  });
+
   // ── Classes & Sections Endpoints ───────────────────────────────────
-  await page.route('**/classes**', async (route) => {
+  await page.route('**/api/**/classes**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -207,13 +237,14 @@ export async function setupApiMocks(page) {
   });
 
   // ── Fees & Vouchers Endpoints ──────────────────────────────────────
-  await page.route('**/fees**', async (route) => {
+  await page.route('**/api/**/fees**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         success: true,
         data: {
+          rows: MOCK_FEES,
           invoices: MOCK_FEES,
           total: MOCK_FEES.length,
         },
@@ -222,7 +253,7 @@ export async function setupApiMocks(page) {
   });
 
   // ── Exams Endpoints ────────────────────────────────────────────────
-  await page.route('**/exams**', async (route) => {
+  await page.route('**/api/**/exams**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -234,7 +265,7 @@ export async function setupApiMocks(page) {
   });
 
   // ── Notices & Announcements Endpoints ──────────────────────────────
-  await page.route('**/notices**', async (route) => {
+  await page.route('**/api/**/notices**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -245,7 +276,7 @@ export async function setupApiMocks(page) {
     });
   });
 
-  await page.route('**/notifications**', async (route) => {
+  await page.route('**/api/**/notifications**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

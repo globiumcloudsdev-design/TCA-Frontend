@@ -65,12 +65,20 @@ export function NotificationContent({ onClose }) {
       if (selectedType !== 'all') filters.type = selectedType;
 
       const response = await notificationService.getAll(filters);
-      const newNotifications = response.data?.data || response.data || [];
-      const pagination = response.data?.pagination || { pages: 1, page: 1 };
+      const raw = response?.data?.rows ?? response?.data?.notifications ?? response?.data?.data ?? response?.data ?? [];
+      const newNotifications = Array.isArray(raw)
+        ? raw
+        : (Array.isArray(raw?.rows)
+            ? raw.rows
+            : (Array.isArray(raw?.notifications) ? raw.notifications : []));
+      const pagination = response?.data?.pagination || response?.pagination || { pages: 1, page: 1 };
 
-      setNotifications(prev => isLoadMore ? [...prev, ...newNotifications] : newNotifications);
-      setCurrentPage(pagination.page);
-      setTotalPages(pagination.pages);
+      setNotifications(prev => {
+        const base = Array.isArray(prev) ? prev : [];
+        return isLoadMore ? [...base, ...newNotifications] : newNotifications;
+      });
+      setCurrentPage(pagination.page || 1);
+      setTotalPages(pagination.pages || pagination.totalPages || 1);
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
     } finally {
@@ -262,12 +270,12 @@ export function NotificationContent({ onClose }) {
 
       {/* ── List with Infinite Scroll ── */}
       <div className="flex-1 overflow-y-auto custom-scrollbar" ref={scrollRef}>
-        {loading && notifications.length === 0 ? (
+        {loading && (!Array.isArray(notifications) || notifications.length === 0) ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <Loader size={32} className="animate-spin text-slate-200 dark:text-slate-700" />
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Loading Notifications</p>
           </div>
-        ) : notifications.length === 0 ? (
+        ) : (!Array.isArray(notifications) || notifications.length === 0) ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4 opacity-40">
             <div className="w-16 h-16 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
               <Bell size={32} className="text-slate-400" />
@@ -280,9 +288,9 @@ export function NotificationContent({ onClose }) {
         ) : (
           <>
             <Accordion type="single" collapsible className="w-full" onValueChange={onAccordionChange}>
-              {notifications.map((notif, index) => (
+              {(Array.isArray(notifications) ? notifications : []).map((notif, index) => (
                 <motion.div
-                  key={notif.id}
+                  key={notif?.id || index}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(index * 0.03, 0.3) }}

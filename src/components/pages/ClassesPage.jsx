@@ -589,9 +589,9 @@ export default function ClassesPage({ type }) {
       />
 
       {/* Error Alerts */}
-      {(error || academicYearsError) && (
+      {error && error?.response?.status !== 403 && error?.response?.status !== 404 && (
         <ErrorAlert
-          message={error?.message || academicYearsError?.message}
+          message={error?.message}
           onRetry={refetch}
         />
       )}

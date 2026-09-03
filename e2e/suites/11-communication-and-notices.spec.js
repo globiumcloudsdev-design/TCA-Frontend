@@ -7,7 +7,7 @@ test.describe('11. Communication, Notices & Admissions Suite', () => {
     await notices.navigate('school');
 
     await expect(schoolAdminPage).toHaveURL(/.*\/notices/);
-    await expect(schoolAdminPage.locator('h1, h2, text=Notice').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Notice|Notification/i }).first()).toBeVisible();
   });
 
   test('Events calendar page renders upcoming school events', async ({ schoolAdminPage }) => {
@@ -15,7 +15,7 @@ test.describe('11. Communication, Notices & Admissions Suite', () => {
     await notices.navigateEvents('school');
 
     await expect(schoolAdminPage).toHaveURL(/.*\/events/);
-    await expect(schoolAdminPage.locator('h1, h2, text=Event').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Event/i }).first()).toBeVisible();
   });
 
   test('Admissions management page renders student applications', async ({ schoolAdminPage }) => {
@@ -23,12 +23,12 @@ test.describe('11. Communication, Notices & Admissions Suite', () => {
     await admissions.navigate('school');
 
     await expect(schoolAdminPage).toHaveURL(/.*\/admissions/);
-    await expect(schoolAdminPage.locator('h1, h2, text=Admission').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Admission/i }).first()).toBeVisible();
   });
 
   test('Parents directory page renders parent contact details', async ({ schoolAdminPage }) => {
     await schoolAdminPage.goto('/school/parents');
     await expect(schoolAdminPage).toHaveURL(/.*\/parents/);
-    await expect(schoolAdminPage.locator('h1, h2, text=Parent').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Parent/i }).first()).toBeVisible();
   });
 });

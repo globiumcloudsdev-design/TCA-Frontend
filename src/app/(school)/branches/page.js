@@ -110,19 +110,19 @@ export default function BranchesPage() {
   const createMutation = useMutation({
     mutationFn: branchService.create,
     onSuccess: () => { invalidate(); setModalOpen(false); toast.success('Branch created'); },
-    onError:   () => toast.error('Failed to create branch'),
+    onError:   (err) => toast.error(err?.response?.data?.message || err?.message || 'Failed to create branch'),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, body }) => branchService.update(id, body),
     onSuccess: () => { invalidate(); setModalOpen(false); toast.success('Branch updated'); },
-    onError:   () => toast.error('Failed to update branch'),
+    onError:   (err) => toast.error(err?.response?.data?.message || err?.message || 'Failed to update branch'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: branchService.delete,
     onSuccess: () => { invalidate(); setDeleteOpen(false); toast.success('Branch deleted'); },
-    onError:   () => toast.error('Failed to delete branch'),
+    onError:   (err) => toast.error(err?.response?.data?.message || err?.message || 'Failed to delete branch'),
   });
 
   // ── handlers ─────────────────────────────────────────────────────────────────

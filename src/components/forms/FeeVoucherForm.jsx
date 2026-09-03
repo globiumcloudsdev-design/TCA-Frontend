@@ -20,6 +20,7 @@ import {
   TextareaField,
   DatePickerField,
   FormSubmitButton,
+  BranchSelectField,
 } from '@/components/common';
 import { Button } from '@/components/ui/button';
 import { studentService } from '@/services/studentService';
@@ -150,6 +151,12 @@ export default function FeeVoucherForm({
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+      <BranchSelectField
+        control={control}
+        error={errors.branch_id}
+        setValue={setValue}
+        required
+      />
       <SelectField
         label="Student"
         name="student_id"

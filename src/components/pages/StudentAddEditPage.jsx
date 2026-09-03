@@ -4,7 +4,7 @@
  * Route (add):  /[type]/students/add
  * Route (edit): /[type]/students/[id]/edit
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -14,7 +14,9 @@ import {
 import { cn } from '@/lib/utils';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
-import { DUMMY_FLAT_STUDENTS } from '@/data/dummyData';
+import { isBranchAdmin as checkIsBranchAdmin, getAssignedBranch } from '@/lib/auth';
+import { branchService } from '@/services';
+import { DUMMY_FLAT_STUDENTS, DUMMY_BRANCHES } from '@/data/dummyData';
 
 // ─── tiny helpers ────────────────────────────────────────────────────────────
 const GENDERS = ['male', 'female', 'other'];
@@ -74,10 +76,10 @@ function SectionCard({ icon: Icon, title, children }) {
 }
 
 // ─── type-specific academic fields ──────────────────────────────────────────
-function AcademicFields({ type, form, onChange, terms }) {
-  const baseSelect = (name, label, options, required) => (
-    <FormField key={name} label={label} required={required}>
-      <Select name={name} value={form[name] ?? ''} onChange={onChange}>
+function AcademicFields({ type, form, onChange, terms, isSuperAdmin, branchOptions, branchError }) {
+  const baseSelect = (name, label, options, required, error) => (
+    <FormField key={name} label={label} required={required} hint={error}>
+      <Select name={name} value={form[name] ?? ''} onChange={onChange} className={error ? 'border-red-500' : ''}>
         <option value="">Select {label}</option>
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
@@ -86,8 +88,13 @@ function AcademicFields({ type, form, onChange, terms }) {
     </FormField>
   );
 
+  const branchField = isSuperAdmin && (
+    baseSelect('branch_id', 'Branch', branchOptions, true, branchError)
+  );
+
   if (type === 'school') return (
     <>
+      {branchField}
       {baseSelect('class_id', terms?.class ?? 'Class', [
         { value: 'cls-1', label: 'Class 1' }, { value: 'cls-2', label: 'Class 2' },
         { value: 'cls-3', label: 'Class 3' }, { value: 'cls-4', label: 'Class 4' },
@@ -105,6 +112,7 @@ function AcademicFields({ type, form, onChange, terms }) {
 
   if (type === 'coaching') return (
     <>
+      {branchField}
       {baseSelect('course_id', 'Course', [
         { value: 'crs-1', label: 'MDCAT Prep' }, { value: 'crs-2', label: 'ECAT Prep' },
         { value: 'crs-3', label: 'CSS/PMS' }, { value: 'crs-4', label: 'IELTS/TOEFL' },
@@ -123,6 +131,7 @@ function AcademicFields({ type, form, onChange, terms }) {
 
   if (type === 'academy') return (
     <>
+      {branchField}
       {baseSelect('program_id', 'Program', [
         { value: 'prog-1', label: 'Web Development' }, { value: 'prog-2', label: 'Graphic Design' },
         { value: 'prog-3', label: 'Digital Marketing' }, { value: 'prog-4', label: 'Data Science' },
@@ -141,6 +150,7 @@ function AcademicFields({ type, form, onChange, terms }) {
 
   if (type === 'college') return (
     <>
+      {branchField}
       {baseSelect('department_id', 'Department', [
         { value: 'dep-1', label: 'Computer Science' }, { value: 'dep-2', label: 'Business Administration' },
         { value: 'dep-3', label: 'Electrical Engineering' }, { value: 'dep-4', label: 'Mass Communication' },
@@ -161,6 +171,7 @@ function AcademicFields({ type, form, onChange, terms }) {
 
   if (type === 'university') return (
     <>
+      {branchField}
       {baseSelect('faculty_id', 'Faculty', [
         { value: 'fac-1', label: 'Faculty of Engineering' }, { value: 'fac-2', label: 'Faculty of Science' },
         { value: 'fac-3', label: 'Faculty of Social Sciences' },
@@ -200,10 +211,43 @@ const EMPTY = {
 export default function StudentAddEditPage({ type, id, mode = 'add' }) {
   const router   = useRouter();
   const qc       = useQueryClient();
-  const canDo    = useAuthStore((s) => s.canDo);
+  const { canDo, user } = useAuthStore();
   const { terms } = useInstituteConfig();
   const [form,  setForm]  = useState(EMPTY);
   const [errors, setErrors] = useState({});
+
+  const isBranchAdmin = checkIsBranchAdmin(user);
+  const isSuperAdmin = !isBranchAdmin;
+  const assignedBranch = getAssignedBranch(user);
+
+  // Fetch branch options for Super Admin
+  const { data: branchData } = useQuery({
+    queryKey: ['branches', 'student-form'],
+    queryFn: async () => {
+      try {
+        const res = await branchService.getAll({ limit: 100, is_active: true });
+        const list = res?.data?.rows ?? res?.data ?? res ?? [];
+        if (Array.isArray(list) && list.length > 0) return list;
+      } catch (e) {}
+      return user?.institute?.branches ?? DUMMY_BRANCHES;
+    },
+    enabled: isSuperAdmin,
+  });
+
+  const branchOptions = useMemo(() => {
+    const list = Array.isArray(branchData) ? branchData : (branchData?.data || DUMMY_BRANCHES);
+    return list.map((b) => ({
+      value: String(b.id || b.value),
+      label: b.name || b.label || `Branch ${b.id}`,
+    }));
+  }, [branchData]);
+
+  // Auto-tag branch for Branch Admin
+  useEffect(() => {
+    if (isBranchAdmin && assignedBranch?.id) {
+      setForm((prev) => ({ ...prev, branch_id: assignedBranch.id }));
+    }
+  }, [isBranchAdmin, assignedBranch]);
 
   const isEdit = mode === 'edit';
   const studentLabel = terms?.student ?? (type === 'coaching' ? 'Candidate' : type === 'academy' ? 'Trainee' : 'Student');
@@ -231,8 +275,12 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
     mutationFn: async (payload) => {
       try {
         const { studentService } = await import('@/services');
-        if (isEdit) return await studentService.update(id, payload, type);
-        return await studentService.create(payload, type);
+        const submitPayload = {
+          ...payload,
+          branch_id: isBranchAdmin ? (assignedBranch?.id || user?.branch_id) : payload.branch_id,
+        };
+        if (isEdit) return await studentService.update(id, submitPayload, type);
+        return await studentService.create(submitPayload, type);
       } catch {
         // Demo mode — simulate success
         return { success: true };
@@ -255,6 +303,7 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
     const errs = {};
     if (!form.first_name?.trim()) errs.first_name = 'First name is required';
     if (!form.last_name?.trim())  errs.last_name  = 'Last name is required';
+    if (isSuperAdmin && !form.branch_id) errs.branch_id = 'Branch is required';
     return errs;
   };
 
@@ -352,7 +401,15 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
 
       {/* ── Academic Info ── */}
       <SectionCard icon={GraduationCap} title="Academic Information">
-        <AcademicFields type={type} form={form} onChange={handleChange} terms={terms} />
+        <AcademicFields
+          type={type}
+          form={form}
+          onChange={handleChange}
+          terms={terms}
+          isSuperAdmin={isSuperAdmin}
+          branchOptions={branchOptions}
+          branchError={errors.branch_id}
+        />
       </SectionCard>
 
       {/* ── Guardian Info ── */}

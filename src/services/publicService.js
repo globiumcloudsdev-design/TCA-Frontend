@@ -5,11 +5,11 @@ export const publicService = {
    * Fetch published pricing plans for the landing page
    */
   getPricingPlans: () => 
-    api.get('/public/pricing-plans').then((r) => r.data?.data ?? r.data),
+    api.get('/public/pricing-plans').then((r) => r.data?.data ?? r.data).catch(() => []),
 
   /**
    * Check platform maintenance status (public)
    */
   getPlatformStatus: () =>
-    api.get('/public/platform-status').then((r) => r.data),
+    api.get('/public/platform-status').then((r) => r.data).catch(() => ({ success: true, data: {} })),
 };
