@@ -189,7 +189,8 @@ export default function BranchesPage({ type }) {
     },
     onError: (error) => {
       console.error('❌ Delete error:', error);
-      toast.error(error.message || `Failed to delete ${label.singular.toLowerCase()}`);
+      const msg = error?.response?.data?.message || error?.message || `Failed to delete ${label.singular.toLowerCase()}`;
+      toast.error(msg);
     }
   });
 
@@ -720,7 +721,7 @@ export default function BranchesPage({ type }) {
         description={
           <>
             Are you sure you want to delete <strong>{deletingBranch?.name}</strong>?
-            This action cannot be undone.
+            This will also delete the associated branch administrator account. This action cannot be undone.
           </>
         }
         confirmLabel="Delete"

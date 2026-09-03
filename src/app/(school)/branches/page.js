@@ -182,7 +182,7 @@ export default function BranchesPage() {
         onClose={() => setDeleteOpen(false)}
         onConfirm={() => deleteMutation.mutate(selected?.id)}
         title="Delete Branch"
-        description={`Are you sure you want to delete "${selected?.name}"? This action cannot be undone.`}
+        description={`Are you sure you want to delete "${selected?.name}"? This will also delete the associated branch administrator account. This action cannot be undone.`}
         isLoading={deleteMutation.isPending}
         variant="destructive"
       />
