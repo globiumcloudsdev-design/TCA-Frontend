@@ -839,7 +839,7 @@ export default function CollectPaymentModal({
           {/* Step 4: Payment Metadata */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <SelectField
-              label="Payment Method *"
+              label="Payment Method"
               required
               options={PAYMENT_METHOD_OPTS}
               value={paymentForm.method}

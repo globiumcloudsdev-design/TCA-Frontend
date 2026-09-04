@@ -9,7 +9,7 @@ import Cookies from 'js-cookie';
 
 // ── Token helpers ─────────────────────────────────────────────────────────
 export function setAccessToken(token) {
-  Cookies.set('access_token', token, { expires: 7, sameSite: 'Lax' });
+  Cookies.set('access_token', token, { expires: 7, sameSite: 'Lax', path: '/' });
 }
 
 export function getAccessToken() {
@@ -17,7 +17,45 @@ export function getAccessToken() {
 }
 
 export function removeAccessToken() {
+  Cookies.remove('access_token', { path: '/' });
   Cookies.remove('access_token');
+  if (typeof window !== 'undefined') {
+    try {
+      Cookies.remove('access_token', { path: '/', domain: window.location.hostname });
+    } catch (e) {}
+  }
+}
+
+export function setRefreshToken(token) {
+  if (!token) return;
+  Cookies.set('refresh_token', token, { expires: 30, sameSite: 'Lax', path: '/' });
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('refresh_token', token);
+    } catch (e) {}
+  }
+}
+
+export function getRefreshToken() {
+  if (typeof window === 'undefined') return Cookies.get('refresh_token') || null;
+  return Cookies.get('refresh_token') || localStorage.getItem('refresh_token') || null;
+}
+
+export function removeRefreshToken() {
+  Cookies.remove('refresh_token', { path: '/' });
+  Cookies.remove('refresh_token');
+  Cookies.remove('refreshToken', { path: '/' });
+  Cookies.remove('refreshToken');
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('refreshToken');
+    } catch (e) {}
+    try {
+      Cookies.remove('refresh_token', { path: '/', domain: window.location.hostname });
+      Cookies.remove('refreshToken', { path: '/', domain: window.location.hostname });
+    } catch (e) {}
+  }
 }
 
 // ── School helpers ────────────────────────────────────────────────────────
@@ -48,9 +86,116 @@ export function getActiveBranch() {
 
 // ── Clear everything on logout ────────────────────────────────────────────
 export function clearAuthData() {
-  removeAccessToken();
-  localStorage.removeItem('school_code');
-  localStorage.removeItem('active_branch_id');
+  const cookieNames = [
+    'access_token',
+    'refresh_token',
+    'refreshToken',
+    'portal_token',
+    'role_code',
+    'user_type',
+    'institute_type',
+    'portal_type',
+    'selected_account_id',
+  ];
+
+  try {
+    const all = Cookies.get() || {};
+    Object.keys(all).forEach((k) => {
+      if (!cookieNames.includes(k)) cookieNames.push(k);
+    });
+  } catch (e) {}
+
+  cookieNames.forEach((name) => {
+    Cookies.remove(name, { path: '/' });
+    Cookies.remove(name);
+    if (typeof window !== 'undefined') {
+      try {
+        Cookies.remove(name, { path: '/', domain: window.location.hostname });
+      } catch (e) {}
+    }
+  });
+
+  if (typeof window !== 'undefined') {
+    const storageKeys = [
+      'school_code',
+      'active_branch_id',
+      'clouds-auth',
+      'clouds-ui',
+      'clouds-institute',
+      'clouds-portal',
+      'accessToken',
+      'refresh_token',
+      'refreshToken',
+      'user',
+      'originalAdminToken',
+      'originalAdminUser',
+    ];
+    storageKeys.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {}
+    });
+
+    try {
+      sessionStorage.clear();
+    } catch (e) {}
+  }
+
+  // Wipe TanStack Query in-memory cache
+  try {
+    const { queryClient } = require('@/lib/queryClient');
+    queryClient.clear();
+  } catch (e) {}
+}
+
+/**
+ * Perform complete, instant logout with zero UI freeze
+ */
+export async function logoutUser({ redirectTo = '/login' } = {}) {
+  // 1. Immediately wipe all local auth cookies, storage, and React Query cache
+  clearAuthData();
+
+  // 2. Reset authStore, uiStore, instituteStore and portalStore
+  try {
+    const authMod = require('@/store/authStore');
+    const authStore = authMod.useAuthStore || authMod.default || authMod;
+    authStore?.getState?.()?.logout?.();
+  } catch (e) {}
+
+  try {
+    const uiMod = require('@/store/uiStore');
+    const uiStore = uiMod.useUIStore || uiMod.default || uiMod;
+    uiStore?.getState?.()?.clearActiveBranch?.();
+  } catch (e) {}
+
+  try {
+    const instMod = require('@/store/instituteStore');
+    const instStore = instMod.useInstituteStore || instMod.default || instMod;
+    instStore?.getState?.()?.clearInstitute?.();
+  } catch (e) {}
+
+  try {
+    const portalMod = require('@/store/portalStore');
+    const portalStore = portalMod.usePortalStore || portalMod.default || portalMod;
+    portalStore?.getState?.()?.clearPortalUser?.();
+  } catch (e) {}
+
+  // 3. Fire-and-forget backend logout with short 800ms timeout so user never waits
+  try {
+    const authSvcMod = require('@/services/authService');
+    const authSvc = authSvcMod.authService || authSvcMod.default || authSvcMod;
+    if (authSvc?.logout) {
+      Promise.race([
+        authSvc.logout(),
+        new Promise((res) => setTimeout(res, 800)),
+      ]).catch(() => {});
+    }
+  } catch (e) {}
+
+  // 4. Clean window redirect - guarantees full unmount and zero stale memory state
+  if (typeof window !== 'undefined') {
+    window.location.replace(redirectTo);
+  }
 }
 
 // ── Permission check ──────────────────────────────────────────────────────

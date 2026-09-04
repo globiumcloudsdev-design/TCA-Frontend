@@ -27,7 +27,7 @@ import DataTable from "@/components/common/DataTable";
 import PageHeader from "@/components/common/PageHeader";
 import StatsCard from "@/components/common/StatsCard";
 import AppModal from "@/components/common/AppModal";
-import { cn } from "@/lib/utils";
+import { cn, getActiveAcademicYearId } from "@/lib/utils";
 import MarkAttendanceModal from "@/components/attendance/MarkAttendanceModal";
 import AttendanceReport from "@/components/attendance/AttendanceReport";
 import DownloadAttendanceSheetModal from "@/components/attendance/DownloadAttendanceSheetModal";
@@ -108,23 +108,13 @@ export default function AttendancePage({ type }) {
 
   // Set default current academic year
   useEffect(() => {
-    if (yearsData?.data && !filters.academic_year_id) {
-      const currentYear =
-        yearsData.data.find((y) => {
-          const isCurrent = y.is_current;
-          return (
-            isCurrent === true ||
-            isCurrent === 1 ||
-            String(isCurrent) === "true" ||
-            String(isCurrent) === "1"
-          );
-        }) || yearsData.data[0];
-
-      if (currentYear) {
-        setFilters((prev) => ({ ...prev, academic_year_id: currentYear.value }));
+    if (yearsData && !filters.academic_year_id) {
+      const activeId = getActiveAcademicYearId(yearsData);
+      if (activeId) {
+        setFilters((prev) => ({ ...prev, academic_year_id: activeId }));
       }
     }
-  }, [yearsData?.data, filters.academic_year_id]);
+  }, [yearsData, filters.academic_year_id]);
 
   // Fetch Classes
   const { data: classesData } = useQuery({

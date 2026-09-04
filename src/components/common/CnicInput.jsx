@@ -1,7 +1,8 @@
 import React from "react";
 import PropTypes from "prop-types";
-import { cn } from "@/lib/utils";
+import { cn, sanitizeFieldLabel } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 /**
  * CnicInput — Professional single-field masked input for CNIC
@@ -43,12 +44,15 @@ export default function CnicInput({
     onChange(formatted);
   };
 
+  const { labelText, isRequired } = sanitizeFieldLabel(label, required);
+
   return (
     <div className={cn("w-full space-y-1.5", className)}>
-      {label && (
-        <label className="text-sm font-semibold text-foreground">
-          {label} {required && <span className="text-red-500">*</span>}
-        </label>
+      {labelText && (
+        <Label className="text-sm font-semibold text-foreground">
+          {labelText}
+          {isRequired && <span className="ml-0.5 text-destructive font-semibold">*</span>}
+        </Label>
       )}
 
       <Input

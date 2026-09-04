@@ -39,7 +39,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { cn } from '@/lib/utils';
+import { cn, getActiveAcademicYearId } from '@/lib/utils';
 
 // Import services
 import { classService } from '@/services/classService';
@@ -745,16 +745,15 @@ export default function TimetablePage({ type }) {
   });
 
   useEffect(() => {
-    if (academicYearsData?.data && !watchedAcademicYear) {
-      setAcademicYears(academicYearsData.data);
-      const currentYear = academicYearsData.data.find(y => y.is_current);
-      if (currentYear) {
-        setFilterValue('academic_year', String(currentYear.id));
-      } else if (academicYearsData.data.length > 0) {
-        setFilterValue('academic_year', String(academicYearsData.data[0].id));
+    const list = academicYearsData?.data?.rows || (Array.isArray(academicYearsData?.data) ? academicYearsData.data : []) || [];
+    if (list.length > 0) {
+      setAcademicYears(list);
+      if (!watchedAcademicYear) {
+        const activeId = getActiveAcademicYearId(list);
+        if (activeId) {
+          setFilterValue('academic_year', activeId);
+        }
       }
-    } else if (academicYearsData?.data) {
-      setAcademicYears(academicYearsData.data);
     }
   }, [academicYearsData, watchedAcademicYear, setFilterValue]);
 

@@ -13,6 +13,7 @@
  */
 'use client';
 
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   InputField,
@@ -21,6 +22,7 @@ import {
   BranchSelectField,
 } from '@/components/common';
 import { Button } from '@/components/ui/button';
+import { getActiveAcademicYearId } from '@/lib/utils';
 
 export default function SectionForm({
   defaultValues       = {},
@@ -32,13 +34,33 @@ export default function SectionForm({
   academicYearOptions = [],
   isEdit              = false,
 }) {
+  const defaultYearId = defaultValues?.academic_year_id || getActiveAcademicYearId(academicYearOptions);
+
   const {
     register,
     control,
     handleSubmit,
     setValue,
+    watch,
+    getValues,
     formState: { errors },
-  } = useForm({ defaultValues });
+  } = useForm({
+    defaultValues: {
+      ...defaultValues,
+      academic_year_id: defaultValues?.academic_year_id || defaultYearId || '',
+    },
+  });
+
+  // Auto-select active academic year if not yet set
+  useEffect(() => {
+    const cur = getValues('academic_year_id');
+    if (!cur && academicYearOptions?.length > 0) {
+      const activeId = getActiveAcademicYearId(academicYearOptions);
+      if (activeId) {
+        setValue('academic_year_id', activeId, { shouldValidate: true });
+      }
+    }
+  }, [academicYearOptions, setValue, getValues]);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -46,6 +68,7 @@ export default function SectionForm({
         control={control}
         error={errors.branch_id}
         setValue={setValue}
+        watch={watch}
         required
       />
       <InputField

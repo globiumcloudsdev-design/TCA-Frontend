@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { studentService, classService, academicYearService } from '@/services';
+import { getActiveAcademicYearId } from '@/lib/utils';
 import useInstituteStore from '@/store/instituteStore';
 import useBranchAccess from '@/hooks/useBranchAccess';
 import {
@@ -77,15 +78,13 @@ export default function DownloadAttendanceSheetModal({
 
   // Set current academic year if not set
   useEffect(() => {
-    if (yearsData?.data && !academicYearId) {
-      const currentYear =
-        yearsData.data.find((y) => y.is_current === true || String(y.is_current) === '1') ||
-        yearsData.data[0];
-      if (currentYear) {
-        setAcademicYearId(String(currentYear.value || currentYear.id));
+    if (yearsData && !academicYearId) {
+      const activeId = getActiveAcademicYearId(yearsData);
+      if (activeId) {
+        setAcademicYearId(activeId);
       }
     }
-  }, [yearsData?.data, academicYearId]);
+  }, [yearsData, academicYearId]);
 
   // Fetch Classes
   const { data: classesData, isLoading: isLoadingClasses } = useQuery({

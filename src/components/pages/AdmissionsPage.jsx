@@ -61,7 +61,7 @@ export default function AdmissionsPage({ type }) {
   const [editing, setEditing] = useState(null);
   const [deleting,setDeleting]= useState(null);
 
-  const { register, handleSubmit, control, setValue, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, control, setValue, watch, reset, formState: { errors } } = useForm({
     resolver: zodResolver(schema), defaultValues: { status: 'pending' },
   });
 
@@ -182,6 +182,7 @@ export default function AdmissionsPage({ type }) {
             control={control}
             error={errors.branch_id}
             setValue={setValue}
+            watch={watch}
             required
           />
           <div className="grid grid-cols-2 gap-4">

@@ -33,6 +33,7 @@ import { academicYearService } from '@/services/academicYearService';
 import { useAuthStore } from '@/store/authStore';
 import useBranchAccess from '@/hooks/useBranchAccess';
 import { EXAM_TYPES, EXAM_CATEGORIES } from '@/constants';
+import { getActiveAcademicYearId } from '@/lib/utils';
 
 // ─────────────────────────────────────────────────────────
 // VALIDATION SCHEMAS
@@ -177,6 +178,17 @@ export default function ExamForm({
 
     fetchData();
   }, [instituteId]);
+
+  // Auto-select active academic year if not yet selected
+  const watchedAcademicYearId = watch('academic_year_id');
+  useEffect(() => {
+    if (academicYears.length > 0 && !watchedAcademicYearId) {
+      const activeYearId = getActiveAcademicYearId(academicYears);
+      if (activeYearId) {
+        setValue('academic_year_id', activeYearId, { shouldValidate: true });
+      }
+    }
+  }, [academicYears, watchedAcademicYearId, setValue]);
 
   // Set entity_type from user's institute
   useEffect(() => {
@@ -379,7 +391,7 @@ export default function ExamForm({
             />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <InputField
-                label="Exam Name *"
+                label="Exam Name"
                 placeholder="e.g., Mid Term Exam 2026"
                 {...register('name')}
                 error={errors.name?.message}
@@ -396,7 +408,7 @@ export default function ExamForm({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <SelectField
-                label="Exam Type *"
+                label="Exam Type"
                 name="type"
                 control={control}
                 error={errors.type}
@@ -405,7 +417,7 @@ export default function ExamForm({
               />
 
               <SelectField
-                label="Exam Category *"
+                label="Exam Category"
                 name="category"
                 control={control}
                 error={errors.category}
@@ -416,7 +428,7 @@ export default function ExamForm({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <SelectField
-                label="Academic Year *"
+                label="Academic Year"
                 name="academic_year_id"
                 control={control}
                 error={errors.academic_year_id}
@@ -437,7 +449,7 @@ export default function ExamForm({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
               <SelectField
-                label="Class/Standard *"
+                label="Class/Standard"
                 name="class_id"
                 control={control}
                 error={errors.class_id}
@@ -459,7 +471,7 @@ export default function ExamForm({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-start-2">
                   <SelectField
-                    label="Section *"
+                    label="Section"
                     name="section_id"
                     control={control}
                     options={sectionOptions}
@@ -526,7 +538,7 @@ export default function ExamForm({
                       {/* Date & Time */}
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                         <DatePickerField
-                          label="Date *"
+                          label="Date"
                           name={`subject_schedules.${idx}.date`}
                           control={control}
                           error={errors.subject_schedules?.[idx]?.date}
@@ -535,7 +547,9 @@ export default function ExamForm({
                         />
 
                         <div className="space-y-1">
-                          <Label className="text-xs font-medium">Start Time *</Label>
+                          <Label className="text-xs font-medium">
+                            Start Time <span className="ml-0.5 text-destructive font-semibold">*</span>
+                          </Label>
                           <TimePickerField
                             value={watch(`subject_schedules.${idx}.start_time`)}
                             onChange={(val) => setValue(`subject_schedules.${idx}.start_time`, val)}
@@ -543,7 +557,9 @@ export default function ExamForm({
                         </div>
 
                         <div className="space-y-1">
-                          <Label className="text-xs font-medium">End Time *</Label>
+                          <Label className="text-xs font-medium">
+                            End Time <span className="ml-0.5 text-destructive font-semibold">*</span>
+                          </Label>
                           <TimePickerField
                             value={watch(`subject_schedules.${idx}.end_time`)}
                             onChange={(val) => {
@@ -566,7 +582,7 @@ export default function ExamForm({
                       {/* Marks */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <InputField
-                          label="Total Marks *"
+                          label="Total Marks"
                           type="number"
                           {...register(`subject_schedules.${idx}.total_marks`)}
                           error={errors.subject_schedules?.[idx]?.total_marks?.message}

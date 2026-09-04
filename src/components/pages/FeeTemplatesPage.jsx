@@ -32,12 +32,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
+import { cn, getActiveAcademicYearId } from '@/lib/utils';
 
 import { feeTemplateService } from '@/services/feeTemplateService';
 import { classService } from '@/services/classService';
 import { branchService } from '@/services/branchService';
 import { academicYearService } from '@/services/academicYearService';
+import { resolveBranchName, registerBranches } from '@/lib/branchUtils';
 import { studentService } from '@/services/studentService';
 
 // Constants
@@ -117,6 +118,7 @@ export default function FeeTemplatesPage({ type }) {
     if (branchesData?.data) {
       console.log('📥 Setting branches:', branchesData.data);
       setBranches(branchesData.data);
+      registerBranches(branchesData.data);
     }
   }, [branchesData]);
 
@@ -137,9 +139,15 @@ export default function FeeTemplatesPage({ type }) {
   });
 
   useEffect(() => {
-    if (academicYearsData?.data) {
+    if (academicYearsData?.data && academicYearsData.data.length > 0) {
       console.log('📥 Setting academic years:', academicYearsData.data);
       setAcademicYears(academicYearsData.data);
+      if (!academicYearFilter || academicYearFilter === 'all') {
+        const activeId = getActiveAcademicYearId(academicYearsData.data);
+        if (activeId) {
+          setAcademicYearFilter(activeId);
+        }
+      }
     }
   }, [academicYearsData]);
 
@@ -761,7 +769,9 @@ export default function FeeTemplatesPage({ type }) {
                     <p className="text-sm text-muted-foreground">Branch</p>
                     <p className="font-medium">
                       {viewingTemplate.branch_id
-                        ? branches.find(b => b.value === viewingTemplate.branch_id)?.label || 'Unknown'
+                        ? (branches.find(b => b.value === viewingTemplate.branch_id || b.id === viewingTemplate.branch_id)?.label ||
+                           branches.find(b => b.value === viewingTemplate.branch_id || b.id === viewingTemplate.branch_id)?.name ||
+                           resolveBranchName(viewingTemplate.branch_id, 'All Branches'))
                         : 'All Branches'}
                     </p>
                   </div>
@@ -872,8 +882,9 @@ export default function FeeTemplatesPage({ type }) {
                     <div className="flex flex-wrap gap-1">
                       {viewingTemplate.applicable_to?.branch_ids?.length > 0 ? (
                         viewingTemplate.applicable_to.branch_ids.map(id => {
-                          const branch = branches.find(b => b.value === id);
-                          return branch ? <Badge key={id} variant="outline">{branch.label}</Badge> : null;
+                          const branch = branches.find(b => b.value === id || b.id === id);
+                          const branchName = branch?.label || branch?.name || resolveBranchName(id);
+                          return <Badge key={id} variant="outline">{branchName}</Badge>;
                         })
                       ) : (
                         <p className="text-sm text-muted-foreground">No specific branches selected</p>

@@ -43,6 +43,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import useBranchAccess from '@/hooks/useBranchAccess';
 import { classService, academicYearService, settingService } from '@/services';
 import { toast } from 'react-hot-toast';
+import { getActiveAcademicYear } from '@/lib/utils';
 
 const generateUniqueId = (prefix = 'doc') => `${prefix}-${new Date().getTime()}-${Math.floor(Math.random() * 1000)}`;
 const VALID_DOCUMENT_TYPES = new Set(DOCUMENT_TYPES.map((d) => d.value));
@@ -177,14 +178,14 @@ export default function StudentForm({
 
   // Auto-select current academic year
   useEffect(() => {
-    if (academicYears.length > 0 && !watchAcademicYear && !isEdit) {
-      const current = academicYears.find(y => y.is_current) || academicYears[0];
+    if (academicYears.length > 0 && !watchAcademicYear) {
+      const current = getActiveAcademicYear(academicYears);
       if (current) {
         setValue('academic_year_id', current.value);
         setSelectedAcademicYear(current.value);
       }
     }
-  }, [academicYears, watchAcademicYear, isEdit, setValue]);
+  }, [academicYears, watchAcademicYear, setValue]);
 
   const watchBranch = watch('branch_id');
   const effectiveBranchId = watchBranch || defaultValues.branch_id || (activeBranchId && activeBranchId !== 'all' ? activeBranchId : undefined);
@@ -473,7 +474,7 @@ export default function StudentForm({
                 <input ref={avatarFileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <InputField label="First Name *" name="first_name" register={register} error={errors.first_name} placeholder="Ahmed" onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} />
+                <InputField label="First Name" name="first_name" register={register} error={errors.first_name} required placeholder="Ahmed" onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} />
                 <InputField label="Last Name" name="last_name" register={register} error={errors.last_name} placeholder="Ali" onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} />
                 <InputField label="GR/Reg No" name="registration_no" register={register} placeholder="e.g. 2024-001" />
                 <DatePickerField label="Date of Birth" name="dob" control={control} error={errors.dob} required disableFutureDates placeholder="Select birth date" />
@@ -492,7 +493,7 @@ export default function StudentForm({
                 <SelectField label="Academic Year" name="academic_year_id" control={control} options={academicYears} required placeholder="Select year" />
                 <SelectField label={getTerm('class')} name="class_id" control={control} options={classOptions} required placeholder={`Select ${getTerm('class')}`} />
                 <SelectField label={getTerm('section')} name="section_id" control={control} options={sectionOptions} required placeholder="Select section" />
-                <InputField label="Roll Number *" name="roll_no" register={register} required placeholder="e.g. 101" onInput={e => e.target.value = e.target.value.replace(/[^0-9]/g, '')} />
+                <InputField label="Roll Number" name="roll_no" register={register} required placeholder="e.g. 101" onInput={e => e.target.value = e.target.value.replace(/[^0-9]/g, '')} />
                 <DatePickerField label="Admission Date" name="admission_date" control={control} required disableFutureDates placeholder="Select admission date" />
               </div>
             </CardContent></Card>
@@ -511,8 +512,8 @@ export default function StudentForm({
                     {guardianFields.length > 1 && <Button type="button" variant="ghost" size="sm" onClick={() => removeGuardian(index)} className="text-red-500"><Trash2 className="w-4 h-4" /></Button>}
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <SelectField label="Type *" name={`guardians.${index}.type`} control={control} options={GUARDIAN_TYPES} required placeholder="Select Type" />
-                    <InputField label="Name *" name={`guardians.${index}.name`} register={register} required placeholder="Enter Guardian Name" onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} />
+                    <SelectField label="Type" name={`guardians.${index}.type`} control={control} options={GUARDIAN_TYPES} required placeholder="Select Type" />
+                    <InputField label="Name" name={`guardians.${index}.name`} register={register} required placeholder="Enter Guardian Name" onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} />
                     <Controller name={`guardians.${index}.cnic`} control={control} render={({ field }) => <CnicInput label="CNIC" {...field} placeholder="XXXXX-XXXXXXX-X" />} />
                     <Controller name={`guardians.${index}.phone`} control={control} render={({ field }) => <PhoneInputField label="Phone" {...field} country="pk" />} />
                     <InputField label="Email" name={`guardians.${index}.email`} register={register} type="email" placeholder="guardian@example.com" />
@@ -527,7 +528,7 @@ export default function StudentForm({
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Controller name="phone" control={control} render={({ field }) => <PhoneInputField label="Phone" {...field} country="pk" />} />
                 <InputField label="Email" name="email" register={register} type="email" placeholder="student@example.com" />
-                <InputField label="City *" name="city" register={register} required placeholder="Enter city" onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} />
+                <InputField label="City" name="city" register={register} required placeholder="Enter city" onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} />
               </div>
               <TextareaField label="Present Address" name="present_address" register={register} required placeholder="Enter present address" />
               <TextareaField label="Permanent Address" name="permanent_address" register={register} placeholder="Enter permanent address" />
@@ -605,8 +606,8 @@ export default function StudentForm({
                         </Button>
                       </div>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <SelectField label="Type *" name={`documents.${index}.type`} control={control} options={DOCUMENT_TYPES} required placeholder="Select Type" />
-                        <InputField label="Title *" name={`documents.${index}.title`} register={register} required placeholder="e.g. B-Form Front" />
+                        <SelectField label="Type" name={`documents.${index}.type`} control={control} options={DOCUMENT_TYPES} required placeholder="Select Type" />
+                        <InputField label="Title" name={`documents.${index}.title`} register={register} required placeholder="e.g. B-Form Front" />
                       </div>
                     </div>
                   ))}

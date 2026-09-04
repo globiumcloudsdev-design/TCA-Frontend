@@ -25,6 +25,7 @@ export { default as ConfirmDialog }     from './ConfirmDialog';
 export { default as AppModal }          from './AppModal';
 export { default as ExportModal }       from './ExportModal';
 export { default as CollectPaymentModal } from './CollectPaymentModal';
+export { default as OperationProgressModal } from './OperationProgressModal';
 
 // Form Fields
 export { default as InputField }        from './InputField';

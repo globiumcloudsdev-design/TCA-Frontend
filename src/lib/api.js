@@ -12,7 +12,7 @@
 
 import axios from 'axios';
 import Cookies from 'js-cookie';
-import { isBranchAdmin, isMainBranchUser, getAssignedBranch } from './auth';
+import { isBranchAdmin, isMainBranchUser, getAssignedBranch, clearAuthData } from './auth';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
@@ -115,7 +115,9 @@ api.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      !originalRequest.url?.includes('/auth/login')
+      !originalRequest.url?.includes('/auth/login') &&
+      !originalRequest.url?.includes('/auth/logout') &&
+      !originalRequest.url?.includes('/auth/refresh-token')
     ) {
       if (isRefreshing) {
         // Queue all requests that come in while refresh is in progress
@@ -140,19 +142,17 @@ api.interceptors.response.use(
         );
         const newToken = data?.data?.access_token;
         if (newToken) {
-          Cookies.set('access_token', newToken, { expires: 7 });
+          Cookies.set('access_token', newToken, { expires: 7, path: '/' });
           api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
           processQueue(null, newToken);
           return api(originalRequest);
         }
       } catch (refreshError) {
         processQueue(refreshError, null);
-        // Token refresh failed — clear everything and redirect to login
-        Cookies.remove('access_token');
-        localStorage.removeItem('school_code');
-        localStorage.removeItem('active_branch_id');
+        // Token refresh failed — clean wipe everything and redirect to login
+        clearAuthData();
         if (typeof window !== 'undefined') {
-          window.location.href = '/login';
+          window.location.replace('/login');
         }
         return Promise.reject(refreshError);
       } finally {

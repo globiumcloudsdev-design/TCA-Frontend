@@ -25,7 +25,7 @@ import SelectField from '@/components/common/SelectField';
 import DatePickerField from '@/components/common/DatePickerField';
 import StatsCard from '@/components/common/StatsCard';
 import BulkVoucherGenerator from '@/components/forms/BulkVoucherGenerator';
-import { cn } from '@/lib/utils';
+import { cn, getActiveAcademicYearId } from '@/lib/utils';
 import { downloadBlob } from '@/lib/download';
 import { generateBulkFeeVouchersPdfBlob, generateFeeVoucherPdfBlob, generateFeeReceiptPdfBlob, generateStudentAccountStatementPdfBlob, getInstituteVoucherFormat } from '@/lib/pdf/feeVoucherPdf';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -387,16 +387,16 @@ const [bulkFilters, setBulkFilters] = useState({
 
   useEffect(() => {
     if (academicYearsData.length > 0 && !voucherAcademicYearId) {
-      const current = academicYearsData.find((ay) => ay.is_current) || academicYearsData[0];
-      if (current) setVoucherAcademicYearId(current.id);
+      const activeId = getActiveAcademicYearId(academicYearsData);
+      if (activeId) setVoucherAcademicYearId(activeId);
     }
   }, [academicYearsData, voucherAcademicYearId]);
 
   useEffect(() => {
     if (academicYearsData.length > 0 && !bulkFilters.academicYearId) {
-      const current = academicYearsData.find((ay) => ay.is_current) || academicYearsData[0];
-      if (current) {
-        setBulkFilters((prev) => ({ ...prev, academicYearId: String(current.id) }));
+      const activeId = getActiveAcademicYearId(academicYearsData);
+      if (activeId) {
+        setBulkFilters((prev) => ({ ...prev, academicYearId: activeId }));
       }
     }
   }, [academicYearsData, bulkFilters.academicYearId]);

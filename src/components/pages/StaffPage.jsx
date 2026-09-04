@@ -985,7 +985,7 @@ export default function StaffManagementPage({ instituteType }) {
 
                                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                             <InputField
-                                                label="First Name *"
+                                                label="First Name"
                                                 name="first_name"
                                                 register={register}
                                                 error={errors.first_name}
@@ -993,7 +993,7 @@ export default function StaffManagementPage({ instituteType }) {
                                                 placeholder="John"
                                             />
                                             <InputField
-                                                label="Last Name *"
+                                                label="Last Name"
                                                 name="last_name"
                                                 register={register}
                                                 error={errors.last_name}
@@ -1149,7 +1149,7 @@ export default function StaffManagementPage({ instituteType }) {
 
                                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                             <SelectField
-                                                label="Staff Type *"
+                                                label="Staff Type"
                                                 name="staff_type"
                                                 control={control}
                                                 error={errors.staff_type}
@@ -1442,7 +1442,7 @@ export default function StaffManagementPage({ instituteType }) {
                                                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                                                 <div>
                                                                     <SelectField
-                                                                        label="Document Type *"
+                                                                        label="Document Type"
                                                                         name={`documents.${index}.type`}
                                                                         control={control}
                                                                         error={errors.documents?.[index]?.type}
@@ -1467,7 +1467,7 @@ export default function StaffManagementPage({ instituteType }) {
                                                                 </div>
 
                                                                 <InputField
-                                                                    label="Document Title *"
+                                                                    label="Document Title"
                                                                     name={`documents.${index}.title`}
                                                                     register={register}
                                                                     error={errors.documents?.[index]?.title}

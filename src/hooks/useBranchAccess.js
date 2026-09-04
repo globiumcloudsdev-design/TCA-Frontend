@@ -1,8 +1,9 @@
-﻿'use client';
+'use client';
 
 import useAuthStore from '@/store/authStore';
 import useUIStore from '@/store/uiStore';
 import { isBranchAdmin as checkBranchAdmin, isSuperAdmin as checkSuperAdmin, getAssignedBranch as checkAssignedBranch, schoolHasBranches as checkHasBranches } from '@/lib/auth';
+import { resolveBranchName } from '@/lib/branchUtils';
 
 /**
  * useBranchAccess hook
@@ -18,8 +19,14 @@ export default function useBranchAccess() {
   const assignedBranch = checkAssignedBranch(user);
   const hasBranches = checkHasBranches(user);
 
-  const assignedBranchName = assignedBranch?.name || user?.branch?.name || user?.branch_name || 'Assigned Branch';
   const assignedBranchId = assignedBranch?.id || user?.branch_id || user?.branch?.id || null;
+  const assignedBranchName = assignedBranch?.name || resolveBranchName(assignedBranchId, user?.branch?.name || user?.branch_name || 'Assigned Branch');
+
+  const resolvedActiveName = isBranchAdmin
+    ? assignedBranchName
+    : (activeBranchName && !activeBranchName.includes('Selected Branch')
+        ? activeBranchName
+        : (activeBranchId ? resolveBranchName(activeBranchId, 'Selected Branch') : 'All Branches'));
 
   return {
     isBranchAdmin,
@@ -30,9 +37,10 @@ export default function useBranchAccess() {
     hasBranches,
     canSwitchBranch: isSuperAdmin,
     activeBranchId: isBranchAdmin ? assignedBranchId : activeBranchId,
-    activeBranchName: isBranchAdmin ? assignedBranchName : (activeBranchName || (activeBranchId ? 'Selected Branch' : 'All Branches')),
-    setActiveBranch,
+    activeBranchName: resolvedActiveName,
+    setActiveBranch: (id, name) => setActiveBranch(id, name || resolveBranchName(id)),
     clearActiveBranch,
     isAllBranches: isSuperAdmin && !activeBranchId,
+    getBranchName: resolveBranchName,
   };
 }

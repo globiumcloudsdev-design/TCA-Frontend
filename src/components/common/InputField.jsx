@@ -28,7 +28,7 @@ import { Controller } from 'react-hook-form';
 import { Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeFieldLabel } from '@/lib/utils';
 
 export default function InputField({
   label,
@@ -49,13 +49,14 @@ export default function InputField({
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === 'password';
   const inputType = isPassword ? (showPassword ? 'text' : 'password') : type;
+  const { labelText, isRequired } = sanitizeFieldLabel(label, required);
 
   return (
     <div className={cn('space-y-1.5', className)}>
-      {label && (
+      {labelText && (
         <Label htmlFor={name}>
-          {label}
-          {required && <span className="ml-0.5 text-destructive">*</span>}
+          {labelText}
+          {isRequired && <span className="ml-0.5 text-destructive font-semibold">*</span>}
         </Label>
       )}
 

@@ -21,8 +21,9 @@ import { toast } from 'sonner';
 import FeeVoucherForm from '@/components/forms/FeeVoucherForm';
 import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
 import useInstituteStore from '@/store/instituteStore';
-import { FileText, Download, Eye, CreditCard, Trash2 } from 'lucide-react';
+import { FileText, Download, Eye, CreditCard, Trash2, Building2 } from 'lucide-react';
 import useUIStore from '@/store/uiStore';
+import { resolveBranchName } from '@/lib/branchUtils';
 import ResultCard from '@/components/cards/ResultCard';
 import { DataTable, StatsCard, AppModal, ConfirmDialog, InputField, SelectField, TextareaField, FormSubmitButton } from '@/components/common';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -124,6 +125,15 @@ function OverviewTab({ student, terms, currentInstitute }) {
   const rollNo = student.registration_no || sDetails.roll_no || student.roll_number || student.candidate_id;
   const className = sDetails.class_name || student.class?.name || '—';
   const section = sDetails.section_name || student.section?.name || '—';
+  const branchName = resolveBranchName(
+    student.branch ||
+    student.branch_name ||
+    sDetails.branch_name ||
+    student.branch_id ||
+    sDetails.branch_id ||
+    student.branchId,
+    null
+  );
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -166,12 +176,13 @@ function OverviewTab({ student, terms, currentInstitute }) {
           <h3 className="text-sm font-bold uppercase tracking-wide">Academic Info</h3>
         </div>
         {[
-          rollNo, className, section, sDetails.admission_date, sDetails.previous_school
+          rollNo, className, section, branchName, sDetails.admission_date, sDetails.previous_school
         ].some(v => v && v !== '—') ? (
           <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6">
             <InfoRow icon={BookOpen} label={idLabel[terms?.type] ?? 'Roll Number'} value={rollNo} />
             <InfoRow icon={BookOpen} label={terms?.class ?? 'Class'} value={className} />
             <InfoRow icon={BookOpen} label={terms?.section ?? 'Section'} value={section} />
+            {branchName && <InfoRow icon={Building2} label="Branch" value={branchName} />}
             <InfoRow icon={Calendar} label="Admission Date" value={formatDate(sDetails.admission_date)} />
             <InfoRow icon={ShieldCheck} label="Current Status" value={student.is_active ? 'Active' : 'Inactive'} />
             <InfoRow icon={TrendingUp} label="Previous School" value={sDetails.previous_school} />

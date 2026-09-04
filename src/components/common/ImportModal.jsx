@@ -47,6 +47,7 @@ import {
   ArrowLeft,
   Edit2,
   Save,
+  Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -438,6 +439,8 @@ export default function ImportModal({
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [importStatus, setImportStatus] = useState('idle');
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [importStageText, setImportStageText] = useState('Preparing import...');
 
   // Filter columns available for mapping
   const availableColumns = useMemo(() => {
@@ -641,21 +644,54 @@ export default function ImportModal({
     if (!importData || importData.length === 0) return;
 
     setImporting(true);
-    setImportProgress(0);
+    setImportProgress(4);
     setImportStatus('processing');
+
+    const total = importData.length;
+    const totalEstSeconds = Math.max(3, Math.min(Math.ceil((total * 50) / 1000), 12));
+    const durationMs = totalEstSeconds * 1000;
+    const start = Date.now();
+    setTimeLeft(totalEstSeconds);
+    setImportStageText(`Parsing and validating ${total} records...`);
+
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const ratio = Math.min(elapsed / durationMs, 0.94);
+      const eased = Math.round(Math.sin((ratio * Math.PI) / 2) * 94);
+      setImportProgress((prev) => Math.max(prev, eased));
+
+      const secLeft = Math.max(1, Math.ceil((durationMs - elapsed) / 1000));
+      setTimeLeft(secLeft);
+
+      if (ratio < 0.25) {
+        setImportStageText(`Validating ${total} records and checking format...`);
+      } else if (ratio < 0.65) {
+        setImportStageText(`Uploading ${total} records to database...`);
+      } else if (ratio < 0.88) {
+        setImportStageText('Creating student profiles & allocating academic units...');
+      } else {
+        setImportStageText('Finalizing records & updating search indexes...');
+      }
+    }, 100);
 
     try {
       // Execute import handler
       await onImport(importData);
+      clearInterval(timer);
       setImportProgress(100);
+      setTimeLeft(0);
+      setImportStageText('All records imported successfully!');
       setImportStatus('success');
 
       setTimeout(() => {
+        setImporting(false);
         handleClose();
-      }, 1200);
+      }, 1500);
     } catch (err) {
+      clearInterval(timer);
       console.error('Import execution error:', err);
       setImportStatus('error');
+      setImporting(false);
       setErrors([
         {
           type: 'import',
@@ -663,8 +699,6 @@ export default function ImportModal({
         },
       ]);
       setTimeout(() => setImportStatus('idle'), 4000);
-    } finally {
-      setImporting(false);
     }
   };
 
@@ -939,26 +973,60 @@ export default function ImportModal({
               </div>
 
               {/* Import Progress & Status */}
-              {importing && (
-                <div className="space-y-1.5 shrink-0 pt-2">
-                  <Progress value={importProgress} className="h-2" />
-                  <p className="text-xs text-muted-foreground text-center">
-                    Importing... {Math.round(importProgress)}%
-                  </p>
-                </div>
-              )}
+              {(importing || importStatus === 'success') && (
+                <div className="p-4 rounded-xl border bg-muted/30 dark:bg-muted/10 space-y-3 shrink-0 transition-all shadow-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {importStatus === 'success' ? (
+                        <div className="h-7 w-7 rounded-full bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center shrink-0">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                      ) : (
+                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-foreground truncate">
+                          {importStatus === 'success' ? 'Import Complete' : importStageText}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {importStatus === 'success'
+                            ? `Successfully imported ${totalRecords.toLocaleString()} records`
+                            : 'Please do not close this window while import is in progress'}
+                        </p>
+                      </div>
+                    </div>
 
-              {importStatus === 'success' && (
-                <div className="flex items-center gap-2 p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-lg text-emerald-700 dark:text-emerald-300 text-xs shrink-0">
-                  <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  <span>Import completed successfully!</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {importStatus !== 'success' && timeLeft > 0 && (
+                        <Badge variant="outline" className="text-[11px] font-medium gap-1 text-muted-foreground bg-background/80 py-0.5 px-2">
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          ~{timeLeft}s left
+                        </Badge>
+                      )}
+                      <span className="text-xs font-bold text-foreground tabular-nums min-w-[36px] text-right">
+                        {Math.round(importProgress)}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <Progress
+                      value={importProgress}
+                      className={cn(
+                        'h-2.5 transition-all duration-300',
+                        importStatus === 'success' && '[&>div]:bg-emerald-600 dark:[&>div]:bg-emerald-500'
+                      )}
+                    />
+                  </div>
                 </div>
               )}
 
               {importStatus === 'error' && errors.length > 0 && (
-                <div className="flex items-center gap-2 p-2.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg text-red-700 dark:text-red-300 text-xs shrink-0">
+                <div className="flex items-center gap-2.5 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-xl text-red-700 dark:text-red-300 text-xs shrink-0 shadow-sm">
                   <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{errors[errors.length - 1]?.message || 'Import failed'}</span>
+                  <span className="font-medium">{errors[errors.length - 1]?.message || 'Import failed'}</span>
                 </div>
               )}
             </div>

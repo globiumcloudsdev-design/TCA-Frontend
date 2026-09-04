@@ -11,6 +11,7 @@ import { dashboardService } from '@/services';
 import StatsCard from '@/components/common/StatsCard';
 import useAuthStore from '@/store/authStore';
 import { useUiStore } from '@/store/uiStore';
+import { resolveBranchName } from '@/lib/branchUtils';
 import { AttendanceChart, FeesChart, EnrollmentChart, DonutChart, FinancialChart } from '@/components/charts';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,39 +58,47 @@ export default function DashboardPage({ type }) {
   const user = useAuthStore((s) => s.user);
   const canDo = useAuthStore((s) => s.canDo);
   const activeBranchId = useUiStore((s) => s.activeBranchId);
-  const activeBranchName = useUiStore((s) => s.activeBranchName);
+  const rawActiveBranchName = useUiStore((s) => s.activeBranchName);
+  const activeBranchName = useMemo(() => {
+    if (!activeBranchId && !rawActiveBranchName) return null;
+    return resolveBranchName(rawActiveBranchName || activeBranchId, null);
+  }, [activeBranchId, rawActiveBranchName]);
+
+  const userId = user?.id || 'guest';
+  const instituteId = user?.institute?.id || user?.school?.id || user?.institute_id || 'default';
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ['adaptive-dashboard', type, activeBranchId],
+    queryKey: ['adaptive-dashboard', type, activeBranchId, userId, instituteId],
     queryFn: () =>
       dashboardService.getAdaptiveDashboard({
         type,
         roleCode: user?.role_code,
         branchId: activeBranchId,
       }),
+    enabled: !!user?.id,
     staleTime: 60000,
     retry: 1,
   });
 
   // Fallback count queries — only run if primary dashboard is loaded and cached for 5 mins
   const { data: studentsFallbackData } = useQuery({
-    queryKey: ['dashboard-fallback-students', type, activeBranchId],
+    queryKey: ['dashboard-fallback-students', type, activeBranchId, userId, instituteId],
     queryFn: () => studentService.getAll({ limit: 1, branch_id: activeBranchId || undefined }, type),
-    enabled: !isLoading,
+    enabled: !!user?.id && !isLoading,
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: teachersFallbackData } = useQuery({
-    queryKey: ['dashboard-fallback-teachers', type, activeBranchId],
+    queryKey: ['dashboard-fallback-teachers', type, activeBranchId, userId, instituteId],
     queryFn: () => teacherService.getAll({ limit: 1, branch_id: activeBranchId || undefined }),
-    enabled: !isLoading,
+    enabled: !!user?.id && !isLoading,
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: classesFallbackData } = useQuery({
-    queryKey: ['dashboard-fallback-classes', type, activeBranchId],
+    queryKey: ['dashboard-fallback-classes', type, activeBranchId, userId, instituteId],
     queryFn: () => classService.getAll({ limit: 1, branch_id: activeBranchId || undefined, institute_type: type }),
-    enabled: !isLoading,
+    enabled: !!user?.id && !isLoading,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -419,6 +428,10 @@ export default function DashboardPage({ type }) {
     return actions;
   }, [type, terms.student, canAddStudent, canMarkAttendance, canCollectFee, canAddExpense, canDo]);
 
+  if (isLoading || !user) {
+    return <DashboardSkeleton terms={terms} />;
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
 
@@ -634,5 +647,80 @@ function ChartCard({ title, subtitle, loading, children }) {
         {loading ? <Skeleton className="h-[280px] w-full rounded-2xl" /> : children}
       </CardContent>
     </Card>
+  );
+}
+
+export function DashboardSkeleton({ terms = {} }) {
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Top Header Skeleton */}
+      <div className="flex flex-col md:flex-row items-start justify-between gap-6">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-10 rounded-2xl bg-indigo-100 dark:bg-indigo-950/40" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-8 w-56 rounded-xl" />
+              <Skeleton className="h-4 w-72 rounded-lg" />
+            </div>
+          </div>
+          <Skeleton className="h-6 w-36 rounded-full mt-2" />
+        </div>
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-9 w-40 rounded-xl" />
+          <Skeleton className="h-9 w-24 rounded-xl" />
+        </div>
+      </div>
+
+      {/* Stats Cards Grid Skeleton */}
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="p-5 rounded-2xl border border-slate-200/80 bg-white dark:bg-slate-900 shadow-sm space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-4 w-28 rounded-md" />
+              <Skeleton className="h-9 w-9 rounded-xl" />
+            </div>
+            <Skeleton className="h-8 w-24 rounded-lg" />
+            <Skeleton className="h-3.5 w-36 rounded-md" />
+          </div>
+        ))}
+      </div>
+
+      {/* Main Charts & Sidebar Skeleton Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-8 space-y-6">
+          <div className="p-6 rounded-2xl border border-slate-200/80 bg-white dark:bg-slate-900 shadow-sm space-y-4">
+            <div className="space-y-1.5">
+              <Skeleton className="h-5 w-48 rounded-md" />
+              <Skeleton className="h-3.5 w-56 rounded-md" />
+            </div>
+            <Skeleton className="h-[280px] w-full rounded-2xl" />
+          </div>
+          <div className="p-6 rounded-2xl border border-slate-200/80 bg-white dark:bg-slate-900 shadow-sm space-y-4">
+            <Skeleton className="h-5 w-40 rounded-md" />
+            <Skeleton className="h-[240px] w-full rounded-2xl" />
+          </div>
+        </div>
+
+        <div className="lg:col-span-4 space-y-6">
+          <div className="p-5 rounded-2xl border border-slate-200/80 bg-white dark:bg-slate-900 shadow-sm space-y-4">
+            <Skeleton className="h-5 w-36 rounded-md" />
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <Skeleton className="h-9 w-9 rounded-xl shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-3.5 w-full rounded-md" />
+                    <Skeleton className="h-2.5 w-2/3 rounded-md" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

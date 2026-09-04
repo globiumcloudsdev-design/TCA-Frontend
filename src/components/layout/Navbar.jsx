@@ -18,17 +18,16 @@ import NotificationBell   from '@/components/common/NotificationBell';
 import UserMenu           from '@/components/common/UserMenu';
 import BranchSwitcher     from '@/components/common/BranchSwitcher';
 
+import { logoutUser } from '@/lib/auth';
+
 export default function Navbar() {
   const router = useRouter();
-  const { user, logout }   = useAuthStore();
+  const { user }           = useAuthStore();
   const { toggleSidebar }  = useUiStore();
 
-  const handleLogout = async () => {
-    try { await authService.logout(); } catch (_) {}
-    logout();
-    Cookies.remove('role_code');
-    router.replace('/login');
+  const handleLogout = () => {
     toast.success('Logged out successfully');
+    logoutUser({ redirectTo: '/login' });
   };
 
   return (

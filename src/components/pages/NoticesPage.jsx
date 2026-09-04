@@ -360,7 +360,7 @@ export default function NotificationsPage() {
           {/* Row 1: Title & Type */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Title *</label>
+              <label className="text-sm font-medium">Title <span className="ml-0.5 text-destructive font-semibold">*</span></label>
               <input
                 {...register('title')}
                 placeholder="Notification title"
@@ -369,10 +369,11 @@ export default function NotificationsPage() {
               {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
             </div>
             <SelectField
-              label="Type *"
+              label="Type"
               name="notification_type"
               control={control}
               options={NOTIF_TYPE_OPTS}
+              required
             />
           </div>
 
@@ -380,7 +381,7 @@ export default function NotificationsPage() {
           <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
             <div className="grid gap-4 sm:grid-cols-2">
               <SelectField
-                label="Send To *"
+                label="Send To"
                 name="audience"
                 control={control}
                 error={errors.audience}
@@ -390,23 +391,19 @@ export default function NotificationsPage() {
 
               {watchAudience && watchAudience !== 'all' && recipientOptions.length > 0 && (
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Select Recipient *</label>
+                  <label className="text-sm font-medium">Select Recipient <span className="ml-0.5 text-destructive font-semibold">*</span></label>
                   <select
                     value={selectedRecipient}
                     onChange={(e) => setSelectedRecipient(e.target.value)}
-                    className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                    className="input-base"
                   >
-                    {recipientOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
+                    <option value="">Select recipient...</option>
+                    {recipientOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-muted-foreground">
-                    {selectedRecipient?.startsWith('all_')
-                      ? `📢 Will broadcast to all ${watchAudience}`
-                      : '👤 Will send to this specific person'}
-                  </p>
                 </div>
               )}
             </div>
@@ -414,7 +411,7 @@ export default function NotificationsPage() {
 
           {/* Message Body */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Message *</label>
+            <label className="text-sm font-medium">Message <span className="ml-0.5 text-destructive font-semibold">*</span></label>
             <textarea
               {...register('body')}
               placeholder="Notification message..."

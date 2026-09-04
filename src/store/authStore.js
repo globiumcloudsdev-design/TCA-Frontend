@@ -9,6 +9,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
   setAccessToken,
+  setRefreshToken,
+  removeRefreshToken,
   setSchoolCode,
   setActiveBranch as setLocalStorageActiveBranch,
   clearActiveBranch as clearLocalStorageActiveBranch,
@@ -38,12 +40,14 @@ export const useAuthStore = create(
       /**
        * Set user after login
        */
-      setUser: (user, accessToken) => {
+      setUser: (user, accessToken, refreshToken) => {
         console.log("🔐 Setting User:", user);
         console.log("🏫 Institute:", user?.institute);
         console.log("🌿 Branch:", user?.branch);
 
         if (accessToken) setAccessToken(accessToken);
+        const refToken = refreshToken || user?.refreshToken || user?.refresh_token;
+        if (refToken) setRefreshToken(refToken);
         
         if (user?.institute?.code) setSchoolCode(user.institute.code);
         if (user?.school?.code) setSchoolCode(user.school.code);

@@ -158,7 +158,7 @@ function PortalLoginContent() {
     toast.info(`${account.role} credentials filled!`);
   };
 
-  const completeLogin = async (user, accessToken) => {
+  const completeLogin = async (user, accessToken, refreshToken) => {
     if (!user || !user.id) {
       toast.error('Invalid user data');
       return false;
@@ -170,23 +170,37 @@ function PortalLoginContent() {
       return false;
     }
 
-    // ✅ IMPORTANT: Clear ALL existing cookies first
-    const allCookies = Cookies.get();
-    Object.keys(allCookies).forEach(cookieName => {
+    // ✅ IMPORTANT: Clear query cache and ALL existing cookies first
+    try {
+      const { queryClient } = require('@/lib/queryClient');
+      queryClient.clear();
+    } catch (e) {}
+
+    const allCookies = Cookies.get() || {};
+    Object.keys(allCookies).forEach((cookieName) => {
+      Cookies.remove(cookieName, { path: '/' });
       Cookies.remove(cookieName);
     });
 
     // Set portal specific cookies
+    const tokenToSave = refreshToken || user?.refreshToken || user?.refresh_token;
     Cookies.set('portal_token', accessToken, { expires: 7, path: '/' });
     Cookies.set('portal_type', user.user_type, { expires: 7, path: '/' });
     Cookies.set('user_type', user.user_type, { expires: 7, path: '/' });
+    Cookies.set('access_token', accessToken, { expires: 7, path: '/' });
+    if (tokenToSave) {
+      Cookies.set('refresh_token', tokenToSave, { expires: 30, path: '/' });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('refresh_token', tokenToSave);
+      }
+    }
 
     // Also set institute info if available
     const instType = user.institute?.institute_type || user.institute_type || 'school';
     Cookies.set('institute_type', instType, { expires: 7, path: '/' });
 
     // Set auth store
-    setAuthUser(user, accessToken);
+    setAuthUser(user, accessToken, tokenToSave);
 
     // Set in portal store
     setPortalUser(
@@ -199,7 +213,11 @@ function PortalLoginContent() {
 
     const redirectPath = getDashboardPath(user);
     console.log('✅ Portal login successful, redirecting to:', redirectPath);
-    router.replace(redirectPath);
+    if (typeof window !== 'undefined') {
+      window.location.replace(redirectPath);
+    } else {
+      router.replace(redirectPath);
+    }
     return true;
   };
 
@@ -214,7 +232,7 @@ function PortalLoginContent() {
       });
 
       if (response?.user) {
-        await completeLogin(response.user, response.accessToken);
+        await completeLogin(response.user, response.accessToken, response.refreshToken);
       } else {
         toast.error('Invalid email or password');
       }
@@ -311,7 +329,7 @@ function PortalLoginContent() {
       if (response?.user) {
         setShowPasswordDialog(false);
         setAccountPassword('');
-        await completeLogin(response.user, response.accessToken);
+        await completeLogin(response.user, response.accessToken, response.refreshToken);
       } else {
         toast.error('Invalid password');
       }

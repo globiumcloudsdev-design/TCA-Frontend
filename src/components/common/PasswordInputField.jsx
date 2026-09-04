@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeFieldLabel } from '@/lib/utils';
 
 /**
  * PasswordInputField — Global reusable password input with visibility toggle
@@ -16,12 +16,14 @@ const PasswordInputField = ({
   className = ""
 }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const { labelText, isRequired } = sanitizeFieldLabel(label, required);
   
   return (
     <div className={cn("space-y-2", className)}>
-      {label && (
+      {labelText && (
         <Label htmlFor={name} className="text-sm font-medium">
-          {label} {required && <span className="text-red-500">*</span>}
+          {labelText}
+          {isRequired && <span className="ml-0.5 text-destructive font-semibold">*</span>}
         </Label>
       )}
       <div className="relative">

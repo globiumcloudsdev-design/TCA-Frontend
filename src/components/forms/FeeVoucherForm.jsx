@@ -11,7 +11,7 @@
  */
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -23,6 +23,8 @@ import {
   BranchSelectField,
 } from '@/components/common';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Clock, Receipt } from 'lucide-react';
 import { studentService } from '@/services/studentService';
 
 const MONTH_OPTIONS = [
@@ -53,6 +55,7 @@ export default function FeeVoucherForm({
     control,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm({
     defaultValues: {
@@ -66,6 +69,30 @@ export default function FeeVoucherForm({
   });
 
   const selectedStudentId = useWatch({ control, name: 'student_id' });
+
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(3);
+
+  useEffect(() => {
+    let timer;
+    if (loading) {
+      setLoadingProgress(12);
+      setTimeLeft(3);
+      const start = Date.now();
+      const duration = 2800;
+      timer = setInterval(() => {
+        const elapsed = Date.now() - start;
+        const pct = Math.min(Math.round((elapsed / duration) * 92), 94);
+        setLoadingProgress((prev) => Math.max(prev, pct));
+        const rem = Math.max(1, Math.ceil((duration - elapsed) / 1000));
+        setTimeLeft(rem);
+      }, 100);
+    } else {
+      setLoadingProgress(0);
+      setTimeLeft(0);
+    }
+    return () => clearInterval(timer);
+  }, [loading]);
 
   // Fetch student details to auto-populate monthly fee & concession
   const { data: studentDetail = null } = useQuery({
@@ -155,6 +182,7 @@ export default function FeeVoucherForm({
         control={control}
         error={errors.branch_id}
         setValue={setValue}
+        watch={watch}
         required
       />
       <SelectField
@@ -228,6 +256,23 @@ export default function FeeVoucherForm({
         placeholder="Optional remarks"
         rows={2}
       />
+
+      {loading && (
+        <div className="p-3.5 rounded-xl border bg-muted/40 dark:bg-muted/20 space-y-2.5 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between text-xs">
+            <span className="flex items-center gap-2 font-semibold text-foreground">
+              <Receipt size={14} className="text-primary animate-pulse" />
+              {isEdit ? 'Saving Voucher Changes...' : 'Generating Fee Voucher & Updating Ledger...'}
+            </span>
+            <div className="flex items-center gap-2 text-muted-foreground font-medium">
+              <Clock size={12} />
+              <span>~{timeLeft}s left</span>
+              <span className="font-bold text-foreground tabular-nums ml-0.5">{loadingProgress}%</span>
+            </div>
+          </div>
+          <Progress value={loadingProgress} className="h-2 transition-all duration-200" />
+        </div>
+      )}
 
       <div className="flex justify-end gap-3 pt-2">
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>

@@ -29,7 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeFieldLabel } from '@/lib/utils';
 
 export default function DatePickerField({
   label,
@@ -112,11 +112,14 @@ export default function DatePickerField({
     );
   };
 
+  const { labelText, isRequired } = sanitizeFieldLabel(label, required);
+
   return (
     <div className={cn('space-y-1.5', className)}>
-      {label && (
+      {labelText && (
         <Label htmlFor={name}>
-          {label}{required && <span className="ml-0.5 text-destructive">*</span>}
+          {labelText}
+          {isRequired && <span className="ml-0.5 text-destructive font-semibold">*</span>}
         </Label>
       )}
 

@@ -27,6 +27,7 @@ import { academicYearService } from '@/services/academicYearService';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import useBranchAccess from '@/hooks/useBranchAccess';
+import { getActiveAcademicYear } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import SelectField from '@/components/common/SelectField';
@@ -138,11 +139,9 @@ const AttendanceReport = ({ terms = {} }) => {
         setAcademicYears(years);
 
         // Auto-select current academic year
-        const currentYear = years.find(y => y.is_current);
+        const currentYear = getActiveAcademicYear(years);
         if (currentYear) {
           setValue('academicYear', currentYear.value);
-        } else if (years.length > 0) {
-          setValue('academicYear', years[0].value);
         }
       } catch (err) {
         console.error('Failed to fetch years:', err);

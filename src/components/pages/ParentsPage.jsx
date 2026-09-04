@@ -340,7 +340,7 @@ export default function ParentsPage({ type }) {
         <form id="parent-form" onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <InputField
-              label="First Name *"
+              label="First Name"
               name="first_name"
               register={register}
               error={errors.first_name}
@@ -348,7 +348,7 @@ export default function ParentsPage({ type }) {
               required
             />
             <InputField
-              label="Last Name *"
+              label="Last Name"
               name="last_name"
               register={register}
               error={errors.last_name}
@@ -363,7 +363,7 @@ export default function ParentsPage({ type }) {
               control={control}
               render={({ field }) => (
                 <PhoneInputField
-                  label="Phone *"
+                  label="Phone"
                   value={field.value}
                   onChange={field.onChange}
                   error={errors.phone}
@@ -405,7 +405,7 @@ export default function ParentsPage({ type }) {
           
           <div className="grid grid-cols-2 gap-4">
             <SelectField 
-              label="Relation *" 
+              label="Relation" 
               name="relation" 
               control={control} 
               error={errors.relation} 
@@ -413,7 +413,7 @@ export default function ParentsPage({ type }) {
               required 
             />
             <SelectField 
-              label="Status *" 
+              label="Status" 
               name="status" 
               control={control} 
               error={errors.status} 

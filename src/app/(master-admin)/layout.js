@@ -14,6 +14,7 @@ import {
   Globe, Newspaper, Palette, LifeBuoy, ShieldAlert, TrendingUp, Ghost, Megaphone
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { logoutUser } from '@/lib/auth';
 import Cookies from 'js-cookie';
 import useAuthStore from '@/store/authStore';
 import { useQuery } from '@tanstack/react-query';
@@ -122,14 +123,9 @@ export default function MasterAdminLayout({ children }) {
     ? NAV.filter(({ perm }) => !perm || canDo(perm))
     : NAV.filter(({ perm }) => !perm);
 
-  const handleLogout = async () => {
-    try { await authService.logout(); } catch (_) { }
-    logout();
-    Cookies.remove('access_token');
-    Cookies.remove('role_code');
-    Cookies.remove('institute_type');
-    router.replace('/login');
+  const handleLogout = () => {
     toast.success('Logged out');
+    logoutUser({ redirectTo: '/login' });
   };
 
   return (

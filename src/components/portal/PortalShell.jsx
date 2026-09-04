@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
+import { logoutUser } from "@/lib/auth";
 import {
   GraduationCap,
   LayoutDashboard,
@@ -513,13 +514,8 @@ export default function PortalShell({ children, type }) {
 
   const handleLogout = () => {
     clearPortal();
-    logout();
-    Cookies.remove("portal_token");
-    Cookies.remove("portal_type");
-    Cookies.remove("access_token");
-    Cookies.remove("user_type");
     toast.success("Logged out successfully");
-    router.replace("/portal-login");
+    logoutUser({ redirectTo: "/portal-login" });
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;

@@ -43,7 +43,7 @@ import {
 } from "@/services";
 import DataTable from "@/components/common/DataTable";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, getActiveAcademicYearId } from "@/lib/utils";
 import { SelectField, DatePickerField } from "@/components/common";
 import ExportModal from "@/components/common/ExportModal";
 
@@ -1286,13 +1286,14 @@ export default function ReportDetailPage() {
 
   // Default Year Effect
   useEffect(() => {
-    if (yearsData?.data?.length && !filters.academic_year_id) {
-      const current =
-        yearsData.data.find((y) => y.is_current) || yearsData.data[0];
-      setFilters((prev) => ({
-        ...prev,
-        academic_year_id: String(current.value || current.id),
-      }));
+    if (yearsData && !filters.academic_year_id) {
+      const activeId = getActiveAcademicYearId(yearsData);
+      if (activeId) {
+        setFilters((prev) => ({
+          ...prev,
+          academic_year_id: activeId,
+        }));
+      }
     }
   }, [yearsData, filters.academic_year_id]);
 
