@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { studentService, classService, academicYearService } from '@/services';
 import useInstituteStore from '@/store/instituteStore';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import {
   generateMonthlyAttendanceSheetPDF,
   generateDailyAttendanceSheetPDF,
@@ -40,6 +41,7 @@ export default function DownloadAttendanceSheetModal({
   terms = {},
 }) {
   const { currentInstitute } = useInstituteStore();
+  const { activeBranchId } = useBranchAccess();
 
   // Modal Form State
   const [academicYearId, setAcademicYearId] = useState(initialAcademicYearId);
@@ -68,8 +70,8 @@ export default function DownloadAttendanceSheetModal({
 
   // Fetch Academic Years
   const { data: yearsData } = useQuery({
-    queryKey: ['academic-years-sheet', currentInstitute?.id],
-    queryFn: () => academicYearService.getOptions(currentInstitute?.id),
+    queryKey: ['academic-years-sheet', currentInstitute?.id, activeBranchId],
+    queryFn: () => academicYearService.getOptions(currentInstitute?.id, true, activeBranchId),
     enabled: open,
   });
 

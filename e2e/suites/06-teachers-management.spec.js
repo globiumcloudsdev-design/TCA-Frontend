@@ -34,6 +34,6 @@ test.describe('06. Teachers & Staff Management Suite', () => {
 
   test('Staff members page renders correctly', async ({ schoolAdminPage }) => {
     await schoolAdminPage.goto('/school/staff');
-    await expect(schoolAdminPage.locator('h1, h2, text=Staff').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Staff/i }).first()).toBeVisible();
   });
 });

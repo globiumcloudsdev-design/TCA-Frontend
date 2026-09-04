@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import { Plus, DollarSign, AlertCircle, FileText, Filter, Download, Trash2, Printer, CheckCircle, AlertTriangle, Check as CheckIcon, RotateCcw, CreditCard, Coins, RefreshCw, ChevronDown } from 'lucide-react';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
 import DataTable from '@/components/common/DataTable';
@@ -136,6 +137,7 @@ export default function FeesPage() {
   const canDo = useAuthStore((s) => s.canDo);
   const currentInstitute = useInstituteStore((s) => s.currentInstitute);
   const { terms } = useInstituteConfig();
+  const { activeBranchId } = useBranchAccess();
 
   // Helper function to check permissions - Using correct permission names from your constants
   const hasPermission = (permission) => {
@@ -238,11 +240,12 @@ const [bulkFilters, setBulkFilters] = useState({
   });
 
   const { data: analyticsVouchersData = [], isLoading: analyticsLoading } = useQuery({
-    queryKey: ['analytics-vouchers', currentInstitute?.id, voucherMonth, voucherAcademicYearId],
+    queryKey: ['analytics-vouchers', currentInstitute?.id, activeBranchId, voucherMonth, voucherAcademicYearId],
     queryFn: async () => {
       if (!currentInstitute?.id || !voucherAcademicYearId || !hasPermission('fees.read')) return [];
       try {
         const response = await feeVoucherService.getAll({
+          branch_id: activeBranchId,
           month: parsedFilterMonth,
           academic_year_id: voucherAcademicYearId || undefined,
         }, { page: 1, limit: 5000 });
@@ -256,11 +259,11 @@ const [bulkFilters, setBulkFilters] = useState({
   });
 
   const { data: ledgerVouchersData = [], isLoading: ledgerLoading } = useQuery({
-    queryKey: ['ledger-student-vouchers', selectedLedgerStudentId],
+    queryKey: ['ledger-student-vouchers', selectedLedgerStudentId, activeBranchId],
     queryFn: async () => {
       if (!selectedLedgerStudentId) return [];
       try {
-        const response = await feeVoucherService.getAll({ student_id: selectedLedgerStudentId }, { page: 1, limit: 1000 });
+        const response = await feeVoucherService.getAll({ student_id: selectedLedgerStudentId, branch_id: activeBranchId }, { page: 1, limit: 1000 });
         return response?.vouchers || [];
       } catch (err) {
         console.error('Failed to fetch ledger student vouchers:', err);
@@ -271,11 +274,11 @@ const [bulkFilters, setBulkFilters] = useState({
   });
 
   const { data: defaultersData = [], isLoading: defaultersLoading, refetch: refetchDefaulters } = useQuery({
-    queryKey: ['fee-defaulters', currentInstitute?.id],
+    queryKey: ['fee-defaulters', currentInstitute?.id, activeBranchId],
     queryFn: async () => {
       if (!currentInstitute?.id || !hasPermission('fees.read')) return [];
       try {
-        const response = await feeVoucherService.getDefaulters();
+        const response = await feeVoucherService.getDefaulters({ branch_id: activeBranchId });
         return response || [];
       } catch (err) {
         console.error('Failed to fetch fee defaulters:', err);
@@ -366,11 +369,12 @@ const [bulkFilters, setBulkFilters] = useState({
 
   // Academic years
   const { data: academicYearsData = [] } = useQuery({
-    queryKey: ['academic-years-fees', currentInstitute?.id],
+    queryKey: ['academic-years-fees', currentInstitute?.id, activeBranchId],
     queryFn: async () => {
       try {
         const response = await academicYearService.getAll({
           institute_id: currentInstitute?.id,
+          branch_id: activeBranchId,
           is_active: true,
         });
         return response?.data?.rows || response?.data || [];
@@ -398,13 +402,14 @@ const [bulkFilters, setBulkFilters] = useState({
   }, [academicYearsData, bulkFilters.academicYearId]);
 
 const { data: bulkClasses = [] } = useQuery({
-    queryKey: ['fees-bulk-classes-all', currentInstitute?.id],
+    queryKey: ['fees-bulk-classes-all', currentInstitute?.id, activeBranchId],
     queryFn: async () => {
       if (!currentInstitute?.id) return [];
       try {
         // Fetch ALL classes across ALL academic years for comprehensive mapping
       const response = await classService.getAll({
           institute_id: currentInstitute?.id,
+          branch_id: activeBranchId,
           institute_type: currentInstitute?.type,
           include_sections: true,
           limit: 2000, // Increased limit for historical classes
@@ -458,7 +463,7 @@ const { data: bulkClasses = [] } = useQuery({
   }, [selectedBulkClass]);
 
   const { data: bulkStudents = [] } = useQuery({
-    queryKey: ['fees-bulk-students', currentInstitute?.id, bulkFilters.academicYearId, bulkFilters.classId, bulkFilters.sectionId],
+    queryKey: ['fees-bulk-students', currentInstitute?.id, activeBranchId, bulkFilters.academicYearId, bulkFilters.classId, bulkFilters.sectionId],
     queryFn: async () => {
       if (!currentInstitute?.id || !bulkFilters.academicYearId || !bulkFilters.classId || bulkFilters.classId === '__all__') {
         return [];
@@ -468,6 +473,7 @@ const { data: bulkClasses = [] } = useQuery({
         const response = await studentService.getAll(
           {
             institute_id: currentInstitute?.id,
+            branch_id: activeBranchId,
             institute_type: currentInstitute?.type,
             academic_year_id: bulkFilters.academicYearId,
             class_id: bulkFilters.classId,
@@ -585,7 +591,7 @@ const { data: bulkClasses = [] } = useQuery({
     isLoading: vouchersLoading,
     refetch: refetchVouchers,
   } = useQuery({
-    queryKey: ['fee-vouchers', currentInstitute?.id, voucherMonth, voucherAcademicYearId, voucherStatus, voucherPage, voucherPageSize, voucherSearch],
+    queryKey: ['fee-vouchers', currentInstitute?.id, activeBranchId, voucherMonth, voucherAcademicYearId, voucherStatus, voucherPage, voucherPageSize, voucherSearch],
     queryFn: async () => {
       // Check permission before making request - USING CORRECT PERMISSION
       if (!hasPermission('fees.read')) {
@@ -595,6 +601,7 @@ const { data: bulkClasses = [] } = useQuery({
       }
       
       const filters = {
+        branch_id: activeBranchId,
         month: parsedFilterMonth,
         academic_year_id: voucherAcademicYearId || undefined,
         status: voucherStatus || undefined,

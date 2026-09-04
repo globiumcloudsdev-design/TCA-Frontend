@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 
 import { examService, classService, academicYearService } from '@/services';
 import useAuthStore from '@/store/authStore';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import { PERMISSIONS, EXAM_TYPES } from '@/constants';
 import { formatDate } from '@/lib/utils';
 import {
@@ -61,6 +62,7 @@ export default function ExamsPage() {
 
   const canCreate = useAuthStore((s) => s.canDo(PERMISSIONS.EXAM_CREATE));
   const canDelete = useAuthStore((s) => s.canDo(PERMISSIONS.EXAM_DELETE));
+  const { activeBranchId } = useBranchAccess();
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -73,12 +75,12 @@ export default function ExamsPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['exams', { page, pageSize, typeFilter }],
-    queryFn:  () => examService.getAll({ page, limit: pageSize, type: typeFilter || undefined }),
+    queryKey: ['exams', activeBranchId, { page, pageSize, typeFilter }],
+    queryFn:  () => examService.getAll({ branch_id: activeBranchId, page, limit: pageSize, type: typeFilter || undefined }),
   });
 
-  const { data: classesData } = useQuery({ queryKey: ['classes-all'],        queryFn: () => classService.getAll({ limit: 500, fetchAll: true }) });
-  const { data: yearsData }   = useQuery({ queryKey: ['academic-years-all'], queryFn: () => academicYearService.getAll() });
+  const { data: classesData } = useQuery({ queryKey: ['classes-all', activeBranchId],        queryFn: () => classService.getAll({ branch_id: activeBranchId, limit: 500, fetchAll: true }) });
+  const { data: yearsData }   = useQuery({ queryKey: ['academic-years-all', activeBranchId], queryFn: () => academicYearService.getAll({ branch_id: activeBranchId }) });
 
   const exams               = extractRows(data);
   const totalPages          = extractPages(data);

@@ -7,7 +7,7 @@ test.describe('10. Exams & Grading Management Suite', () => {
     await examsPage.navigate('school');
 
     await expect(schoolAdminPage).toHaveURL(/.*\/exams/);
-    await expect(schoolAdminPage.locator('h1, h2, text=Exam').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Exam/i }).first()).toBeVisible();
   });
 
   test('Create Exam button opens exam schedule dialog', async ({ schoolAdminPage }) => {
@@ -23,6 +23,6 @@ test.describe('10. Exams & Grading Management Suite', () => {
 
   test('Reports overview page renders report filters', async ({ schoolAdminPage }) => {
     await schoolAdminPage.goto('/school/reports');
-    await expect(schoolAdminPage.locator('h1, h2, text=Report').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Report/i }).first()).toBeVisible();
   });
 });

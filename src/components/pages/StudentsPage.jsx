@@ -35,6 +35,7 @@ import { format, isValid, parseISO } from 'date-fns';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import { studentService, academicYearService, classService, reportService } from '@/services';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
@@ -151,6 +152,7 @@ export default function StudentsPage({ type }) {
   const canDo = useAuthStore((s) => s.canDo);
   const { currentInstitute } = useInstituteStore();
   const { terms, studentColumns } = useInstituteConfig();
+  const { activeBranchId } = useBranchAccess();
 
   // State
   const [search, setSearch] = useState('');
@@ -191,9 +193,10 @@ export default function StudentsPage({ type }) {
 
   // Fetch academic years
   const { data: academicYearsData } = useQuery({
-    queryKey: ['academic-years', currentInstitute?.id],
+    queryKey: ['academic-years', currentInstitute?.id, activeBranchId],
     queryFn: () => academicYearService.getAll({
       institute_id: currentInstitute?.id,
+      branch_id: activeBranchId,
       is_active: true
     }),
     enabled: !!currentInstitute?.id,
@@ -213,10 +216,11 @@ export default function StudentsPage({ type }) {
 
   // Fetch all available classes
   const { data: classesData, isLoading: isClassesLoading } = useQuery({
-    queryKey: ['classes-all', academicYearId, type, currentInstitute?.id],
+    queryKey: ['classes-all', academicYearId, type, currentInstitute?.id, activeBranchId],
     queryFn: () => classService.getAll({
       academic_year_id: academicYearId || undefined,
       institute_id: currentInstitute?.id,
+      branch_id: (activeBranchId && activeBranchId !== 'all') ? activeBranchId : undefined,
       is_active: true,
       institute_type: type,
       limit: 500,
@@ -392,6 +396,10 @@ export default function StudentsPage({ type }) {
   const filters = useMemo(() => {
     const f = { page, limit: pageSize, search };
     
+    if (activeBranchId && activeBranchId !== 'all') {
+      f.branch_id = activeBranchId;
+    }
+
     if (status === 'active') f.is_active = true;
     else if (status === 'inactive') f.is_active = false;
     
@@ -414,10 +422,10 @@ export default function StudentsPage({ type }) {
     }
     
     return f;
-  }, [page, pageSize, search, status, academicYearId, classId, sectionId, type, sortBy, sortOrder]);
+  }, [page, pageSize, search, status, academicYearId, classId, sectionId, type, sortBy, sortOrder, activeBranchId]);
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ['students', type, filters],
+    queryKey: ['students', type, activeBranchId, filters],
     enabled: !!academicYearId,
     queryFn: async () => {
       let res;

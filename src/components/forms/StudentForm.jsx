@@ -22,7 +22,8 @@ import {
   TextareaField,
   DatePickerField,
   FormSubmitButton,
-  SwitchField
+  SwitchField,
+  BranchSelectField,
 } from '@/components/common';
 import PhoneInputField from '@/components/common/PhoneInput';
 import CnicInput from '@/components/common/CnicInput';
@@ -39,6 +40,7 @@ import {
   GENDER_OPTIONS, RELIGION_OPTIONS, BLOOD_GROUP_OPTIONS, DOCUMENT_TYPES, CONCESSION_OPTIONS, GUARDIAN_TYPES
 } from '@/constants';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import { classService, academicYearService, settingService } from '@/services';
 import { toast } from 'react-hot-toast';
 
@@ -55,6 +57,7 @@ export default function StudentForm({
   isEdit = false,
 }) {
   const [activeTab, setActiveTab] = useState('personal');
+  const { activeBranchId } = useBranchAccess();
 
   // Fetch settingsData to check document allowance settings
   const { data: settingsData } = useQuery({
@@ -157,8 +160,8 @@ export default function StudentForm({
 
   // Fetch Academic Years
   const { data: rawAcademicYearsData = [] } = useQuery({
-    queryKey: ['academic-years', instituteId],
-    queryFn: () => academicYearService.getAll({ institute_id: instituteId, is_active: true }),
+    queryKey: ['academic-years', instituteId, activeBranchId],
+    queryFn: () => academicYearService.getAll({ institute_id: instituteId, branch_id: activeBranchId, is_active: true }),
     enabled: !!instituteId,
   });
 
@@ -183,12 +186,16 @@ export default function StudentForm({
     }
   }, [academicYears, watchAcademicYear, isEdit, setValue]);
 
-  // Fetch Classes
+  const watchBranch = watch('branch_id');
+  const effectiveBranchId = watchBranch || defaultValues.branch_id || (activeBranchId && activeBranchId !== 'all' ? activeBranchId : undefined);
+
+  // Fetch Classes — scoped to branch
   const { data: classes = [] } = useQuery({
-    queryKey: ['classes', instituteId, selectedAcademicYear],
+    queryKey: ['classes', instituteId, selectedAcademicYear, effectiveBranchId],
     queryFn: async () => {
       const response = await classService.getAll({
         academic_year_id: selectedAcademicYear || undefined,
+        branch_id: effectiveBranchId || undefined,
         include_sections: true,
         limit: 500,
         fetchAll: true,
@@ -199,6 +206,10 @@ export default function StudentForm({
     enabled: true,
   });
 
+  const classOptions = useMemo(() => {
+    return (Array.isArray(classes) ? classes : []).map(c => ({ value: String(c.id), label: c.name }));
+  }, [classes]);
+
   const selectedClassData = useMemo(() => {
     return Array.isArray(classes) ? classes.find((c) => String(c?.id) === String(watchClass)) : null;
   }, [classes, watchClass]);
@@ -208,6 +219,10 @@ export default function StudentForm({
     const rawSections = Array.isArray(selectedClassData?.sections) ? selectedClassData.sections : [];
     return rawSections.map(s => ({ id: s.id, name: s.name, is_active: s.is_active !== false })).filter(s => s.id && s.is_active);
   }, [watchClass, selectedClassData]);
+
+  const sectionOptions = useMemo(() => {
+    return (Array.isArray(sections) ? sections : []).map(s => ({ value: String(s.id), label: s.name }));
+  }, [sections]);
 
   const selectedSectionData = useMemo(() => {
     return sections.find((s) => String(s?.id) === String(watchSection)) || null;
@@ -231,9 +246,13 @@ export default function StudentForm({
   useEffect(() => {
     const className = selectedClassData?.name || '';
     const sectionName = selectedSectionData?.name || '';
-    setValue('class_name', className, { shouldDirty: false });
-    setValue('section_name', sectionName, { shouldDirty: false });
-  }, [selectedClassData, selectedSectionData, setValue]);
+    if (getValues('class_name') !== className) {
+      setValue('class_name', className, { shouldDirty: false });
+    }
+    if (getValues('section_name') !== sectionName) {
+      setValue('section_name', sectionName, { shouldDirty: false });
+    }
+  }, [selectedClassData?.name, selectedSectionData?.name, setValue, getValues]);
 
   // Sync Class and Section once data is loaded
   useEffect(() => {
@@ -373,9 +392,9 @@ export default function StudentForm({
 
   const onSubmitForm = (data) => {
     const formData = new FormData();
-    const editableKeys = ['first_name', 'last_name', 'email', 'phone', 'registration_no', 'dob', 'gender', 'blood_group', 'religion', 'nationality', 'cnic', 'academic_year_id', 'class_id', 'section_id', 'roll_no', 'admission_date', 'present_address', 'permanent_address', 'city', 'monthly_fee', 'admission_fee', 'discount_type', 'lab_charges', 'annual_charges', 'concession_type', 'concession_percentage', 'concession_reason', 'medical_conditions', 'allergies', 'previous_school', 'previous_class', 'is_active'];
+    const editableKeys = ['first_name', 'last_name', 'email', 'phone', 'registration_no', 'dob', 'gender', 'blood_group', 'religion', 'nationality', 'cnic', 'branch_id', 'academic_year_id', 'class_id', 'section_id', 'roll_no', 'admission_date', 'present_address', 'permanent_address', 'city', 'monthly_fee', 'admission_fee', 'discount_type', 'lab_charges', 'annual_charges', 'concession_type', 'concession_percentage', 'concession_reason', 'medical_conditions', 'allergies', 'previous_school', 'previous_class', 'is_active'];
     
-    editableKeys.forEach(key => { if (data[key] !== undefined) formData.append(key, data[key]); });
+    editableKeys.forEach(key => { if (data[key] !== undefined && data[key] !== null) formData.append(key, data[key]); });
     if (data.avatar_file instanceof File) formData.append('photo', data.avatar_file);
     
     const normalizedGuardians = (data.guardians || []).map(g => ({ ...g, type: g.type || 'father', relation: g.relation || g.type || 'father' }));
@@ -469,9 +488,10 @@ export default function StudentForm({
           <TabsContent value="academic">
             <Card><CardContent className="p-4 sm:p-6 space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <BranchSelectField control={control} error={errors.branch_id} setValue={setValue} watch={watch} required />
                 <SelectField label="Academic Year" name="academic_year_id" control={control} options={academicYears} required placeholder="Select year" />
-                <SelectField label={getTerm('class')} name="class_id" control={control} options={classes.map(c => ({ value: c.id, label: c.name }))} required placeholder={`Select ${getTerm('class')}`} />
-                <SelectField label={getTerm('section')} name="section_id" control={control} options={sections.map(s => ({ value: s.id, label: s.name }))} required placeholder="Select section" />
+                <SelectField label={getTerm('class')} name="class_id" control={control} options={classOptions} required placeholder={`Select ${getTerm('class')}`} />
+                <SelectField label={getTerm('section')} name="section_id" control={control} options={sectionOptions} required placeholder="Select section" />
                 <InputField label="Roll Number *" name="roll_no" register={register} required placeholder="e.g. 101" onInput={e => e.target.value = e.target.value.replace(/[^0-9]/g, '')} />
                 <DatePickerField label="Admission Date" name="admission_date" control={control} required disableFutureDates placeholder="Select admission date" />
               </div>

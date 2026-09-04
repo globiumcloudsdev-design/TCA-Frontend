@@ -14,6 +14,7 @@ import {
   TextareaField,
   DatePickerField,
   FormSubmitButton,
+  BranchSelectField,
 } from '@/components/common';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -67,6 +68,7 @@ const teacherSchema = z.object({
   phone: z.string().min(10, 'Phone number required'),
   alternate_phone: z.string().optional(),
   employee_id: z.string().optional(),
+  branch_id: z.string().optional(),
   cnic: z.string().optional(),
   dob: z.string()
     .optional()
@@ -664,6 +666,7 @@ export default function TeacherForm({
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Employment Details</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <BranchSelectField control={control} error={errors.branch_id} setValue={setValue} watch={watch} required />
                   <SelectField label="Designation" name="designation" control={control} error={errors.designation} options={TEACHER_DESIGNATION_OPTIONS} placeholder="Select" />
                   <SelectField label="Employment Type" name="employment_type" control={control} error={errors.employment_type} options={EMPLOYMENT_TYPE_OPTIONS} placeholder="Select" />
                   <DatePickerField label="Joining Date" name="joining_date" control={control} error={errors.joining_date} />

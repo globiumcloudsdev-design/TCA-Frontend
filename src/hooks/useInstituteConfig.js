@@ -52,38 +52,33 @@ export function useTerm(key) {
  * Usage:
  *   const navItems = useInstituteNav();
  */
-// export function useInstituteNav() {
-//   const { nav } = useInstituteConfig();
-//   const canDo = useAuthStore((s) => s.canDo);
-//   const schoolHasBranches = useAuthStore((s) => s.schoolHasBranches);
-//   const user = useAuthStore((s) => s.user);
-
-//   const filteredNav = useMemo(() => {
-//     // Basic dependency check
-//     if (!nav) return [];
-
-//     return nav.filter((item) => {
-//       // Permission check
-//       if (item.permission) {
-//         if (!canDo(item.permission)) return false;
-//       }
-
-//       // Branches check
-//       if (item.requiresBranches) {
-//         if (!schoolHasBranches()) return false;
-//       }
-
-//       return true;
-//     });
-//   }, [nav, canDo, schoolHasBranches, user]);
-
-//   return filteredNav;
-// }
-
-
-
+import { isBranchAdmin as checkIsBranchAdmin, schoolHasBranches as checkSchoolHasBranches } from '@/lib/auth';
 
 export function useInstituteNav() {
   const { nav } = useInstituteConfig();
-  return nav || [];
+  const user = useAuthStore((s) => s.user);
+
+  const filteredNav = useMemo(() => {
+    if (!Array.isArray(nav)) return [];
+    const isBranchAdmin = checkIsBranchAdmin(user);
+    const hasBranches = checkSchoolHasBranches(user);
+
+    return nav.filter((item) => {
+      // 1. Branch Admin is strictly locked out of Branch Management
+      if (isBranchAdmin) {
+        if (item.href?.includes('/branches')) return false;
+        if (item.superAdminOnly === true) return false;
+        if (item.hideForRoles?.includes('BRANCH_ADMIN')) return false;
+      }
+
+      // 2. Hide branch-dependent items if institute doesn't have multiple branches
+      if (item.requiresBranches && !hasBranches) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [nav, user]);
+
+  return filteredNav;
 }

@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Shield, UserCog, MapPin } from 'lucide-react';
@@ -97,13 +98,13 @@ const branchSchema = z.object({
   is_active: z.boolean().default(true),
   is_main: z.boolean().default(false),
 
-  // 👇 HEAD USER FIELDS - will be created in users table
+  // 👇 HEAD USER FIELDS (Optional - create or assign head user)
   head: z.object({
-    first_name: z.string().min(2, 'First name required').optional().or(z.literal('')),
-    last_name: z.string().min(2, 'Last name required').optional().or(z.literal('')),
-    email: z.string().email('Valid email required').optional().or(z.literal('')),
-    phone: z.string().optional(),
-    password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
+    first_name: z.string().optional().nullable().or(z.literal('')),
+    last_name: z.string().optional().nullable().or(z.literal('')),
+    email: z.string().email('Valid email required').optional().nullable().or(z.literal('')),
+    phone: z.string().optional().nullable().or(z.literal('')),
+    password: z.string().optional().nullable().or(z.literal('')),
     permissions: z.array(z.string()).default([])
   }).optional().default({})
 });
@@ -119,6 +120,9 @@ export default function BranchForm({
   const [activeTab, setActiveTab] = useState('basic');
   const [isMounted, setIsMounted] = useState(false);
   const [selectedPermissions, setSelectedPermissions] = useState([]);
+  const [createHeadUser, setCreateHeadUser] = useState(
+    Boolean(defaultValues?.head?.email || defaultValues?.head?.first_name || defaultValues?.head_email)
+  );
 
   const availableRoles = user?.permissions ?? [];
 
@@ -234,36 +238,37 @@ export default function BranchForm({
     // Format data for API
     const formattedData = {
       // Branch data
-      name: data.name,
-      code: data.code,
-      phone: data.phone,
-      email: data.email,
-      address: data.address,
-      city: data.city,
+      name: data.name?.trim(),
+      code: data.code?.trim() || null,
+      phone: data.phone?.trim() || null,
+      email: data.email?.trim() || null,
+      address: data.address?.trim() || null,
+      city: data.city?.trim() || null,
       location: data.location,
       settings: data.settings,
       is_active: data.is_active,
       is_main: data.is_main,
-
-      // 👇 Head user data to be created in users table
-      head: {
-        first_name: data.head.first_name,
-        last_name: data.head.last_name,
-        email: data.head.email,
-        phone: data.head.phone,
-        password: data.head.password,
-        permissions: selectedPermissions
-      }
     };
 
-    // Remove empty password (auto-generate on backend)
-    if (!formattedData.head.password) {
-      delete formattedData.head.password;
-    }
+    // Only attach head user if user explicitly toggled it ON and provided first name and email
+    if (createHeadUser && data.head?.first_name?.trim() && data.head?.email?.trim()) {
+      if (user?.email && data.head.email.trim().toLowerCase() === user.email.toLowerCase()) {
+        toast.error(`Cannot assign your current administrator account (${user.email}) as a separate branch head. Please use a unique email address or leave branch head disabled.`);
+        setActiveTab('head');
+        return;
+      }
 
-    // For editing, don't send head data if not provided
-    if (isEdit && !data.head.first_name) {
-      delete formattedData.head;
+      formattedData.head = {
+        first_name: data.head.first_name.trim(),
+        last_name: (data.head.last_name || '').trim(),
+        email: data.head.email.trim().toLowerCase(),
+        phone: data.head.phone?.trim() || null,
+        permissions: selectedPermissions
+      };
+
+      if (data.head.password?.trim()) {
+        formattedData.head.password = data.head.password.trim();
+      }
     }
 
     onSubmit(formattedData);
@@ -515,148 +520,189 @@ export default function BranchForm({
         </TabsContent>
 
         {/* Tab 3: Branch Head (Create User) */}
-        <TabsContent value="head" forceMount className={cn(activeTab === 'head' ? 'block' : 'hidden')}>
-          <Card>
-            <CardContent className="p-4 space-y-4">
-              <h3 className="font-semibold flex items-center gap-2">
-                <UserCog className="h-4 w-4" />
-                Branch Head Details
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                A user account will be created for the branch head
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Controller
-                  name="head.first_name"
-                  control={control}
-                  render={({ field, fieldState: { error } }) => (
-                    <InputField
-                      label="First Name"
-                      {...field}
-                      value={field.value ?? ''}
-                      error={error}
-                      required
-                      placeholder="e.g. Muhammad"
-                    />
-                  )}
-                />
-
-                <Controller
-                  name="head.last_name"
-                  control={control}
-                  render={({ field, fieldState: { error } }) => (
-                    <InputField
-                      label="Last Name"
-                      {...field}
-                      value={field.value ?? ''}
-                      error={error}
-                      required
-                      placeholder="e.g. Ali"
-                    />
-                  )}
-                />
+        <TabsContent value="head" forceMount className={cn(activeTab === 'head' ? 'block' : 'hidden', "space-y-4")}>
+          <Card className="bg-muted/30">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <UserCog className="h-4 w-4 text-primary" />
+                  Assign / Create Branch Head Account
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Enable to configure dedicated login credentials for this branch now. You can also leave this off and configure it later.
+                </p>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Controller
-                  name="head.email"
-                  control={control}
-                  render={({ field, fieldState: { error } }) => (
-                    <InputField
-                      label="Email"
-                      {...field}
-                      value={field.value ?? ''}
-                      error={error}
-                      type="email"
-                      required
-                      placeholder="head@branch.com"
-                    />
-                  )}
-                />
-
-                <Controller
-                  name="head.phone"
-                  control={control}
-                  render={({ field, fieldState: { error } }) => (
-                    <InputField
-                      label="Phone"
-                      {...field}
-                      value={field.value ?? ''}
-                      error={error}
-                      placeholder="+92-300-1234567"
-                    />
-                  )}
-                />
-              </div>
-
-              {!isEdit && (
-                <Controller
-                  name="head.password"
-                  control={control}
-                  render={({ field, fieldState: { error } }) => (
-                    <InputField
-                      label="Password"
-                      {...field}
-                      value={field.value ?? ''}
-                      error={error}
-                      type="password"
-                      placeholder={isEdit ? "Leave empty to keep current" : "Enter password"}
-                      hint={!isEdit ? "Leave empty to auto-generate password" : undefined}
-                    />
-                  )}
-                />
-              )}
+              <Switch
+                checked={createHeadUser}
+                onCheckedChange={(checked) => {
+                  setCreateHeadUser(checked);
+                  if (!checked) {
+                    setValue('head.first_name', '');
+                    setValue('head.last_name', '');
+                    setValue('head.email', '');
+                    setValue('head.phone', '');
+                    setValue('head.password', '');
+                  }
+                }}
+              />
             </CardContent>
           </Card>
 
-          {/* Permissions Section */}
-          <Card>
-            <CardContent className="p-4 space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  Head Permissions
-                </h3>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleSelectAll}
-                  >
-                    Select All
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleClearAll}
-                  >
-                    Clear All
-                  </Button>
-                </div>
-              </div>
+          {!createHeadUser ? (
+            <Card className="border-dashed">
+              <CardContent className="p-8 text-center space-y-2 text-muted-foreground">
+                <UserCog className="h-10 w-10 mx-auto text-muted-foreground/50 mb-1" />
+                <h4 className="text-sm font-semibold text-foreground">No Dedicated Branch Head User Configured</h4>
+                <p className="text-xs max-w-md mx-auto">
+                  The branch will be created without dedicated login credentials. As a Super Admin, you have full global access to this branch. You can assign staff members or branch administrators at any time from the Staff or Users section.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <Card>
+                <CardContent className="p-4 space-y-4">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <UserCog className="h-4 w-4" />
+                    Branch Head Details
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Create a dedicated login account for this branch administrator. Please ensure the email is unique.
+                  </p>
 
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">
-                  {selectedPermissions.length} of {availableRoles.length} selected
-                </Badge>
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Controller
+                      name="head.first_name"
+                      control={control}
+                      render={({ field, fieldState: { error } }) => (
+                        <InputField
+                          label="First Name"
+                          {...field}
+                          value={field.value ?? ''}
+                          error={error}
+                          placeholder="e.g. Muhammad"
+                          required
+                        />
+                      )}
+                    />
 
-              <div className="border rounded-lg divide-y max-h-96 overflow-y-auto">
-                {availableRoles.map((perm) => (
-                  <PermissionCheckbox
-                    key={perm}
-                    label={perm.split('.').join(' ').replace(/_/g, ' ')}
-                    code={perm}
-                    checked={selectedPermissions.includes(perm)}
-                    onChange={handlePermissionToggle}
-                  />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                    <Controller
+                      name="head.last_name"
+                      control={control}
+                      render={({ field, fieldState: { error } }) => (
+                        <InputField
+                          label="Last Name"
+                          {...field}
+                          value={field.value ?? ''}
+                          error={error}
+                          placeholder="e.g. Ali"
+                        />
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Controller
+                      name="head.email"
+                      control={control}
+                      render={({ field, fieldState: { error } }) => (
+                        <InputField
+                          label="Email"
+                          {...field}
+                          value={field.value ?? ''}
+                          error={error}
+                          type="email"
+                          placeholder="head@branch.com"
+                          required
+                          hint="Must be a unique email not already used for another account"
+                        />
+                      )}
+                    />
+
+                    <Controller
+                      name="head.phone"
+                      control={control}
+                      render={({ field, fieldState: { error } }) => (
+                        <InputField
+                          label="Phone"
+                          {...field}
+                          value={field.value ?? ''}
+                          error={error}
+                          placeholder="+92-300-1234567"
+                        />
+                      )}
+                    />
+                  </div>
+
+                  {!isEdit && (
+                    <Controller
+                      name="head.password"
+                      control={control}
+                      render={({ field, fieldState: { error } }) => (
+                        <InputField
+                          label="Password"
+                          {...field}
+                          value={field.value ?? ''}
+                          error={error}
+                          type="password"
+                          placeholder={isEdit ? "Leave empty to keep current" : "Enter password"}
+                          hint={!isEdit ? "Leave empty to auto-generate password" : undefined}
+                        />
+                      )}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Permissions Section */}
+              <Card>
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      Head Permissions
+                    </h3>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSelectAll}
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleClearAll}
+                      >
+                        Clear All
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">
+                      {selectedPermissions.length} of {availableRoles.length} selected
+                    </Badge>
+                  </div>
+
+                  <div className="border rounded-lg divide-y max-h-96 overflow-y-auto">
+                    {availableRoles.map((perm) => (
+                      <PermissionCheckbox
+                        key={perm}
+                        label={perm.split('.').join(' ').replace(/_/g, ' ')}
+                        code={perm}
+                        checked={selectedPermissions.includes(perm)}
+                        onChange={handlePermissionToggle}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
 
         {/* Tab 4: Settings */}

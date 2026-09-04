@@ -693,6 +693,7 @@ import { cn } from '@/lib/utils';
 
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import { studentService, academicYearService, classService } from '@/services';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
@@ -754,6 +755,7 @@ export default function StudentPromotePage({ type }) {
   const qc = useQueryClient();
   const canDo = useAuthStore((s) => s.canDo);
   const { currentInstitute } = useInstituteStore();
+  const { activeBranchId } = useBranchAccess();
   const terms = getTerminology(type);
 
   // State
@@ -769,9 +771,10 @@ export default function StudentPromotePage({ type }) {
 
   // ── 1. Academic Years ─────────────────────────────────────
   const { data: academicYearsData } = useQuery({
-    queryKey: ['academic-years', currentInstitute?.id],
+    queryKey: ['academic-years', currentInstitute?.id, activeBranchId],
     queryFn: () => academicYearService.getAll({
       institute_id: currentInstitute?.id,
+      branch_id: activeBranchId,
       is_active: true
     }),
     enabled: !!currentInstitute?.id,

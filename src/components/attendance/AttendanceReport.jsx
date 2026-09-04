@@ -26,6 +26,7 @@ import { studentService } from '@/services/studentService';
 import { academicYearService } from '@/services/academicYearService';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import SelectField from '@/components/common/SelectField';
@@ -72,6 +73,7 @@ const StatCard = ({ title, value, icon: Icon, color, trend, trendValue }) => (
 const AttendanceReport = ({ terms = {} }) => {
   const [isMounted, setIsMounted] = useState(false);
   const { user } = useAuth();
+  const { activeBranchId } = useBranchAccess();
   const [reportType, setReportType] = useState('class');
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -131,7 +133,7 @@ const AttendanceReport = ({ terms = {} }) => {
     if (!isMounted) return;
     const fetchYears = async () => {
       try {
-        const res = await academicYearService.getOptions(user?.school_id);
+        const res = await academicYearService.getOptions(user?.school_id, true, activeBranchId);
         const years = res.data || [];
         setAcademicYears(years);
 

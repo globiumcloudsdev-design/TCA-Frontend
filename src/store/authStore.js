@@ -7,7 +7,17 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { setAccessToken, setSchoolCode, clearAuthData } from "@/lib/auth";
+import {
+  setAccessToken,
+  setSchoolCode,
+  setActiveBranch as setLocalStorageActiveBranch,
+  clearActiveBranch as clearLocalStorageActiveBranch,
+  clearAuthData,
+  isBranchAdmin as checkIsBranchAdmin,
+  isSuperAdmin as checkIsSuperAdmin,
+  getAssignedBranch as checkGetAssignedBranch,
+  schoolHasBranches as checkSchoolHasBranches,
+} from "@/lib/auth";
 import { settingService } from "@/services/settingService";
 import { getDashboardPath } from "@/utils/authUtils";
 
@@ -38,6 +48,26 @@ export const useAuthStore = create(
         if (user?.institute?.code) setSchoolCode(user.institute.code);
         if (user?.school?.code) setSchoolCode(user.school.code);
 
+        // Synchronously lock or clear active branch so no other branch can ever leak through
+        if (checkIsBranchAdmin(user)) {
+          const assigned = checkGetAssignedBranch(user);
+          const bId = assigned?.id || user?.branch_id || user?.branch?.id;
+          const bName = assigned?.name || user?.branch?.name || user?.branch_name || 'Assigned Branch';
+          if (bId) {
+            setLocalStorageActiveBranch(bId);
+            try {
+              const { useUIStore } = require('@/store/uiStore');
+              useUIStore.getState().setActiveBranch(bId, bName);
+            } catch (e) {}
+          }
+        } else {
+          clearLocalStorageActiveBranch();
+          try {
+            const { useUIStore } = require('@/store/uiStore');
+            useUIStore.getState().clearActiveBranch();
+          } catch (e) {}
+        }
+
         set({
           user,
           isAuthenticated: true,
@@ -57,6 +87,12 @@ export const useAuthStore = create(
       logout: () => {
         console.log("🚪 User Logged Out:", get().user);
         clearAuthData();
+        try {
+          const { useUIStore } = require('@/store/uiStore');
+          useUIStore.getState().clearActiveBranch();
+        } catch (e) {
+          // ignore
+        }
         set({
           user: null,
           isAuthenticated: false,
@@ -238,8 +274,25 @@ export const useAuthStore = create(
       },
 
       schoolHasBranches: () => {
+        return checkSchoolHasBranches(get().user);
+      },
+
+      isBranchAdmin: () => {
+        return checkIsBranchAdmin(get().user);
+      },
+
+      isSuperAdmin: () => {
+        return checkIsSuperAdmin(get().user);
+      },
+
+      getAssignedBranch: () => {
+        return checkGetAssignedBranch(get().user);
+      },
+
+      canSwitchBranch: () => {
         const u = get().user;
-        return u?.institute?.settings?.has_branches === true;
+        if (!u) return false;
+        return checkIsSuperAdmin(u) && checkSchoolHasBranches(u);
       },
 
       getBranch: () => {

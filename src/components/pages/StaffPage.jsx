@@ -267,9 +267,13 @@ export default function StaffManagementPage({ instituteType }) {
         },
     });
 
-    const staffMembers = data?.data ?? [];
-    const total = data?.pagination.total ?? 0;
-    const totalPages = data?.pagination?.totalPages ?? 1;
+    const staffMembers = Array.isArray(data?.data)
+        ? data.data
+        : (Array.isArray(data?.data?.rows)
+            ? data.data.rows
+            : (Array.isArray(data?.rows) ? data.rows : []));
+    const total = data?.pagination?.total ?? data?.total ?? data?.data?.total ?? (Array.isArray(staffMembers) ? staffMembers.length : 0);
+    const totalPages = data?.pagination?.totalPages ?? data?.totalPages ?? 1;
     const availableRoles = user?.permissions ?? [];
 
     // Get default permissions

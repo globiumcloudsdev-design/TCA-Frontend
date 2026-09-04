@@ -12,6 +12,7 @@ import TableRowActions from '@/components/common/TableRowActions';
 import { CreatableSelectField } from '@/components/common';
 import { cn } from '@/lib/utils';
 import useAuthStore from '@/store/authStore';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import { expenseService } from '@/services/expenseService';
 import { vendorService } from '@/services/vendorService';
 
@@ -57,6 +58,7 @@ const EMPTY_FORM = {
 
 export default function Expense() {
   const canDo = useAuthStore((s) => s.canDo);
+  const { activeBranchId } = useBranchAccess();
   const queryClient = useQueryClient();
 
   // Filter states
@@ -102,10 +104,10 @@ export default function Expense() {
 
   // Fetch vendors for dropdown
   const { data: vendorsData = [] } = useQuery({
-    queryKey: ['vendor-options'],
+    queryKey: ['vendor-options', activeBranchId],
     queryFn: async () => {
       try {
-        const res = await vendorService.getOptions?.({ status: 'active' });
+        const res = await vendorService.getOptions?.({ status: 'active', branch_id: activeBranchId });
         return res?.data || [];
       } catch (error) {
         console.error('Failed to fetch vendors:', error);
@@ -122,9 +124,10 @@ export default function Expense() {
     isFetching,
     refetch
   } = useQuery({
-    queryKey: ['expenses', page, pageSize, search, statusFilter, categoryFilter],
+    queryKey: ['expenses', activeBranchId, page, pageSize, search, statusFilter, categoryFilter],
     queryFn: async () => {
       const params = {
+        branch_id: activeBranchId,
         page,
         limit: pageSize,
         search: search || undefined,
@@ -153,7 +156,7 @@ export default function Expense() {
 
   // Mutations
   const createMutation = useMutation({
-    mutationFn: expenseService.create,
+    mutationFn: (payload) => expenseService.create({ ...payload, branch_id: activeBranchId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       toast.success('Expense created successfully');

@@ -23,10 +23,10 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useSocket } from "@/hooks/useSocket";
 
-// ── Shared components ────────────────────────────────────────────
 import AppBreadcrumb from "@/components/common/AppBreadcrumb";
 import NotificationBell from "@/components/common/NotificationBell";
 import ThemeToggle from "@/components/common/ThemeToggle";
+import BranchSwitcher from "@/components/common/BranchSwitcher";
 import { 
   ConfirmDialog, AvatarWithInitials, GlobalAnnouncementBanner, UserMenu 
 } from "../common";
@@ -576,10 +576,13 @@ export default function InstituteLayoutWrapper({ children }) {
           </div>
 
           {/* ── Right actions ── */}
-          <div className="flex shrink-0 items-center gap-0.5">
+          <div className="flex shrink-0 items-center gap-1.5">
+            {/* Global Branch Switcher / Assigned Branch Tag */}
+            <BranchSwitcher />
+
             {/* Institute code badge — medium screens+ */}
             {(user?.school?.code || user?.institute?.code) && (
-              <span className="hidden md:inline-flex items-center rounded-md border bg-muted px-2 py-0.5 text-[11px] font-mono font-medium text-muted-foreground mr-1.5">
+              <span className="hidden md:inline-flex items-center rounded-md border bg-muted px-2 py-0.5 text-[11px] font-mono font-medium text-muted-foreground">
                 {user?.school?.code || user?.institute?.code}
               </span>
             )}

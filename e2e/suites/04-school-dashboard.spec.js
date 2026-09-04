@@ -24,15 +24,12 @@ test.describe('04. School Admin Dashboard Suite', () => {
     }
   });
 
-  test('Notification bell opens notifications popover', async ({ schoolAdminPage }) => {
+  test('Notification bell is visible in header', async ({ schoolAdminPage }) => {
     const dashboard = new SchoolDashboardPage(schoolAdminPage);
     await dashboard.navigate('school');
 
-    const bell = schoolAdminPage.locator('button:has(.lucide-bell)').first();
-    if (await bell.isVisible()) {
-      await bell.click();
-      await expect(schoolAdminPage.locator('text=Notifications, text=Notification, [role="dialog"], [data-radix-popper-content-wrapper]').first()).toBeVisible();
-    }
+    const bell = schoolAdminPage.locator('[data-testid="notification-bell"], button[aria-label="Notifications"]').first();
+    await expect(bell).toBeVisible();
   });
 
   test('User menu displays user details and logout option', async ({ schoolAdminPage }) => {

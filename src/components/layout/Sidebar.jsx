@@ -28,8 +28,11 @@ const ICON_MAP = {
   Layers, Bell, BarChart2, FlaskConical,
 };
 
+import { isBranchAdmin as checkIsBranchAdmin } from '@/lib/auth';
+
 export default function Sidebar() {
   const pathname      = usePathname();
+  const user          = useAuthStore((s) => s.user);
   const isMaster      = useAuthStore((s) => s.isMasterAdmin());
   const canDo         = useAuthStore((s) => s.canDo);
   const roleCode      = useAuthStore((s) => s.user?.role_code);
@@ -40,8 +43,13 @@ export default function Sidebar() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  // Show all navigation items (bypassing permission & role filtering)
-  const visibleItems = SCHOOL_NAV;
+  const isBranchAdmin = checkIsBranchAdmin(user);
+  const visibleItems = SCHOOL_NAV.filter((item) => {
+    if (isBranchAdmin && (item.href?.includes('/branches') || item.hideForRoles?.includes('BRANCH_ADMIN'))) {
+      return false;
+    }
+    return true;
+  });
 
   // Group items by their `group` property preserving insert order
   const grouped = visibleItems.reduce((acc, item) => {

@@ -22,6 +22,7 @@ import {
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import { academicYearService } from '@/services/academicYearService';
 
 // Reusable Components
@@ -43,6 +44,7 @@ export default function AcademicYearsPage({ type }) {
   const { canDo } = useAuthStore();
   const { currentInstitute } = useInstituteStore();
   const { terms } = useInstituteConfig();
+  const { activeBranchId } = useBranchAccess();
   
   // Local state
   const [search, setSearch] = useState('');
@@ -58,9 +60,10 @@ export default function AcademicYearsPage({ type }) {
 
   // Fetch academic years
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['academic-years', currentInstitute?.id, page, pageSize, search],
+    queryKey: ['academic-years', currentInstitute?.id, activeBranchId, page, pageSize, search],
     queryFn: () => academicYearService.getAll({
       institute_id: currentInstitute?.id,
+      branch_id: activeBranchId,
       page,
       limit: pageSize,
       search: search || undefined,
@@ -80,7 +83,8 @@ export default function AcademicYearsPage({ type }) {
   const createMutation = useMutation({
     mutationFn: (data) => academicYearService.create({
       ...data,
-      institute_id: currentInstitute?.id
+      institute_id: currentInstitute?.id,
+      branch_id: activeBranchId,
     }),
     onSuccess: () => {
       toast.success(`${terms?.academic_year || 'Academic year'} created successfully`);
@@ -350,7 +354,9 @@ export default function AcademicYearsPage({ type }) {
       />
 
       {/* Error Alert */}
-      <ErrorAlert message={error?.message} />
+      {error && error?.response?.status !== 403 && error?.response?.status !== 404 && (
+        <ErrorAlert message={error?.message} onRetry={refetch} />
+      )}
 
       {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

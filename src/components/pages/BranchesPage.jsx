@@ -5,10 +5,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, MapPin, Power, Eye, Copy, Filter, RefreshCw } from 'lucide-react';
+import { Plus, MapPin, Power, Eye, Copy, Filter, RefreshCw, Building2 } from 'lucide-react';
 
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
+import { isBranchAdmin as checkIsBranchAdmin, getAssignedBranch } from '@/lib/auth';
 
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
@@ -41,8 +42,11 @@ const PERMISSIONS = {
 
 export default function BranchesPage({ type }) {
   const queryClient = useQueryClient();
-  const { canDo } = useAuthStore();
+  const { canDo, user } = useAuthStore();
   const { instituteId, instituteType, hasBranches } = useInstituteStore();
+
+  const isBranchAdmin = checkIsBranchAdmin(user);
+  const assignedBranch = getAssignedBranch(user);
 
   // Get label based on institute type
   const label = useMemo(() => {
@@ -58,6 +62,7 @@ export default function BranchesPage({ type }) {
   }, [instituteType]);
 
   // State
+  const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [city, setCity] = useState('all');
@@ -70,13 +75,17 @@ export default function BranchesPage({ type }) {
   const [viewingBranch, setViewingBranch] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Check permissions
   const canView = canDo(PERMISSIONS.VIEW);
   const canCreate = canDo(PERMISSIONS.CREATE);
   const canUpdate = canDo(PERMISSIONS.UPDATE);
   const canDelete = canDo(PERMISSIONS.DELETE);
 
-  // Fetch branches
+  // Fetch branches — completely disabled for Branch Admin
   const {
     data,
     isLoading,
@@ -106,14 +115,14 @@ export default function BranchesPage({ type }) {
       console.log('📥 Branches response:', response);
       return response;
     },
-    enabled: !!instituteId() && canView,
+    enabled: !!instituteId() && canView && !isBranchAdmin,
   });
 
-  // Fetch stats
+  // Fetch stats — disabled for Branch Admin
   const { data: statsData, refetch: refetchStats } = useQuery({
     queryKey: ['branch-stats', instituteId()],
     queryFn: () => branchService.getStats(),
-    enabled: !!instituteId() && canView,
+    enabled: !!instituteId() && canView && !isBranchAdmin,
   });
 
   // ✅ FIX: Properly extract data from response
@@ -144,7 +153,8 @@ export default function BranchesPage({ type }) {
     },
     onError: (error) => {
       console.error('❌ Create error:', error);
-      toast.error(error.message || `Failed to create ${label.singular.toLowerCase()}`);
+      const msg = error?.response?.data?.message || error?.message || `Failed to create ${label.singular.toLowerCase()}`;
+      toast.error(msg);
     }
   });
 
@@ -161,7 +171,8 @@ export default function BranchesPage({ type }) {
     },
     onError: (error) => {
       console.error('❌ Update error:', error);
-      toast.error(error.message || `Failed to update ${label.singular.toLowerCase()}`);
+      const msg = error?.response?.data?.message || error?.message || `Failed to update ${label.singular.toLowerCase()}`;
+      toast.error(msg);
     }
   });
 
@@ -178,7 +189,8 @@ export default function BranchesPage({ type }) {
     },
     onError: (error) => {
       console.error('❌ Delete error:', error);
-      toast.error(error.message || `Failed to delete ${label.singular.toLowerCase()}`);
+      const msg = error?.response?.data?.message || error?.message || `Failed to delete ${label.singular.toLowerCase()}`;
+      toast.error(msg);
     }
   });
 
@@ -348,6 +360,30 @@ export default function BranchesPage({ type }) {
       }
     }
   ], [canUpdate, canDelete, label]);
+
+  // Prevent hydration mismatch: render loader until client mounts
+  if (!mounted) {
+    return <PageLoader message={`Loading ${label.plural.toLowerCase()}...`} />;
+  }
+
+  // If Branch Admin attempts to view Branches page, restrict and show assigned branch
+  if (isBranchAdmin) {
+    const branchName = assignedBranch?.name || user?.branch?.name || user?.branch_name || 'Your Assigned Branch';
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center max-w-md p-6 bg-card border rounded-xl shadow-xs">
+          <Building2 className="h-12 w-12 mx-auto text-primary mb-3" />
+          <h3 className="text-lg font-semibold mb-1">Branch-Scoped Access</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Branch management is restricted to Super Admins. You are currently logged into and managing <strong>{branchName}</strong>.
+          </p>
+          <Button onClick={() => window.location.href = `/${type || 'school'}/dashboard`} size="sm">
+            Go to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // If user doesn't have view permission
   if (!canView) {
@@ -685,7 +721,7 @@ export default function BranchesPage({ type }) {
         description={
           <>
             Are you sure you want to delete <strong>{deletingBranch?.name}</strong>?
-            This action cannot be undone.
+            This will also delete the associated branch administrator account. This action cannot be undone.
           </>
         }
         confirmLabel="Delete"

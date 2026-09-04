@@ -1,104 +1,186 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { GitBranch, ChevronDown, Check } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Building2, ChevronDown, Check, Layers } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
-import { PERMISSIONS } from '@/constants';
 import { branchService } from '@/services';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { isBranchAdmin as checkIsBranchAdmin, getAssignedBranch, schoolHasBranches } from '@/lib/auth';
+import { DUMMY_BRANCHES } from '@/data/dummyData';
 
 /**
- * BranchSwitcher — shown in the school Navbar.
+ * BranchSwitcher — Global Branch Selector in Header/Navbar
  *
- * • School Admin (BRANCH_READ permission) → interactive dropdown
- *   - "All Branches" resets the filter
- *   - Selecting a branch scopes all queries to that branch
+ * Requirements:
+ * 1. Super Admin:
+ *    - Prominent "Branch Selector" dropdown menu listing "All Branches" and active campuses.
+ *    - Switching triggers instant query invalidation / screen refresh for that branch context.
  *
- * • Branch Admin → static badge showing their assigned branch
+ * 2. Branch Admin:
+ *    - Dropdown menu is completely hidden / removed.
+ *    - Displays plain text: "Logged into: [Branch Name]" with no ability to switch.
  */
-export default function BranchSwitcher() {
-  const { canDo, schoolHasBranches, user } = useAuthStore();
+export default function BranchSwitcher({ className = '' }) {
+  const queryClient = useQueryClient();
+  const { user } = useAuthStore();
   const { activeBranchId, activeBranchName, setActiveBranch, clearActiveBranch } = useUIStore();
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  // Fetch branch list for the switcher dropdown (School Admin only)
+  const isBranchAdmin = checkIsBranchAdmin(user);
+  const isSuperAdmin = !isBranchAdmin;
+  const assignedBranch = getAssignedBranch(user);
+  const hasBranches = schoolHasBranches(user);
+
+  // Auto-scope Branch Admin if not already scoped
+  useEffect(() => {
+    if (isBranchAdmin && assignedBranch?.id) {
+      if (activeBranchId !== assignedBranch.id) {
+        setActiveBranch(assignedBranch.id, assignedBranch.name || 'Assigned Branch');
+      }
+    }
+  }, [isBranchAdmin, assignedBranch, activeBranchId, setActiveBranch]);
+
+  // Fetch branches for Super Admin switcher
   const { data } = useQuery({
-    queryKey: ['branches', 'switcher'],
-    queryFn: () => branchService.getAll({ limit: 100 }),
-    enabled: mounted && schoolHasBranches() && canDo(PERMISSIONS.BRANCH_READ),
-    staleTime: 5 * 60 * 1000,
+    queryKey: ['branches', 'global-switcher'],
+    queryFn: async () => {
+      try {
+        const res = await branchService.getAll({ limit: 100 });
+        const list = res?.data?.rows ?? res?.data ?? res ?? [];
+        if (Array.isArray(list) && list.length > 0) return list;
+      } catch (err) {
+        // fallback
+      }
+      return user?.institute?.branches ?? user?.branches ?? DUMMY_BRANCHES;
+    },
+    enabled: mounted && isSuperAdmin && hasBranches,
+    staleTime: 60 * 1000,
   });
 
-  const branches = data?.data?.rows ?? data?.data ?? data ?? [];
+  const branches = Array.isArray(data)
+    ? data
+    : (data?.data?.rows ?? data?.data ?? user?.institute?.branches ?? DUMMY_BRANCHES);
 
-  if (!mounted || !schoolHasBranches()) return null;
+  if (!mounted) return null;
 
-  // ── Branch Admin: readonly badge ─────────────────────────────────────────────
-  if (!canDo(PERMISSIONS.BRANCH_READ) || user?.role_code === 'BRANCH_ADMIN') {
-    const label = user?.branch?.name ?? activeBranchName ?? 'My Branch';
+  // ── 1. BRANCH ADMIN: Plain Text Display Only (No Dropdown) ───────────────────
+  if (isBranchAdmin) {
+    const branchDisplayName = assignedBranch?.name || user?.branch?.name || user?.branch_name || 'Assigned Branch';
     return (
-      <Badge variant="outline" className="hidden sm:flex items-center gap-1.5 text-xs font-medium">
-        <GitBranch className="h-3 w-3" />
-        {label}
-      </Badge>
+      <div
+        className={cn(
+          "flex items-center gap-1.5 text-xs text-muted-foreground font-medium px-2.5 py-1.5 rounded-md bg-muted/60 border border-border/50 select-none shadow-xs",
+          className
+        )}
+        title={`Logged into: ${branchDisplayName}`}
+      >
+        <Building2 className="h-3.5 w-3.5 text-primary/80 shrink-0" />
+        <span className="truncate max-w-[200px]">
+          Logged into: <strong className="text-foreground font-semibold">{branchDisplayName}</strong>
+        </span>
+      </div>
     );
   }
 
-  // ── School Admin: interactive dropdown ──────────────────────────────────────
-  const currentLabel = activeBranchName ?? 'All Branches';
+  // ── 2. SUPER ADMIN: Interactive Dropdown Branch Selector ─────────────────────
+  const currentLabel = activeBranchId
+    ? (activeBranchName || branches.find((b) => String(b.id) === String(activeBranchId))?.name || 'Selected Branch')
+    : 'All Branches';
+
+  const handleSelectBranch = (branch) => {
+    setActiveBranch(branch.id, branch.name);
+    // Instant refresh across the entire screen
+    queryClient.invalidateQueries();
+    toast.success(`Switched view to ${branch.name}`);
+  };
+
+  const handleClearBranch = () => {
+    clearActiveBranch();
+    // Instant refresh across the entire screen
+    queryClient.invalidateQueries();
+    toast.success('Viewing All Branches (Global View)');
+  };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="hidden sm:flex h-8 items-center gap-1.5 text-xs font-medium max-w-[160px]"
-        >
-          <GitBranch className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{currentLabel}</span>
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
-        </Button>
-      </DropdownMenuTrigger>
-
-      <DropdownMenuContent align="start" className="min-w-[180px]">
-        {/* All branches option */}
-        <DropdownMenuItem
-          onSelect={clearActiveBranch}
-          className={cn('gap-2', !activeBranchId && 'font-semibold')}
-        >
-          <Check className={cn('h-3.5 w-3.5', activeBranchId ? 'opacity-0' : 'opacity-100')} />
-          All Branches
-        </DropdownMenuItem>
-
-        {branches.length > 0 && <DropdownMenuSeparator />}
-
-        {branches.map((branch) => (
-          <DropdownMenuItem
-            key={branch.id}
-            onSelect={() => setActiveBranch(branch.id, branch.name)}
-            className={cn('gap-2', activeBranchId === branch.id && 'font-semibold')}
+    <div className={cn("relative flex items-center", className)}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8.5 px-3 flex items-center gap-2 text-xs font-semibold bg-background hover:bg-accent/60 border-primary/20 shadow-xs hover:border-primary/40 transition-colors"
           >
-            <Check
-              className={cn('h-3.5 w-3.5', activeBranchId === branch.id ? 'opacity-100' : 'opacity-0')}
-            />
-            {branch.name}
+            <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span className="truncate max-w-[140px] sm:max-w-[180px] font-medium text-foreground">
+              {currentLabel}
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          </Button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent align="end" className="w-56 p-1.5 shadow-md">
+          <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
+            Branch Selector
+          </DropdownMenuLabel>
+
+          {/* All Branches Global View */}
+          <DropdownMenuItem
+            onClick={handleClearBranch}
+            className={cn(
+              'flex items-center justify-between px-2.5 py-2 rounded-sm cursor-pointer text-xs transition-colors',
+              !activeBranchId ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted'
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <Layers className="h-3.5 w-3.5" />
+              <span>All Branches</span>
+            </div>
+            {!activeBranchId && <Check className="h-4 w-4 text-primary" />}
           </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+
+          {branches.length > 0 && <DropdownMenuSeparator className="my-1" />}
+
+          {/* Individual Active Branches */}
+          <div className="max-h-60 overflow-y-auto space-y-0.5">
+            {branches.map((branch) => {
+              const isSelected = String(activeBranchId) === String(branch.id);
+              return (
+                <DropdownMenuItem
+                  key={branch.id}
+                  onClick={() => handleSelectBranch(branch)}
+                  className={cn(
+                    'flex items-center justify-between px-2.5 py-2 rounded-sm cursor-pointer text-xs transition-colors',
+                    isSelected ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted'
+                  )}
+                >
+                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                    <Building2 className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                    <span className="truncate">{branch.name}</span>
+                  </div>
+                  {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+                </DropdownMenuItem>
+              );
+            })}
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
+

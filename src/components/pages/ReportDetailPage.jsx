@@ -32,6 +32,7 @@ import { toast } from "sonner";
 
 import useAuthStore from "@/store/authStore";
 import useInstituteStore from "@/store/instituteStore";
+import useBranchAccess from "@/hooks/useBranchAccess";
 import {
   reportService,
   classService,
@@ -1207,6 +1208,7 @@ export default function ReportDetailPage() {
   const reportType = searchParams.get("report") || "student";
   const currentInstitute = useInstituteStore((s) => s.currentInstitute);
   const canDo = useAuthStore((s) => s.canDo);
+  const { activeBranchId } = useBranchAccess();
 
   const config = REPORT_CONFIGS[reportType] || REPORT_CONFIGS.student;
 
@@ -1239,16 +1241,17 @@ export default function ReportDetailPage() {
 
   // FETCH: Helper data
   const { data: yearsData } = useQuery({
-    queryKey: ["academic-years", currentInstitute?.id],
-    queryFn: () => academicYearService.getOptions(currentInstitute?.id),
+    queryKey: ["academic-years", currentInstitute?.id, activeBranchId],
+    queryFn: () => academicYearService.getOptions(currentInstitute?.id, true, activeBranchId),
     enabled: !!currentInstitute?.id,
   });
 
   const { data: classesData } = useQuery({
-    queryKey: ["classes", currentInstitute?.id, filters.academic_year_id],
+    queryKey: ["classes", currentInstitute?.id, activeBranchId, filters.academic_year_id],
     queryFn: () =>
       classService.getAll({
         institute_id: currentInstitute?.id,
+        branch_id: activeBranchId,
         academic_year_id: filters.academic_year_id,
         limit: 500,
         fetchAll: true,

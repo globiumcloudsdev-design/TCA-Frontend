@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { academicYearService, classService } from '@/services';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import { SelectField, DatePickerField } from '@/components/common';
 
 /**
@@ -20,16 +21,18 @@ const AttendanceFilter = ({
   terms = {}, 
   showDate = true 
 }) => {
+  const { activeBranchId } = useBranchAccess();
+
   // Fetch Academic Years
   const { data: yearsData } = useQuery({
-    queryKey: ['academic-years'],
-    queryFn: () => academicYearService.getAll({ is_active: true }),
+    queryKey: ['academic-years', activeBranchId],
+    queryFn: () => academicYearService.getAll({ branch_id: activeBranchId, is_active: true }),
   });
 
   // Fetch Classes
   const { data: classesData } = useQuery({
-    queryKey: ['classes'],
-    queryFn: () => classService.getAll(),
+    queryKey: ['classes', activeBranchId],
+    queryFn: () => classService.getAll({ branch_id: activeBranchId }),
   });
 
   // Default to current academic year if not set

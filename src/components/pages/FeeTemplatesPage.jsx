@@ -13,6 +13,7 @@ import {
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
+import useBranchAccess from '@/hooks/useBranchAccess';
 
 // ✅ Reusable Components
 import PageHeader from '@/components/common/PageHeader';
@@ -53,12 +54,19 @@ export default function FeeTemplatesPage({ type }) {
   const { canDo } = useAuthStore();
   const { currentInstitute, hasBranches, instituteId, instituteType } = useInstituteStore();
   const { terms } = useInstituteConfig();
+  const { activeBranchId, isBranchAdmin } = useBranchAccess();
 
   // State
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
-  const [branchFilter, setBranchFilter] = useState('all');
+  const [branchFilter, setBranchFilter] = useState(activeBranchId || 'all');
   const [academicYearFilter, setAcademicYearFilter] = useState('all');
+
+  useEffect(() => {
+    if (activeBranchId) {
+      setBranchFilter(activeBranchId);
+    }
+  }, [activeBranchId]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [modalOpen, setModalOpen] = useState(false);
@@ -118,10 +126,10 @@ export default function FeeTemplatesPage({ type }) {
     isLoading: academicYearsLoading,
     refetch: refetchAcademicYears
   } = useQuery({
-    queryKey: ['academic-years-options', instituteId()],
+    queryKey: ['academic-years-options', instituteId(), branchFilter],
     queryFn: async () => {
       console.log('📥 Fetching academic years for institute:', instituteId());
-      const response = await academicYearService.getOptions(instituteId());
+      const response = await academicYearService.getOptions(instituteId(), true, branchFilter !== 'all' ? branchFilter : null);
       console.log('📥 Academic years response:', response);
       return response;
     },
@@ -234,7 +242,7 @@ export default function FeeTemplatesPage({ type }) {
   const createMutation = useMutation({
     mutationFn: (data) => {
       console.log('📤 Creating fee template:', data);
-      return feeTemplateService.create(data);
+      return feeTemplateService.create({ ...data, branch_id: activeBranchId || data.branch_id });
     },
     onSuccess: () => {
       toast.success('Fee template created successfully');

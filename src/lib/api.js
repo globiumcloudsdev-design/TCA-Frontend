@@ -12,11 +12,13 @@
 
 import axios from 'axios';
 import Cookies from 'js-cookie';
+import { isBranchAdmin, isMainBranchUser, getAssignedBranch } from './auth';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
 const api = axios.create({
   baseURL: BASE_URL,
+  timeout: 45000, // 45 seconds timeout to prevent hanging connections
   withCredentials: true, // send httpOnly refresh token cookie
   headers: { 'Content-Type': 'application/json' },
 });
@@ -29,12 +31,55 @@ api.interceptors.request.use(
     if (token) config.headers['Authorization'] = `Bearer ${token}`;
 
     // School code — read from localStorage (set after login)
-    const schoolCode = localStorage.getItem('school_code');
+    const schoolCode = typeof window !== 'undefined' ? localStorage.getItem('school_code') : null;
     if (schoolCode) config.headers['X-School-Code'] = schoolCode;
 
-    // Branch ID — optional, only when school has branches
-    const branchId = localStorage.getItem('active_branch_id');
-    if (branchId) config.headers['X-Branch-ID'] = branchId;
+    // Avoid custom header X-Branch-ID to prevent CORS preflight rejection on remote servers.
+    delete config.headers['X-Branch-ID'];
+    delete config.headers['x-branch-id'];
+
+    const url = String(config.url || '');
+    const isGlobalEndpoint =
+      url.includes('/subscription-plans') ||
+      url.includes('/master-admin') ||
+      url.includes('/auth/') ||
+      url.includes('/public/') ||
+      url.includes('/branches') ||
+      url.includes('/settings') ||
+      url.includes('/roles');
+
+    // Resolve active branch securely
+    let branchId = typeof window !== 'undefined' ? localStorage.getItem('active_branch_id') : null;
+
+    // Branch Admin role isolation
+    if (typeof window !== 'undefined') {
+      try {
+        const authRaw = localStorage.getItem('clouds-auth');
+        if (authRaw && typeof authRaw === 'string' && authRaw.trim().startsWith('{')) {
+          const authData = JSON.parse(authRaw)?.state?.user;
+          if (authData) {
+            // Main Branch User = Super Admin (Never restricted, allowed global access)
+            if (isMainBranchUser(authData)) {
+              // branchId remains whatever active_branch_id has (or null for "all")
+            } else if (isBranchAdmin(authData)) {
+              // Non-Main Branch Admin: Strictly locked to their assigned branch
+              const assigned = getAssignedBranch(authData);
+              branchId = assigned?.id || authData.branch?.id || authData.branch_id;
+            }
+          }
+        }
+      } catch (e) {
+        // ignore JSON parse errors
+      }
+    }
+
+    // Attach branch_id to query params for branch-scoped endpoints
+    if (branchId && branchId !== 'all' && !isGlobalEndpoint) {
+      if (!config.params) config.params = {};
+      if (config.params.branch_id === undefined) {
+        config.params.branch_id = branchId;
+      }
+    }
 
     // For FormData uploads, remove the default JSON Content-Type so the browser
     // can set multipart/form-data with the correct boundary automatically.

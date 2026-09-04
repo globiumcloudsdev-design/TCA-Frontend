@@ -42,6 +42,6 @@ test.describe('05. Student Management Suite', () => {
 
   test('Student promote workflow page renders correctly', async ({ schoolAdminPage }) => {
     await schoolAdminPage.goto('/school/students/promote');
-    await expect(schoolAdminPage.locator('h1, h2, text=Promote, text=Promotion').first()).toBeVisible();
+    await expect(schoolAdminPage.locator('h1, h2, h3').filter({ hasText: /Promot/i }).first()).toBeVisible();
   });
 });

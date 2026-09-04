@@ -25,11 +25,13 @@ import InputField from '@/components/common/InputField';
 import DatePickerField from '@/components/common/DatePickerField';
 import TimePickerField from '@/components/common/TimePickerField';
 import SwitchField from '@/components/common/SwitchField';
+import BranchSelectField from '@/components/common/BranchSelectField';
 
 import { examService } from '@/services/examService';
 import { classService } from '@/services/classService';
 import { academicYearService } from '@/services/academicYearService';
 import { useAuthStore } from '@/store/authStore';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import { EXAM_TYPES, EXAM_CATEGORIES } from '@/constants';
 
 // ─────────────────────────────────────────────────────────
@@ -57,6 +59,7 @@ const step1Schema = z.object({
   name: z.string().min(3, 'Exam name required (min 3 chars)'),
   code: z.string().optional(),
   description: z.string().optional(),
+  branch_id: z.string().optional(),
   type: z.string().min(1, 'Exam type required'),
   category: z.string().min(1, 'Category required'),
   entity_type: z.string().min(1, 'Entity type required'),
@@ -85,6 +88,7 @@ export default function ExamForm({
   isEdit = false
 }) {
   const { user } = useAuthStore();
+  const { activeBranchId } = useBranchAccess();
   const instituteId = user?.institute?.id || user?.school_id;
   const rawInstituteType = user?.institute?.institute_type || user?.institute?.instituteType;
   const instituteType = typeof rawInstituteType === 'object' 
@@ -157,8 +161,8 @@ export default function ExamForm({
     const fetchData = async () => {
       try {
         const [yearsRes, classesRes] = await Promise.all([
-          academicYearService.getAll({ institute_id: instituteId, is_active: true }),
-          classService.getAll({ institute_id: instituteId, is_active: true, limit: 500, fetchAll: true })
+          academicYearService.getAll({ institute_id: instituteId, branch_id: activeBranchId, is_active: true }),
+          classService.getAll({ institute_id: instituteId, branch_id: activeBranchId, is_active: true, limit: 500, fetchAll: true })
         ]);
 
         const rawYears = yearsRes?.data?.rows || yearsRes?.rows || (Array.isArray(yearsRes?.data) ? yearsRes.data : []) || (Array.isArray(yearsRes) ? yearsRes : []);
@@ -366,6 +370,13 @@ export default function ExamForm({
             <CardTitle>Basic Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <BranchSelectField
+              control={control}
+              error={errors.branch_id}
+              setValue={setValue}
+              watch={watch}
+              required
+            />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <InputField
                 label="Exam Name *"

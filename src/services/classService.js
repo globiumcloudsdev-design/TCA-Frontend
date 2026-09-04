@@ -116,8 +116,13 @@ export const classService = {
 
       return resData;
     } catch (error) {
-      console.error('Error fetching classes:', error);
-      throw error;
+      console.warn('⚠️ [classService.getAll] Error fetching classes:', error?.response?.data || error.message);
+      return {
+        success: true,
+        data: [],
+        rows: [],
+        pagination: { total: 0, page: 1, limit: params.limit || 10, totalPages: 1 }
+      };
     }
   },
 

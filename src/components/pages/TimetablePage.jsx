@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
+import useBranchAccess from '@/hooks/useBranchAccess';
 
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
@@ -630,6 +631,7 @@ export default function TimetablePage({ type }) {
   const { canDo } = useAuthStore();
   const { currentInstitute } = useInstituteStore();
   const { terms } = useInstituteConfig();
+  const { activeBranchId } = useBranchAccess();
 
   const entityType = getEntityTypeFromInstitute(type);
 
@@ -737,8 +739,8 @@ export default function TimetablePage({ type }) {
 
   // Fetch Academic Years
   const { data: academicYearsData, isLoading: academicYearsLoading } = useQuery({
-    queryKey: ['academic-years', currentInstitute?.id],
-    queryFn: () => academicYearService.getAll({ institute_id: currentInstitute?.id, is_active: true }),
+    queryKey: ['academic-years', currentInstitute?.id, activeBranchId],
+    queryFn: () => academicYearService.getAll({ institute_id: currentInstitute?.id, branch_id: activeBranchId, is_active: true }),
     enabled: !!currentInstitute?.id,
   });
 
@@ -758,9 +760,10 @@ export default function TimetablePage({ type }) {
 
   // Fetch Classes
   const { data: classesData, isLoading: classesLoading } = useQuery({
-    queryKey: ['classes', currentInstitute?.id, selectedAcademicYear],
+    queryKey: ['classes', currentInstitute?.id, activeBranchId, selectedAcademicYear],
     queryFn: () => classService.getAll({
       institute_id: currentInstitute?.id,
+      branch_id: activeBranchId,
       academic_year_id: selectedAcademicYear,
       is_active: true,
       limit: 500,
@@ -778,9 +781,10 @@ export default function TimetablePage({ type }) {
 
   // Fetch Teachers
   const { data: teachersData, isLoading: teachersLoading } = useQuery({
-    queryKey: ['teachers', currentInstitute?.id],
+    queryKey: ['teachers', currentInstitute?.id, activeBranchId],
     queryFn: () => teacherService.getAll({
       institute_id: currentInstitute?.id,
+      branch_id: activeBranchId,
       is_active: true,
       limit: 200
     }),
@@ -800,8 +804,10 @@ export default function TimetablePage({ type }) {
     error,
     refetch
   } = useQuery({
-    queryKey: ['timetables', currentInstitute?.id, selectedAcademicYear, entityType, selectedClass, selectedSection],
+    queryKey: ['timetables', currentInstitute?.id, activeBranchId, selectedAcademicYear, entityType, selectedClass, selectedSection],
     queryFn: () => timetableService.getAll({
+      institute_id: currentInstitute?.id,
+      branch_id: activeBranchId,
       academic_year_id: selectedAcademicYear,
       entity_type: entityType,
       class_id: selectedClass || undefined,
