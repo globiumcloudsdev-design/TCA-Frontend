@@ -22,6 +22,7 @@ import {
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
+import useBranchAccess from '@/hooks/useBranchAccess';
 
 // Reusable Components
 import DataTable from '@/components/common/DataTable';
@@ -52,6 +53,7 @@ export default function ClassesPage({ type }) {
   const { canDo, user } = useAuthStore();
   const { currentInstitute } = useInstituteStore();
   const { terms } = useInstituteConfig();
+  const { activeBranchId } = useBranchAccess();
 
   // State Management
   const [search, setSearch] = useState('');
@@ -95,8 +97,8 @@ export default function ClassesPage({ type }) {
     error: academicYearsError,
     isLoading: academicYearsLoading
   } = useQuery({
-    queryKey: ['academic-years-options', currentInstitute?.id],
-    queryFn: () => academicYearService.getOptions(currentInstitute?.id, true),
+    queryKey: ['academic-years-options', currentInstitute?.id, activeBranchId],
+    queryFn: () => academicYearService.getOptions(currentInstitute?.id, true, activeBranchId),
     enabled: !!currentInstitute?.id,
   });
 
@@ -142,10 +144,11 @@ export default function ClassesPage({ type }) {
     refetch,
     isFetching
   } = useQuery({
-    queryKey: ['classes', currentInstitute?.id, page, pageSize, search, selectedStatus, selectedAcademicYear],
+    queryKey: ['classes', currentInstitute?.id, activeBranchId, page, pageSize, search, selectedStatus, selectedAcademicYear],
     queryFn: async () => {
       console.log('📥 Fetching classes with params:', {
         institute_id: currentInstitute?.id,
+        branch_id: (activeBranchId && activeBranchId !== 'all') ? activeBranchId : undefined,
         page,
         limit: pageSize,
         search: search || undefined,
@@ -155,6 +158,7 @@ export default function ClassesPage({ type }) {
 
       const response = await classService.getAll({
         institute_id: currentInstitute?.id,
+        branch_id: (activeBranchId && activeBranchId !== 'all') ? activeBranchId : undefined,
         page,
         limit: pageSize,
         search: search || undefined,

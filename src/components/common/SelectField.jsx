@@ -25,7 +25,7 @@
  */
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { Controller } from 'react-hook-form';
 import {
   Select,
@@ -103,23 +103,31 @@ export default function SelectField({
       ? Object.values(options)
       : [];
 
-  const normalizedOptions = (optionsArray || [])
-    .map((opt) => {
-      if (typeof opt === 'string' || typeof opt === 'number') {
-        return { value: String(opt), label: String(opt) };
-      }
-      if (typeof opt === 'object' && opt !== null) {
-        const val = opt.value !== undefined ? opt.value : (opt.id !== undefined ? opt.id : '');
-        const lbl = opt.label !== undefined ? opt.label : (opt.name !== undefined ? opt.name : String(val));
-        return {
-          ...opt,
-          value: String(val ?? ''),
-          label: String(lbl ?? ''),
-        };
-      }
-      return null;
-    })
-    .filter((opt) => opt && String(opt.value).trim() !== '');
+  const normalizedOptions = useMemo(() => {
+    const seen = new Set();
+    return (optionsArray || [])
+      .map((opt) => {
+        if (typeof opt === 'string' || typeof opt === 'number') {
+          return { value: String(opt), label: String(opt) };
+        }
+        if (typeof opt === 'object' && opt !== null) {
+          const val = opt.value !== undefined ? opt.value : (opt.id !== undefined ? opt.id : '');
+          const lbl = opt.label !== undefined ? opt.label : (opt.name !== undefined ? opt.name : String(val));
+          return {
+            ...opt,
+            value: String(val ?? ''),
+            label: String(lbl ?? ''),
+          };
+        }
+        return null;
+      })
+      .filter((opt) => {
+        if (!opt || String(opt.value).trim() === '') return false;
+        if (seen.has(opt.value)) return false;
+        seen.add(opt.value);
+        return true;
+      });
+  }, [optionsArray]);
 
   return (
     <div className={cn('space-y-1.5', className)}>
@@ -135,44 +143,50 @@ export default function SelectField({
           name={name}
           control={control}
           rules={rules}
-          render={({ field }) => (
-            <Select
-              value={field.value ?? ''}
-              onValueChange={field.onChange}
-              disabled={disabled}
-            >
-              <SelectTrigger id={name} aria-invalid={!!error}>
-                <SelectValue placeholder={placeholder} />
-              </SelectTrigger>
-              <SelectContent>
-                {normalizedOptions.length > 0 ? (
-                  normalizedOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={String(opt.value)}>
-                      <span className="flex items-center justify-between gap-2 w-full">
-                        <span>{opt.label}</span>
-                        {opt.badgeStatus ? (
-                          <StatusBadge status={opt.badgeStatus} label={opt.badgeLabel || 'Current'} />
-                        ) : null}
-                      </span>
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="p-4 text-[11px] text-slate-400 text-center italic">
-                    No options found
-                  </div>
-                )}
+          render={({ field }) => {
+            const selectValue = (field.value !== undefined && field.value !== null && String(field.value) !== '')
+              ? String(field.value)
+              : undefined;
 
-                {/* Inject the Polling Tripwire here */}
-                {onReachBottom && (
-                  <PollingTripwire isFetchingNextPage={isLoadingMore} onReachBottom={onReachBottom} />
-                )}
-              </SelectContent>
-            </Select>
-          )}
+            return (
+              <Select
+                value={selectValue}
+                onValueChange={field.onChange}
+                disabled={disabled}
+              >
+                <SelectTrigger id={name} aria-invalid={!!error}>
+                  <SelectValue placeholder={placeholder} />
+                </SelectTrigger>
+                <SelectContent>
+                  {normalizedOptions.length > 0 ? (
+                    normalizedOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={String(opt.value)}>
+                        <span className="flex items-center justify-between gap-2 w-full">
+                          <span>{opt.label}</span>
+                          {opt.badgeStatus ? (
+                            <StatusBadge status={opt.badgeStatus} label={opt.badgeLabel || 'Current'} />
+                          ) : null}
+                        </span>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="p-4 text-[11px] text-slate-400 text-center italic">
+                      No options found
+                    </div>
+                  )}
+
+                  {/* Inject the Polling Tripwire here */}
+                  {onReachBottom && (
+                    <PollingTripwire isFetchingNextPage={isLoadingMore} onReachBottom={onReachBottom} />
+                  )}
+                </SelectContent>
+              </Select>
+            );
+          }}
         />
       ) : (
         <Select
-          value={value ?? ''}
+          value={(value !== undefined && value !== null && String(value) !== '') ? String(value) : undefined}
           onValueChange={onChange}
           disabled={disabled}
         >

@@ -37,6 +37,7 @@ import {
   academicYearService,
   studentService,
 } from "@/services";
+import useBranchAccess from '@/hooks/useBranchAccess';
 import { SelectField, DatePickerField } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,6 +71,7 @@ export default function AttendancePage({ type }) {
   const { canDo, user } = useAuthStore();
   const schoolId = user?.school_id;
   const { terms, attendanceConfig } = useInstituteConfig();
+  const { activeBranchId } = useBranchAccess();
 
   const [view, setView] = useState("list"); // 'list' or 'report'
   const [isMarkOpen, setIsMarkOpen] = useState({ open: false, mode: "class" });
@@ -99,8 +101,8 @@ export default function AttendancePage({ type }) {
 
   // Fetch Academic Years
   const { data: yearsData } = useQuery({
-    queryKey: ["academic-years", schoolId],
-    queryFn: () => academicYearService.getOptions(schoolId),
+    queryKey: ["academic-years", schoolId, activeBranchId],
+    queryFn: () => academicYearService.getOptions(schoolId, true, activeBranchId),
     enabled: !!schoolId,
   });
 

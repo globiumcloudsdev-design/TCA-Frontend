@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { studentService } from '@/services/studentService';
 import { vendorService } from '@/services/vendorService';
 import useAuthStore from '@/store/authStore';
+import useBranchAccess from '@/hooks/useBranchAccess';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
@@ -68,6 +69,7 @@ export default function Vendors() {
   const canDo = useAuthStore((s) => s.canDo);
   const user = useAuthStore((s) => s.user);
   const type = user?.institute?.institute_type || null;
+  const { activeBranchId } = useBranchAccess();
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -108,9 +110,10 @@ export default function Vendors() {
     isFetching: vendorsFetching,
     refetch: refetchVendors
   } = useQuery({
-    queryKey: ['vendors', page, pageSize, search, statusFilter, vendorTypeFilter],
+    queryKey: ['vendors', activeBranchId, page, pageSize, search, statusFilter, vendorTypeFilter],
     queryFn: async () => {
       const params = {
+        branch_id: activeBranchId,
         page,
         limit: pageSize,
         search: search || undefined,
@@ -180,7 +183,7 @@ export default function Vendors() {
 
   // ─── Mutations ──────────────────────────────────────────────────────────
   const createMutation = useMutation({
-    mutationFn: vendorService.create,
+    mutationFn: (payload) => vendorService.create({ ...payload, branch_id: activeBranchId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
       toast.success('Vendor created successfully');

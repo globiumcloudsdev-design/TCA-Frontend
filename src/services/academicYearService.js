@@ -27,16 +27,13 @@ export const academicYearService = {
   getAll: async (params = {}) => {
     try {
       const queryString = buildQuery(params);
-      const response = await api.get(`/academic-years${queryString}`, {
-        headers: { 'X-Branch-ID': null }
-      });
+      const response = await api.get(`/academic-years${queryString}`);
       return response.data;
     } catch (error) {
       console.warn('⚠️ [academicYearService.getAll] Error fetching academic years, trying current fallback:', error?.response?.data || error.message);
       try {
         const curRes = await api.get('/academic-years/current', {
-          params: { institute_id: params.institute_id },
-          headers: { 'X-Branch-ID': null }
+          params: { institute_id: params.institute_id, ...(params.branch_id ? { branch_id: params.branch_id } : {}) }
         });
         const currentYear = curRes.data?.data || curRes.data;
         if (currentYear?.id) {
@@ -77,12 +74,13 @@ export const academicYearService = {
   /**
    * Get current academic year
    * @param {string} instituteId - Institute ID
+   * @param {string} [branchId] - Branch ID
    */
-  getCurrent: async (instituteId) => {
+  getCurrent: async (instituteId, branchId = null) => {
     try {
-      const response = await api.get(`/academic-years/current`, {
-        params: { institute_id: instituteId }
-      });
+      const params = { institute_id: instituteId };
+      if (branchId) params.branch_id = branchId;
+      const response = await api.get(`/academic-years/current`, { params });
       return response.data;
     } catch (error) {
       console.error('Error fetching current academic year:', error);
@@ -185,15 +183,14 @@ export const academicYearService = {
    * Get academic year options for dropdown
    * @param {string} instituteId - Institute ID
    * @param {boolean} onlyActive - Only active years
+   * @param {string} [branchId] - Branch ID
    */
-  getOptions: async (instituteId, onlyActive = true) => {
+  getOptions: async (instituteId, onlyActive = true, branchId = null) => {
     try {
       const params = { institute_id: instituteId, limit: 100, sortBy: 'start_date', sortOrder: 'DESC' };
       if (onlyActive) params.is_active = true;
-      const response = await api.get('/academic-years/options', {
-        params,
-        headers: { 'X-Branch-ID': null }
-      });
+      if (branchId) params.branch_id = branchId;
+      const response = await api.get('/academic-years/options', { params });
       const years = (response.data?.data || [])
         .map((y) => ({
           value: y?.value || y?.id,
@@ -207,10 +204,9 @@ export const academicYearService = {
     } catch (error) {
       console.warn('⚠️ [academicYearService.getOptions] Options endpoint failed, trying /academic-years fallback:', error?.response?.data || error.message);
       try {
-        const fallbackRes = await api.get('/academic-years', {
-          params: { institute_id: instituteId, limit: 50 },
-          headers: { 'X-Branch-ID': null }
-        });
+        const fallbackParams = { institute_id: instituteId, limit: 50 };
+        if (branchId) fallbackParams.branch_id = branchId;
+        const fallbackRes = await api.get('/academic-years', { params: fallbackParams });
         const rows = fallbackRes.data?.data || fallbackRes.data?.rows || [];
         const years = (Array.isArray(rows) ? rows : [])
           .map((y) => ({

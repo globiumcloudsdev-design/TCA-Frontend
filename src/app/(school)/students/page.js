@@ -107,13 +107,13 @@ export default function StudentsPage() {
   });
 
   const { data: classesData } = useQuery({
-    queryKey: ['classes-all'],
-    queryFn:  () => classService.getAll({ limit: 500, fetchAll: true }),
+    queryKey: ['classes-all', activeBranchId],
+    queryFn:  () => classService.getAll({ branch_id: activeBranchId, limit: 500, fetchAll: true }),
   });
 
   const { data: yearsData } = useQuery({
-    queryKey: ['academic-years-all'],
-    queryFn:  () => academicYearService.getAll(),
+    queryKey: ['academic-years-all', activeBranchId],
+    queryFn:  () => academicYearService.getAll({ branch_id: activeBranchId }),
   });
 
   const students   = extractRows(data);

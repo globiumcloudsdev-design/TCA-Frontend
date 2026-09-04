@@ -16,6 +16,7 @@ import {
 import { classService, academicYearService, studentService, feeTemplateService } from '@/services';
 import { feeVoucherService } from '@/services';
 import useInstituteStore from '@/store/instituteStore';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle, AlertTriangle, DollarSign, Info } from 'lucide-react';
 
@@ -47,6 +48,7 @@ const FEE_TYPE_OPTIONS = [
 export default function BulkVoucherGenerator({ instituteId: propInstituteId, onSuccess, onGeneratingChange }) {
   const currentInstitute = useInstituteStore((s) => s.currentInstitute);
   const instituteId = propInstituteId || currentInstitute?.id;
+  const { activeBranchId } = useBranchAccess();
   
   const qc = useQueryClient();
   const [selectedMode, setSelectedMode] = useState('single');
@@ -108,11 +110,12 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
 
   // Fetch academic years
   const { data: academicYears = [] } = useQuery({
-    queryKey: ['academic-years', instituteId],
+    queryKey: ['academic-years', instituteId, activeBranchId],
     queryFn: async () => {
       try {
         const response = await academicYearService.getAll({ 
           institute_id: instituteId, 
+          branch_id: activeBranchId,
           is_active: true,
           limit: 1000  // Fetch all for dropdown
         });

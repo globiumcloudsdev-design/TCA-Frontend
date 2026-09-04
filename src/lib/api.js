@@ -40,7 +40,6 @@ api.interceptors.request.use(
 
     const url = String(config.url || '');
     const isGlobalEndpoint =
-      url.includes('/academic-years') ||
       url.includes('/subscription-plans') ||
       url.includes('/master-admin') ||
       url.includes('/auth/') ||

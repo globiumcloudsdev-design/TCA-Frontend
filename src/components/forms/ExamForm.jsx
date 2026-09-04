@@ -31,6 +31,7 @@ import { examService } from '@/services/examService';
 import { classService } from '@/services/classService';
 import { academicYearService } from '@/services/academicYearService';
 import { useAuthStore } from '@/store/authStore';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import { EXAM_TYPES, EXAM_CATEGORIES } from '@/constants';
 
 // ─────────────────────────────────────────────────────────
@@ -87,6 +88,7 @@ export default function ExamForm({
   isEdit = false
 }) {
   const { user } = useAuthStore();
+  const { activeBranchId } = useBranchAccess();
   const instituteId = user?.institute?.id || user?.school_id;
   const rawInstituteType = user?.institute?.institute_type || user?.institute?.instituteType;
   const instituteType = typeof rawInstituteType === 'object' 
@@ -159,8 +161,8 @@ export default function ExamForm({
     const fetchData = async () => {
       try {
         const [yearsRes, classesRes] = await Promise.all([
-          academicYearService.getAll({ institute_id: instituteId, is_active: true }),
-          classService.getAll({ institute_id: instituteId, is_active: true, limit: 500, fetchAll: true })
+          academicYearService.getAll({ institute_id: instituteId, branch_id: activeBranchId, is_active: true }),
+          classService.getAll({ institute_id: instituteId, branch_id: activeBranchId, is_active: true, limit: 500, fetchAll: true })
         ]);
 
         const rawYears = yearsRes?.data?.rows || yearsRes?.rows || (Array.isArray(yearsRes?.data) ? yearsRes.data : []) || (Array.isArray(yearsRes) ? yearsRes : []);

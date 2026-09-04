@@ -77,16 +77,16 @@ export default function BranchSelectField({
   useEffect(() => {
     if (isBranchAdmin && setValue) {
       const branchId = assignedBranch?.id || user?.branch_id || user?.branch?.id;
-      if (branchId) {
-        setValue(name, String(branchId), { shouldValidate: true, shouldDirty: false });
+      if (branchId && String(currentValue || '') !== String(branchId)) {
+        setValue(name, String(branchId), { shouldValidate: false, shouldDirty: false });
       }
     }
-  }, [isBranchAdmin, assignedBranch, user, name, setValue]);
+  }, [isBranchAdmin, assignedBranch?.id, user?.branch_id, user?.branch?.id, name, setValue, currentValue]);
 
-  // Pre-fill with activeBranchId for Super Admin if field is currently empty
+  // Pre-fill with activeBranchId for Super Admin if field is currently empty (ignore 'all')
   useEffect(() => {
-    if (!isBranchAdmin && setValue && activeBranchId && (!currentValue || currentValue === '')) {
-      setValue(name, String(activeBranchId), { shouldValidate: true });
+    if (!isBranchAdmin && setValue && activeBranchId && activeBranchId !== 'all' && (!currentValue || currentValue === '')) {
+      setValue(name, String(activeBranchId), { shouldValidate: false, shouldDirty: false });
     }
   }, [isBranchAdmin, activeBranchId, currentValue, name, setValue]);
 
