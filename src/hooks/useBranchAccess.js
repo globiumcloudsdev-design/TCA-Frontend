@@ -22,11 +22,15 @@ export default function useBranchAccess() {
   const assignedBranchId = assignedBranch?.id || user?.branch_id || user?.branch?.id || null;
   const assignedBranchName = assignedBranch?.name || resolveBranchName(assignedBranchId, user?.branch?.name || user?.branch_name || 'Assigned Branch');
 
+  const isAllBranches = !activeBranchId || activeBranchId === 'all';
+
   const resolvedActiveName = isBranchAdmin
     ? assignedBranchName
-    : (activeBranchName && !activeBranchName.includes('Selected Branch')
-        ? activeBranchName
-        : (activeBranchId ? resolveBranchName(activeBranchId, 'Selected Branch') : 'All Branches'));
+    : (!isAllBranches
+        ? (activeBranchName && !activeBranchName.includes('Selected Branch')
+            ? activeBranchName
+            : resolveBranchName(activeBranchId, 'Selected Branch'))
+        : 'All Branches');
 
   return {
     isBranchAdmin,
@@ -36,11 +40,11 @@ export default function useBranchAccess() {
     assignedBranchId,
     hasBranches,
     canSwitchBranch: isSuperAdmin,
-    activeBranchId: isBranchAdmin ? assignedBranchId : activeBranchId,
+    activeBranchId: isBranchAdmin ? assignedBranchId : (isAllBranches ? null : activeBranchId),
     activeBranchName: resolvedActiveName,
     setActiveBranch: (id, name) => setActiveBranch(id, name || resolveBranchName(id)),
     clearActiveBranch,
-    isAllBranches: isSuperAdmin && !activeBranchId,
+    isAllBranches: isSuperAdmin && isAllBranches,
     getBranchName: resolveBranchName,
   };
 }

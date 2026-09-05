@@ -73,8 +73,13 @@ api.interceptors.request.use(
       }
     }
 
+    // Sanitize config.params if client explicitly passed branch_id as 'all' or 'null'
+    if (config.params && (config.params.branch_id === 'all' || config.params.branch_id === 'null' || config.params.branch_id === 'undefined')) {
+      delete config.params.branch_id;
+    }
+
     // Attach branch_id to query params for branch-scoped endpoints
-    if (branchId && branchId !== 'all' && !isGlobalEndpoint) {
+    if (branchId && branchId !== 'all' && branchId !== 'null' && !isGlobalEndpoint) {
       if (!config.params) config.params = {};
       if (config.params.branch_id === undefined) {
         config.params.branch_id = branchId;
