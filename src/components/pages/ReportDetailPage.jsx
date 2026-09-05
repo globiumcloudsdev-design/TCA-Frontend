@@ -43,7 +43,7 @@ import {
 } from "@/services";
 import DataTable from "@/components/common/DataTable";
 import { Button } from "@/components/ui/button";
-import { cn, getActiveAcademicYearId } from "@/lib/utils";
+import { cn, getActiveAcademicYearId, formatDate } from "@/lib/utils";
 import { SelectField, DatePickerField } from "@/components/common";
 import ExportModal from "@/components/common/ExportModal";
 
@@ -115,12 +115,12 @@ const STUDENT_REPORT_COLUMNS = [
   {
     id: "dob",
     header: "Date of Birth",
-    accessorFn: (s) => s.dob || "—",
+    accessorFn: (s) => (s.dob || s.date_of_birth) ? formatDate(s.dob || s.date_of_birth) : "—",
   },
   {
     id: "admission_date",
     header: "Admission Date",
-    accessorFn: (s) => s.admission_date || s.enrollment_date || "—",
+    accessorFn: (s) => (s.admission_date || s.enrollment_date) ? formatDate(s.admission_date || s.enrollment_date) : "—",
   },
   { id: "cnic", header: "CNIC / B-Form", accessorFn: (s) => s.cnic || "—" },
   {

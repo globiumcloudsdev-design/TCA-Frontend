@@ -46,7 +46,7 @@ import StudentForm from '@/components/forms/StudentForm';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import SelectField from '@/components/common/SelectField';
 import { SimpleTooltip } from '@/components/ui/SimpleTooltip';
-import { cn, getActiveAcademicYearId } from '@/lib/utils';
+import { cn, getActiveAcademicYearId, formatDate } from '@/lib/utils';
 import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -144,6 +144,7 @@ const flattenStudent = (s) => {
   const details = s.details?.studentDetails || {};
   const flat = { ...s, ...details, id: s.id };
   if (flat.date_of_birth && !flat.dob) flat.dob = flat.date_of_birth;
+  if (flat.dob && !flat.date_of_birth) flat.date_of_birth = flat.dob;
   return flat;
 };
 
@@ -699,6 +700,7 @@ export default function StudentsPage({ type }) {
         roll_number: val('roll_no') || val('roll_number') || '',
         class_name: val('class_name') || s.class?.name || '',
         section_name: val('section_name') || s.section?.name || '',
+        date_of_birth: formatDate(val('date_of_birth') || val('dob')),
         branch_name: resolveBranchName(s.branch || s.branch_name || val('branch_id'), ''),
       };
     });
@@ -1146,8 +1148,12 @@ function StudentCell({ student: s, columnKey, type, terms }) {
     if (baseVal) return baseVal;
 
     // Fallbacks for date fields
-    if (k === 'dob') return s.date_of_birth ?? s.details?.studentDetails?.date_of_birth;
-    if (k === 'admission_date') return s.admission_date ?? s.details?.studentDetails?.admission_date;
+    if (k === 'dob' || k === 'date_of_birth') {
+      return s.date_of_birth ?? s.dob ?? s.details?.studentDetails?.date_of_birth ?? s.details?.studentDetails?.dob;
+    }
+    if (k === 'admission_date') {
+      return s.admission_date ?? s.details?.studentDetails?.admission_date;
+    }
     
     return null;
   };
@@ -1209,22 +1215,35 @@ function StudentCell({ student: s, columnKey, type, terms }) {
       );
     
     case 'dob':
+    case 'date_of_birth':
     case 'admission_date':
     case 'created_at':
+    case 'updated_at': {
       const dateVal = val(columnKey);
       if (!dateVal) return <span className="text-muted-foreground">—</span>;
       try {
-        const date = typeof dateVal === 'string' ? parseISO(dateVal) : new Date(dateVal);
-        if (isValid(date)) {
+        let date;
+        if (typeof dateVal === 'string') {
+          const match = dateVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
+          if (match) {
+            date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+          } else {
+            date = parseISO(dateVal);
+          }
+        } else {
+          date = new Date(dateVal);
+        }
+        if (isValid(date) && !isNaN(date.getTime())) {
           return (
             <div className="flex items-center gap-1.5">
               <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <span className="text-sm whitespace-nowrap">{format(date, 'MMM dd, yyyy')}</span>
+              <span className="text-sm whitespace-nowrap">{format(date, 'dd MMM yyyy')}</span>
             </div>
           );
         }
       } catch (e) {}
       return <span className="text-sm">{String(dateVal)}</span>;
+    }
 
     case 'branch':
     case 'branch_id':
@@ -1239,15 +1258,30 @@ function StudentCell({ student: s, columnKey, type, terms }) {
       );
     }
 
-
-    default:
+    default: {
       const defaultValue = val(columnKey);
       if (!defaultValue) return <span className="text-muted-foreground">—</span>;
+      // Safety net for raw ISO timestamps (e.g. 2026-06-15T00:00:00.000Z)
+      if (typeof defaultValue === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(defaultValue)) {
+        try {
+          const match = defaultValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+          const date = match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : parseISO(defaultValue);
+          if (isValid(date) && !isNaN(date.getTime())) {
+            return (
+              <div className="flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-sm whitespace-nowrap">{format(date, 'dd MMM yyyy')}</span>
+              </div>
+            );
+          }
+        } catch (e) {}
+      }
       return (
         <SimpleTooltip content={columnKey.replace(/_/g, ' ')} side="top">
           <span className="cursor-help">{String(defaultValue)}</span>
         </SimpleTooltip>
       );
+    }
   }
 }
 
