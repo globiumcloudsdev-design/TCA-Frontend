@@ -59,21 +59,23 @@ export default function DashboardPage({ type }) {
   const canDo = useAuthStore((s) => s.canDo);
   const activeBranchId = useUiStore((s) => s.activeBranchId);
   const rawActiveBranchName = useUiStore((s) => s.activeBranchName);
+  const isAllBranches = !activeBranchId || activeBranchId === 'all';
+  const branchFilter = isAllBranches ? undefined : activeBranchId;
   const activeBranchName = useMemo(() => {
-    if (!activeBranchId && !rawActiveBranchName) return null;
+    if (isAllBranches) return null;
     return resolveBranchName(rawActiveBranchName || activeBranchId, null);
-  }, [activeBranchId, rawActiveBranchName]);
+  }, [isAllBranches, activeBranchId, rawActiveBranchName]);
 
   const userId = user?.id || 'guest';
   const instituteId = user?.institute?.id || user?.school?.id || user?.institute_id || 'default';
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ['adaptive-dashboard', type, activeBranchId, userId, instituteId],
+    queryKey: ['adaptive-dashboard', type, branchFilter, userId, instituteId],
     queryFn: () =>
       dashboardService.getAdaptiveDashboard({
         type,
         roleCode: user?.role_code,
-        branchId: activeBranchId,
+        branchId: branchFilter,
       }),
     enabled: !!user?.id,
     staleTime: 60000,
@@ -82,22 +84,22 @@ export default function DashboardPage({ type }) {
 
   // Fallback count queries — only run if primary dashboard is loaded and cached for 5 mins
   const { data: studentsFallbackData } = useQuery({
-    queryKey: ['dashboard-fallback-students', type, activeBranchId, userId, instituteId],
-    queryFn: () => studentService.getAll({ limit: 1, branch_id: activeBranchId || undefined }, type),
+    queryKey: ['dashboard-fallback-students', type, branchFilter, userId, instituteId],
+    queryFn: () => studentService.getAll({ limit: 1, branch_id: branchFilter }, type),
     enabled: !!user?.id && !isLoading,
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: teachersFallbackData } = useQuery({
-    queryKey: ['dashboard-fallback-teachers', type, activeBranchId, userId, instituteId],
-    queryFn: () => teacherService.getAll({ limit: 1, branch_id: activeBranchId || undefined }),
+    queryKey: ['dashboard-fallback-teachers', type, branchFilter, userId, instituteId],
+    queryFn: () => teacherService.getAll({ limit: 1, branch_id: branchFilter }),
     enabled: !!user?.id && !isLoading,
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: classesFallbackData } = useQuery({
-    queryKey: ['dashboard-fallback-classes', type, activeBranchId, userId, instituteId],
-    queryFn: () => classService.getAll({ limit: 1, branch_id: activeBranchId || undefined, institute_type: type }),
+    queryKey: ['dashboard-fallback-classes', type, branchFilter, userId, instituteId],
+    queryFn: () => classService.getAll({ limit: 1, branch_id: branchFilter, institute_type: type }),
     enabled: !!user?.id && !isLoading,
     staleTime: 5 * 60 * 1000,
   });

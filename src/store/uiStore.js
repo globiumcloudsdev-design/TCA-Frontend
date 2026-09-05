@@ -19,7 +19,7 @@ export const useUIStore = create(
       setSidebarOpen: (val) => set({ sidebarOpen: val }),
 
       // Active Branch (only relevant when school.has_branches = true)
-      // null means school-wide scope
+      // null or 'all' means school-wide scope
       activeBranchId: null,
       activeBranchName: null,
       setActiveBranch: (id, name) => {
@@ -27,6 +27,10 @@ export const useUIStore = create(
         set({ activeBranchId: id, activeBranchName: name });
       },
       clearActiveBranch: () => {
+        setActiveBranch('all');
+        set({ activeBranchId: 'all', activeBranchName: 'All Branches' });
+      },
+      resetActiveBranch: () => {
         setActiveBranch(null);
         set({ activeBranchId: null, activeBranchName: null });
       },

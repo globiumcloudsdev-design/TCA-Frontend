@@ -107,8 +107,8 @@ export function parseToIsoDate(val) {
   const str = sanitizeStr(val);
   if (!str) return '';
 
-  // 1. YYYY-MM-DD or YYYY/MM/DD
-  const isoMatch = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  // 1. YYYY-MM-DD or YYYY/MM/DD (including ISO timestamps like 2026-06-15T00:00:00.000Z)
+  const isoMatch = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
   if (isoMatch) {
     const [, y, m, d] = isoMatch;
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
@@ -168,6 +168,7 @@ const FIELD_SYNONYMS = {
   registration_no: ['registrationno', 'registrationnumber', 'regno', 'regnumber', 'registration', 'reg', 'grno', 'grnumber', 'gr', 'studentcode', 'studentid', 'admissionno'],
   cnic: ['cnic', 'bform', 'cnicbform', 'bformno', 'cnicno', 'nationalid', 'idcard', 'identity', 'formb'],
   dob: ['dob', 'dateofbirth', 'birthdate', 'birthofdate', 'dateofbirthdob'],
+  date_of_birth: ['dob', 'dateofbirth', 'birthdate', 'birthofdate', 'dateofbirthdob'],
   gender: ['gender', 'sex'],
   blood_group: ['bloodgroup', 'bloodtype', 'blood'],
   religion: ['religion'],
@@ -225,7 +226,7 @@ function matchHeaderToColumn(fileCol, availableCols) {
   // 2. Synonyms dictionary lookup
   for (const [key, synonyms] of Object.entries(FIELD_SYNONYMS)) {
     if (synonyms.includes(normFileCol)) {
-      const col = availableCols.find((c) => c.key === key);
+      const col = availableCols.find((c) => c.key === key || (key === 'dob' && c.key === 'date_of_birth') || (key === 'date_of_birth' && c.key === 'dob'));
       if (col) return col;
     }
   }

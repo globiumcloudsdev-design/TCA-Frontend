@@ -18,6 +18,7 @@ import {
   isBranchAdmin as checkIsBranchAdmin,
   isSuperAdmin as checkIsSuperAdmin,
   getAssignedBranch as checkGetAssignedBranch,
+  getMainBranch as checkGetMainBranch,
   schoolHasBranches as checkSchoolHasBranches,
 } from "@/lib/auth";
 import { settingService } from "@/services/settingService";
@@ -65,11 +66,25 @@ export const useAuthStore = create(
             } catch (e) {}
           }
         } else {
-          clearLocalStorageActiveBranch();
-          try {
-            const { useUIStore } = require('@/store/uiStore');
-            useUIStore.getState().clearActiveBranch();
-          } catch (e) {}
+          // Super Admin / Institute Admin:
+          // Business requirement: Default to Main Branch data first upon login.
+          // If the user later selects "All Branches", it will switch to global view.
+          const mainBranch = checkGetMainBranch(user);
+          if (mainBranch?.id) {
+            const bId = mainBranch.id;
+            const bName = mainBranch.name || 'Main Branch';
+            setLocalStorageActiveBranch(bId);
+            try {
+              const { useUIStore } = require('@/store/uiStore');
+              useUIStore.getState().setActiveBranch(bId, bName);
+            } catch (e) {}
+          } else {
+            clearLocalStorageActiveBranch();
+            try {
+              const { useUIStore } = require('@/store/uiStore');
+              useUIStore.getState().clearActiveBranch();
+            } catch (e) {}
+          }
         }
 
         set({
@@ -436,9 +451,7 @@ export const useAuthStore = create(
       },
 
       getMainBranch: () => {
-        const u = get().user;
-        const branches = u?.institute?.branches || [];
-        return branches.find(b => b.is_main === true) || null;
+        return checkGetMainBranch(get().user);
       },
     }),
     {

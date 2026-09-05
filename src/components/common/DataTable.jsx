@@ -216,8 +216,8 @@ export default function DataTable({
 
   // Dynamic Branch column rule:
   // Super Admin + "All Branches" (no activeBranchId) + multi-branch → show Branch column
-  // Branch Admin OR specific branch selected → hide Branch column
-  const shouldShowBranchColumn = isSuperAdmin && !activeBranchId && hasBranches;
+  const isAllBranches = !activeBranchId || activeBranchId === 'all';
+  const shouldShowBranchColumn = isSuperAdmin && isAllBranches && hasBranches;
 
   // Process columns with selection and dynamic branch column
   const finalColumns = useMemo(() => {

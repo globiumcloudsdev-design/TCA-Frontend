@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { isBranchAdmin as checkIsBranchAdmin, getAssignedBranch, schoolHasBranches } from '@/lib/auth';
+import { isBranchAdmin as checkIsBranchAdmin, getAssignedBranch, schoolHasBranches, getMainBranch } from '@/lib/auth';
 import { resolveBranchName, registerBranches } from '@/lib/branchUtils';
 
 /**
@@ -88,6 +88,28 @@ export default function BranchSwitcher({ className = '' }) {
     registerBranches(branches);
   }
 
+  // Auto-scope Super Admin to Main Branch if not yet initialized
+  useEffect(() => {
+    if (!mounted || !isSuperAdmin || !hasBranches) return;
+    const isUninitialized = !activeBranchId || activeBranchId === 'null' || activeBranchId === 'undefined';
+    if (isUninitialized && branches.length > 0) {
+      const main =
+        getMainBranch(user) ||
+        branches.find((b) => b.is_main === true) ||
+        branches.find((b) => {
+          const code = String(b.code || '').toUpperCase();
+          const name = String(b.name || '').toLowerCase();
+          return code.endsWith('-MAIN') || code === 'MAIN' || name.includes('main');
+        }) ||
+        branches[0];
+
+      if (main?.id) {
+        const bName = resolveBranchName(main, main.name || 'Main Branch');
+        setActiveBranch(main.id, bName);
+      }
+    }
+  }, [mounted, isSuperAdmin, hasBranches, activeBranchId, branches, user, setActiveBranch]);
+
   if (!mounted) return null;
 
   // ── 1. BRANCH ADMIN: Plain Text Display Only (No Dropdown) ───────────────────
@@ -113,7 +135,8 @@ export default function BranchSwitcher({ className = '' }) {
   }
 
   // ── 2. SUPER ADMIN: Interactive Dropdown Branch Selector ─────────────────────
-  const currentLabel = activeBranchId
+  const isAllBranches = !activeBranchId || activeBranchId === 'all';
+  const currentLabel = !isAllBranches
     ? (resolveBranchName(activeBranchId, activeBranchName && !activeBranchName.includes('Selected Branch') ? activeBranchName : null) || 'Selected Branch')
     : 'All Branches';
 
@@ -126,7 +149,8 @@ export default function BranchSwitcher({ className = '' }) {
   };
 
   const handleClearBranch = () => {
-    clearActiveBranch();
+    // Explicitly set 'all' for All Branches global view
+    setActiveBranch('all', 'All Branches');
     // Instant refresh across the entire screen
     queryClient.invalidateQueries();
     toast.success('Viewing All Branches (Global View)');
@@ -139,6 +163,7 @@ export default function BranchSwitcher({ className = '' }) {
           <Button
             variant="outline"
             size="sm"
+            aria-label={`Branch Selector: ${currentLabel}`}
             className="h-8.5 px-3 flex items-center gap-2 text-xs font-semibold bg-background hover:bg-accent/60 border-primary/20 shadow-xs hover:border-primary/40 transition-colors"
           >
             <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
@@ -159,14 +184,14 @@ export default function BranchSwitcher({ className = '' }) {
             onClick={handleClearBranch}
             className={cn(
               'flex items-center justify-between px-2.5 py-2 rounded-sm cursor-pointer text-xs transition-colors',
-              !activeBranchId ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted'
+              isAllBranches ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted'
             )}
           >
             <div className="flex items-center gap-2">
               <Layers className="h-3.5 w-3.5" />
               <span>All Branches</span>
             </div>
-            {!activeBranchId && <Check className="h-4 w-4 text-primary" />}
+            {isAllBranches && <Check className="h-4 w-4 text-primary" />}
           </DropdownMenuItem>
 
           {branches.length > 0 && <DropdownMenuSeparator className="my-1" />}
@@ -174,7 +199,7 @@ export default function BranchSwitcher({ className = '' }) {
           {/* Individual Active Branches */}
           <div className="max-h-60 overflow-y-auto space-y-0.5">
             {branches.map((branch) => {
-              const isSelected = String(activeBranchId) === String(branch.id);
+              const isSelected = !isAllBranches && String(activeBranchId) === String(branch.id);
               return (
                 <DropdownMenuItem
                   key={branch.id}

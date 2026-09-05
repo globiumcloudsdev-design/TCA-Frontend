@@ -409,3 +409,92 @@ export function schoolHasBranches(user) {
   return true;
 }
 
+/**
+ * Resolve the Main Branch for an institute/user.
+ * Searches:
+ * 1. user.main_branch / user.mainBranch
+ * 2. user.branch if marked as is_main or matching MAIN code/name
+ * 3. user.institute.branches or user.branches (finds is_main: true, -MAIN code, or first branch)
+ * 4. user.branch / user.assigned_branch fallback
+ *
+ * @param {object} user
+ * @returns {{ id: string, name: string } | null}
+ */
+export function getMainBranch(user) {
+  if (!user) return null;
+
+  if (user.main_branch?.id) {
+    return {
+      id: user.main_branch.id,
+      name: user.main_branch.name || user.main_branch.branch_name || 'Main Branch',
+      ...user.main_branch,
+    };
+  }
+
+  if (user.mainBranch?.id) {
+    return {
+      id: user.mainBranch.id,
+      name: user.mainBranch.name || user.mainBranch.branch_name || 'Main Branch',
+      ...user.mainBranch,
+    };
+  }
+
+  const branches = user.institute?.branches || user.branches || [];
+  if (Array.isArray(branches) && branches.length > 0) {
+    const main = branches.find((b) => b.is_main === true);
+    if (main?.id) {
+      return {
+        id: main.id,
+        name: main.name || main.branch_name || 'Main Branch',
+        ...main,
+      };
+    }
+    const byCodeOrName = branches.find((b) => {
+      const code = String(b.code || '').toUpperCase();
+      const name = String(b.name || '').toLowerCase();
+      return code.endsWith('-MAIN') || code === 'MAIN' || name.includes('main');
+    });
+    if (byCodeOrName?.id) {
+      return {
+        id: byCodeOrName.id,
+        name: byCodeOrName.name || byCodeOrName.branch_name || 'Main Branch',
+        ...byCodeOrName,
+      };
+    }
+    if (branches[0]?.id) {
+      return {
+        id: branches[0].id,
+        name: branches[0].name || branches[0].branch_name || 'Main Branch',
+        ...branches[0],
+      };
+    }
+  }
+
+  if (user.branch?.id && (user.branch.is_main === true || user.is_main_branch === true)) {
+    return {
+      id: user.branch.id,
+      name: user.branch.name || user.branch.branch_name || 'Main Branch',
+      ...user.branch,
+    };
+  }
+
+  if (user.branch?.id) {
+    return {
+      id: user.branch.id,
+      name: user.branch.name || user.branch.branch_name || 'Main Branch',
+      ...user.branch,
+    };
+  }
+
+  if (user.assigned_branch?.id) {
+    return {
+      id: user.assigned_branch.id,
+      name: user.assigned_branch.name || user.assigned_branch.branch_name || 'Main Branch',
+      ...user.assigned_branch,
+    };
+  }
+
+  return null;
+}
+
+

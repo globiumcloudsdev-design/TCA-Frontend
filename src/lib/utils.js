@@ -4,7 +4,7 @@
 
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { format, formatDistance } from 'date-fns';
+import { format, formatDistance, isValid } from 'date-fns';
 
 // ── Tailwind class merge ──────────────────────────────────────────────────
 export function cn(...inputs) {
@@ -14,7 +14,24 @@ export function cn(...inputs) {
 // ── Date formatting ───────────────────────────────────────────────────────
 export function formatDate(date, pattern = 'dd MMM yyyy') {
   if (!date) return '—';
-  return format(new Date(date), pattern);
+  try {
+    let d;
+    if (date instanceof Date) {
+      d = date;
+    } else if (typeof date === 'string') {
+      const match = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+      } else {
+        d = new Date(date);
+      }
+    } else {
+      d = new Date(date);
+    }
+    return isValid(d) && !isNaN(d.getTime()) ? format(d, pattern) : '—';
+  } catch (e) {
+    return '—';
+  }
 }
 
 export function timeAgo(date) {

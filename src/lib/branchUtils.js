@@ -65,6 +65,10 @@ export function resolveBranchName(branchOrId, fallback = '—') {
     return fallback;
   }
 
+  if (str.toLowerCase() === 'all') {
+    return fallback !== '—' && fallback !== null ? fallback : 'All Branches';
+  }
+
   // 2. Check in-memory cache
   if (branchNameCache.has(str)) {
     return branchNameCache.get(str);
