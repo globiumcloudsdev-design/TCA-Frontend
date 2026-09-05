@@ -23,10 +23,14 @@ const nextConfig = {
   },
   // All API calls proxy through Next.js to avoid CORS in dev
   async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+    if (!apiUrl || (!apiUrl.startsWith('http://') && !apiUrl.startsWith('https://') && !apiUrl.startsWith('/'))) {
+      return [];
+    }
     return [
       {
         source: '/api/backend/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL}/:path*`,
+        destination: `${apiUrl.replace(/\/$/, '')}/:path*`,
       },
     ];
   },
