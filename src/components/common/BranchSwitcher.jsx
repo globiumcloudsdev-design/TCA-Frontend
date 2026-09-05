@@ -18,7 +18,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { isBranchAdmin as checkIsBranchAdmin, getAssignedBranch, schoolHasBranches } from '@/lib/auth';
-import { DUMMY_BRANCHES } from '@/data/dummyData';
+import { resolveBranchName, registerBranches } from '@/lib/branchUtils';
 
 /**
  * BranchSwitcher — Global Branch Selector in Header/Navbar
@@ -51,7 +51,8 @@ export default function BranchSwitcher({ className = '' }) {
   useEffect(() => {
     if (isBranchAdmin && assignedBranch?.id) {
       if (activeBranchId !== assignedBranch.id) {
-        setActiveBranch(assignedBranch.id, assignedBranch.name || 'Assigned Branch');
+        const bName = resolveBranchName(assignedBranch.id, assignedBranch.name || 'Assigned Branch');
+        setActiveBranch(assignedBranch.id, bName);
       }
     }
   }, [isBranchAdmin, assignedBranch, activeBranchId, setActiveBranch]);
@@ -61,27 +62,40 @@ export default function BranchSwitcher({ className = '' }) {
     queryKey: ['branches', 'global-switcher'],
     queryFn: async () => {
       try {
-        const res = await branchService.getAll({ limit: 100 });
-        const list = res?.data?.rows ?? res?.data ?? res ?? [];
-        if (Array.isArray(list) && list.length > 0) return list;
+        const res = await branchService.getAll({ limit: 100, is_active: true });
+        const list = res?.data?.rows ?? (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
+        if (Array.isArray(list) && list.length > 0) {
+          registerBranches(list);
+          return list;
+        }
       } catch (err) {
         // fallback
       }
-      return user?.institute?.branches ?? user?.branches ?? DUMMY_BRANCHES;
+      const fallbackList = user?.institute?.branches ?? user?.branches ?? [];
+      registerBranches(fallbackList);
+      return fallbackList;
     },
     enabled: mounted && isSuperAdmin && hasBranches,
     staleTime: 60 * 1000,
   });
 
-  const branches = Array.isArray(data)
+  const rawBranches = Array.isArray(data)
     ? data
-    : (data?.data?.rows ?? data?.data ?? user?.institute?.branches ?? DUMMY_BRANCHES);
+    : (data?.data?.rows ?? (Array.isArray(data?.data) ? data.data : (user?.institute?.branches ?? user?.branches ?? [])));
+  const branches = Array.isArray(rawBranches) ? rawBranches : [];
+
+  if (branches.length > 0) {
+    registerBranches(branches);
+  }
 
   if (!mounted) return null;
 
   // ── 1. BRANCH ADMIN: Plain Text Display Only (No Dropdown) ───────────────────
   if (isBranchAdmin) {
-    const branchDisplayName = assignedBranch?.name || user?.branch?.name || user?.branch_name || 'Assigned Branch';
+    const branchDisplayName = resolveBranchName(
+      assignedBranch?.id || user?.branch_id,
+      assignedBranch?.name || user?.branch?.name || user?.branch_name || 'Assigned Branch'
+    );
     return (
       <div
         className={cn(
@@ -100,14 +114,15 @@ export default function BranchSwitcher({ className = '' }) {
 
   // ── 2. SUPER ADMIN: Interactive Dropdown Branch Selector ─────────────────────
   const currentLabel = activeBranchId
-    ? (activeBranchName || branches.find((b) => String(b.id) === String(activeBranchId))?.name || 'Selected Branch')
+    ? (resolveBranchName(activeBranchId, activeBranchName && !activeBranchName.includes('Selected Branch') ? activeBranchName : null) || 'Selected Branch')
     : 'All Branches';
 
   const handleSelectBranch = (branch) => {
-    setActiveBranch(branch.id, branch.name);
+    const bName = resolveBranchName(branch, branch.name || 'Branch');
+    setActiveBranch(branch.id, bName);
     // Instant refresh across the entire screen
     queryClient.invalidateQueries();
-    toast.success(`Switched view to ${branch.name}`);
+    toast.success(`Switched view to ${bName}`);
   };
 
   const handleClearBranch = () => {
@@ -171,7 +186,7 @@ export default function BranchSwitcher({ className = '' }) {
                 >
                   <div className="flex items-center gap-2 min-w-0 pr-2">
                     <Building2 className="h-3.5 w-3.5 shrink-0 opacity-70" />
-                    <span className="truncate">{branch.name}</span>
+                    <span className="truncate">{resolveBranchName(branch, branch.name || 'Branch')}</span>
                   </div>
                   {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
                 </DropdownMenuItem>

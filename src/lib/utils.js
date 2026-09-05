@@ -100,3 +100,65 @@ export function buildQuery(params = {}) {
   });
   return query.toString() ? `?${query}` : '';
 }
+
+// ── Active Academic Year Helpers ──────────────────────────────────────────
+/**
+ * Resolves the active / current academic year object from a list of academic years or options.
+ * Prioritizes:
+ * 1. is_current === true
+ * 2. is_active === true (or status === 'active')
+ * 3. first available element
+ */
+export function getActiveAcademicYear(years = []) {
+  const list = Array.isArray(years?.data?.rows)
+    ? years.data.rows
+    : Array.isArray(years?.data)
+    ? years.data
+    : Array.isArray(years?.rows)
+    ? years.rows
+    : Array.isArray(years)
+    ? years
+    : [];
+
+  if (!list.length) return null;
+
+  const current = list.find(
+    (y) => y?.is_current === true || String(y?.is_current) === 'true' || String(y?.is_current) === '1'
+  );
+  if (current) return current;
+
+  const active = list.find(
+    (y) =>
+      y?.is_active === true ||
+      String(y?.is_active) === 'true' ||
+      String(y?.is_active) === '1' ||
+      y?.status === 'active'
+  );
+  if (active) return active;
+
+  return list[0];
+}
+
+/**
+ * Returns the ID (or value) of the active / current academic year as string, or '' if not found.
+ */
+export function getActiveAcademicYearId(years = []) {
+  const active = getActiveAcademicYear(years);
+  if (!active) return '';
+  return String(active.value ?? active.id ?? '');
+}
+
+/**
+ * Normalizes field label and required status so that there are never duplicate asterisks.
+ * If the label text contains trailing asterisk(s) (or required is true), it strips all asterisks
+ * from the label text and returns { labelText, isRequired: true }.
+ */
+export function sanitizeFieldLabel(label, required = false) {
+  if (typeof label !== 'string') {
+    return { labelText: label, isRequired: Boolean(required) };
+  }
+  const hasAsterisk = /[\s*]*\*+[\s*]*$/.test(label);
+  const isRequired = Boolean(required || hasAsterisk);
+  const labelText = label.replace(/[\s*]*\*+[\s*]*$/, '').trim();
+  return { labelText, isRequired };
+}

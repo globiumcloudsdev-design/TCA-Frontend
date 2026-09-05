@@ -16,6 +16,7 @@ import {
 } from '@/components/common';
 import { BranchForm } from '@/components/forms';
 import { Button } from '@/components/ui/button';
+import { registerBranches } from '@/lib/branchUtils';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 const extractRows  = (d) => d?.data?.rows ?? d?.data ?? [];
@@ -103,6 +104,12 @@ export default function BranchesPage() {
 
   const rows       = extractRows(data);
   const totalPages = extractPages(data);
+
+  useEffect(() => {
+    if (rows && rows.length > 0) {
+      registerBranches(rows);
+    }
+  }, [rows]);
 
   // ── mutations ────────────────────────────────────────────────────────────────
   const invalidate = () => qc.invalidateQueries({ queryKey: ['branches'] });

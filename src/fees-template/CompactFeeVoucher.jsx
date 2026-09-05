@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { fmtDate, fmtAmount } from '@/lib/formatters';
+import { resolveBranchName } from '@/lib/branchUtils';
 
 const toNumber = (value) => {
   const parsed = Number(value);
@@ -29,6 +30,18 @@ export default function CompactFeeVoucher({
   const classNameVal = studentData.className || studentData.class_name || studentData.class || '';
   const sectionNameVal = studentData.sectionName || studentData.section_name || studentData.section || '';
   const classAndSection = [classNameVal, sectionNameVal].filter(Boolean).join(' - ') || 'N/A';
+  const branchName = resolveBranchName(
+    studentData.branch ||
+    studentData.branch_name ||
+    studentData.branch_id ||
+    voucherMeta.branch ||
+    voucherMeta.branch_name ||
+    voucherMeta.branch_id ||
+    instituteData.branch ||
+    instituteData.branch_name ||
+    instituteData.branch_id,
+    null
+  );
 
   const monthLabel = voucherMeta.month || voucherMeta.monthLabel || voucherMeta.fee_month || 'N/A';
   const yearLabel = voucherMeta.year || (new Date().getFullYear());
@@ -145,6 +158,12 @@ export default function CompactFeeVoucher({
           <span className="font-semibold text-slate-600">Class &amp; Section:</span>
           <span className="font-medium text-slate-900">{classAndSection}</span>
         </div>
+        {branchName && (
+          <div className="flex justify-between items-center py-0.5">
+            <span className="font-semibold text-slate-600">Branch:</span>
+            <span className="font-medium text-slate-900">{branchName}</span>
+          </div>
+        )}
         {regNo && (
           <div className="flex justify-between items-center py-0.5">
             <span className="font-semibold text-slate-600">Reg #:</span>

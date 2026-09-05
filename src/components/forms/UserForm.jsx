@@ -35,6 +35,7 @@ export default function UserForm({
     control,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm({ defaultValues });
 
@@ -104,6 +105,7 @@ export default function UserForm({
         control={control}
         error={errors.branch_id}
         setValue={setValue}
+        watch={watch}
         branches={branchOptions}
         required={false}
       />

@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Controller } from 'react-hook-form';
 import { Check, ChevronDown, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeFieldLabel } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 
@@ -82,12 +82,14 @@ function MultiSelectFieldBase({
     return option?.label || val;
   };
 
+  const { labelText, isRequired } = sanitizeFieldLabel(label, required);
+
   return (
     <div className={cn("space-y-2", className)} ref={containerRef}>
-      {label && (
+      {labelText && (
         <Label className="text-sm font-medium">
-          {label}
-          {required && <span className="text-destructive ml-1">*</span>}
+          {labelText}
+          {isRequired && <span className="ml-0.5 text-destructive font-semibold">*</span>}
         </Label>
       )}
 

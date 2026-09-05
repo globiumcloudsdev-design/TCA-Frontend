@@ -60,6 +60,7 @@ import { toast } from 'sonner';
 import useAuthStore from '@/store/authStore';
 import useUIStore from '@/store/uiStore';
 import { isBranchAdmin as checkIsBranchAdmin, schoolHasBranches } from '@/lib/auth';
+import { resolveBranchName, useBranches } from '@/lib/branchUtils';
 import {
   Table,
   TableBody,
@@ -210,6 +211,9 @@ export default function DataTable({
   const isSuperAdmin = !isBranchAdmin;
   const hasBranches = schoolHasBranches(user);
 
+  // Proactively warm the branch cache so any branch_id can be resolved to a human name
+  useBranches();
+
   // Dynamic Branch column rule:
   // Super Admin + "All Branches" (no activeBranchId) + multi-branch → show Branch column
   // Branch Admin OR specific branch selected → hide Branch column
@@ -240,21 +244,26 @@ export default function DataTable({
           id: 'branch',
           header: 'Branch',
           accessorFn: (row) =>
-            row.branch?.name ||
-            row.branch_name ||
-            row.branch?.code ||
-            row.student?.branch?.name ||
-            row.student?.branch_name ||
-            (row.branch_id ? `Branch ${row.branch_id}` : '—'),
+            resolveBranchName(
+              row.branch ||
+              row.branch_name ||
+              row.branch?.code ||
+              row.student?.branch ||
+              row.student?.branch_name ||
+              row.branch_id,
+              '—'
+            ),
           cell: ({ row }) => {
             const r = row.original;
-            const bName =
-              r.branch?.name ||
+            const bName = resolveBranchName(
+              r.branch ||
               r.branch_name ||
               r.branch?.code ||
-              r.student?.branch?.name ||
+              r.student?.branch ||
               r.student?.branch_name ||
-              (r.branch_id ? `Branch ${r.branch_id}` : null);
+              r.branch_id,
+              null
+            );
             if (!bName) return <span className="text-muted-foreground">—</span>;
             return (
               <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 px-2 py-0.5 text-xs font-medium whitespace-nowrap">
@@ -274,6 +283,36 @@ export default function DataTable({
         } else {
           cols.push(branchCol);
         }
+      } else {
+        // Ensure explicit branch column renders resolved branch name instead of raw ID
+        cols = cols.map((c) => {
+          if (!isBranchColumn(c)) return c;
+          const originalCell = c.cell;
+          return {
+            ...c,
+            cell: (cellProps) => {
+              if (typeof originalCell === 'function') {
+                const res = originalCell(cellProps);
+                if (typeof res === 'string' && (res.includes('-') || res.startsWith('Branch '))) {
+                  return (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 px-2 py-0.5 text-xs font-medium whitespace-nowrap">
+                      {resolveBranchName(res.replace(/^Branch\s+/i, ''), res)}
+                    </span>
+                  );
+                }
+                return res;
+              }
+              const r = cellProps.row?.original;
+              const rawVal = cellProps.getValue?.() ?? (r?.branch || r?.branch_name || r?.branch_id);
+              const bName = resolveBranchName(rawVal, '—');
+              return (
+                <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 px-2 py-0.5 text-xs font-medium whitespace-nowrap">
+                  {bName}
+                </span>
+              );
+            },
+          };
+        });
       }
     } else {
       // If branch column is present but we shouldn't show it (Branch Admin or scoped branch), filter it out

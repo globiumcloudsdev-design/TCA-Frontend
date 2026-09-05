@@ -18,15 +18,20 @@ const normalizeLoginResponse = (response) => {
   console.log('🔄 Normalizing login response:', response);
   
   // If response already has user and accessToken
-  if (response.user && response.accessToken) {
-    return response;
+  if (response.user && (response.accessToken || response.access_token)) {
+    return {
+      ...response,
+      accessToken: response.accessToken || response.access_token,
+      refreshToken: response.refreshToken || response.refresh_token
+    };
   }
   
   // If response is wrapped in data
-  if (response.data?.user && response.data?.accessToken) {
+  if (response.data?.user && (response.data?.accessToken || response.data?.access_token)) {
     return {
       user: response.data.user,
-      accessToken: response.data.accessToken
+      accessToken: response.data.accessToken || response.data.access_token,
+      refreshToken: response.data.refreshToken || response.data.refresh_token
     };
   }
   
@@ -97,7 +102,8 @@ export const authService = {
     const result = response.data?.data || response.data;
     return {
       user: result?.user,
-      accessToken: result?.accessToken
+      accessToken: result?.accessToken || result?.access_token,
+      refreshToken: result?.refreshToken || result?.refresh_token
     };
   },
 

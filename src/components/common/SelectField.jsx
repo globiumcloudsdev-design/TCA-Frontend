@@ -36,7 +36,7 @@ import {
 } from '@/components/ui/select';
 import StatusBadge from '@/components/common/StatusBadge';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeFieldLabel } from '@/lib/utils';
 
 const PollingTripwire = ({ onReachBottom, isFetchingNextPage }) => {
   const tripwireRef = useRef(null);
@@ -129,12 +129,14 @@ export default function SelectField({
       });
   }, [optionsArray]);
 
+  const { labelText, isRequired } = sanitizeFieldLabel(label, required);
+
   return (
     <div className={cn('space-y-1.5', className)}>
-      {label && (
+      {labelText && (
         <Label htmlFor={name}>
-          {label}
-          {required && <span className="ml-0.5 text-destructive">*</span>}
+          {labelText}
+          {isRequired && <span className="ml-0.5 text-destructive font-semibold">*</span>}
         </Label>
       )}
 

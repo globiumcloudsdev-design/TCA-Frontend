@@ -11,7 +11,8 @@ import {
   InputField,
   FormSubmitButton,
   DatePickerField,
-  ConfirmDialog
+  ConfirmDialog,
+  OperationProgressModal,
 } from '@/components/common';
 import { classService, academicYearService, studentService, feeTemplateService } from '@/services';
 import { feeVoucherService } from '@/services';
@@ -19,6 +20,7 @@ import useInstituteStore from '@/store/instituteStore';
 import useBranchAccess from '@/hooks/useBranchAccess';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle, AlertTriangle, DollarSign, Info } from 'lucide-react';
+import { getActiveAcademicYear } from '@/lib/utils';
 
 // Month options for dropdown
 const MONTH_OPTIONS = [
@@ -56,6 +58,10 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmData, setConfirmData] = useState(null);
   const [result, setResult] = useState(null);
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [progressStatus, setProgressStatus] = useState('processing');
+  const [progressResult, setProgressResult] = useState(null);
+  const [progressError, setProgressError] = useState('');
 
   useEffect(() => {
     onGeneratingChange?.(submitting);
@@ -131,7 +137,7 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
   // Auto-select current academic year using useEffect (NOT during render)
   useEffect(() => {
     if (Array.isArray(academicYears) && academicYears.length > 0 && !watch('academicYearId')) {
-      const currentAcademicYear = academicYears.find(ay => ay.is_current) || academicYears[0];
+      const currentAcademicYear = getActiveAcademicYear(academicYears);
       if (currentAcademicYear) {
         setValue('academicYearId', currentAcademicYear.id);
       }
@@ -258,7 +264,13 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
       return;
     }
 
+    setShowConfirm(false);
+    setShowProgressModal(true);
+    setProgressStatus('processing');
+    setProgressError('');
+    setProgressResult(null);
     setSubmitting(true);
+
     try {
       const academicYear = Array.isArray(academicYears) ? academicYears.find(ay => ay.id === confirmData.academicYearId) : null;
       if (!academicYear) {
@@ -318,8 +330,17 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
         );
       }
 
+      const resData = response?.data || response;
+      const count = resData?.generated ?? resData?.total ?? resData?.count ?? (confirmData.mode === 'single' ? 1 : 0);
+
+      setProgressResult({
+        total: count,
+        generated: count,
+      });
+      setProgressStatus('success');
       setResult(response);
-      toast.success(response.message || `Vouchers generated successfully!`);
+      toast.success(response?.message || `Vouchers generated successfully!`);
+
       qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
       qc.invalidateQueries({ queryKey: ['fees'] });
       qc.invalidateQueries({ queryKey: ['student-vouchers'] });
@@ -327,13 +348,14 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
       qc.invalidateQueries({ queryKey: ['student-unpaid-vouchers-gen'] });
       qc.invalidateQueries({ queryKey: ['student-stats'] });
       reset();
-      setShowConfirm(false);
-      onSuccess?.();
     } catch (error) {
       console.error('Generation error:', error);
-      toast.error(error.response?.data?.message || error.message || 'Failed to generate vouchers');
+      const errMsg = error.response?.data?.message || error.message || 'Failed to generate vouchers';
+      setProgressStatus('error');
+      setProgressError(errMsg);
+      toast.error(errMsg);
       setResult({
-        error: error.response?.data?.message || error.message,
+        error: errMsg,
         generated: 0,
         failed: 0,
         total: 0,
@@ -685,6 +707,30 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
         title="Confirm Voucher Generation"
         description={`Generate vouchers for ${confirmData?.mode === 'single' ? 'single student' : confirmData?.mode === 'class' ? 'all students in class' : 'entire institute'} in ${MONTH_OPTIONS.find(m => m.value === parseInt(confirmData?.month))?.label || 'selected month'}?`}
         confirmLabel="Generate"
+      />
+
+      {/* Operation Progress Modal */}
+      <OperationProgressModal
+        open={showProgressModal}
+        onClose={() => {
+          setShowProgressModal(false);
+          if (progressStatus === 'success') {
+            onSuccess?.();
+          }
+        }}
+        type="voucher"
+        title="Generating Fee Vouchers"
+        subtitle={`Generating vouchers for ${confirmData?.mode === 'single' ? 'single student' : confirmData?.mode === 'class' ? 'selected class' : 'entire institute'} (${MONTH_OPTIONS.find(m => m.value === parseInt(confirmData?.month))?.label || ''})`}
+        estimatedSeconds={confirmData?.mode === 'single' ? 3 : confirmData?.mode === 'class' ? 5 : 9}
+        status={progressStatus}
+        statusMessage="Fee vouchers have been generated successfully and recorded in ledger."
+        errorMessage={progressError}
+        result={progressResult}
+        onDone={() => {
+          setShowProgressModal(false);
+          onSuccess?.();
+        }}
+        doneText="View Generated Vouchers"
       />
     </Card>
   );

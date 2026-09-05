@@ -25,7 +25,12 @@ import { Badge }  from '@/components/ui/badge';
 
 const extractRows  = (d) => Array.isArray(d) ? d : (d?.data?.rows ?? (Array.isArray(d?.data) ? d?.data : []));
 const extractPages = (d) => d?.data?.totalPages ?? 1;
-const toOptions    = (arr, labelFn) => (arr ?? []).map((x) => ({ value: x.id, label: labelFn(x) }));
+const toOptions    = (arr, labelFn) => (arr ?? []).map((x) => ({
+  value: x.id,
+  label: labelFn(x),
+  is_current: !!x.is_current,
+  is_active: x.is_active !== false,
+}));
 
 const buildColumns = (onEdit, onDelete, router) => [
   {

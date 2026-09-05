@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Check, ChevronDown, X, Plus, Search as SearchIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeFieldLabel } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 
 export default function CreatableSelectField({
@@ -152,12 +152,14 @@ export default function CreatableSelectField({
   const exactMatch = search.trim() && allOptions.find(o => o.value === search.trim());
   const canCreate = search.trim() && !exactMatch;
 
+  const { labelText, isRequired } = sanitizeFieldLabel(label, required);
+
   return (
     <div className={cn("relative w-full", className)} ref={containerRef}>
-      {label && (
+      {labelText && (
         <Label className="text-sm font-medium mb-1.5 block">
-          {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+          {labelText}
+          {isRequired && <span className="text-destructive ml-0.5 font-semibold">*</span>}
         </Label>
       )}
 

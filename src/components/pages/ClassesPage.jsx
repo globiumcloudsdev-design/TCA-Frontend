@@ -33,6 +33,7 @@ import StatsCard from '@/components/common/StatsCard';
 import TableRowActions from '@/components/common/TableRowActions';
 import ErrorAlert from '@/components/common/ErrorAlert';
 import PageLoader from '@/components/common/PageLoader';
+import { getActiveAcademicYear } from '@/lib/utils';
 import ClassForm from '@/components/forms/ClassForm';
 import SectionHeader from '@/components/common/SectionHeader';
 import SelectField from '@/components/common/SelectField'; // ✅ Original SelectField
@@ -115,11 +116,9 @@ export default function ClassesPage({ type }) {
   // ✅ Set current academic year as default
   useEffect(() => {
     if (normalizedAcademicYearOptions.length > 0 && !selectedAcademicYear) {
-      const currentYear = normalizedAcademicYearOptions.find(y => y.is_current);
+      const currentYear = getActiveAcademicYear(normalizedAcademicYearOptions);
       if (currentYear) {
         setFilterValue('academic_year', String(currentYear.value));
-      } else {
-        setFilterValue('academic_year', String(normalizedAcademicYearOptions[0].value));
       }
     }
   }, [normalizedAcademicYearOptions, selectedAcademicYear, setFilterValue]);

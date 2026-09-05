@@ -121,11 +121,11 @@ export default function ProgramsPage({ type }) {
         footer={<><button type="button" onClick={closeModal} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button><button type="submit" form="prog-form" disabled={save.isPending} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60">{save.isPending ? 'Saving…' : editing ? 'Update' : 'Create'}</button></>}>
         <form id="prog-form" onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><label className="text-sm font-medium">Program Name *</label><input {...register('name')} className="input-base" />{errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}</div>
-            <div className="space-y-1.5"><label className="text-sm font-medium">Code *</label><input {...register('code')} className="input-base" />{errors.code && <p className="text-xs text-destructive">{errors.code.message}</p>}</div>
+            <div className="space-y-1.5"><label className="text-sm font-medium">Program Name <span className="ml-0.5 text-destructive font-semibold">*</span></label><input {...register('name')} className="input-base" />{errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}</div>
+            <div className="space-y-1.5"><label className="text-sm font-medium">Code <span className="ml-0.5 text-destructive font-semibold">*</span></label><input {...register('code')} className="input-base" />{errors.code && <p className="text-xs text-destructive">{errors.code.message}</p>}</div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <SelectField label="Degree Type *" name="degree_type" control={control} error={errors.degree_type} options={DEGREE_OPTS} required />
+            <SelectField label="Degree Type" name="degree_type" control={control} error={errors.degree_type} options={DEGREE_OPTS} required />
             <div className="space-y-1.5"><label className="text-sm font-medium">Duration</label><input {...register('duration')} className="input-base" placeholder="e.g. 4 years" /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -133,7 +133,7 @@ export default function ProgramsPage({ type }) {
             <div className="space-y-1.5"><label className="text-sm font-medium">Intake Capacity</label><input type="number" {...register('intake')} className="input-base" /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <SelectField label="Status *" name="status" control={control} error={errors.status} options={STATUS_OPTS} required />
+            <SelectField label="Status" name="status" control={control} error={errors.status} options={STATUS_OPTS} required />
           </div>
           <div className="space-y-1.5"><label className="text-sm font-medium">Description</label><textarea {...register('description')} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none" /></div>
         </form>

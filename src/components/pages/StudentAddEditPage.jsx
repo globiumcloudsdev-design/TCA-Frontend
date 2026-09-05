@@ -16,7 +16,8 @@ import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
 import { isBranchAdmin as checkIsBranchAdmin, getAssignedBranch } from '@/lib/auth';
 import { branchService } from '@/services';
-import { DUMMY_FLAT_STUDENTS, DUMMY_BRANCHES } from '@/data/dummyData';
+import { resolveBranchName, registerBranches } from '@/lib/branchUtils';
+import { DUMMY_FLAT_STUDENTS } from '@/data/dummyData';
 
 // ─── tiny helpers ────────────────────────────────────────────────────────────
 const GENDERS = ['male', 'female', 'other'];
@@ -88,7 +89,7 @@ function AcademicFields({ type, form, onChange, terms, isSuperAdmin, branchOptio
     </FormField>
   );
 
-  const branchField = isSuperAdmin && (
+  const branchField = isSuperAdmin && branchOptions?.length > 1 && (
     baseSelect('branch_id', 'Branch', branchOptions, true, branchError)
   );
 
@@ -226,21 +227,55 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
     queryFn: async () => {
       try {
         const res = await branchService.getAll({ limit: 100, is_active: true });
-        const list = res?.data?.rows ?? res?.data ?? res ?? [];
+        const list = res?.data?.rows ?? (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
         if (Array.isArray(list) && list.length > 0) return list;
       } catch (e) {}
-      return user?.institute?.branches ?? DUMMY_BRANCHES;
+      return user?.institute?.branches ?? user?.branches ?? [];
     },
     enabled: isSuperAdmin,
   });
 
-  const branchOptions = useMemo(() => {
-    const list = Array.isArray(branchData) ? branchData : (branchData?.data || DUMMY_BRANCHES);
-    return list.map((b) => ({
-      value: String(b.id || b.value),
-      label: b.name || b.label || `Branch ${b.id}`,
-    }));
+  const branchList = useMemo(() => {
+    const list = Array.isArray(branchData) ? branchData : (branchData?.data || []);
+    return Array.isArray(list) ? list : [];
   }, [branchData]);
+
+  useEffect(() => {
+    if (branchList.length > 0) {
+      registerBranches(branchList);
+    }
+  }, [branchList]);
+
+  const mainBranch = useMemo(() => {
+    if (!branchList || branchList.length === 0) return null;
+    return (
+      branchList.find((b) => b.is_main === true || b.is_main === 'true') ||
+      branchList.find((b) => {
+        const code = String(b.code || '').toUpperCase();
+        return code.endsWith('-MAIN') || code === 'MAIN';
+      }) ||
+      branchList.find((b) => String(b.name || b.label || '').toLowerCase().includes('main')) ||
+      branchList[0]
+    );
+  }, [branchList]);
+
+  const branchOptions = useMemo(() => {
+    return branchList.map((b) => {
+      const val = String(b.id || b.value || '');
+      const isMain = b.is_main === true || b.is_main === 'true' ||
+        String(b.code || '').toUpperCase().endsWith('-MAIN') ||
+        String(b.code || '').toUpperCase() === 'MAIN' ||
+        String(b.name || b.label || '').toLowerCase().includes('main');
+      const baseLabel = b.name || b.label || b.branch_name || resolveBranchName(val, 'Branch');
+      const displayLabel = isMain && !baseLabel.toLowerCase().includes('(main')
+        ? `${baseLabel} (Main)`
+        : baseLabel;
+      return {
+        value: val,
+        label: displayLabel,
+      };
+    });
+  }, [branchList]);
 
   // Auto-tag branch for Branch Admin
   useEffect(() => {
@@ -248,6 +283,21 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
       setForm((prev) => ({ ...prev, branch_id: assignedBranch.id }));
     }
   }, [isBranchAdmin, assignedBranch]);
+
+  // Auto-tag branch for Super Admin: single branch -> auto assign, multiple branches -> default to main branch
+  useEffect(() => {
+    if (isSuperAdmin && branchList.length === 1) {
+      const singleId = String(branchList[0]?.id || branchList[0]?.value || '');
+      if (singleId && (!form.branch_id || form.branch_id === '')) {
+        setForm((prev) => ({ ...prev, branch_id: singleId }));
+      }
+    } else if (isSuperAdmin && branchList.length > 1 && mainBranch) {
+      const mainId = String(mainBranch?.id || mainBranch?.value || '');
+      if (mainId && (!form.branch_id || form.branch_id === '')) {
+        setForm((prev) => ({ ...prev, branch_id: mainId }));
+      }
+    }
+  }, [isSuperAdmin, branchList, mainBranch, form.branch_id]);
 
   const isEdit = mode === 'edit';
   const studentLabel = terms?.student ?? (type === 'coaching' ? 'Candidate' : type === 'academy' ? 'Trainee' : 'Student');

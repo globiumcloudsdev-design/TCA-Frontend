@@ -119,8 +119,8 @@ export default function FacultiesPage({ type }) {
         footer={<><button type="button" onClick={closeModal} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button><button type="submit" form="fac-form" disabled={save.isPending} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60">{save.isPending ? 'Saving…' : editing ? 'Update' : 'Create'}</button></>}>
         <form id="fac-form" onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><label className="text-sm font-medium">Faculty Name *</label><input {...register('name')} className="input-base" />{errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}</div>
-            <div className="space-y-1.5"><label className="text-sm font-medium">Code *</label><input {...register('code')} className="input-base" />{errors.code && <p className="text-xs text-destructive">{errors.code.message}</p>}</div>
+            <div className="space-y-1.5"><label className="text-sm font-medium">Faculty Name <span className="ml-0.5 text-destructive font-semibold">*</span></label><input {...register('name')} className="input-base" />{errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}</div>
+            <div className="space-y-1.5"><label className="text-sm font-medium">Code <span className="ml-0.5 text-destructive font-semibold">*</span></label><input {...register('code')} className="input-base" />{errors.code && <p className="text-xs text-destructive">{errors.code.message}</p>}</div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5"><label className="text-sm font-medium">Dean</label><input {...register('dean')} className="input-base" /></div>
@@ -128,7 +128,7 @@ export default function FacultiesPage({ type }) {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5"><label className="text-sm font-medium">Email</label><input type="email" {...register('email')} className="input-base" /></div>
-            <SelectField label="Status *" name="status" control={control} error={errors.status} options={STATUS_OPTS} required />
+            <SelectField label="Status" name="status" control={control} error={errors.status} options={STATUS_OPTS} required />
           </div>
           <div className="space-y-1.5"><label className="text-sm font-medium">Description</label><textarea {...register('description')} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none" /></div>
         </form>

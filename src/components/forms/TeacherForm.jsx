@@ -600,8 +600,8 @@ export default function TeacherForm({
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InputField label="First Name *" name="first_name" register={register} error={errors.first_name} required placeholder="Ahmed" />
-                  <InputField label="Last Name *" name="last_name" register={register} error={errors.last_name} required placeholder="Hassan" />
+                  <InputField label="First Name" name="first_name" register={register} error={errors.first_name} required placeholder="Ahmed" />
+                  <InputField label="Last Name" name="last_name" register={register} error={errors.last_name} required placeholder="Hassan" />
                   <InputField label="Employee ID" name="employee_id" register={register} error={errors.employee_id} placeholder="TCH-2024-001" />
                   <DatePickerField label="Date of Birth" name="dob" control={control} error={errors.dob} maxDate={new Date()} />
                   <SelectField label="Gender" name="gender" control={control} error={errors.gender} options={GENDER_OPTIONS} placeholder="Select gender" />
@@ -613,7 +613,7 @@ export default function TeacherForm({
                 <Separator />
                 <h3 className="text-lg font-semibold">Contact Information</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <InputField label="Email *" name="email" register={register} error={errors.email} required type="email" placeholder="teacher@school.com" />
+                  <InputField label="Email" name="email" register={register} error={errors.email} required type="email" placeholder="teacher@school.com" />
                   <PhoneInputField label="Phone Number" value={watch('phone') || ''} onChange={val => setValue('phone', val)} error={errors.phone} />
                   <PhoneInputField label="Alternate Phone" value={watch('alternate_phone') || ''} onChange={val => setValue('alternate_phone', val)} error={errors.alternate_phone} />
                   <InputField label="City" name="city" register={register} error={errors.city} placeholder="Karachi" />
@@ -766,7 +766,7 @@ export default function TeacherForm({
                           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
                               <SelectField
-                                label="Document Type *"
+                                label="Document Type"
                                 name={`documents.${index}.type`}
                                 control={control}
                                 error={errors.documents?.[index]?.type}
@@ -789,7 +789,7 @@ export default function TeacherForm({
                               )}
                             </div>
                             <InputField
-                              label="Document Title *"
+                              label="Document Title"
                               name={`documents.${index}.title`}
                               register={register}
                               error={errors.documents?.[index]?.title}

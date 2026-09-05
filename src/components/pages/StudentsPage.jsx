@@ -36,6 +36,7 @@ import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
 import useBranchAccess from '@/hooks/useBranchAccess';
+import { resolveBranchName } from '@/lib/branchUtils';
 import { studentService, academicYearService, classService, reportService } from '@/services';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
@@ -45,7 +46,7 @@ import StudentForm from '@/components/forms/StudentForm';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import SelectField from '@/components/common/SelectField';
 import { SimpleTooltip } from '@/components/ui/SimpleTooltip';
-import { cn } from '@/lib/utils';
+import { cn, getActiveAcademicYearId } from '@/lib/utils';
 import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -204,15 +205,14 @@ export default function StudentsPage({ type }) {
 
   // Set current academic year as default
   useEffect(() => {
-    if (academicYearsData?.data?.length > 0 && !academicYearId) {
-      const currentYear = academicYearsData.data.find(y => y.is_current);
-      if (currentYear) {
-        setAcademicYearId(currentYear.id);
-      } else if (academicYearsData.data.length > 0) {
-        setAcademicYearId(academicYearsData.data[0].id);
+    const list = academicYearsData?.data?.rows || (Array.isArray(academicYearsData?.data) ? academicYearsData.data : []) || [];
+    if (list.length > 0 && !academicYearId) {
+      const activeId = getActiveAcademicYearId(list);
+      if (activeId) {
+        setAcademicYearId(activeId);
       }
     }
-  }, [academicYearsData?.data]);
+  }, [academicYearsData, academicYearId]);
 
   // Fetch all available classes
   const { data: classesData, isLoading: isClassesLoading } = useQuery({
@@ -576,12 +576,14 @@ export default function StudentsPage({ type }) {
   ];
 
   const academicYearOptions = useMemo(() => {
-    if (!academicYearsData?.data) return [];
-    return academicYearsData.data.map(year => ({
-      value: year.id,
-      label: year.name || `${year.start_year} - ${year.end_year}`
+    const list = academicYearsData?.data?.rows || (Array.isArray(academicYearsData?.data) ? academicYearsData.data : []) || [];
+    return list.map(year => ({
+      value: String(year.id),
+      label: year.name || `${year.start_year || ''} - ${year.end_year || ''}`,
+      is_current: !!year.is_current,
+      is_active: year.is_active !== false,
     }));
-  }, [academicYearsData?.data]);
+  }, [academicYearsData]);
 
   const classOptions = useMemo(() => {
     if (!rawClassesList.length) return [];
@@ -697,6 +699,7 @@ export default function StudentsPage({ type }) {
         roll_number: val('roll_no') || val('roll_number') || '',
         class_name: val('class_name') || s.class?.name || '',
         section_name: val('section_name') || s.section?.name || '',
+        branch_name: resolveBranchName(s.branch || s.branch_name || val('branch_id'), ''),
       };
     });
   }, [students]);
@@ -804,10 +807,7 @@ export default function StudentsPage({ type }) {
     }
 
     try {
-      const toastId = toast.loading(`Importing ${importedData.length} ${terms.students}...`);
       const res = await studentService.bulkCreate(importedData, type);
-      toast.dismiss(toastId);
-
       const data = res?.data || res;
       
       if (data?.failed?.length > 0) {
@@ -823,7 +823,9 @@ export default function StudentsPage({ type }) {
       qc.invalidateQueries({ queryKey: ['students', type] });
       qc.invalidateQueries({ queryKey: ['student-stats', type] });
     } catch (error) {
-      toast.error(error.message || 'Failed to import students');
+      const msg = error.response?.data?.message || error.message || 'Failed to import students';
+      toast.error(msg);
+      throw error;
     }
   };
 
@@ -1223,6 +1225,20 @@ function StudentCell({ student: s, columnKey, type, terms }) {
         }
       } catch (e) {}
       return <span className="text-sm">{String(dateVal)}</span>;
+
+    case 'branch':
+    case 'branch_id':
+    case 'branch_name': {
+      const bName = resolveBranchName(s.branch || s.branch_id || s.branch_name || val(columnKey));
+      if (!bName) return <span className="text-muted-foreground">—</span>;
+      return (
+        <Badge variant="outline" className="text-xs font-normal border-primary/20 bg-primary/5 text-primary gap-1">
+          <Building2 className="h-3 w-3 shrink-0" />
+          {bName}
+        </Badge>
+      );
+    }
+
 
     default:
       const defaultValue = val(columnKey);

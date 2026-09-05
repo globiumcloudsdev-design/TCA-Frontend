@@ -82,42 +82,61 @@ export default function LoginPage() {
     toast.info(`Filled ${cred.label} credentials`);
   };
 
-  const completeLogin = async (user, accessToken) => {
+  const completeLogin = async (user, accessToken, refreshToken) => {
     if (!user || !user.id) {
       toast.error('Invalid user data');
       return;
     }
-    Cookies.remove('access_token');
-    Cookies.remove('role_code');
-    Cookies.remove('institute_type');
-    Cookies.remove('user_type');
-    Cookies.remove('portal_token');
-    Cookies.remove('portal_type');
-    Cookies.remove('selected_account_id');
 
-    setUser(user, accessToken);
-    Cookies.set('access_token', accessToken, { expires: 7 });
-    Cookies.set('role_code', user.user_type, { expires: 7 });
-    Cookies.set('user_type', user.user_type, { expires: 7 });
+    // Wipe any query cache from previous session
+    try {
+      const { queryClient } = require('@/lib/queryClient');
+      queryClient.clear();
+    } catch (e) {}
+
+    const cookieNames = [
+      'access_token', 'refresh_token', 'refreshToken', 'role_code', 'institute_type',
+      'user_type', 'portal_token', 'portal_type', 'selected_account_id'
+    ];
+    cookieNames.forEach((name) => {
+      Cookies.remove(name, { path: '/' });
+      Cookies.remove(name);
+    });
+
+    const tokenToSave = refreshToken || user?.refreshToken || user?.refresh_token;
+    setUser(user, accessToken, tokenToSave);
+    Cookies.set('access_token', accessToken, { expires: 7, path: '/' });
+    if (tokenToSave) {
+      Cookies.set('refresh_token', tokenToSave, { expires: 30, path: '/' });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('refresh_token', tokenToSave);
+      }
+    }
+    Cookies.set('role_code', user.user_type, { expires: 7, path: '/' });
+    Cookies.set('user_type', user.user_type, { expires: 7, path: '/' });
 
     const instType = user.institute?.institute_type || user.institute_type || null;
-    if (instType) Cookies.set('institute_type', instType, { expires: 7 });
+    if (instType) Cookies.set('institute_type', instType, { expires: 7, path: '/' });
 
     if (['STUDENT', 'PARENT', 'TEACHER'].includes(user.user_type)) {
-      Cookies.set('portal_token', accessToken, { expires: 7 });
-      Cookies.set('portal_type', user.user_type, { expires: 7 });
+      Cookies.set('portal_token', accessToken, { expires: 7, path: '/' });
+      Cookies.set('portal_type', user.user_type, { expires: 7, path: '/' });
     }
 
     toast.success(`Welcome, ${user.first_name}!`);
     const redirectPath = getDashboardPath(user);
-    router.replace(redirectPath);
+    if (typeof window !== 'undefined') {
+      window.location.replace(redirectPath);
+    } else {
+      router.replace(redirectPath);
+    }
   };
 
   const onSingleLogin = async (data) => {
     try {
       setLoading(true);
       const response = await authService.login({ email: data.email, password: data.password });
-      if (response?.user) await completeLogin(response.user, response.accessToken);
+      if (response?.user) await completeLogin(response.user, response.accessToken, response.refreshToken);
       else toast.error('Invalid email or password');
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Login failed');
@@ -146,7 +165,7 @@ export default function LoginPage() {
         return;
       }
       if (response?.user) {
-        await completeLogin(response.user, response.accessToken);
+        await completeLogin(response.user, response.accessToken, response.refreshToken);
         return;
       }
       toast.error(response?.message || 'No account found');
@@ -171,7 +190,7 @@ export default function LoginPage() {
       if (response?.user) {
         setShowPasswordDialog(false);
         setAccountPassword('');
-        await completeLogin(response.user, response.accessToken);
+        await completeLogin(response.user, response.accessToken, response.refreshToken);
       } else toast.error('Invalid password');
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Invalid password');

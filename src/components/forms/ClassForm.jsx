@@ -21,6 +21,7 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { getActiveAcademicYearId } from '@/lib/utils';
 import {
   InputField,
   SelectField,
@@ -123,15 +124,19 @@ export default function ClassForm({
 
   // ✅ FIXED: Prepare initial values
   const getInitialValues = () => {
+    const defaultYearId = defaultValues?.academic_year_id || getActiveAcademicYearId(academicYearOptions);
     const initial = {
       name: '',
       description: '',
-      academic_year_id: '',
+      academic_year_id: defaultYearId || '',
       active: true,
       sections: [],
       courses: [],
       ...defaultValues,
     };
+    if (!initial.academic_year_id && defaultYearId) {
+      initial.academic_year_id = defaultYearId;
+    }
     
     // Ensure sections have all fields
     initial.sections = (initial.sections || []).map(s => ({
@@ -189,6 +194,17 @@ export default function ClassForm({
   const selectedAcademicYear = (academicYearOptions || []).find(
     (option) => String(option.value) === String(selectedAcademicYearId)
   );
+
+  // Auto-select active academic year if not yet selected
+  useEffect(() => {
+    const currentVal = getValues('academic_year_id');
+    if (!currentVal && academicYearOptions?.length > 0) {
+      const activeYearId = getActiveAcademicYearId(academicYearOptions);
+      if (activeYearId) {
+        setValue('academic_year_id', activeYearId, { shouldValidate: true });
+      }
+    }
+  }, [academicYearOptions, setValue, getValues]);
 
   // ✅ FIXED: Reset form when defaultValues change (important for edit mode)
   useEffect(() => {
@@ -368,16 +384,6 @@ export default function ClassForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmitForm, onFormError)} className="space-y-4 sm:space-y-6">
-      {/* Debug info - remove in production */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="text-xs text-muted-foreground p-2 border rounded">
-          <p>Mode: {isEdit ? 'Edit' : 'Create'}</p>
-          <p>Form Dirty: {isDirty ? 'Yes' : 'No'}</p>
-          <p>Sections: {sectionFields.length}</p>
-          <p>Courses: {courseFields.length}</p>
-        </div>
-      )}
-
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
@@ -432,15 +438,14 @@ export default function ClassForm({
                 </p>
                 
                 <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
-                  <div className="col-span-1 md:col-span-2">
-                    <BranchSelectField
-                      control={control}
-                      error={errors.branch_id}
-                      setValue={setValue}
-                      watch={watch}
-                      required
-                    />
-                  </div>
+                  <BranchSelectField
+                    control={control}
+                    error={errors.branch_id}
+                    setValue={setValue}
+                    watch={watch}
+                    required
+                    className="col-span-1 md:col-span-2"
+                  />
 
                   <InputField
                     label={`${getTerm('class')} Name`}

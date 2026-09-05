@@ -10,6 +10,7 @@ import { useEffect, useRef } from 'react';
 import useAuthStore from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
 import { isBranchAdmin as checkIsBranchAdmin, getAssignedBranch } from '@/lib/auth';
+import { resolveBranchName } from '@/lib/branchUtils';
 
 export default function BranchInitializer() {
   const user = useAuthStore((s) => s.user);
@@ -28,7 +29,7 @@ export default function BranchInitializer() {
     if (checkIsBranchAdmin(user)) {
       const assigned = getAssignedBranch(user);
       const branchId = assigned?.id || user?.branch_id || user?.branch?.id;
-      const branchName = assigned?.name || user?.branch?.name || user?.branch_name || 'Assigned Branch';
+      const branchName = resolveBranchName(assigned || user?.branch || user?.branch_name || branchId, 'Assigned Branch');
       if (branchId && activeBranchId !== branchId) {
         setActiveBranch(branchId, branchName);
       }

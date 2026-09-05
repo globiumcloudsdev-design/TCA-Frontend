@@ -689,7 +689,7 @@ import {
   Loader2, ChevronRight, Mail, Phone, Flag
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, getActiveAcademicYearId } from '@/lib/utils';
 
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
@@ -782,11 +782,14 @@ export default function StudentPromotePage({ type }) {
 
   // Set default source academic year (current year)
   useEffect(() => {
-    if (academicYearsData?.data?.length && !academicYearId) {
-      const current = academicYearsData.data.find(y => y.is_current);
-      setAcademicYearId(current?.id || academicYearsData.data[0]?.id);
+    const list = academicYearsData?.data?.rows || (Array.isArray(academicYearsData?.data) ? academicYearsData.data : []) || [];
+    if (list.length && !academicYearId) {
+      const activeId = getActiveAcademicYearId(list);
+      if (activeId) {
+        setAcademicYearId(activeId);
+      }
     }
-  }, [academicYearsData]);
+  }, [academicYearsData, academicYearId]);
 
   // Set default target academic year (next year, fallback to same)
   useEffect(() => {

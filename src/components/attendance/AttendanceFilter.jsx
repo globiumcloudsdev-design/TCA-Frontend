@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { academicYearService, classService } from '@/services';
 import useBranchAccess from '@/hooks/useBranchAccess';
 import { SelectField, DatePickerField } from '@/components/common';
+import { getActiveAcademicYearId } from '@/lib/utils';
 
 /**
  * Reusable Attendance Filter Component
@@ -37,15 +38,10 @@ const AttendanceFilter = ({
 
   // Default to current academic year if not set
   useEffect(() => {
-    if (yearsData?.data && !filters.academic_year_id) {
-      const currentYear = yearsData.data.find(y => 
-        y.is_current === true || 
-        String(y.is_current) === '1' || 
-        String(y.is_current) === 'true'
-      ) || yearsData.data[0];
-      
-      if (currentYear) {
-        setFilters(prev => ({ ...prev, academic_year_id: currentYear.id }));
+    if (yearsData && !filters.academic_year_id) {
+      const activeId = getActiveAcademicYearId(yearsData);
+      if (activeId) {
+        setFilters(prev => ({ ...prev, academic_year_id: activeId }));
       }
     }
   }, [yearsData, filters.academic_year_id, setFilters]);

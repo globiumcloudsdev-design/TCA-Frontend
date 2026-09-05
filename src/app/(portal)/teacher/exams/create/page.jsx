@@ -251,7 +251,7 @@ export default function CreateExamPage() {
           {/* Exam Name */}
           <div>
             <InputField
-              label="Exam Name*"
+              label="Exam Name"
               placeholder="e.g. Mid-Term Assessment 2026"
               required
               value={form.name}
@@ -274,7 +274,7 @@ export default function CreateExamPage() {
             </div>
             <div>
               <SelectField
-                label="Exam Type*"
+                label="Exam Type"
                 required
                 value={form.type}
                 onChange={(v) => setForm(p => ({ ...p, type: v }))}
@@ -288,7 +288,7 @@ export default function CreateExamPage() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <SelectField
-                label="Exam Category*"
+                label="Exam Category"
                 required
                 value={form.category}
                 onChange={(v) => setForm(p => ({ ...p, category: v }))}
@@ -311,7 +311,7 @@ export default function CreateExamPage() {
           {/* Exam Date */}
           <div>
             <InputField
-              label="Exam Date*"
+              label="Exam Date"
               type="date"
               required
               value={form.exam_date}
@@ -408,21 +408,21 @@ export default function CreateExamPage() {
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <InputField
-                        label="Date *"
+                        label="Date"
                         type="date"
                         value={schedule.date}
                         onChange={(e) => handleScheduleChange(schedule.subject_id, 'date', e.target.value)}
                         required
                       />
                       <InputField
-                        label="Start Time *"
+                        label="Start Time"
                         type="time"
                         value={schedule.start_time}
                         onChange={(e) => handleScheduleChange(schedule.subject_id, 'start_time', e.target.value)}
                         required
                       />
                       <InputField
-                        label="End Time *"
+                        label="End Time"
                         type="time"
                         value={schedule.end_time}
                         onChange={(e) => handleScheduleChange(schedule.subject_id, 'end_time', e.target.value)}
@@ -436,7 +436,7 @@ export default function CreateExamPage() {
                         onChange={(e) => handleScheduleChange(schedule.subject_id, 'duration_minutes', e.target.value)}
                       />
                       <InputField
-                        label="Total Marks *"
+                        label="Total Marks"
                         type="number"
                         min="1"
                         value={schedule.total_marks}
@@ -444,7 +444,7 @@ export default function CreateExamPage() {
                         required
                       />
                       <InputField
-                        label="Passing Marks *"
+                        label="Passing Marks"
                         type="number"
                         min="1"
                         value={schedule.pass_marks}

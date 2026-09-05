@@ -17,6 +17,7 @@ import {
 } from '@/components/common';
 import MultiSelectField from '@/components/common/MultiSelectField';
 import { Button } from '@/components/ui/button';
+import { getActiveAcademicYear } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -553,14 +554,14 @@ export default function FeeTemplateForm({
     // ✅ AUTO-SELECT CURRENT ACADEMIC YEAR
     useEffect(() => {
         const currentYearId = watch('academic_year_id');
-        if (academicYears.length > 0 && !currentYearId && !isEdit) {
-            const current = academicYears.find(y => y.is_current) || academicYears[0];
+        if (academicYears.length > 0 && !currentYearId) {
+            const current = getActiveAcademicYear(academicYears);
             if (current && current.value) {
                 console.log('📅 Auto-selecting current academic year:', current.label);
-                setValue('academic_year_id', current.value);
+                setValue('academic_year_id', String(current.value));
             }
         }
-    }, [academicYears, isEdit, setValue]);
+    }, [academicYears, setValue, watch]);
 
     // Field arrays
     const { fields, append, remove, insert } = useFieldArray({

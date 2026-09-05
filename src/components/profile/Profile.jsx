@@ -1353,9 +1353,9 @@ export default function Profile() {
                                 <Separator />
                                 {/* Common fields */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    <InputField label="First Name *" name="first_name" register={register} error={errors.first_name} required />
-                                    <InputField label="Last Name *" name="last_name" register={register} error={errors.last_name} required />
-                                    <InputField label="Email *" name="email" register={register} error={errors.email} type="email" />
+                                    <InputField label="First Name" name="first_name" register={register} error={errors.first_name} required />
+                                    <InputField label="Last Name" name="last_name" register={register} error={errors.last_name} required />
+                                    <InputField label="Email" name="email" register={register} error={errors.email} type="email" required />
                                     <PhoneInputField label="Phone Number" value={watch('phone') || ''} onChange={val => setValue('phone', val)} error={errors.phone} />
                                     <CnicInput label="CNIC / B-Form" value={watch('cnic') || ''} onChange={val => setValue('cnic', val)} error={errors.cnic} />
                                 </div>

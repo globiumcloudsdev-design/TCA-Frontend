@@ -22,6 +22,7 @@ import { authService, publicService } from "@/services";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useSocket } from "@/hooks/useSocket";
+import { logoutUser } from "@/lib/auth";
 
 import AppBreadcrumb from "@/components/common/AppBreadcrumb";
 import NotificationBell from "@/components/common/NotificationBell";
@@ -420,8 +421,7 @@ export default function InstituteLayoutWrapper({ children }) {
       toast.success('Returned to Master Admin session');
       window.location.href = '/master-admin/ghost-mode';
     } else {
-      logout();
-      window.location.href = '/login';
+      logoutUser({ redirectTo: '/login' });
     }
   };
 
@@ -444,17 +444,10 @@ export default function InstituteLayoutWrapper({ children }) {
   // Auto-build breadcrumb from current pathname using static and dynamic nav mapping
   const breadcrumbItems = useBreadcrumbs(rawNav || allNavItems, pathname, dashboardPath, breadcrumbLabel);
 
-  const handleLogout = useCallback(async () => {
-    try {
-      await authService.logout();
-    } catch (_) {
-      /* ignore */
-    } finally {
-      logout();
-      router.replace("/login");
-      toast.success("Logged out successfully");
-    }
-  }, [logout, router]);
+  const handleLogout = useCallback(() => {
+    toast.success("Logged out successfully");
+    logoutUser({ redirectTo: "/login" });
+  }, []);
 
   const sidebarProps = {
     grouped,
