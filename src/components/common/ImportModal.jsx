@@ -623,20 +623,56 @@ export default function ImportModal({
       setErrors([
         {
           type: 'required',
-          message: `Missing required columns: ${missing.join(', ')}`,
+          message: `Missing required columns: ${missing.map(k => availableColumns.find(c => c.key === k)?.label || k).join(', ')}`,
         },
       ]);
       return null;
     }
 
-    return rawRows.map((row, idx) => {
+    const rowErrors = [];
+    const processedRows = rawRows.map((row, idx) => {
       const sanitized = sanitizeMappedRow(row, mapping);
       const previewOverride = previewData[idx];
-      if (previewOverride) {
-        return { ...sanitized, ...previewOverride };
+      const finalRow = previewOverride ? { ...sanitized, ...previewOverride } : sanitized;
+
+      // Validate required columns for this row
+      for (const reqKey of requiredColumns) {
+        const val = finalRow[reqKey];
+        if (val === undefined || val === null || String(val).trim() === '') {
+          const colDef = availableColumns.find((c) => c.key === reqKey);
+          const colLabel = colDef?.label || reqKey;
+          rowErrors.push(`Row ${idx + 2}: "${colLabel}" is required and cannot be empty.`);
+        }
       }
-      return sanitized;
+
+      // Check monthly_fee if present or required
+      if (finalRow.monthly_fee !== undefined && finalRow.monthly_fee !== null && String(finalRow.monthly_fee).trim() !== '') {
+        const num = Number(finalRow.monthly_fee);
+        if (isNaN(num) || num <= 0) {
+          rowErrors.push(`Row ${idx + 2}: "Monthly Fee" must be a valid number greater than 0.`);
+        }
+      }
+
+      return finalRow;
     });
+
+    if (rowErrors.length > 0) {
+      const maxDisplay = 10;
+      const displayErrors = rowErrors.slice(0, maxDisplay).map((msg) => ({
+        type: 'validation',
+        message: msg,
+      }));
+      if (rowErrors.length > maxDisplay) {
+        displayErrors.push({
+          type: 'validation',
+          message: `...and ${rowErrors.length - maxDisplay} more row validation errors. Please correct them before importing.`,
+        });
+      }
+      setErrors(displayErrors);
+      return null;
+    }
+
+    return processedRows;
   };
 
   // Execute import process
@@ -1024,10 +1060,17 @@ export default function ImportModal({
                 </div>
               )}
 
-              {importStatus === 'error' && errors.length > 0 && (
-                <div className="flex items-center gap-2.5 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-xl text-red-700 dark:text-red-300 text-xs shrink-0 shadow-sm">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span className="font-medium">{errors[errors.length - 1]?.message || 'Import failed'}</span>
+              {errors.length > 0 && (
+                <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-xl text-red-700 dark:text-red-300 text-xs shrink-0 shadow-sm space-y-1.5 max-h-36 overflow-y-auto">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+                    <span>Please fix the following issues before importing:</span>
+                  </div>
+                  <ul className="list-disc list-inside pl-2 space-y-0.5 text-[11px]">
+                    {errors.map((err, i) => (
+                      <li key={i}>{err.message}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>
