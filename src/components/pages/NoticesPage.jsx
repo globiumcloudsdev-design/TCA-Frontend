@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import { Send, Bell, Eye } from 'lucide-react';
 import useAuthStore from '@/store/authStore';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
@@ -44,6 +45,7 @@ const schema = z.object({
 
 export default function NotificationsPage() {
   const qc = useQueryClient();
+  const { activeBranchId } = useBranchAccess();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [selectedRecipient, setSelectedRecipient] = useState('all');
@@ -66,16 +68,16 @@ export default function NotificationsPage() {
       const { studentService, teacherService, parentService, staffService } = await import('@/services');
 
       if (audienceType === 'students') {
-        const res = await studentService.getAll({ limit: 1000 });
+        const res = await studentService.getAll({ limit: 1000, branch_id: activeBranchId || undefined });
         users = res.data?.rows || res.data || [];
       } else if (audienceType === 'teachers') {
-        const res = await teacherService.getAll({ limit: 1000 });
+        const res = await teacherService.getAll({ limit: 1000, branch_id: activeBranchId || undefined });
         users = res.data?.rows || res.data || [];
       } else if (audienceType === 'parents') {
-        const res = await parentService.getAll({ limit: 1000 });
+        const res = await parentService.getAll({ limit: 1000, branch_id: activeBranchId || undefined });
         users = res.data?.rows || res.data || [];
       } else if (audienceType === 'staff') {
-        const res = await staffService.getAll({ limit: 1000 });
+        const res = await staffService.getAll({ limit: 1000, branch_id: activeBranchId || undefined });
         users = res.data?.rows || res.data || [];
       }
 
@@ -112,16 +114,15 @@ export default function NotificationsPage() {
       setRecipientOptions([]);
       setSelectedRecipient('all');
     }
-  }, [watchAudience]);
+  }, [watchAudience, activeBranchId]);
 
   // Fetch notifications
   const { data: notificationsData, isLoading: notifLoading, refetch } = useQuery({
-    queryKey: ['notifications', page, pageSize],
+    queryKey: ['notifications', activeBranchId, page, pageSize],
     queryFn: async () => {
       try {
         const { notificationService } = await import('@/services');
-        const result = await notificationService.getAll({ page, limit: pageSize });
-        // console.log('Notifications fetched:', result);
+        const result = await notificationService.getAll({ page, limit: pageSize, branch_id: activeBranchId || undefined });
         return result;
       } catch (error) {
         console.error('Error fetching notifications:', error);

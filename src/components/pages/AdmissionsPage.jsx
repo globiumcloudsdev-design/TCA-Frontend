@@ -13,6 +13,7 @@ import { Plus, Pencil, Trash2, ClipboardList } from 'lucide-react';
 
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
@@ -50,6 +51,7 @@ export default function AdmissionsPage({ type }) {
   const qc     = useQueryClient();
   const canDo  = useAuthStore((s) => s.canDo);
   const { terms } = useInstituteConfig();
+  const { activeBranchId } = useBranchAccess();
   const label  = type === 'coaching' ? 'Enrollment' : type === 'academy' ? 'Registration' : 'Admission';
   const labelP = type === 'coaching' ? 'Enrollments' : type === 'academy' ? 'Registrations' : 'Admissions';
 
@@ -66,11 +68,11 @@ export default function AdmissionsPage({ type }) {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admissions', type, page, pageSize, search, status],
+    queryKey: ['admissions', type, activeBranchId, page, pageSize, search, status],
     queryFn: async () => {
       try {
         const { admissionService } = await import('@/services');
-        return await admissionService.getAll({ page, limit: pageSize, search, status });
+        return await admissionService.getAll({ page, limit: pageSize, search, status, branch_id: activeBranchId || undefined });
       } catch {
         const d = DUMMY_ADMISSIONS.filter(a =>
           (!search || `${a.first_name} ${a.last_name}`.toLowerCase().includes(search.toLowerCase())) &&
@@ -91,7 +93,8 @@ export default function AdmissionsPage({ type }) {
     mutationFn: async (vals) => {
       try {
         const { admissionService } = await import('@/services');
-        return editing ? await admissionService.update(editing.id, vals) : await admissionService.create(vals);
+        const payload = { ...vals, ...(activeBranchId ? { branch_id: vals.branch_id || activeBranchId } : {}) };
+        return editing ? await admissionService.update(editing.id, payload) : await admissionService.create(payload);
       } catch { return { data: vals }; }
     },
     onSuccess: () => { toast.success(editing ? 'Updated' : 'Created'); qc.invalidateQueries({ queryKey: ['admissions'] }); closeModal(); },

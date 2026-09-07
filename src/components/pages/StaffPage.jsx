@@ -23,6 +23,7 @@ import {
 import { TableRowActions } from '@/components/common';
 import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
 import useAuthStore from '@/store/authStore';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import { staffService } from '@/services/staffService';
 import { settingService } from '@/services';
 import DataTable from '@/components/common/DataTable';
@@ -189,6 +190,7 @@ export default function StaffManagementPage({ instituteType }) {
     const qc = useQueryClient();
     const canDo = useAuthStore((s) => s.canDo);
     const user = useAuthStore((s) => s.user);
+    const { activeBranchId } = useBranchAccess();
 
     // ✅ State declarations - MUST be before any hooks that depend on them
     const [activeTab, setActiveTab] = useState('personal');
@@ -254,7 +256,7 @@ export default function StaffManagementPage({ instituteType }) {
 
     // Fetch staff members
     const { data, isLoading, refetch, isFetching } = useQuery({
-        queryKey: ['staff', page, pageSize, search, statusFilter, typeFilter],
+        queryKey: ['staff', activeBranchId, page, pageSize, search, statusFilter, typeFilter],
         queryFn: () => {
             const fetchFn = search ? staffService.search : staffService.getAll;
             return fetchFn({
@@ -262,7 +264,8 @@ export default function StaffManagementPage({ instituteType }) {
                 limit: pageSize,
                 search: search || undefined,
                 is_active: statusFilter === 'active' ? true : statusFilter === 'inactive' ? false : undefined,
-                staff_type: typeFilter || undefined
+                staff_type: typeFilter || undefined,
+                branch_id: activeBranchId || undefined
             });
         },
     });
@@ -522,7 +525,10 @@ export default function StaffManagementPage({ instituteType }) {
 
     // Mutations
     const createMutation = useMutation({
-        mutationFn: (data) => staffService.create(data),
+        mutationFn: (data) => staffService.create({
+            ...data,
+            ...(activeBranchId ? { branch_id: data.branch_id || activeBranchId } : {})
+        }),
         onSuccess: () => {
             toast.success('Staff member created successfully');
             qc.invalidateQueries({ queryKey: ['staff'] });

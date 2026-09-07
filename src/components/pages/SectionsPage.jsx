@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Users } from 'lucide-react';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
@@ -36,6 +37,7 @@ export default function SectionsPage({ type }) {
   const qc    = useQueryClient();
   const canDo = useAuthStore((s) => s.canDo);
   const { terms } = useInstituteConfig();
+  const { activeBranchId } = useBranchAccess();
   const label  = type === 'coaching' || type === 'academy' ? 'Batch'   : 'Section';
   const labelP = type === 'coaching' || type === 'academy' ? 'Batches' : 'Sections';
   const parentLabel = terms.primary_unit ?? 'Class';
@@ -51,9 +53,12 @@ export default function SectionsPage({ type }) {
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm({ resolver: zodResolver(schema), defaultValues: { status:'active', capacity:40 } });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['sections', type, page, pageSize, search, status],
+    queryKey: ['sections', type, activeBranchId, page, pageSize, search, status],
     queryFn: async () => {
-      try { const { sectionService } = await import('@/services'); return await sectionService.getAll({ page, limit: pageSize, search, status }); }
+      try {
+        const { sectionService } = await import('@/services');
+        return await sectionService.getAll({ page, limit: pageSize, search, status, branch_id: activeBranchId || undefined });
+      }
       catch {
         const d = DUMMY_SECTIONS.filter(r => (!search || r.name.toLowerCase().includes(search.toLowerCase())) && (!status || r.status === status));
         const slice = d.slice((page-1)*pageSize, page*pageSize);
@@ -69,7 +74,11 @@ export default function SectionsPage({ type }) {
 
   const save = useMutation({
     mutationFn: async (vals) => {
-      try { const { sectionService } = await import('@/services'); return editing ? await sectionService.update(editing.id, vals) : await sectionService.create(vals); }
+      try {
+        const { sectionService } = await import('@/services');
+        const payload = { ...vals, ...(activeBranchId ? { branch_id: vals.branch_id || activeBranchId } : {}) };
+        return editing ? await sectionService.update(editing.id, payload) : await sectionService.create(payload);
+      }
       catch { return { data: vals }; }
     },
     onSuccess: () => { toast.success(editing ? 'Updated' : 'Created'); qc.invalidateQueries({ queryKey: ['sections'] }); closeModal(); },

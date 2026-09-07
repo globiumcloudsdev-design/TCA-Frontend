@@ -123,6 +123,24 @@ export default function LoginPage() {
       Cookies.set('portal_type', user.user_type, { expires: 7, path: '/' });
     }
 
+    // Set or clear active branch for the logged in user
+    try {
+      const { isBranchAdmin, getAssignedBranch } = require('@/lib/auth');
+      const { useUIStore } = require('@/store/uiStore');
+      const isBranchAdminUser = isBranchAdmin(user);
+      const assignedBranch = getAssignedBranch(user);
+      const assignedBranchId = assignedBranch?.id || user?.branch_id || user?.branch?.id || null;
+      const assignedBranchName = assignedBranch?.name || user?.branch?.name || user?.branch_name || 'Assigned Branch';
+
+      if (isBranchAdminUser && assignedBranchId) {
+        useUIStore.getState().setActiveBranch(assignedBranchId, assignedBranchName);
+        localStorage.setItem('active_branch_id', assignedBranchId);
+      } else {
+        useUIStore.getState().clearActiveBranch();
+        localStorage.removeItem('active_branch_id');
+      }
+    } catch (e) {}
+
     toast.success(`Welcome, ${user.first_name}!`);
     const redirectPath = getDashboardPath(user);
     if (typeof window !== 'undefined') {
