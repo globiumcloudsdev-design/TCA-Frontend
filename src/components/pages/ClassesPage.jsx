@@ -473,11 +473,17 @@ export default function ClassesPage({ type }) {
       header: sectionTerm,
       cell: ({ row }) => {
         const sections = row.original.sections;
-        const count = Array.isArray(sections) ? sections.length : (sections || 0);
+        const sectionCount = Array.isArray(sections) ? sections.length : (sections || 0);
+        const studentCount = row.original.student_count ?? row.original.total_students ?? 0;
         return (
-          <Badge variant="outline">
-            {count} {count === 1 ? sectionTerm.toLowerCase() : `${sectionTerm.toLowerCase()}s`}
-          </Badge>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge variant="outline">
+              {sectionCount} {sectionCount === 1 ? sectionTerm.toLowerCase() : `${sectionTerm.toLowerCase()}s`}
+            </Badge>
+            <Badge variant="secondary" className="font-normal text-xs">
+              {studentCount} {studentCount === 1 ? 'Student' : 'Students'}
+            </Badge>
+          </div>
         );
       },
     },
@@ -828,6 +834,16 @@ export default function ClassesPage({ type }) {
                   <p className="text-2xl font-bold">{viewingClass.sections?.length || 0}</p>
                 </div>
                 <div>
+                  <p className="text-sm text-muted-foreground">Total Students</p>
+                  <p className="text-2xl font-bold">
+                    {viewingClass.student_count ?? viewingClass.total_students ?? (
+                      Array.isArray(viewingClass.sections)
+                        ? viewingClass.sections.reduce((acc, s) => acc + (s.student_count ?? s.total_students ?? 0), 0)
+                        : 0
+                    )}
+                  </p>
+                </div>
+                <div>
                   <p className="text-sm text-muted-foreground">Total {courseTerm}s</p>
                   <p className="text-2xl font-bold">{viewingClass.courses?.length || 0}</p>
                 </div>
@@ -849,39 +865,47 @@ export default function ClassesPage({ type }) {
             <TabsContent value="sections" className="space-y-4 pt-4">
               {viewingClass.sections && viewingClass.sections.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {viewingClass.sections.map((section, idx) => (
-                    <Card key={idx}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{section.name}</span>
-                          <Badge variant={(section.active ?? section.is_active) ? 'success' : 'secondary'} size="sm">
-                            {(section.active ?? section.is_active) ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </div>
-                        {(section.room_no || section.capacity) && (
-                          <div className="mt-2 text-sm text-muted-foreground space-y-1">
-                            {section.room_no && (
-                              <div className="flex items-center">
-                                <span className="w-20">📍 Room:</span>
-                                <span>{section.room_no}</span>
-                              </div>
-                            )}
-                            {section.capacity && (
-                              <div className="flex items-center">
-                                <span className="w-20">👥 Capacity:</span>
-                                <span>{section.capacity}</span>
-                              </div>
-                            )}
+                  {viewingClass.sections.map((section, idx) => {
+                    const sectionStudentCount = section.student_count ?? section.total_students ?? 0;
+                    return (
+                      <Card key={idx}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{section.name}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" size="sm" className="font-normal text-xs">
+                                {sectionStudentCount} {sectionStudentCount === 1 ? 'Student' : 'Students'}
+                              </Badge>
+                              <Badge variant={(section.active ?? section.is_active) ? 'success' : 'secondary'} size="sm">
+                                {(section.active ?? section.is_active) ? 'Active' : 'Inactive'}
+                              </Badge>
+                            </div>
                           </div>
-                        )}
-                        {section.teacher && (
-                          <div className="mt-2 text-xs text-muted-foreground">
-                            👨‍🏫 Teacher: {section.teacher.name}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
+                          {(section.room_no || section.capacity) && (
+                            <div className="mt-2 text-sm text-muted-foreground space-y-1">
+                              {section.room_no && (
+                                <div className="flex items-center">
+                                  <span className="w-20">📍 Room:</span>
+                                  <span>{section.room_no}</span>
+                                </div>
+                              )}
+                              {section.capacity && (
+                                <div className="flex items-center">
+                                  <span className="w-20">👥 Capacity:</span>
+                                  <span>{section.capacity}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {section.teacher && (
+                            <div className="mt-2 text-xs text-muted-foreground">
+                              👨‍🏫 Teacher: {section.teacher.name}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-center text-muted-foreground py-8">
