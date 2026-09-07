@@ -64,8 +64,8 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
   const [progressError, setProgressError] = useState('');
 
   useEffect(() => {
-    onGeneratingChange?.(submitting);
-  }, [submitting, onGeneratingChange]);
+    onGeneratingChange?.(submitting || (showProgressModal && progressStatus === 'processing'));
+  }, [submitting, showProgressModal, progressStatus, onGeneratingChange]);
 
   const { control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
@@ -721,7 +721,7 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
         type="voucher"
         title="Generating Fee Vouchers"
         subtitle={`Generating vouchers for ${confirmData?.mode === 'single' ? 'single student' : confirmData?.mode === 'class' ? 'selected class' : 'entire institute'} (${MONTH_OPTIONS.find(m => m.value === parseInt(confirmData?.month))?.label || ''})`}
-        estimatedSeconds={confirmData?.mode === 'single' ? 3 : confirmData?.mode === 'class' ? 5 : 9}
+        estimatedSeconds={confirmData?.mode === 'single' ? 3 : confirmData?.mode === 'class' ? 6 : 12}
         status={progressStatus}
         statusMessage="Fee vouchers have been generated successfully and recorded in ledger."
         errorMessage={progressError}
