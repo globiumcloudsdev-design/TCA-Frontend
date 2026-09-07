@@ -66,7 +66,38 @@ const TABS = ['Overview', 'Attendance', 'Fees', 'Exams', 'Documents', 'Behaviora
 function OverviewTab({ student, terms, currentInstitute }) {
   const sDetails = student.details?.studentDetails || {};
   const sessions = sDetails.academicSessions || [];
-  const guardians = sDetails.guardians || [];
+  const rawGuardians = Array.isArray(sDetails.guardians) && sDetails.guardians.length > 0
+    ? sDetails.guardians
+    : (Array.isArray(student.guardians) && student.guardians.length > 0 ? student.guardians : []);
+
+  const guardians = rawGuardians.length > 0
+    ? rawGuardians
+    : [
+        ...(sDetails.father_name || student.father_name ? [{
+          name: sDetails.father_name || student.father_name,
+          relation: 'father',
+          type: 'father',
+          phone: sDetails.father_phone || student.father_phone || '—',
+          cnic: sDetails.father_cnic || student.father_cnic || '—',
+          email: '—'
+        }] : []),
+        ...(sDetails.mother_name || student.mother_name ? [{
+          name: sDetails.mother_name || student.mother_name,
+          relation: 'mother',
+          type: 'mother',
+          phone: sDetails.mother_phone || student.mother_phone || '—',
+          cnic: sDetails.mother_cnic || student.mother_cnic || '—',
+          email: '—'
+        }] : []),
+        ...(sDetails.guardian_name || student.guardian_name ? [{
+          name: sDetails.guardian_name || student.guardian_name,
+          relation: sDetails.guardian_relation || 'guardian',
+          type: sDetails.guardian_type || 'guardian',
+          phone: sDetails.guardian_phone || student.guardian_phone || '—',
+          cnic: sDetails.guardian_cnic || student.guardian_cnic || '—',
+          email: sDetails.guardian_email || student.guardian_email || '—'
+        }] : [])
+      ];
 
   const guardianColumns = [
     { accessorKey: 'name', header: 'Name', cell: ({ row }) => <span className="font-medium">{row.original.name || '—'}</span> },
@@ -531,7 +562,7 @@ function FeesTab({ student, currentInstitute, onGenerateVoucher }) {
           columns={feeColumns}
           data={vouchers}
           loading={loadingVouchers}
-          emptyMessage="No fee vouchers found for this student."
+          emptyMessage="No fee vouchers generated yet for this student. Click 'Generate Voucher' to create one."
         />
       </div>
 

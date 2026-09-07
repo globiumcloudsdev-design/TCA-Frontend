@@ -255,58 +255,14 @@ export const studentService = {
    */
   getUnpaidVouchers: async (studentId) => {
     if (!studentId) return [];
-    
-    const resultsMap = new Map();
-
-    const addVouchers = (list) => {
-      if (!Array.isArray(list)) return;
-      for (const item of list) {
-        if (!item) continue;
-        const id = item.id || item._id || item.voucher_id || item.voucherId;
-        const key = id ? String(id) : `${item.year || ''}-${item.month || ''}-${item.voucher_number || item.voucherNumber || ''}`;
-        if (!resultsMap.has(key)) {
-          resultsMap.set(key, item);
-        }
-      }
-    };
-
-    // 1. Fetch from /fee-vouchers?student_id=:id&include_archived=true&include_all=true&limit=1000
     try {
       const resp = await api.get(`/fee-vouchers?student_id=${studentId}&include_archived=true&include_all=true&limit=1000`, { timeout: 10000 });
       const vouchers = resp.data?.data?.vouchers || resp.data?.data || resp.data?.vouchers || resp.data?.rows || [];
-      addVouchers(vouchers);
+      return Array.isArray(vouchers) ? vouchers : [];
     } catch (err) {
-      // ignore
+      console.warn('Could not fetch student fee vouchers:', err?.message || err);
+      return [];
     }
-
-    // 2. Fetch from /fees/vouchers?student_id=:id&include_archived=true&limit=1000
-    try {
-      const resp2 = await api.get(`/fees/vouchers?student_id=${studentId}&include_archived=true&limit=1000`, { timeout: 10000 });
-      const vouchers2 = resp2.data?.data?.rows || resp2.data?.data?.vouchers || resp2.data?.data || resp2.data || [];
-      addVouchers(vouchers2);
-    } catch (err2) {
-      // ignore
-    }
-
-    // 3. Fetch from dedicated endpoint /students/:id/unpaid-vouchers
-    try {
-      const response = await api.get(`/students/${studentId}/unpaid-vouchers`, { timeout: 10000 });
-      const rawList = response.data?.data?.vouchers || response.data?.data || response.data?.vouchers || response.data || [];
-      addVouchers(rawList);
-    } catch (error) {
-      // ignore
-    }
-
-    // 4. Fetch from /student/fees-vouchers?studentId=:id&limit=1000
-    try {
-      const resp3 = await api.get(`/student/fees-vouchers?studentId=${studentId}&limit=1000`, { timeout: 10000 });
-      const vouchers3 = resp3.data?.data?.vouchers || resp3.data?.data || [];
-      addVouchers(vouchers3);
-    } catch (err3) {
-      // ignore
-    }
-
-    return Array.from(resultsMap.values());
   },
 
   /**

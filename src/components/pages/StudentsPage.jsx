@@ -143,8 +143,70 @@ const flattenStudent = (s) => {
   if (!s) return s;
   const details = s.details?.studentDetails || {};
   const flat = { ...s, ...details, id: s.id };
-  if (flat.date_of_birth && !flat.dob) flat.dob = flat.date_of_birth;
-  if (flat.dob && !flat.date_of_birth) flat.date_of_birth = flat.dob;
+  
+  // Clean date fields (convert ISO timestamps 2026-06-15T00:00:00.000Z to YYYY-MM-DD)
+  const cleanDateStr = (d) => {
+    if (!d) return null;
+    const str = String(d).trim();
+    const isoMatch = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (isoMatch) {
+      const [, y, m, day] = isoMatch;
+      return `${y}-${m.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+    return str;
+  };
+
+  flat.date_of_birth = cleanDateStr(flat.date_of_birth || flat.dob);
+  flat.dob = flat.date_of_birth;
+  flat.admission_date = cleanDateStr(flat.admission_date);
+
+  // Fee info
+  flat.monthly_fee = flat.monthly_fee ?? details.monthly_fee ?? '';
+  flat.admission_fee = flat.admission_fee ?? details.admission_fee ?? details.admission_charges ?? '';
+
+  // Guardian normalization - Ensure guardians array is never blank if father/mother exist
+  let guardians = Array.isArray(flat.guardians) && flat.guardians.length > 0
+    ? flat.guardians
+    : (Array.isArray(details.guardians) && details.guardians.length > 0 ? details.guardians : []);
+
+  if (guardians.length === 0) {
+    const fatherName = flat.father_name || details.father_name;
+    const motherName = flat.mother_name || details.mother_name;
+    const guardianName = flat.guardian_name || details.guardian_name;
+    if (fatherName) {
+      guardians.push({
+        name: fatherName,
+        relation: 'father',
+        type: 'father',
+        phone: flat.father_phone || details.father_phone || '',
+        cnic: flat.father_cnic || details.father_cnic || '',
+        email: ''
+      });
+    }
+    if (motherName) {
+      guardians.push({
+        name: motherName,
+        relation: 'mother',
+        type: 'mother',
+        phone: flat.mother_phone || details.mother_phone || '',
+        cnic: flat.mother_cnic || details.mother_cnic || '',
+        email: ''
+      });
+    }
+    if (guardianName) {
+      const gType = flat.guardian_type || details.guardian_type || flat.guardian_relation || details.guardian_relation || 'guardian';
+      guardians.push({
+        name: guardianName,
+        relation: flat.guardian_relation || details.guardian_relation || gType,
+        type: String(gType).toLowerCase(),
+        phone: flat.guardian_phone || details.guardian_phone || '',
+        cnic: flat.guardian_cnic || details.guardian_cnic || '',
+        email: flat.guardian_email || details.guardian_email || ''
+      });
+    }
+  }
+  flat.guardians = guardians;
+
   return flat;
 };
 
@@ -634,27 +696,27 @@ export default function StudentsPage({ type }) {
 
   const handleDownloadTemplate = () => {
     try {
-      const headers = IMPORT_COLUMNS.map(col => col.label);
+      const headers = IMPORT_COLUMNS.map(col => col.required ? `${col.label} *` : col.label);
       
       // Sample Data Row
       const sampleRow = IMPORT_COLUMNS.map(col => {
-        if (col.key === 'first_name') return 'John';
-        if (col.key === 'last_name') return 'Doe';
-        if (col.key === 'email') return 'john.doe@example.com';
+        if (col.key === 'first_name') return 'Muhammad';
+        if (col.key === 'last_name') return 'Ali';
+        if (col.key === 'email') return 'student@example.com';
         if (col.key === 'phone') return '03001234567';
         if (col.key === 'registration_no') return 'REG-1001';
         if (col.key === 'cnic') return '42101-1234567-1';
-        if (col.key === 'dob') return '2010-01-01';
+        if (col.key === 'dob') return '2012-05-15';
         if (col.key === 'gender') return 'male';
         if (col.key === 'blood_group') return 'A+';
         if (col.key === 'religion') return 'Islam';
         if (col.key === 'nationality') return 'Pakistani';
-        if (col.key === 'class_name') return 'Class 1'; // Should match existing class name
+        if (col.key === 'class_name') return 'Class 1'; // Must match existing class name
         if (col.key === 'section_name') return 'A';
         if (col.key === 'academic_year_name') return '2024-2025';
-        if (col.key === 'admission_date') return '2024-05-01';
+        if (col.key === 'admission_date') return '2024-04-01';
         if (col.key === 'roll_no' || col.key === 'candidate_id' || col.key === 'roll_number') return '101';
-        if (col.key === 'father_name') return 'Father Name';
+        if (col.key === 'father_name') return 'Tariq Mahmood';
         if (col.key === 'father_phone') return '03009876543';
         if (col.key === 'monthly_fee') return '5000';
         if (col.key === 'admission_fee') return '2000';
@@ -767,7 +829,7 @@ export default function StudentsPage({ type }) {
     { key: 'emergency_contact_phone', label: 'Emergency Contact Phone', required: false, validation: 'phone' },
 
     // Fee Information
-    { key: 'monthly_fee', label: 'Monthly Fee', required: false, validation: 'number' },
+    { key: 'monthly_fee', label: 'Monthly Fee', required: true, validation: 'number' },
     { key: 'admission_fee', label: 'Admission Fee', required: false, validation: 'number' },
     { key: 'concession_type', label: 'Concession Type', required: false, validation: 'select', options: ['none', 'merit', 'need', 'staff', 'sibling'] },
     { key: 'concession_percentage', label: 'Concession Percentage', required: false, validation: 'number' },

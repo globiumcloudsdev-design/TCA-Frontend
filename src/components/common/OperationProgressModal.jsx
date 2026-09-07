@@ -139,7 +139,10 @@ export default function OperationProgressModal({
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v && status !== 'processing') onClose?.(); }}>
       <DialogContent
-        className="w-[95vw] sm:max-w-lg p-0 overflow-hidden border border-slate-200/80 dark:border-slate-800 shadow-2xl rounded-3xl bg-white dark:bg-slate-900"
+        className={cn(
+          "w-[95vw] sm:max-w-lg p-0 overflow-hidden border border-slate-200/80 dark:border-slate-800 shadow-2xl rounded-3xl bg-white dark:bg-slate-900 z-[70]",
+          status === 'processing' && "[&>button]:hidden cursor-wait"
+        )}
         onPointerDownOutside={(e) => { if (status === 'processing') e.preventDefault(); }}
         onEscapeKeyDown={(e) => { if (status === 'processing') e.preventDefault(); }}
       >
@@ -223,13 +226,18 @@ export default function OperationProgressModal({
               </span>
 
               {status === 'processing' && (
-                <Badge
-                  variant="outline"
-                  className="gap-1.5 font-semibold text-[11px] bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
-                >
-                  <Clock className="w-3 h-3 text-indigo-500" />
-                  ~{secondsRemaining}s left
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-extrabold text-xs">
+                    {internalProgress}%
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="gap-1 font-semibold text-[11px] bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 py-0.5"
+                  >
+                    <Clock className="w-3 h-3 text-indigo-500" />
+                    ~{secondsRemaining}s left
+                  </Badge>
+                </div>
               )}
 
               {status !== 'processing' && (

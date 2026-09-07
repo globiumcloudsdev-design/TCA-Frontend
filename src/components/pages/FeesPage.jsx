@@ -147,6 +147,7 @@ export default function FeesPage() {
   const canGenerateBulkVouchers = hasPermission('fees.voucher.bulk_generate') || hasPermission('fees.create');
 
   const [voucherGeneratorModal, setVoucherGeneratorModal] = useState(false);
+  const [isGeneratingVouchers, setIsGeneratingVouchers] = useState(false);
   const [deletingVoucher, setDeletingVoucher] = useState(null);
   const [selectedVouchers, setSelectedVouchers] = useState([]);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
@@ -625,31 +626,8 @@ const { data: bulkClasses = [] } = useQuery({
   });
 
   const vouchers = useMemo(() => {
-    const rawList = voucherData?.vouchers || [];
-    if (!voucherMonth || voucherMonth === '__all__') {
-      return rawList;
-    }
-    const targetMonthNum = parseInt(voucherMonth, 10);
-    return rawList.filter((v) => {
-      const vm = Number(v.month || 0);
-      if (vm > 0) {
-        return vm === targetMonthNum;
-      }
-      const rawMonthStr = String(v.fee_month || v.feeMonth || v.monthLabel || v.month_label || '').toLowerCase();
-      const monthObj = MONTH_OPTS.find((m) => m.value === String(targetMonthNum));
-      if (monthObj && rawMonthStr.includes(monthObj.label.toLowerCase())) {
-        return true;
-      }
-      const dStr = v.dueDate || v.due_date || v.issuedDate || v.issue_date || v.createdAt;
-      if (dStr) {
-        const d = new Date(dStr);
-        if (!isNaN(d.getTime())) {
-          return d.getMonth() + 1 === targetMonthNum;
-        }
-      }
-      return false;
-    });
-  }, [voucherData?.vouchers, voucherMonth]);
+    return voucherData?.vouchers || [];
+  }, [voucherData?.vouchers]);
 
   const voucherPagination = voucherData?.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 };
 
@@ -2261,11 +2239,37 @@ const downloadReceipt = async (payment, voucher) => {
       )}
 
 
+      {/* Screen Freeze Overlay during Bulk Voucher Operations */}
+      {isGeneratingVouchers && (
+        <div 
+          className="fixed inset-0 z-[55] bg-slate-950/40 backdrop-blur-[1.5px] pointer-events-auto cursor-wait select-none transition-all animate-in fade-in duration-200"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onKeyDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          aria-live="assertive"
+        />
+      )}
+
       {/* Bulk Voucher Generator Modal */}
-      <AppModal open={voucherGeneratorModal} onClose={() => setVoucherGeneratorModal(false)} title="Generate Bulk Vouchers" size="xl">
+      <AppModal 
+        open={voucherGeneratorModal} 
+        onClose={() => {
+          if (!isGeneratingVouchers) {
+            setVoucherGeneratorModal(false);
+          }
+        }} 
+        title="Generate Bulk Vouchers" 
+        size="xl"
+      >
         {canGenerateBulkVouchers ? (
           <BulkVoucherGenerator
             instituteId={currentInstitute?.id}
+            onGeneratingChange={setIsGeneratingVouchers}
             onSuccess={() => {
               setVoucherGeneratorModal(false);
               refetchVouchers();

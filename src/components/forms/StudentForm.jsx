@@ -138,7 +138,44 @@ export default function StudentForm({
 
   useEffect(() => {
     if (isEdit && defaultValues?.id) {
-      reset(defaultValues);
+      // Normalize guardians array so Father / Mother are not lost
+      let normalizedGuardians = Array.isArray(defaultValues.guardians) && defaultValues.guardians.length > 0
+        ? defaultValues.guardians.map(g => ({
+            name: g.name || '',
+            relation: g.relation || g.type || 'father',
+            type: g.type || g.relation || 'father',
+            phone: g.phone || '',
+            cnic: g.cnic || '',
+            email: g.email || ''
+          }))
+        : [];
+
+      if (normalizedGuardians.length === 0) {
+        if (defaultValues.father_name) {
+          normalizedGuardians.push({ name: defaultValues.father_name, relation: 'father', type: 'father', phone: defaultValues.father_phone || '', cnic: defaultValues.father_cnic || '', email: '' });
+        }
+        if (defaultValues.mother_name) {
+          normalizedGuardians.push({ name: defaultValues.mother_name, relation: 'mother', type: 'mother', phone: defaultValues.mother_phone || '', cnic: defaultValues.mother_cnic || '', email: '' });
+        }
+        if (defaultValues.guardian_name) {
+          normalizedGuardians.push({ name: defaultValues.guardian_name, relation: defaultValues.guardian_relation || 'guardian', type: defaultValues.guardian_type || 'guardian', phone: defaultValues.guardian_phone || '', cnic: defaultValues.guardian_cnic || '', email: defaultValues.guardian_email || '' });
+        }
+      }
+
+      if (normalizedGuardians.length === 0) {
+        normalizedGuardians = [{ name: '', relation: 'father', phone: '', cnic: '', email: '', type: 'father' }];
+      }
+
+      const cleanDob = defaultValues.dob || defaultValues.date_of_birth || defaultValues.details?.studentDetails?.date_of_birth || defaultValues.details?.studentDetails?.dob;
+
+      reset({
+        ...defaultValues,
+        guardians: normalizedGuardians,
+        dob: cleanDob,
+        date_of_birth: cleanDob,
+        monthly_fee: defaultValues.monthly_fee ?? defaultValues.details?.studentDetails?.monthly_fee ?? '',
+        admission_fee: defaultValues.admission_fee ?? defaultValues.details?.studentDetails?.admission_fee ?? defaultValues.details?.studentDetails?.admission_charges ?? '',
+      });
       
       const academicYearId = defaultValues.academic_year_id || defaultValues.details?.studentDetails?.academic_year_id;
       if (academicYearId) {
@@ -543,7 +580,19 @@ export default function StudentForm({
           <TabsContent value="fee">
             <Card><CardContent className="p-4 sm:p-6 space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <InputField label="Monthly Fee" name="monthly_fee" register={register} type="number" placeholder="Enter monthly fee" />
+                <InputField 
+                  label="Monthly Fee" 
+                  name="monthly_fee" 
+                  register={register} 
+                  rules={{ 
+                    required: 'Monthly fee is required', 
+                    min: { value: 0, message: 'Monthly fee must be 0 or greater' } 
+                  }}
+                  error={errors.monthly_fee}
+                  required 
+                  type="number" 
+                  placeholder="Enter monthly fee" 
+                />
                 <InputField label="Admission Fee" name="admission_fee" register={register} type="number" placeholder="Enter admission fee" />
                 <SelectField label="Concession" name="concession_type" control={control} options={CONCESSION_OPTIONS} placeholder="Select concession" />
               </div>

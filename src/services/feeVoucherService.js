@@ -63,8 +63,8 @@ export const COLLECTION_CATEGORIES = {
  * Normalize pagination
  */
 const normalizePagination = (page = 1, limit = 20) => ({
-  page: Math.max(1, parseInt(page)),
-  limit: Math.max(1, Math.min(100, parseInt(limit))) // Cap at 100
+  page: Math.max(1, parseInt(page) || 1),
+  limit: Math.max(1, Math.min(2000, parseInt(limit) || 20))
 });
 
 /**
@@ -73,6 +73,9 @@ const normalizePagination = (page = 1, limit = 20) => ({
 const buildVoucherFilters = (filters = {}) => {
   const base = {};
   
+  if (filters.branch_id || filters.branchId) {
+    base.branch_id = filters.branch_id || filters.branchId;
+  }
   if (filters.month !== undefined && filters.month !== null && filters.month !== '' && filters.month !== '__all__' && !isNaN(parseInt(filters.month))) {
     base.month = parseInt(filters.month);
   }
@@ -1023,10 +1026,8 @@ export const feeVoucherService = {
         show_archived: true,
         with_archived: true,
         page,
-        limit: Math.max(limit, 1000)
+        limit
       };
-      // Do not constrain backend query to single month so that unbundled historical months (e.g. June, July) are not dropped by SQL
-      delete queryParams.month;
 
       const queryString = buildQuery(queryParams);
       let rawData;
@@ -1045,23 +1046,13 @@ export const feeVoucherService = {
       
       const transformed = await transformVouchersList(rawData, classSvc, sectionSvc);
 
-      // Decompose any merged vouchers so that past unpaid months NEVER disappear
-      let allDecomposed = decomposeVouchersForPayment(transformed.vouchers || []);
-
-      // If specific month was requested:
-      let filteredVouchers = allDecomposed;
-      if (filters.month !== undefined && filters.month !== null && filters.month !== '' && filters.month !== '__all__') {
-        const targetMonthNum = parseInt(filters.month, 10);
-        if (!isNaN(targetMonthNum)) {
-          filteredVouchers = allDecomposed.filter((v) => Number(v.month) === targetMonthNum);
-        }
-      }
-
       return {
-        vouchers: filteredVouchers,
-        pagination: {
-          ...transformed.pagination,
-          total: filteredVouchers.length
+        vouchers: transformed.vouchers || [],
+        pagination: transformed.pagination || {
+          total: (transformed.vouchers || []).length,
+          page,
+          limit,
+          totalPages: Math.max(1, Math.ceil(((transformed.vouchers || []).length) / limit))
         }
       };
     } catch (error) {
