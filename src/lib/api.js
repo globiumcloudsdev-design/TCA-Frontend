@@ -12,7 +12,15 @@
 
 import axios from 'axios';
 import Cookies from 'js-cookie';
-import { isBranchAdmin, isMainBranchUser, getAssignedBranch, clearAuthData } from './auth';
+import {
+  isBranchAdmin,
+  isMainBranchUser,
+  getAssignedBranch,
+  clearAuthData,
+  getRefreshToken,
+  setRefreshToken,
+  setAccessToken
+} from './auth';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
@@ -136,27 +144,52 @@ api.interceptors.response.use(
           .catch((err) => Promise.reject(err));
       }
 
+      const storedRefreshToken =
+        getRefreshToken() ||
+        Cookies.get('refreshToken') ||
+        Cookies.get('refresh_token') ||
+        (typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null);
+
+      // If no refresh token exists at all, do not attempt network refresh
+      if (!storedRefreshToken) {
+        clearAuthData();
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          window.location.replace('/login');
+        }
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
       isRefreshing = true;
 
       try {
         const { data } = await axios.post(
           `${BASE_URL}/auth/refresh-token`,
-          {},
+          {
+            refreshToken: storedRefreshToken,
+            refresh_token: storedRefreshToken
+          },
           { withCredentials: true }
         );
-        const newToken = data?.data?.access_token;
+        const newToken = data?.data?.access_token || data?.data?.accessToken;
+        const newRefreshToken = data?.data?.refresh_token || data?.data?.refreshToken;
         if (newToken) {
-          Cookies.set('access_token', newToken, { expires: 7, path: '/' });
+          setAccessToken(newToken);
+          if (newRefreshToken) {
+            setRefreshToken(newRefreshToken);
+          }
           api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+          originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
           processQueue(null, newToken);
           return api(originalRequest);
+        } else {
+          throw new Error('No access token received from refresh-token');
         }
       } catch (refreshError) {
         processQueue(refreshError, null);
         // Token refresh failed — clean wipe everything and redirect to login
         clearAuthData();
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
           window.location.replace('/login');
         }
         return Promise.reject(refreshError);
