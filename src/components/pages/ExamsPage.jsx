@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import { EXAM_TYPES } from '@/constants';
 
 import PageHeader from '@/components/common/PageHeader';
@@ -60,6 +61,7 @@ export default function ExamsPage({ type }) {
   const { canDo } = useAuthStore();
   const { currentInstitute } = useInstituteStore();
   const { terms } = useInstituteConfig();
+  const { activeBranchId } = useBranchAccess();
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -77,9 +79,10 @@ export default function ExamsPage({ type }) {
 
   // Fetch exams
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['exams', currentInstitute?.id, page, pageSize, search, status, examType],
+    queryKey: ['exams', currentInstitute?.id, activeBranchId, page, pageSize, search, status, examType],
     queryFn: () => examService.getAll({
       institute_id: currentInstitute?.id,
+      branch_id: activeBranchId || undefined,
       page,
       limit: pageSize,
       search,

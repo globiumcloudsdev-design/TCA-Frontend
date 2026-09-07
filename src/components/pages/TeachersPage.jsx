@@ -30,6 +30,7 @@ import {
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
+import useBranchAccess from '@/hooks/useBranchAccess';
 
 // Components
 import DataTable from '@/components/common/DataTable';
@@ -66,6 +67,7 @@ export default function TeachersPage({ type }) {
   const { canDo, user } = useAuthStore();
   const { currentInstitute } = useInstituteStore();
   const { terms } = useInstituteConfig();
+  const { activeBranchId } = useBranchAccess();
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -113,10 +115,11 @@ export default function TeachersPage({ type }) {
     refetch,
     isFetching
   } = useQuery({
-    queryKey: ['teachers', currentInstitute?.id, page, pageSize, search, selectedStatus],
+    queryKey: ['teachers', currentInstitute?.id, activeBranchId, page, pageSize, search, selectedStatus],
     queryFn: async () => {
       console.log('📥 Fetching teachers with filters:', {
         institute_id: currentInstitute?.id,
+        branch_id: activeBranchId || undefined,
         page,
         limit: pageSize,
         search: search || undefined,
@@ -126,6 +129,7 @@ export default function TeachersPage({ type }) {
       const fetchFn = search ? teacherService.search : teacherService.getAll;
       const response = await fetchFn({
         institute_id: currentInstitute?.id,
+        branch_id: activeBranchId || undefined,
         page,
         limit: pageSize,
         search: search || undefined,
@@ -139,7 +143,10 @@ export default function TeachersPage({ type }) {
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data) => teacherService.create(data),
+    mutationFn: (data) => teacherService.create({
+      ...data,
+      ...(activeBranchId ? { branch_id: data.branch_id || activeBranchId } : {})
+    }),
     onSuccess: (response) => {
       toast.success(`${teacherLabel} created successfully`);
       queryClient.invalidateQueries({ queryKey: ['teachers'] });

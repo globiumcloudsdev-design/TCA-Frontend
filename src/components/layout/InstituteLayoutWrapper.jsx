@@ -28,6 +28,7 @@ import AppBreadcrumb from "@/components/common/AppBreadcrumb";
 import NotificationBell from "@/components/common/NotificationBell";
 import ThemeToggle from "@/components/common/ThemeToggle";
 import BranchSwitcher from "@/components/common/BranchSwitcher";
+import BranchInitializer from "@/components/common/BranchInitializer";
 import { 
   ConfirmDialog, AvatarWithInitials, GlobalAnnouncementBanner, UserMenu 
 } from "../common";
@@ -460,7 +461,9 @@ export default function InstituteLayoutWrapper({ children }) {
   return (
 // <div className="flex h-screen overflow-hidden bg-background">
     // only 1 scrollbar on the page
-    <div className="fixed inset-0 flex overflow-hidden bg-background">      {/* Mobile backdrop */}
+    <div className="fixed inset-0 flex overflow-hidden bg-background">
+      <BranchInitializer />
+      {/* Mobile backdrop */}
       <div
         onClick={() => setMobileOpen(false)}
         aria-hidden="true"

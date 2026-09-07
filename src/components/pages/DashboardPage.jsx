@@ -8,9 +8,9 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { dashboardService } from '@/services';
-import StatsCard from '@/components/common/StatsCard';
 import useAuthStore from '@/store/authStore';
 import { useUiStore } from '@/store/uiStore';
+import useBranchAccess from '@/hooks/useBranchAccess';
 import { resolveBranchName } from '@/lib/branchUtils';
 import { AttendanceChart, FeesChart, EnrollmentChart, DonutChart, FinancialChart } from '@/components/charts';
 import { Badge } from '@/components/ui/badge';
@@ -57,14 +57,23 @@ export default function DashboardPage({ type }) {
   const { terms, typeDefinition } = useInstituteConfig();
   const user = useAuthStore((s) => s.user);
   const canDo = useAuthStore((s) => s.canDo);
-  const activeBranchId = useUiStore((s) => s.activeBranchId);
-  const rawActiveBranchName = useUiStore((s) => s.activeBranchName);
-  const isAllBranches = !activeBranchId || activeBranchId === 'all';
-  const branchFilter = isAllBranches ? undefined : activeBranchId;
+  const { 
+    isBranchAdmin, 
+    assignedBranchId, 
+    activeBranchId, 
+    activeBranchName: resolvedBranchName, 
+    isAllBranches 
+  } = useBranchAccess();
+
+  const branchFilter = isBranchAdmin
+    ? (assignedBranchId || activeBranchId || undefined)
+    : (isAllBranches ? undefined : (activeBranchId || undefined));
+
   const activeBranchName = useMemo(() => {
+    if (isBranchAdmin) return resolvedBranchName || 'Assigned Branch';
     if (isAllBranches) return null;
-    return resolveBranchName(rawActiveBranchName || activeBranchId, null);
-  }, [isAllBranches, activeBranchId, rawActiveBranchName]);
+    return resolvedBranchName || null;
+  }, [isBranchAdmin, resolvedBranchName, isAllBranches]);
 
   const userId = user?.id || 'guest';
   const instituteId = user?.institute?.id || user?.school?.id || user?.institute_id || 'default';
@@ -147,7 +156,7 @@ export default function DashboardPage({ type }) {
     );
   }, [dashboard]);
 
-  const parsedStudentsRaw = Number(
+  const rawStudents =
     summary.total_students ??
     summary.totalStudents ??
     summary.students_count ??
@@ -157,12 +166,11 @@ export default function DashboardPage({ type }) {
     dashboard.total_students ??
     dashboard.totalStudents ??
     dashboard.students_count ??
-    0
-  );
+    null;
 
-  const totalStudents = parsedStudentsRaw > 0
-    ? parsedStudentsRaw
-    : (fallbackStudentsCount != null && fallbackStudentsCount > 0 ? fallbackStudentsCount : parsedStudentsRaw);
+  const totalStudents = rawStudents !== null && rawStudents !== undefined
+    ? Number(rawStudents)
+    : (fallbackStudentsCount != null ? fallbackStudentsCount : 0);
 
   const activeStudents =
     summary.active_students ??
@@ -172,7 +180,7 @@ export default function DashboardPage({ type }) {
     dashboard.active_students ??
     totalStudents;
 
-  const parsedTeachersRaw = Number(
+  const rawTeachers =
     summary.total_teachers ??
     summary.totalTeachers ??
     summary.teachers_count ??
@@ -183,12 +191,11 @@ export default function DashboardPage({ type }) {
     summary.faculty_count ??
     dashboard.total_teachers ??
     dashboard.totalTeachers ??
-    0
-  );
+    null;
 
-  const totalTeachers = parsedTeachersRaw > 0
-    ? parsedTeachersRaw
-    : (fallbackTeachersCount != null && fallbackTeachersCount > 0 ? fallbackTeachersCount : parsedTeachersRaw);
+  const totalTeachers = rawTeachers !== null && rawTeachers !== undefined
+    ? Number(rawTeachers)
+    : (fallbackTeachersCount != null ? fallbackTeachersCount : 0);
 
   const activeTeachers =
     summary.active_teachers ??
@@ -196,7 +203,7 @@ export default function DashboardPage({ type }) {
     dashboard.active_teachers ??
     totalTeachers;
 
-  const parsedClassesRaw = Number(
+  const rawClasses =
     summary.total_classes ??
     summary.totalClasses ??
     summary.classes_count ??
@@ -208,12 +215,11 @@ export default function DashboardPage({ type }) {
     summary.total_sections ??
     dashboard.total_classes ??
     dashboard.totalClasses ??
-    0
-  );
+    null;
 
-  const totalClasses = parsedClassesRaw > 0
-    ? parsedClassesRaw
-    : (fallbackClassesCount != null && fallbackClassesCount > 0 ? fallbackClassesCount : parsedClassesRaw);
+  const totalClasses = rawClasses !== null && rawClasses !== undefined
+    ? Number(rawClasses)
+    : (fallbackClassesCount != null ? fallbackClassesCount : 0);
 
   const feesCollected =
     summary.fees_collected ??
@@ -275,20 +281,20 @@ export default function DashboardPage({ type }) {
         );
       });
 
-      // Map existing stats, replacing '0' with non-zero fallback counts if available
+      // Map existing stats, keeping valid 0 counts from API
       const mappedStats = dashboard.stats.map((stat) => {
         const lbl = String(stat.label || '').toLowerCase();
         const isStudent = lbl.includes((terms.student || 'student').toLowerCase()) || lbl.includes('student') || lbl.includes('enrollment');
         const isTeacher = lbl.includes((terms.teacher || 'teacher').toLowerCase()) || lbl.includes('teacher') || lbl.includes('faculty');
         const isClass = lbl.includes((terms.primaryUnit || 'class').toLowerCase()) || lbl.includes('class') || lbl.includes('unit');
 
-        if (isStudent && (stat.value === '0' || stat.value === 0 || !stat.value) && totalStudents > 0) {
+        if (isStudent && (stat.value === null || stat.value === undefined || stat.value === '')) {
           return { ...stat, value: Number(totalStudents).toLocaleString() };
         }
-        if (isTeacher && (stat.value === '0' || stat.value === 0 || !stat.value) && totalTeachers > 0) {
+        if (isTeacher && (stat.value === null || stat.value === undefined || stat.value === '')) {
           return { ...stat, value: Number(totalTeachers).toLocaleString() };
         }
-        if (isClass && (stat.value === '0' || stat.value === 0 || !stat.value) && totalClasses > 0) {
+        if (isClass && (stat.value === null || stat.value === undefined || stat.value === '')) {
           return { ...stat, value: Number(totalClasses).toLocaleString() };
         }
         return stat;
