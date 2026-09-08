@@ -474,16 +474,27 @@ export default function ClassesPage({ type }) {
       cell: ({ row }) => {
         const sections = row.original.sections;
         const sectionCount = Array.isArray(sections) ? sections.length : (sections || 0);
-        const studentCount = row.original.student_count ?? row.original.total_students ?? 0;
         return (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <Badge variant="outline">
-              {sectionCount} {sectionCount === 1 ? sectionTerm.toLowerCase() : `${sectionTerm.toLowerCase()}s`}
-            </Badge>
-            <Badge variant="secondary" className="font-normal text-xs">
-              {studentCount} {studentCount === 1 ? 'Student' : 'Students'}
-            </Badge>
-          </div>
+          <Badge variant="outline" className="whitespace-nowrap">
+            {sectionCount} {sectionCount === 1 ? sectionTerm.toLowerCase() : `${sectionTerm.toLowerCase()}s`}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: 'students',
+      id: 'students',
+      header: 'Students',
+      cell: ({ row }) => {
+        const studentCount = row.original.student_count ?? row.original.total_students ?? (
+          Array.isArray(row.original.sections)
+            ? row.original.sections.reduce((acc, s) => acc + (s.student_count ?? s.total_students ?? 0), 0)
+            : 0
+        );
+        return (
+          <Badge variant="secondary" className="font-normal text-xs whitespace-nowrap">
+            {studentCount} {studentCount === 1 ? 'Student' : 'Students'}
+          </Badge>
         );
       },
     },
@@ -699,36 +710,38 @@ export default function ClassesPage({ type }) {
       </Card>
 
       {/* Data Table */}
-      <DataTable
-        columns={columns}
-        data={data?.data || []}
-        loading={isLoading || isFetching}
-        // action={addClassButton}
-        // search={search}
-        // onSearch={setSearch}
-        // searchPlaceholder={`Search ${classTermPlural.toLowerCase()}...`}
-        enableColumnVisibility
-        // exportConfig={{
-        //   fileName: classTermPlural.toLowerCase().replace(/\s+/g, '-'),
-        //   dateField: 'created_at'
-        // }}
-        pagination={{
-          page,
-          totalPages: data?.pagination?.totalPages || 1,
-          onPageChange: (newPage) => {
-            console.log('📄 Changing to page:', newPage);
-            setPage(newPage);
-          },
-          total: data?.pagination?.total || 0,
-          pageSize,
-          onPageSizeChange: (newSize) => {
-            console.log('📄 Changing page size to:', newSize);
-            setPageSize(newSize);
-            setPage(1);
-          },
-        }}
-        emptyMessage={`No ${classTermPlural.toLowerCase()} found`}
-      />
+      <div className="w-full max-w-full overflow-x-auto">
+        <DataTable
+          columns={columns}
+          data={data?.data || []}
+          loading={isLoading || isFetching}
+          // action={addClassButton}
+          // search={search}
+          // onSearch={setSearch}
+          // searchPlaceholder={`Search ${classTermPlural.toLowerCase()}...`}
+          enableColumnVisibility
+          // exportConfig={{
+          //   fileName: classTermPlural.toLowerCase().replace(/\s+/g, '-'),
+          //   dateField: 'created_at'
+          // }}
+          pagination={{
+            page,
+            totalPages: data?.pagination?.totalPages || 1,
+            onPageChange: (newPage) => {
+              console.log('📄 Changing to page:', newPage);
+              setPage(newPage);
+            },
+            total: data?.pagination?.total || 0,
+            pageSize,
+            onPageSizeChange: (newSize) => {
+              console.log('📄 Changing page size to:', newSize);
+              setPageSize(newSize);
+              setPage(1);
+            },
+          }}
+          emptyMessage={`No ${classTermPlural.toLowerCase()} found`}
+        />
+      </div>
 
       {/* Add/Edit Modal */}
       <AppModal
@@ -760,6 +773,7 @@ export default function ClassesPage({ type }) {
         onClose={closeViewModal}
         title={`${classTerm} Details: ${viewingClass?.name}`}
         size="lg"
+        className="w-full max-w-2xl mx-auto"
         footer={
           <div className="flex gap-2">
             <Button variant="outline" onClick={closeViewModal}>
@@ -785,7 +799,7 @@ export default function ClassesPage({ type }) {
             </TabsList>
 
             <TabsContent value="overview" className="space-y-4 pt-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Name</p>
                   <p className="font-medium">{viewingClass.name}</p>
@@ -819,7 +833,7 @@ export default function ClassesPage({ type }) {
                 )}
 
                 {viewingClass.description && (
-                  <div className="col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <p className="text-sm text-muted-foreground">Description</p>
                     <p className="text-sm bg-muted/50 p-3 rounded-md">{viewingClass.description}</p>
                   </div>
@@ -828,7 +842,7 @@ export default function ClassesPage({ type }) {
 
               <Separator />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Total {sectionTerm}s</p>
                   <p className="text-2xl font-bold">{viewingClass.sections?.length || 0}</p>
@@ -864,41 +878,47 @@ export default function ClassesPage({ type }) {
 
             <TabsContent value="sections" className="space-y-4 pt-4">
               {viewingClass.sections && viewingClass.sections.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {viewingClass.sections.map((section, idx) => {
                     const sectionStudentCount = section.student_count ?? section.total_students ?? 0;
                     return (
-                      <Card key={idx}>
+                      <Card key={idx} className="overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
                         <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">{section.name}</span>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="secondary" size="sm" className="font-normal text-xs">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-medium text-slate-800 dark:text-slate-200 truncate">
+                              {section.name}
+                            </span>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Badge variant="secondary" size="sm" className="font-normal text-xs whitespace-nowrap">
                                 {sectionStudentCount} {sectionStudentCount === 1 ? 'Student' : 'Students'}
                               </Badge>
-                              <Badge variant={(section.active ?? section.is_active) ? 'success' : 'secondary'} size="sm">
+                              <Badge
+                                variant={(section.active ?? section.is_active) ? 'success' : 'secondary'}
+                                size="sm"
+                                className="whitespace-nowrap"
+                              >
                                 {(section.active ?? section.is_active) ? 'Active' : 'Inactive'}
                               </Badge>
                             </div>
                           </div>
                           {(section.room_no || section.capacity) && (
-                            <div className="mt-2 text-sm text-muted-foreground space-y-1">
+                            <div className="mt-2.5 text-xs sm:text-sm text-muted-foreground space-y-1">
                               {section.room_no && (
                                 <div className="flex items-center">
-                                  <span className="w-20">📍 Room:</span>
-                                  <span>{section.room_no}</span>
+                                  <span className="w-20 shrink-0">📍 Room:</span>
+                                  <span className="truncate">{section.room_no}</span>
                                 </div>
                               )}
                               {section.capacity && (
                                 <div className="flex items-center">
-                                  <span className="w-20">👥 Capacity:</span>
+                                  <span className="w-20 shrink-0">👥 Capacity:</span>
                                   <span>{section.capacity}</span>
                                 </div>
                               )}
                             </div>
                           )}
                           {section.teacher && (
-                            <div className="mt-2 text-xs text-muted-foreground">
+                            <div className="mt-2 text-xs text-muted-foreground truncate">
                               👨‍🏫 Teacher: {section.teacher.name}
                             </div>
                           )}

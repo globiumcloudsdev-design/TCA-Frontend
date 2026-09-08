@@ -47,8 +47,8 @@ export default function AppModal({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
         className={cn(
-          // Width: full on mobile, capped on larger screens
-          'w-full p-0',
+          // Width: full with safe margin on mobile, capped on larger screens
+          'w-[calc(100%-1.5rem)] sm:w-full p-0 mx-auto',
           SIZE_CLASSES[size],
           // Height: never taller than 95vh; scroll inside
           'max-h-[95vh] flex flex-col',
@@ -56,7 +56,7 @@ export default function AppModal({
         )}
       >
         {/* ── Sticky Header ── */}
-        <DialogHeader className="shrink-0 border-b px-5 pt-5 pb-4">
+        <DialogHeader className="shrink-0 border-b px-4 py-3.5 sm:px-6 sm:py-4">
           <DialogTitle className="text-base sm:text-lg">{title}</DialogTitle>
           {description ? (
             <DialogDescription className="text-sm">{description}</DialogDescription>
@@ -66,13 +66,13 @@ export default function AppModal({
         </DialogHeader>
 
         {/* ── Scrollable Body ── */}
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className="flex-1 overflow-y-auto px-4 py-3 sm:px-6 sm:py-5">
           {children}
         </div>
 
         {/* ── Optional Footer ── */}
         {footer && (
-          <div className="shrink-0 border-t px-5 py-4 flex justify-end gap-2">
+          <div className="shrink-0 border-t px-4 py-3 sm:px-6 sm:py-4 flex justify-end gap-2">
             {footer}
           </div>
         )}
