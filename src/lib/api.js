@@ -100,6 +100,12 @@ api.interceptors.request.use(
       delete config.headers['Content-Type'];
     }
 
+    // Guarantee a safe minimum timeout of at least 60 seconds for ANY request across the app,
+    // preventing hardcoded low timeouts (e.g. 5s, 10s, 15s in legacy services) from aborting prematurely.
+    if (!config.timeout || config.timeout < 60000) {
+      config.timeout = 60000;
+    }
+
     // Automatically elevate timeout for heavy operations across the complete app
     const urlLower = url.toLowerCase();
     const isHeavyOperation =
@@ -111,7 +117,10 @@ api.interceptors.request.use(
       urlLower.includes('report') ||
       urlLower.includes('backup') ||
       urlLower.includes('sync') ||
-      urlLower.includes('voucher');
+      urlLower.includes('voucher') ||
+      urlLower.includes('fee') ||
+      urlLower.includes('defaulter') ||
+      urlLower.includes('attendance');
 
     if (isHeavyOperation) {
       config.timeout = Math.max(config.timeout || 0, 300000); // 5 minutes for heavy operations
