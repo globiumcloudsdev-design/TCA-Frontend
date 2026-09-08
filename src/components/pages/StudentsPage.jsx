@@ -871,7 +871,7 @@ export default function StudentsPage({ type }) {
     }
 
     try {
-      const BATCH_SIZE = 200;
+      const BATCH_SIZE = 100;
       let totalImported = 0;
       let allFailed = [];
 
@@ -902,8 +902,10 @@ export default function StudentsPage({ type }) {
         toast.error('Import failed');
       }
 
-      qc.invalidateQueries({ queryKey: ['students', type] });
-      qc.invalidateQueries({ queryKey: ['student-stats', type] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['student-stats'] });
+      qc.invalidateQueries({ queryKey: ['academic-years'] });
+      qc.invalidateQueries({ queryKey: ['classes-all'] });
     } catch (error) {
       const msg = error.response?.data?.message || error.message || 'Failed to import students';
       toast.error(msg);

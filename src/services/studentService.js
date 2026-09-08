@@ -153,7 +153,7 @@ export const studentService = {
         students: studentsData,
         institute_type: instituteType,
       }, {
-        timeout: 120000, // 2 minutes timeout for bulk operations
+        timeout: 300000, // 5 minutes timeout for bulk operations
       });
       return response.data;
     } catch (error) {
