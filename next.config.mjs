@@ -21,6 +21,12 @@ const nextConfig = {
       '@radix-ui/react-popover',
     ],
   },
+  turbopack: {},
+  webpack: (config) => {
+    config.output = config.output || {};
+    config.output.chunkLoadTimeout = 300000; // 5 minutes to prevent ChunkLoadError timeouts
+    return config;
+  },
   // All API calls proxy through Next.js to avoid CORS in dev
   async rewrites() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;

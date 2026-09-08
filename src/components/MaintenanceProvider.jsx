@@ -1,10 +1,12 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
-import { publicService } from '@/services';
-import MaintenancePage from './common/MaintenancePage';
+import { publicService } from '@/services/publicService';
 import useAuthStore from '@/store/authStore';
 import { usePathname } from 'next/navigation';
+
+const MaintenancePage = dynamic(() => import('./common/MaintenancePage'), { ssr: false });
 
 export default function MaintenanceProvider({ children }) {
   const user = useAuthStore(s => s.user);
