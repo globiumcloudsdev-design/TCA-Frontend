@@ -315,26 +315,104 @@ export default function StudentForm({
     }
   }, [isEdit, sections, watchSection, watchClass, setValue, defaultValues]);
 
-  // ✅ Updated Tab Navigation logic - dynamically using availableTabs
-  const validateTab = async (tab) => {
-    let fields = [];
-    if (tab === 'personal') {
-      fields = ['first_name', 'last_name', 'dob', 'gender'];
-    } else if (tab === 'academic') {
-      fields = ['academic_year_id', 'class_id', 'section_id', 'roll_no', 'admission_date'];
-    } else if (tab === 'guardian') {
-      fields = ['guardians'];
-    } else if (tab === 'contact') {
-      fields = ['phone', 'city', 'present_address'];
-    } else if (tab === 'fee') {
-      fields = ['monthly_fee', 'concession_type'];
-    } else if (tab === 'documents') {
-      fields = ['documents'];
-    }
-    return await trigger(fields);
+  const TAB_LABELS = {
+    personal: 'Personal',
+    academic: 'Academic',
+    guardian: 'Guardian',
+    contact: 'Contact',
+    fee: 'Fee',
+    documents: 'Docs',
   };
 
-  // ✅ Updated nextTab - uses availableTabs
+  // Helper to determine if a tab currently contains errors
+  const tabHasErrors = (tabKey) => {
+    if (!errors || Object.keys(errors).length === 0) return false;
+
+    switch (tabKey) {
+      case 'personal':
+        return Boolean(
+          errors.first_name ||
+          errors.last_name ||
+          errors.dob ||
+          errors.gender ||
+          errors.cnic ||
+          errors.nationality
+        );
+      case 'academic':
+        return Boolean(
+          errors.branch_id ||
+          errors.academic_year_id ||
+          errors.class_id ||
+          errors.section_id ||
+          errors.roll_no ||
+          errors.admission_date
+        );
+      case 'guardian':
+        return Boolean(errors.guardians);
+      case 'contact':
+        return Boolean(
+          errors.city ||
+          errors.present_address ||
+          errors.phone ||
+          errors.email
+        );
+      case 'fee':
+        return Boolean(
+          errors.monthly_fee ||
+          errors.admission_fee ||
+          errors.concession_type ||
+          errors.discount_type ||
+          errors.concession_percentage ||
+          errors.concession_amount
+        );
+      case 'documents':
+        return Boolean(errors.documents);
+      default:
+        return false;
+    }
+  };
+
+  const getTabFields = (tab) => {
+    switch (tab) {
+      case 'personal':
+        return ['first_name', 'last_name', 'dob', 'gender'];
+      case 'academic': {
+        const fields = ['academic_year_id', 'class_id', 'section_id', 'roll_no', 'admission_date'];
+        if (watch('branch_id') !== undefined) {
+          fields.push('branch_id');
+        }
+        return fields;
+      }
+      case 'guardian': {
+        const guardianValues = getValues('guardians') || [];
+        const fields = ['guardians'];
+        guardianValues.forEach((_, idx) => {
+          fields.push(`guardians.${idx}.name`);
+          fields.push(`guardians.${idx}.type`);
+        });
+        return fields;
+      }
+      case 'contact':
+        return ['city', 'present_address'];
+      case 'fee':
+        return ['monthly_fee'];
+      case 'documents':
+        return ['documents'];
+      default:
+        return [];
+    }
+  };
+
+  const validateTab = async (tab) => {
+    const fields = getTabFields(tab);
+    if (!fields.length) return true;
+    const isValid = await trigger(fields);
+    if (!isValid) {
+      toast.error(`Please complete the required fields in ${TAB_LABELS[tab] || tab}.`);
+    }
+    return isValid;
+  };
+
   const nextTab = async () => {
     const isValid = await validateTab(activeTab);
     if (!isValid) return;
@@ -344,7 +422,6 @@ export default function StudentForm({
     }
   };
 
-  // ✅ Updated prevTab - uses availableTabs
   const prevTab = () => {
     const currentIndex = availableTabs.indexOf(activeTab);
     if (currentIndex > 0) {
@@ -352,37 +429,32 @@ export default function StudentForm({
     }
   };
 
-  // ✅ Updated handleTabChange - uses availableTabs
-  const handleTabChange = async (value) => {
+  const handleTabChange = async (targetTab) => {
     const currentIndex = availableTabs.indexOf(activeTab);
-    const targetIndex = availableTabs.indexOf(value);
+    const targetIndex = availableTabs.indexOf(targetTab);
     
     if (targetIndex === -1) return;
     
-    if (targetIndex > currentIndex) {
-      const isValid = await validateTab(activeTab);
-      if (!isValid) return;
+    // Moving backwards is always allowed
+    if (targetIndex <= currentIndex) {
+      setActiveTab(targetTab);
+      return;
     }
-    setActiveTab(value);
+    
+    // Moving forwards: Validate all tabs between current and target
+    for (let i = currentIndex; i < targetIndex; i++) {
+      const tabToValidate = availableTabs[i];
+      const fields = getTabFields(tabToValidate);
+      const isTabValid = await trigger(fields);
+      if (!isTabValid) {
+        toast.error(`Please complete the required fields in ${TAB_LABELS[tabToValidate] || tabToValidate} first.`);
+        setActiveTab(tabToValidate);
+        return;
+      }
+    }
+    
+    setActiveTab(targetTab);
   };
-
-  // ✅ Updated error navigation - uses availableTabs
-  useEffect(() => {
-    const errorFields = Object.keys(errors);
-    if (errorFields.length > 0) {
-      const personalFields = ['first_name', 'last_name', 'dob', 'gender', 'cnic', 'nationality', 'city'];
-      const academicFields = ['academic_year_id', 'class_id', 'section_id', 'roll_no', 'admission_date'];
-      const contactFields = ['phone', 'email', 'present_address', 'permanent_address'];
-      const feeFields = ['monthly_fee', 'admission_fee', 'concession_type', 'discount_type'];
-      
-      if (errorFields.some(f => personalFields.includes(f))) setActiveTab('personal');
-      else if (errorFields.some(f => academicFields.includes(f))) setActiveTab('academic');
-      else if (errorFields.some(f => f.startsWith('guardians'))) setActiveTab('guardian');
-      else if (errorFields.some(f => contactFields.includes(f))) setActiveTab('contact');
-      else if (errorFields.some(f => feeFields.includes(f))) setActiveTab('fee');
-      else if (studentDocsAllowed && errorFields.some(f => f.startsWith('documents'))) setActiveTab('documents');
-    }
-  }, [errors, studentDocsAllowed]);
 
   const watchConcessionType = watch('concession_type');
   const isConcessionNone = watchConcessionType === 'none' || !watchConcessionType;
@@ -453,6 +525,28 @@ export default function StudentForm({
     onSubmit(formData);
   };
 
+  const onInvalid = async (formErrors) => {
+    console.warn('StudentForm submission prevented due to errors:', formErrors);
+
+    // Trigger validation across all available tabs so every tab with errors turns red
+    for (const tab of availableTabs) {
+      const fields = getTabFields(tab);
+      if (fields.length) {
+        await trigger(fields);
+      }
+    }
+
+    // Direct user to the first tab that has an error
+    for (const tab of availableTabs) {
+      if (tabHasErrors(tab)) {
+        setActiveTab(tab);
+        break;
+      }
+    }
+
+    toast.error('Please complete all required fields. The highlighted tab(s) in red have missing information.');
+  };
+
   const getTerm = (key) => {
     const terms = { school: { class: 'Class', section: 'Section', student: 'Student' } };
     return terms[instituteType]?.[key] || key;
@@ -473,28 +567,36 @@ export default function StudentForm({
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4 sm:space-y-6">
+      <form onSubmit={handleSubmit(onSubmitForm, onInvalid)} className="space-y-4 sm:space-y-6">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <div className="overflow-x-auto pb-2 mb-4 -mx-4 px-4 sm:mx-0 sm:px-0">
-            <TabsList className="inline-flex w-auto sm:grid min-w-full" style={{ gridTemplateColumns: `repeat(${availableTabs.length}, minmax(0, 1fr))` }}>
-              {availableTabs.includes('personal') && (
-                <TabsTrigger value="personal">Personal</TabsTrigger>
-              )}
-              {availableTabs.includes('academic') && (
-                <TabsTrigger value="academic">Academic</TabsTrigger>
-              )}
-              {availableTabs.includes('guardian') && (
-                <TabsTrigger value="guardian">Guardian</TabsTrigger>
-              )}
-              {availableTabs.includes('contact') && (
-                <TabsTrigger value="contact">Contact</TabsTrigger>
-              )}
-              {availableTabs.includes('fee') && (
-                <TabsTrigger value="fee">Fee</TabsTrigger>
-              )}
-              {studentDocsAllowed && availableTabs.includes('documents') && (
-                <TabsTrigger value="documents">Docs</TabsTrigger>
-              )}
+            <TabsList 
+              className="inline-flex w-auto sm:grid min-w-full gap-1 p-1 bg-slate-100/80 rounded-xl border border-slate-200" 
+              style={{ gridTemplateColumns: `repeat(${availableTabs.length}, minmax(0, 1fr))` }}
+            >
+              {availableTabs.map((tab) => {
+                const hasError = tabHasErrors(tab);
+                return (
+                  <TabsTrigger
+                    key={tab}
+                    value={tab}
+                    className={cn(
+                      "relative transition-all font-medium py-2 px-3 text-xs sm:text-sm rounded-lg",
+                      hasError && "!text-red-600 !border-red-500 bg-red-50/80 hover:bg-red-100 data-[state=active]:!bg-red-100 data-[state=active]:!text-red-700 data-[state=active]:!border-red-600 data-[state=active]:font-semibold border shadow-xs"
+                    )}
+                  >
+                    <span className="flex items-center justify-center gap-1.5">
+                      <span>{TAB_LABELS[tab] || tab}</span>
+                      {hasError && (
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-600" />
+                        </span>
+                      )}
+                    </span>
+                  </TabsTrigger>
+                );
+              })}
             </TabsList>
           </div>
 
@@ -511,11 +613,53 @@ export default function StudentForm({
                 <input ref={avatarFileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <InputField label="First Name" name="first_name" register={register} error={errors.first_name} required placeholder="Ahmed" onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} />
-                <InputField label="Last Name" name="last_name" register={register} error={errors.last_name} placeholder="Ali" onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} />
+                <InputField 
+                  label="First Name" 
+                  name="first_name" 
+                  register={register} 
+                  rules={{ 
+                    required: 'First name is required',
+                    validate: (v) => (v && v.trim().length >= 2) || 'First name must be at least 2 characters'
+                  }}
+                  error={errors.first_name} 
+                  required 
+                  placeholder="Ahmed" 
+                  onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} 
+                />
+                <InputField 
+                  label="Last Name" 
+                  name="last_name" 
+                  register={register} 
+                  rules={{ 
+                    required: 'Last name is required',
+                    validate: (v) => (v && v.trim().length >= 1) || 'Last name is required'
+                  }}
+                  error={errors.last_name} 
+                  required 
+                  placeholder="Ali" 
+                  onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} 
+                />
                 <InputField label="GR/Reg No" name="registration_no" register={register} placeholder="e.g. 2024-001" />
-                <DatePickerField label="Date of Birth" name="dob" control={control} error={errors.dob} required disableFutureDates placeholder="Select birth date" />
-                <SelectField label="Gender" name="gender" control={control} error={errors.gender} options={GENDER_OPTIONS} required placeholder="Select gender" />
+                <DatePickerField 
+                  label="Date of Birth" 
+                  name="dob" 
+                  control={control} 
+                  rules={{ required: 'Date of birth is required' }}
+                  error={errors.dob} 
+                  required 
+                  disableFutureDates 
+                  placeholder="Select birth date" 
+                />
+                <SelectField 
+                  label="Gender" 
+                  name="gender" 
+                  control={control} 
+                  rules={{ required: 'Gender is required' }}
+                  error={errors.gender} 
+                  options={GENDER_OPTIONS} 
+                  required 
+                  placeholder="Select gender" 
+                />
                 <SelectField label="Religion" name="religion" control={control} options={RELIGION_OPTIONS} placeholder="Select religion" />
                 <InputField label="Nationality" name="nationality" register={register} defaultValue="Pakistani" placeholder="e.g. Pakistani" />
                 <Controller name="cnic" control={control} render={({ field }) => <CnicInput label="CNIC / B-Form" {...field} error={errors.cnic} placeholder="XXXXX-XXXXXXX-X" />} />
@@ -526,12 +670,64 @@ export default function StudentForm({
           <TabsContent value="academic">
             <Card><CardContent className="p-4 sm:p-6 space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <BranchSelectField control={control} error={errors.branch_id} setValue={setValue} watch={watch} required />
-                <SelectField label="Academic Year" name="academic_year_id" control={control} options={academicYears} required placeholder="Select year" />
-                <SelectField label={getTerm('class')} name="class_id" control={control} options={classOptions} required placeholder={`Select ${getTerm('class')}`} />
-                <SelectField label={getTerm('section')} name="section_id" control={control} options={sectionOptions} required placeholder="Select section" />
-                <InputField label="Roll Number" name="roll_no" register={register} required placeholder="e.g. 101" onInput={e => e.target.value = e.target.value.replace(/[^0-9]/g, '')} />
-                <DatePickerField label="Admission Date" name="admission_date" control={control} required disableFutureDates placeholder="Select admission date" />
+                <BranchSelectField 
+                  control={control} 
+                  error={errors.branch_id} 
+                  setValue={setValue} 
+                  watch={watch} 
+                  rules={{ required: 'Branch is required' }}
+                  required 
+                />
+                <SelectField 
+                  label="Academic Year" 
+                  name="academic_year_id" 
+                  control={control} 
+                  rules={{ required: 'Academic year is required' }}
+                  error={errors.academic_year_id} 
+                  options={academicYears} 
+                  required 
+                  placeholder="Select year" 
+                />
+                <SelectField 
+                  label={getTerm('class')} 
+                  name="class_id" 
+                  control={control} 
+                  rules={{ required: `${getTerm('class')} is required` }}
+                  error={errors.class_id} 
+                  options={classOptions} 
+                  required 
+                  placeholder={`Select ${getTerm('class')}`} 
+                />
+                <SelectField 
+                  label={getTerm('section')} 
+                  name="section_id" 
+                  control={control} 
+                  rules={{ required: `${getTerm('section')} is required` }}
+                  error={errors.section_id} 
+                  options={sectionOptions} 
+                  required 
+                  placeholder="Select section" 
+                />
+                <InputField 
+                  label="Roll Number" 
+                  name="roll_no" 
+                  register={register} 
+                  rules={{ required: 'Roll number is required' }}
+                  error={errors.roll_no} 
+                  required 
+                  placeholder="e.g. 101" 
+                  onInput={e => e.target.value = e.target.value.replace(/[^0-9]/g, '')} 
+                />
+                <DatePickerField 
+                  label="Admission Date" 
+                  name="admission_date" 
+                  control={control} 
+                  rules={{ required: 'Admission date is required' }}
+                  error={errors.admission_date} 
+                  required 
+                  disableFutureDates 
+                  placeholder="Select admission date" 
+                />
               </div>
             </CardContent></Card>
           </TabsContent>
@@ -540,7 +736,7 @@ export default function StudentForm({
             <Card><CardContent className="p-4 sm:p-6 space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="font-semibold">Guardians</h3>
-                <Button type="button" variant="outline" size="sm" onClick={() => appendGuardian({ name: '', type: 'father' })}><Plus className="w-4 h-4 mr-2" />Add</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => appendGuardian({ name: '', type: 'father', phone: '' })}><Plus className="w-4 h-4 mr-2" />Add</Button>
               </div>
               {guardianFields.map((field, index) => (
                 <div key={field.id} className="border p-4 rounded-lg space-y-4">
@@ -549,10 +745,35 @@ export default function StudentForm({
                     {guardianFields.length > 1 && <Button type="button" variant="ghost" size="sm" onClick={() => removeGuardian(index)} className="text-red-500"><Trash2 className="w-4 h-4" /></Button>}
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <SelectField label="Type" name={`guardians.${index}.type`} control={control} options={GUARDIAN_TYPES} required placeholder="Select Type" />
-                    <InputField label="Name" name={`guardians.${index}.name`} register={register} required placeholder="Enter Guardian Name" onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} />
+                    <SelectField 
+                      label="Type" 
+                      name={`guardians.${index}.type`} 
+                      control={control} 
+                      rules={{ required: 'Guardian type is required' }}
+                      error={errors.guardians?.[index]?.type}
+                      options={GUARDIAN_TYPES} 
+                      required 
+                      placeholder="Select Type" 
+                    />
+                    <InputField 
+                      label="Name" 
+                      name={`guardians.${index}.name`} 
+                      register={register} 
+                      rules={{ 
+                        required: 'Guardian name is required',
+                        validate: (v) => (v && v.trim().length >= 2) || 'Guardian name must be at least 2 characters'
+                      }}
+                      error={errors.guardians?.[index]?.name}
+                      required 
+                      placeholder="Enter Guardian Name" 
+                      onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} 
+                    />
                     <Controller name={`guardians.${index}.cnic`} control={control} render={({ field }) => <CnicInput label="CNIC" {...field} placeholder="XXXXX-XXXXXXX-X" />} />
-                    <Controller name={`guardians.${index}.phone`} control={control} render={({ field }) => <PhoneInputField label="Phone" {...field} country="pk" />} />
+                    <Controller 
+                      name={`guardians.${index}.phone`} 
+                      control={control} 
+                      render={({ field }) => <PhoneInputField label="Phone" {...field} country="pk" />} 
+                    />
                     <InputField label="Email" name={`guardians.${index}.email`} register={register} type="email" placeholder="guardian@example.com" />
                   </div>
                 </div>
@@ -565,9 +786,32 @@ export default function StudentForm({
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Controller name="phone" control={control} render={({ field }) => <PhoneInputField label="Phone" {...field} country="pk" />} />
                 <InputField label="Email" name="email" register={register} type="email" placeholder="student@example.com" />
-                <InputField label="City" name="city" register={register} required placeholder="Enter city" onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} />
+                <InputField 
+                  label="City" 
+                  name="city" 
+                  register={register} 
+                  rules={{ 
+                    required: 'City is required',
+                    validate: (v) => (v && v.trim().length >= 2) || 'City is required'
+                  }}
+                  error={errors.city}
+                  required 
+                  placeholder="Enter city" 
+                  onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} 
+                />
               </div>
-              <TextareaField label="Present Address" name="present_address" register={register} required placeholder="Enter present address" />
+              <TextareaField 
+                label="Present Address" 
+                name="present_address" 
+                register={register} 
+                rules={{ 
+                  required: 'Present address is required',
+                  validate: (v) => (v && v.trim().length >= 3) || 'Present address is required'
+                }}
+                error={errors.present_address}
+                required 
+                placeholder="Enter present address" 
+              />
               <TextareaField label="Permanent Address" name="permanent_address" register={register} placeholder="Enter permanent address" />
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <InputField label="Emergency Contact Person" name="emergency_contact_name" register={register} placeholder="Contact name" />
@@ -688,7 +932,7 @@ export default function StudentForm({
               <div className="flex flex-col items-end gap-2">
                 {Object.keys(errors).length > 0 && (
                   <p className="text-xs text-red-500 font-medium animate-pulse">
-                    Please fix errors in other tabs before submitting
+                    Please fix required fields in the highlighted tabs before submitting
                   </p>
                 )}
                 <FormSubmitButton 
