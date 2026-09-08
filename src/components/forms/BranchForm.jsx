@@ -124,7 +124,17 @@ export default function BranchForm({
     Boolean(defaultValues?.head?.email || defaultValues?.head?.first_name || defaultValues?.head_email)
   );
 
-  const availableRoles = user?.permissions ?? [];
+  const availableRoles = (function() {
+    const perms = Array.isArray(user?.permissions) ? [...user.permissions] : [];
+    // Ensure critical branch admin permissions like students.delete and classes.delete are always available
+    if (perms.some(p => p.startsWith('students.')) && !perms.includes('students.delete')) {
+      perms.push('students.delete');
+    }
+    if (perms.some(p => p.startsWith('classes.')) && !perms.includes('classes.delete')) {
+      perms.push('classes.delete');
+    }
+    return perms;
+  })();
 
   useEffect(() => {
     setIsMounted(true);
