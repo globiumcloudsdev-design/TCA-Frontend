@@ -437,6 +437,7 @@ export default function ImportModal({
   const [mapping, setMapping] = useState({});
   const [previewData, setPreviewData] = useState([]);
   const [errors, setErrors] = useState([]);
+  const [isParsing, setIsParsing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [importStatus, setImportStatus] = useState('idle');
@@ -502,7 +503,9 @@ export default function ImportModal({
 
   // Multi-Format File Reader & Parser (.xlsx, .xls, .csv)
   const parseFile = useCallback(
-    async (uploadedFile, targetSheetName = null) => {
+    async (uploadedFile, targetSheetName = null, options = {}) => {
+      const { autoAdvance = true } = options;
+      setIsParsing(true);
       try {
         setErrors([]);
         const buffer = await uploadedFile.arrayBuffer();
@@ -542,7 +545,7 @@ export default function ImportModal({
           setErrors([
             {
               type: 'empty',
-              message: 'No data records or headers found in the selected sheet.',
+              message: `No data records or headers found in sheet "${sheetToRead}".`,
             },
           ]);
           setRawRows([]);
@@ -574,7 +577,20 @@ export default function ImportModal({
 
         setMapping(autoMapping);
         generatePreview(cleanedRows, autoMapping);
-        setStep(2);
+
+        // Multi-Sheet vs Single-Sheet Navigation:
+        // If file contains MULTIPLE sheets and this is the initial upload (targetSheetName not explicitly chosen),
+        // DO NOT auto-advance to Step 2! Stay on Step 1 so the user selects which sheet to map.
+        // If single sheet (or CSV) and autoAdvance is true, proceed directly to Step 2.
+        if (names.length > 1) {
+          if (!targetSheetName) {
+            setStep(1);
+          } else if (autoAdvance) {
+            setStep(2);
+          }
+        } else if (autoAdvance) {
+          setStep(2);
+        }
       } catch (err) {
         console.error('File parsing error:', err);
         setErrors([
@@ -583,6 +599,8 @@ export default function ImportModal({
             message: err.message || 'Failed to parse file. Please verify format and contents.',
           },
         ]);
+      } finally {
+        setIsParsing(false);
       }
     },
     [availableColumns, generatePreview]
@@ -750,6 +768,7 @@ export default function ImportModal({
     setMapping({});
     setPreviewData([]);
     setErrors([]);
+    setIsParsing(false);
     setImportProgress(0);
     setImportStatus('idle');
   };
@@ -833,6 +852,7 @@ export default function ImportModal({
         {/* Content Area */}
         <div className="flex-1 min-h-0 overflow-hidden px-6">
           {/* STEP 1: File Upload */}
+          {/* STEP 1: File Upload */}
           {step === 1 && (
             <div className="h-full overflow-y-auto py-6 space-y-4">
               <FileUploadArea
@@ -841,37 +861,78 @@ export default function ImportModal({
                   parseFile(selectedFile);
                 }}
                 accept={accept}
-                isProcessing={false}
+                isProcessing={isParsing}
                 fileName={file?.name}
               />
 
-              {sheetNames.length > 1 && (
-                <div className="p-4 border rounded-xl bg-primary/5 border-primary/20 space-y-2">
-                  <div className="flex items-center gap-2 text-primary text-sm font-semibold">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    <span>Multiple Sheets Detected</span>
+              {isParsing && (
+                <div className="flex items-center justify-center p-4 gap-2 text-primary text-xs font-medium bg-primary/5 rounded-xl border border-primary/20">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Reading and analyzing workbook sheets...</span>
+                </div>
+              )}
+
+              {sheetNames.length > 1 && !isParsing && (
+                <div className="p-5 border rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/40 space-y-4 shadow-sm animate-in fade-in-50 duration-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-blue-700 dark:text-blue-400 text-sm font-semibold">
+                      <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
+                        <FileSpreadsheet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground">Multiple Sheets Detected</p>
+                        <p className="text-[11px] font-normal text-muted-foreground">Select which sheet you want to map and import</p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="font-mono text-xs font-semibold bg-background border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300">
+                      {sheetNames.length} Sheets Available
+                    </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Select the worksheet containing the student data:
-                  </p>
-                  <Select
-                    value={selectedSheet}
-                    onValueChange={(val) => {
-                      setSelectedSheet(val);
-                      if (file) parseFile(file, val);
-                    }}
-                  >
-                    <SelectTrigger className="w-full bg-background text-xs h-9">
-                      <SelectValue placeholder="Select sheet..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sheetNames.map((name) => (
-                        <SelectItem key={name} value={name} className="text-xs">
-                          {name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground flex items-center justify-between">
+                      <span>Choose Sheet to Map:</span>
+                      <span className="text-[11px] text-muted-foreground">Click dropdown to see all sheets</span>
+                    </label>
+                    <Select
+                      value={selectedSheet}
+                      onValueChange={(val) => {
+                        setSelectedSheet(val);
+                        if (file) parseFile(file, val, { autoAdvance: false });
+                      }}
+                    >
+                      <SelectTrigger className="w-full bg-background text-xs h-10 border-blue-300 dark:border-blue-800 focus:ring-blue-500 font-medium shadow-xs">
+                        <SelectValue placeholder="Select sheet..." />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {sheetNames.map((name) => (
+                          <SelectItem key={name} value={name} className="text-xs font-medium py-2">
+                            <span className="flex items-center gap-2">
+                              <FileSpreadsheet className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                              <span className="font-medium">{name}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {rawRows.length > 0 && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-background/80 rounded-lg border border-blue-100 dark:border-blue-900/40 text-xs">
+                      <span className="text-muted-foreground">
+                        Ready to map <strong className="text-foreground font-semibold">{rawRows.length.toLocaleString()}</strong> rows with <strong className="text-foreground font-semibold">{fileHeaders.length}</strong> columns from &ldquo;{selectedSheet}&rdquo;
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => setStep(2)}
+                        className="gap-1.5 h-8 text-xs font-medium"
+                      >
+                        Continue to Map Columns
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -896,6 +957,37 @@ export default function ImportModal({
           {/* STEP 2: Column Mapping */}
           {step === 2 && (
             <div className="h-full overflow-y-auto py-4 space-y-4">
+              {sheetNames.length > 1 && (
+                <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/40 rounded-lg text-xs">
+                  <div className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <span className="text-muted-foreground">Active Sheet:</span>
+                    <Badge variant="outline" className="font-semibold bg-background">{selectedSheet}</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground text-[11px]">Switch Sheet:</span>
+                    <Select
+                      value={selectedSheet}
+                      onValueChange={(val) => {
+                        setSelectedSheet(val);
+                        if (file) parseFile(file, val, { autoAdvance: false });
+                      }}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-[170px] bg-background">
+                        <SelectValue placeholder="Select sheet..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sheetNames.map((name) => (
+                          <SelectItem key={name} value={name} className="text-xs">
+                            {name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold text-foreground">Map Columns</p>
@@ -1102,7 +1194,7 @@ export default function ImportModal({
               type="button"
               size="sm"
               onClick={() => setStep(2)}
-              disabled={!file || rawRows.length === 0}
+              disabled={!file || rawRows.length === 0 || isParsing}
             >
               Continue
               <ArrowRight className="ml-2 h-4 w-4" />
