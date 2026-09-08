@@ -12,6 +12,7 @@ import useAuthStore from '@/store/authStore';
 import { useUiStore } from '@/store/uiStore';
 import useBranchAccess from '@/hooks/useBranchAccess';
 import { resolveBranchName } from '@/lib/branchUtils';
+import StatsCard from '@/components/common/StatsCard';
 import { AttendanceChart, FeesChart, EnrollmentChart, DonutChart, FinancialChart } from '@/components/charts';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
