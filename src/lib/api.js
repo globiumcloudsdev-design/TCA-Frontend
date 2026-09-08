@@ -26,7 +26,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v
 
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 45000, // 45 seconds timeout to prevent hanging connections
+  timeout: 120000, // 120 seconds default timeout across the app
   withCredentials: true, // send httpOnly refresh token cookie
   headers: { 'Content-Type': 'application/json' },
 });
@@ -98,6 +98,23 @@ api.interceptors.request.use(
     // can set multipart/form-data with the correct boundary automatically.
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
+    }
+
+    // Automatically elevate timeout for heavy operations across the complete app
+    const urlLower = url.toLowerCase();
+    const isHeavyOperation =
+      urlLower.includes('bulk') ||
+      urlLower.includes('import') ||
+      urlLower.includes('export') ||
+      urlLower.includes('upload') ||
+      urlLower.includes('generate') ||
+      urlLower.includes('report') ||
+      urlLower.includes('backup') ||
+      urlLower.includes('sync') ||
+      urlLower.includes('voucher');
+
+    if (isHeavyOperation) {
+      config.timeout = Math.max(config.timeout || 0, 300000); // 5 minutes for heavy operations
     }
 
     return config;
@@ -195,6 +212,15 @@ api.interceptors.response.use(
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
+      }
+    }
+
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      const timeoutMsg = 'Operation timed out. The server is taking longer than expected to respond. If importing large data, please try again.';
+      if (error.response?.data) {
+        error.response.data.message = timeoutMsg;
+      } else {
+        error.message = timeoutMsg;
       }
     }
 
