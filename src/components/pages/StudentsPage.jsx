@@ -871,15 +871,33 @@ export default function StudentsPage({ type }) {
     }
 
     try {
-      const res = await studentService.bulkCreate(importedData, type);
-      const data = res?.data || res;
-      
-      if (data?.failed?.length > 0) {
-        setSkippedStudents(data.failed);
+      const BATCH_SIZE = 200;
+      let totalImported = 0;
+      let allFailed = [];
+
+      for (let i = 0; i < importedData.length; i += BATCH_SIZE) {
+        const batch = importedData.slice(i, i + BATCH_SIZE);
+        const res = await studentService.bulkCreate(batch, type);
+        const data = res?.data || res;
+
+        if (data?.imported !== undefined) {
+          totalImported += data.imported;
+        }
+        if (data?.failed?.length > 0) {
+          const adjustedFailed = data.failed.map(f => ({
+            ...f,
+            row: f.row ? f.row + i : f.row
+          }));
+          allFailed = allFailed.concat(adjustedFailed);
+        }
+      }
+
+      if (allFailed.length > 0) {
+        setSkippedStudents(allFailed);
         setIsSkippedModalOpen(true);
-        toast.warning(`✅ ${data.imported || 0} imported | ❌ ${data.failed.length} failed`);
-      } else if (data?.imported !== undefined) {
-        toast.success(`🎉 Successfully imported ${data.imported} ${terms.students}!`);
+        toast.warning(`✅ ${totalImported} imported | ❌ ${allFailed.length} failed`);
+      } else if (totalImported > 0) {
+        toast.success(`🎉 Successfully imported ${totalImported} ${terms.students}!`);
       } else {
         toast.error('Import failed');
       }
