@@ -837,7 +837,7 @@ const handleBulkDownload = async () => {
     const firstPage = await feeVoucherService.getAll(
       voucherFilters, 
       { page: 1, limit: BULK_PAGE_SIZE }, 
-      { timeout: 45000 }
+      { timeout: 180000 }
     );
     
     const totalPages = firstPage?.pagination?.totalPages || 1;
@@ -852,7 +852,7 @@ const handleBulkDownload = async () => {
       const response = await feeVoucherService.getAll(
         voucherFilters, 
         { page, limit: BULK_PAGE_SIZE }, 
-        { timeout: 45000 }
+        { timeout: 180000 }
       );
       vouchersList.push(...(response?.vouchers || []));
       setBulkDownloadProgress({ current: page, total: totalPages });

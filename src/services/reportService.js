@@ -103,7 +103,7 @@ export const reportService = {
       // Make API call to backend student report endpoint
       const response = await api.get("/reports/student", {
         params: queryParams,
-        timeout: 15000,
+        timeout: 120000,
       });
 
       // Response structure from backend: { status, message, data: { type, summary, records, pagination } }
@@ -238,7 +238,7 @@ export const reportService = {
       // Make API call to backend fee report endpoint
       const queryString = buildQuery(queryParams);
       const response = await api.get(`/reports/fee${queryString}`, {
-        timeout: 15000,
+        timeout: 120000,
       });
 
       // Response structure from backend: { type, summary, records, pagination }
@@ -394,7 +394,7 @@ export const reportService = {
 
       const response = await api.get("/reports/payroll", {
         params: queryParams,
-        timeout: 15000,
+        timeout: 120000,
       });
 
       const reportData = response.data?.data || response.data || {};
@@ -478,7 +478,7 @@ export const reportService = {
 
       const response = await api.get("/reports/profit-loss", {
         params: queryParams,
-        timeout: 15000,
+        timeout: 120000,
       });
 
       const reportData = response.data?.data || response.data || {};

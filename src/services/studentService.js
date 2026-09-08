@@ -258,7 +258,7 @@ export const studentService = {
   getUnpaidVouchers: async (studentId) => {
     if (!studentId) return [];
     try {
-      const resp = await api.get(`/fee-vouchers?student_id=${studentId}&include_archived=true&include_all=true&limit=1000`, { timeout: 10000 });
+      const resp = await api.get(`/fee-vouchers?student_id=${studentId}&include_archived=true&include_all=true&limit=1000`, { timeout: 60000 });
       const vouchers = resp.data?.data?.vouchers || resp.data?.data || resp.data?.vouchers || resp.data?.rows || [];
       return Array.isArray(vouchers) ? vouchers : [];
     } catch (err) {
@@ -276,7 +276,7 @@ export const studentService = {
   syncStudentPendingDues: async (studentId) => {
     if (!studentId) return null;
     try {
-      const response = await api.post(`/students/${studentId}/sync-dues`, {}, { timeout: 10000 });
+      const response = await api.post(`/students/${studentId}/sync-dues`, {}, { timeout: 60000 });
       return response.data?.data || response.data;
     } catch (err) {
       try {
