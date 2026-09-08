@@ -43,7 +43,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import useBranchAccess from '@/hooks/useBranchAccess';
 import { classService, academicYearService, settingService } from '@/services';
 import { toast } from 'react-hot-toast';
-import { getActiveAcademicYear } from '@/lib/utils';
+import { cn, getActiveAcademicYear } from '@/lib/utils';
 
 const generateUniqueId = (prefix = 'doc') => `${prefix}-${new Date().getTime()}-${Math.floor(Math.random() * 1000)}`;
 const VALID_DOCUMENT_TYPES = new Set(DOCUMENT_TYPES.map((d) => d.value));
