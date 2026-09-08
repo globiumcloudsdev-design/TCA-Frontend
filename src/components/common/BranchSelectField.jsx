@@ -42,6 +42,7 @@ export default function BranchSelectField({
   hint = '',
   className = '',
   branches: customBranches = null,
+  rules,
 }) {
   const { user } = useAuthStore();
   const { currentInstitute } = useInstituteStore();
@@ -212,6 +213,7 @@ export default function BranchSelectField({
         disabled={disabled}
         placeholder={placeholder}
         hint={hint}
+        rules={rules || (required ? { required: 'Branch is required' } : undefined)}
       />
     </div>
   );

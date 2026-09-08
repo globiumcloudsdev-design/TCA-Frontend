@@ -139,6 +139,7 @@ export default function TextareaField({
   isTiptap = false,
   content = '',
   onContentChange,
+  rules,
   ...props
 }) {
   const { labelText, isRequired } = sanitizeFieldLabel(label, required);
@@ -158,6 +159,7 @@ export default function TextareaField({
           <Controller
             name={name}
             control={control}
+            rules={rules}
             render={({ field }) => (
               <TiptapEditor
                 content={field.value ?? content}
@@ -175,7 +177,7 @@ export default function TextareaField({
           <TiptapEditor
             content={content}
             onChange={(html) => {
-              if (register) register(name).onChange({ target: { name, value: html } });
+              if (register) register(name, rules).onChange({ target: { name, value: html } });
               if (onContentChange) onContentChange(html);
             }}
             placeholder={placeholder}
@@ -189,6 +191,7 @@ export default function TextareaField({
           <Controller
             name={name}
             control={control}
+            rules={rules}
             render={({ field }) => (
               <Textarea
                 {...field}
@@ -212,7 +215,7 @@ export default function TextareaField({
             disabled={disabled}
             aria-invalid={!!error}
             className={textareaClassName}
-            {...(register ? register(name) : props)}
+            {...(register ? register(name, rules) : props)}
           />
         )
       )}
