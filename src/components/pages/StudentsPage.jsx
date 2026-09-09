@@ -829,7 +829,7 @@ export default function StudentsPage({ type }) {
     { key: 'emergency_contact_phone', label: 'Emergency Contact Phone', required: false, validation: 'phone' },
 
     // Fee Information
-    { key: 'monthly_fee', label: 'Monthly Fee', required: true, validation: 'number' },
+    { key: 'monthly_fee', label: 'Monthly Fee', required: false, validation: 'number' },
     { key: 'admission_fee', label: 'Admission Fee', required: false, validation: 'number' },
     { key: 'concession_type', label: 'Concession Type', required: false, validation: 'select', options: ['none', 'merit', 'need', 'staff', 'sibling'] },
     { key: 'concession_percentage', label: 'Concession Percentage', required: false, validation: 'number' },
