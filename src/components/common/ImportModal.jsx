@@ -148,6 +148,35 @@ export function parseToIsoDate(val) {
 }
 
 /**
+ * Safely parse numbers from user input or Excel cells.
+ * Strips commas, currency prefixes/suffixes (PKR, Rs, $, /-), spaces,
+ * and converts Arabic/Urdu numerals to Latin digits.
+ * Returns null if invalid or empty.
+ */
+export function parseNumber(val) {
+  if (val === null || val === undefined) return null;
+  let str = String(val)
+    .replace(/[\u200B-\u200D\uFEFF\u200E\u200F\u00A0]/g, '')
+    .trim();
+  if (!str) return null;
+
+  // Convert Eastern Arabic & Persian/Urdu digits to 0-9
+  str = str
+    .replace(/[\u0660-\u0669]/g, (c) => c.charCodeAt(0) - 0x0660)
+    .replace(/[\u06F0-\u06F9]/g, (c) => c.charCodeAt(0) - 0x06F0);
+
+  // Remove common currency symbols/text and formatting: Rs., PKR, $, USD, /-, commas
+  str = str
+    .replace(/^(rs\.?|pkr|\$|usd|inr|eur)\s*/i, '')
+    .replace(/(\/-|\s*(pkr|rs\.?|\$|usd|inr|eur))$/i, '')
+    .replace(/,/g, '')
+    .trim();
+
+  const num = Number(str);
+  return isNaN(num) ? null : num;
+}
+
+/**
  * Normalizes headers by removing control characters, spaces, and punctuation.
  */
 function normalizeHeader(str) {
@@ -478,7 +507,19 @@ export default function ImportModal({
           return;
         }
 
-        // 3. General string sanitization
+        // 3. Numeric fields
+        if (
+          dbCol === 'monthly_fee' ||
+          dbCol === 'admission_fee' ||
+          dbCol === 'concession_percentage' ||
+          dbCol === 'cgpa'
+        ) {
+          const parsedNum = parseNumber(rawVal);
+          mapped[dbCol] = parsedNum !== null ? parsedNum : sanitizeStr(rawVal);
+          return;
+        }
+
+        // 4. General string sanitization
         mapped[dbCol] = sanitizeStr(rawVal);
       }
     });
@@ -555,12 +596,18 @@ export default function ImportModal({
         }
 
         // 4. Normalize rows to have cleaned header keys
-        const rawHeaderKeys = Object.keys(validRows[0] || {});
         const cleanedRows = validRows.map((row) => {
           const cleanRow = {};
-          cleanedHeaders.forEach((h, idx) => {
-            const originalKey = rawHeaderKeys[idx] || h;
-            cleanRow[h] = row[originalKey] !== undefined ? row[originalKey] : row[h];
+          for (const [key, val] of Object.entries(row)) {
+            const cleanKey = String(key || '').replace(/[\u200B-\u200D\uFEFF\u200E\u200F\u00A0]/g, '').trim();
+            if (cleanKey && !cleanKey.startsWith('__EMPTY')) {
+              cleanRow[cleanKey] = val;
+            }
+          }
+          cleanedHeaders.forEach((h) => {
+            if (cleanRow[h] === undefined && row[h] !== undefined) {
+              cleanRow[h] = row[h];
+            }
           });
           return cleanRow;
         });
@@ -663,11 +710,33 @@ export default function ImportModal({
         }
       }
 
-      // Check monthly_fee if present or required
+      // Check monthly_fee if present
       if (finalRow.monthly_fee !== undefined && finalRow.monthly_fee !== null && String(finalRow.monthly_fee).trim() !== '') {
-        const num = Number(finalRow.monthly_fee);
-        if (isNaN(num) || num <= 0) {
-          rowErrors.push(`Row ${idx + 2}: "Monthly Fee" must be a valid number greater than 0.`);
+        const num = parseNumber(finalRow.monthly_fee);
+        if (num === null || num < 0) {
+          rowErrors.push(`Row ${idx + 2}: "Monthly Fee" must be a valid number (0 or greater).`);
+        } else {
+          finalRow.monthly_fee = num;
+        }
+      }
+
+      // Check admission_fee if present
+      if (finalRow.admission_fee !== undefined && finalRow.admission_fee !== null && String(finalRow.admission_fee).trim() !== '') {
+        const num = parseNumber(finalRow.admission_fee);
+        if (num === null || num < 0) {
+          rowErrors.push(`Row ${idx + 2}: "Admission Fee" must be a valid number (0 or greater).`);
+        } else {
+          finalRow.admission_fee = num;
+        }
+      }
+
+      // Check concession_percentage if present
+      if (finalRow.concession_percentage !== undefined && finalRow.concession_percentage !== null && String(finalRow.concession_percentage).trim() !== '') {
+        const num = parseNumber(finalRow.concession_percentage);
+        if (num === null || num < 0 || num > 100) {
+          rowErrors.push(`Row ${idx + 2}: "Concession Percentage" must be a number between 0 and 100.`);
+        } else {
+          finalRow.concession_percentage = num;
         }
       }
 
