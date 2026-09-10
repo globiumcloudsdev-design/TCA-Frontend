@@ -33,7 +33,7 @@ const STATUS_OPTIONS = [
 
 const schema = z.object({
   first_name:    z.string().min(2, 'Required'),
-  last_name:     z.string().min(2, 'Required'),
+  last_name:     z.string().optional(),
   email:         z.string().email('Invalid email'),
   phone:         z.string().min(10, 'Required'),
   branch_id:     z.string().optional(),
@@ -195,8 +195,8 @@ export default function AdmissionsPage({ type }) {
               {errors.first_name && <p className="text-xs text-destructive">{errors.first_name.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Last Name *</label>
-              <input {...register('last_name')} className="input-base" placeholder="Khan" />
+              <label className="text-sm font-medium">Last Name</label>
+              <input {...register('last_name')} className="input-base" placeholder="Khan (Optional)" />
               {errors.last_name && <p className="text-xs text-destructive">{errors.last_name.message}</p>}
             </div>
           </div>

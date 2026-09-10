@@ -71,7 +71,7 @@ const STATUS_COLORS = {
 const staffSchema = z.object({
     // Personal Info
     first_name: z.string().min(2, 'First name required'),
-    last_name: z.string().min(2, 'Last name required'),
+    last_name: z.string().optional().or(z.literal('')),
     email: z.string().email('Valid email required').optional().or(z.literal('')),
     phone: z.string().optional(),
     alternate_phone: z.string().optional(),
@@ -1003,8 +1003,7 @@ export default function StaffManagementPage({ instituteType }) {
                                                 name="last_name"
                                                 register={register}
                                                 error={errors.last_name}
-                                                required
-                                                placeholder="Doe"
+                                                placeholder="Doe (Optional)"
                                             />
                                             <InputField
                                                 label="Employee ID"

@@ -352,7 +352,6 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
   const validate = () => {
     const errs = {};
     if (!form.first_name?.trim()) errs.first_name = 'First name is required';
-    if (!form.last_name?.trim())  errs.last_name  = 'Last name is required';
     if (isSuperAdmin && !form.branch_id) errs.branch_id = 'Branch is required';
     return errs;
   };
@@ -411,8 +410,8 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
           <Input name="first_name" value={form.first_name} onChange={handleChange} placeholder="Ali" />
           {errors.first_name && <p className="mt-1 text-xs text-red-500">{errors.first_name}</p>}
         </FormField>
-        <FormField label="Last Name" required>
-          <Input name="last_name" value={form.last_name} onChange={handleChange} placeholder="Raza" />
+        <FormField label="Last Name">
+          <Input name="last_name" value={form.last_name} onChange={handleChange} placeholder="Raza (Optional)" />
           {errors.last_name && <p className="mt-1 text-xs text-red-500">{errors.last_name}</p>}
         </FormField>
         <FormField label="Gender">

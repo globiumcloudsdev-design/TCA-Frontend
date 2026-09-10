@@ -63,7 +63,7 @@ const documentSchema = z.object({
 
 const teacherSchema = z.object({
   first_name: z.string().min(1, 'First name required'),
-  last_name: z.string().min(1, 'Last name required'),
+  last_name: z.string().optional(),
   email: z.string().email('Valid email required'),
   phone: z.string().min(10, 'Phone number required'),
   alternate_phone: z.string().optional(),
@@ -601,7 +601,7 @@ export default function TeacherForm({
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <InputField label="First Name" name="first_name" register={register} error={errors.first_name} required placeholder="Ahmed" />
-                  <InputField label="Last Name" name="last_name" register={register} error={errors.last_name} required placeholder="Hassan" />
+                  <InputField label="Last Name" name="last_name" register={register} error={errors.last_name} placeholder="Hassan (Optional)" />
                   <InputField label="Employee ID" name="employee_id" register={register} error={errors.employee_id} placeholder="TCH-2024-001" />
                   <DatePickerField label="Date of Birth" name="dob" control={control} error={errors.dob} maxDate={new Date()} />
                   <SelectField label="Gender" name="gender" control={control} error={errors.gender} options={GENDER_OPTIONS} placeholder="Select gender" />

@@ -236,8 +236,8 @@ function ParentForm({ defaultValues, onSubmit, onCancel, isLoading }) {
           {errors.first_name && <p className="text-xs text-destructive">{errors.first_name.message}</p>}
         </div>
         <div className="space-y-1.5">
-          <Label>Last Name <span className="text-destructive">*</span></Label>
-          <Input {...register('last_name', { required: 'Required' })} />
+          <Label>Last Name</Label>
+          <Input {...register('last_name')} placeholder="(Optional)" />
           {errors.last_name && <p className="text-xs text-destructive">{errors.last_name.message}</p>}
         </div>
       </div>

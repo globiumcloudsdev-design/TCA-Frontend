@@ -288,8 +288,8 @@ function AdmissionForm({ onSubmit, classOptions, onCancel }) {
           {errors.first_name && <p className="text-xs text-destructive">{errors.first_name.message}</p>}
         </div>
         <div className="space-y-1.5">
-          <Label>Last Name <span className="text-destructive">*</span></Label>
-          <Input {...register('last_name', { required: 'Required' })} placeholder="Last name" />
+          <Label>Last Name</Label>
+          <Input {...register('last_name')} placeholder="Last name (Optional)" />
           {errors.last_name && <p className="text-xs text-destructive">{errors.last_name.message}</p>}
         </div>
       </div>
