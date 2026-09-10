@@ -55,8 +55,7 @@ export default function UserForm({
           name="last_name"
           register={register}
           error={errors.last_name}
-          required
-          placeholder="e.g. Khan"
+          placeholder="e.g. Khan (Optional)"
         />
       </div>
 

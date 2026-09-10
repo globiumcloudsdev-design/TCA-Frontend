@@ -332,7 +332,6 @@ export default function StudentForm({
       case 'personal':
         return Boolean(
           errors.first_name ||
-          errors.last_name ||
           errors.dob ||
           errors.gender ||
           errors.cnic ||
@@ -375,7 +374,7 @@ export default function StudentForm({
   const getTabFields = (tab) => {
     switch (tab) {
       case 'personal':
-        return ['first_name', 'last_name', 'dob', 'gender'];
+        return ['first_name', 'dob', 'gender'];
       case 'academic': {
         const fields = ['academic_year_id', 'class_id', 'section_id', 'roll_no', 'admission_date'];
         if (watch('branch_id') !== undefined) {
@@ -630,13 +629,8 @@ export default function StudentForm({
                   label="Last Name" 
                   name="last_name" 
                   register={register} 
-                  rules={{ 
-                    required: 'Last name is required',
-                    validate: (v) => (v && v.trim().length >= 1) || 'Last name is required'
-                  }}
                   error={errors.last_name} 
-                  required 
-                  placeholder="Ali" 
+                  placeholder="Ali (Optional)" 
                   onInput={e => e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '')} 
                 />
                 <InputField label="GR/Reg No" name="registration_no" register={register} placeholder="e.g. 2024-001" />

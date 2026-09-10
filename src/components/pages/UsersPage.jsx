@@ -24,7 +24,7 @@ const STATUS_COLORS = { active:'bg-emerald-100 text-emerald-700', inactive:'bg-g
 
 const schema = z.object({
   first_name: z.string().min(2, 'Required'),
-  last_name:  z.string().min(2, 'Required'),
+  last_name:  z.string().optional(),
   email:      z.string().email('Invalid email'),
   phone:      z.string().optional(),
   role:       z.string().min(1, 'Required'),
@@ -133,7 +133,7 @@ export default function UsersPage({ type }) {
         <form id="user-form" onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5"><label className="text-sm font-medium">First Name *</label><input {...register('first_name')} className="input-base" />{errors.first_name && <p className="text-xs text-destructive">{errors.first_name.message}</p>}</div>
-            <div className="space-y-1.5"><label className="text-sm font-medium">Last Name *</label><input {...register('last_name')} className="input-base" />{errors.last_name && <p className="text-xs text-destructive">{errors.last_name.message}</p>}</div>
+            <div className="space-y-1.5"><label className="text-sm font-medium">Last Name</label><input {...register('last_name')} className="input-base" placeholder="(Optional)" />{errors.last_name && <p className="text-xs text-destructive">{errors.last_name.message}</p>}</div>
           </div>
           <div className="space-y-1.5"><label className="text-sm font-medium">Email *</label><input type="email" {...register('email')} className="input-base" />{errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}</div>
           <div className="grid grid-cols-2 gap-4">

@@ -889,7 +889,7 @@ const getServiceByUserType = (userType) => {
 // ----------------------------------------------------------------------
 const baseSchema = z.object({
     first_name: z.string().min(1, 'First name required'),
-    last_name: z.string().min(1, 'Last name required'),
+    last_name: z.string().optional(),
     email: z.string().email('Valid email required'),
     phone: z.string().min(10, 'Phone number required'),
     date_of_birth: z.string().optional(),
@@ -1354,7 +1354,7 @@ export default function Profile() {
                                 {/* Common fields */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     <InputField label="First Name" name="first_name" register={register} error={errors.first_name} required />
-                                    <InputField label="Last Name" name="last_name" register={register} error={errors.last_name} required />
+                                    <InputField label="Last Name" name="last_name" register={register} error={errors.last_name} placeholder="(Optional)" />
                                     <InputField label="Email" name="email" register={register} error={errors.email} type="email" required />
                                     <PhoneInputField label="Phone Number" value={watch('phone') || ''} onChange={val => setValue('phone', val)} error={errors.phone} />
                                     <CnicInput label="CNIC / B-Form" value={watch('cnic') || ''} onChange={val => setValue('cnic', val)} error={errors.cnic} />
