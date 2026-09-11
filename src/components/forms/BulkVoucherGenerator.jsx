@@ -9,17 +9,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   SelectField,
   InputField,
-  FormSubmitButton,
   DatePickerField,
-  ConfirmDialog,
   OperationProgressModal,
 } from '@/components/common';
-import { classService, academicYearService, studentService, feeTemplateService } from '@/services';
-import { feeVoucherService } from '@/services';
+import { classService, academicYearService, studentService, feeTemplateService, feeVoucherService } from '@/services';
 import useInstituteStore from '@/store/instituteStore';
 import useBranchAccess from '@/hooks/useBranchAccess';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle, AlertTriangle, DollarSign, Info } from 'lucide-react';
+import {
+  Loader2,
+  CheckCircle,
+  AlertTriangle,
+  DollarSign,
+  Info,
+  Users,
+  User,
+  Building,
+  Calendar,
+  Sparkles
+} from 'lucide-react';
 import { getActiveAcademicYear } from '@/lib/utils';
 
 // Month options for dropdown
@@ -51,30 +59,39 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
   const currentInstitute = useInstituteStore((s) => s.currentInstitute);
   const instituteId = propInstituteId || currentInstitute?.id;
   const { activeBranchId } = useBranchAccess();
-  
+
   const qc = useQueryClient();
-  const [selectedMode, setSelectedMode] = useState('single');
+  const [selectedMode, setSelectedMode] = useState('class'); // Default to class mode for non-tech users
   const [submitting, setSubmitting] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [confirmData, setConfirmData] = useState(null);
   const [result, setResult] = useState(null);
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [progressStatus, setProgressStatus] = useState('processing');
   const [progressResult, setProgressResult] = useState(null);
   const [progressError, setProgressError] = useState('');
+  const [activeGenerationMeta, setActiveGenerationMeta] = useState(null);
 
   useEffect(() => {
     onGeneratingChange?.(submitting || (showProgressModal && progressStatus === 'processing'));
   }, [submitting, showProgressModal, progressStatus, onGeneratingChange]);
 
+  // Default due date: 10th of current month (or +10 days)
+  const defaultDueDate = (() => {
+    const d = new Date();
+    d.setDate(10);
+    if (d < new Date()) {
+      d.setDate(new Date().getDate() + 10);
+    }
+    return d.toISOString().split('T')[0];
+  })();
+
   const { control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
-      mode: 'single',
+      mode: 'class',
       studentId: '',
       classId: '',
       academicYearId: '',
       month: String(new Date().getMonth() + 1),
-      dueDate: '',
+      dueDate: defaultDueDate,
       feeTemplateId: '',
       feeType: 'monthly',
     }
@@ -85,7 +102,7 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
     queryKey: ['fee-templates', instituteId],
     queryFn: async () => {
       try {
-        const response = await feeTemplateService.getOptions({ 
+        const response = await feeTemplateService.getOptions({
           institute_id: instituteId,
           is_active: true
         });
@@ -119,11 +136,11 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
     queryKey: ['academic-years', instituteId, activeBranchId],
     queryFn: async () => {
       try {
-        const response = await academicYearService.getAll({ 
-          institute_id: instituteId, 
+        const response = await academicYearService.getAll({
+          institute_id: instituteId,
           branch_id: activeBranchId,
           is_active: true,
-          limit: 1000  // Fetch all for dropdown
+          limit: 1000
         });
         return response.data?.rows || response.data || [];
       } catch (error) {
@@ -134,12 +151,14 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
     enabled: !!instituteId
   });
 
-  // Auto-select current academic year using useEffect (NOT during render)
+  // Auto-select active academic year
   useEffect(() => {
     if (Array.isArray(academicYears) && academicYears.length > 0 && !watch('academicYearId')) {
       const currentAcademicYear = getActiveAcademicYear(academicYears);
       if (currentAcademicYear) {
         setValue('academicYearId', currentAcademicYear.id);
+      } else if (academicYears[0]?.id) {
+        setValue('academicYearId', academicYears[0].id);
       }
     }
   }, [academicYears, setValue, watch]);
@@ -149,9 +168,9 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
     queryKey: ['classes-voucher', instituteId],
     queryFn: async () => {
       try {
-        const response = await classService.getAll({ 
+        const response = await classService.getAll({
           institute_id: instituteId,
-          limit: 1000  // Fetch all for dropdown
+          limit: 1000
         });
         return response.data?.rows || response.data || [];
       } catch (error) {
@@ -165,28 +184,24 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
   const classOptions = Array.isArray(classes) ? classes.map(c => ({ value: c.id, label: c.name })) : [];
   const academicYearOptions = Array.isArray(academicYears) ? academicYears.map(ay => ({ value: ay.id, label: ay.name })) : [];
 
-  // Get selected values
   const selectedClassId = watch('classId');
   const selectedStudentId = watch('studentId');
-  
-  // Fetch students for selected class using studentService
+
+  // Fetch students for selected class
   const { data: classStudents = [], isLoading: isLoadingStudents } = useQuery({
     queryKey: ['students-by-class', selectedClassId, instituteId],
     queryFn: async () => {
       if (!selectedClassId) return [];
       try {
-        const response = await studentService.getAll({ 
+        const response = await studentService.getAll({
           class_id: selectedClassId,
           institute_id: instituteId,
           is_active: true,
-          limit: 1000  // Fetch all for dropdown
+          limit: 1000
         });
-        const students = response.data?.rows || response.data || [];
-        console.log('Fetched students:', students);
-        return students;
+        return response.data?.rows || response.data || [];
       } catch (error) {
         console.error('Failed to fetch students:', error);
-        toast.error('Failed to fetch students for selected class');
         return [];
       }
     },
@@ -200,7 +215,7 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
 
   const selectedStudent = Array.isArray(classStudents) ? classStudents.find(s => String(s.id) === String(selectedStudentId)) : null;
 
-  // Fetch unpaid prior vouchers for selected student to calculate previous charges/arrears
+  // Unpaid vouchers for single student
   const { data: studentUnpaidVouchers = [] } = useQuery({
     queryKey: ['student-unpaid-vouchers-gen', selectedStudentId],
     queryFn: async () => {
@@ -225,46 +240,34 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
     (sum, v) => sum + Number(v.pending_amount ?? (v.net_amount || v.amount || 0)),
     0
   );
-  const estimatedNetTotal = Math.max(
-    0,
-    (selectedTemplate ? Number(selectedTemplate.total_amount || 0) : studentBaseMonthlyFee) - concessionAmount
-  ) + previousArrears;
 
-  const handleGenerateClick = (data) => {
-    // Validate based on mode
-    if (selectedMode === 'single' && (!data.studentId || !data.classId)) {
-      toast.error('Please select both class and student');
+  // Directly start generation smoothly without double modal prompt
+  const handleGenerateClick = async (formData) => {
+    if (selectedMode === 'single' && (!formData.studentId || !formData.classId)) {
+      toast.error('Please select both a class and a student');
       return;
     }
-    if (selectedMode === 'class' && !data.classId) {
+    if (selectedMode === 'class' && !formData.classId) {
       toast.error('Please select a class');
       return;
     }
-    if (!data.academicYearId) {
+    if (!formData.academicYearId) {
       toast.error('Please select an academic year');
       return;
     }
-    if (!data.month) {
+    if (!formData.month) {
       toast.error('Please select a month');
       return;
     }
 
-    setConfirmData({ ...data, mode: selectedMode });
-    setShowConfirm(true);
-  };
+    const dueDate = formData.dueDate || defaultDueDate;
+    const genPayload = {
+      ...formData,
+      mode: selectedMode,
+      dueDate
+    };
 
-  const handleConfirmGenerate = async () => {
-    if (!confirmData || !instituteId) {
-      toast.error('Institute information is missing');
-      return;
-    }
-
-    if (!confirmData.dueDate) {
-      toast.error('Please select a due date');
-      return;
-    }
-
-    setShowConfirm(false);
+    setActiveGenerationMeta(genPayload);
     setShowProgressModal(true);
     setProgressStatus('processing');
     setProgressError('');
@@ -272,12 +275,12 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
     setSubmitting(true);
 
     try {
-      const academicYear = Array.isArray(academicYears) ? academicYears.find(ay => ay.id === confirmData.academicYearId) : null;
+      const academicYear = Array.isArray(academicYears) ? academicYears.find(ay => ay.id === genPayload.academicYearId) : null;
       if (!academicYear) {
         throw new Error('Academic year not found');
       }
 
-      const month = parseInt(confirmData.month, 10);
+      const month = parseInt(genPayload.month, 10);
       const currentCalendarYear = new Date().getFullYear();
       let year = currentCalendarYear;
       if (academicYear.start_year && academicYear.end_year) {
@@ -285,53 +288,52 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
       } else {
         year = academicYear.start_year || academicYear.end_year || currentCalendarYear;
       }
-      const dueDate = confirmData.dueDate; // Use the selected due date from DatePickerField
 
       let response;
 
-      if (confirmData.mode === 'single') {
+      if (genPayload.mode === 'single') {
         response = await feeVoucherService.generateSingle(
-          confirmData.studentId, 
-          month, 
+          genPayload.studentId,
+          month,
           year,
-          { 
-            academicYearId: confirmData.academicYearId, 
+          {
+            academicYearId: genPayload.academicYearId,
             dueDate,
-            feeType: confirmData.feeType,
-            feeTemplateId: confirmData.feeTemplateId || undefined,
+            feeType: genPayload.feeType,
+            feeTemplateId: genPayload.feeTemplateId || undefined,
             baseAmount: selectedTemplate ? Number(selectedTemplate.total_amount || 0) : studentBaseMonthlyFee,
             monthly_fee: studentBaseMonthlyFee,
             discount: concessionAmount,
             arrears: previousArrears,
           }
         );
-      } else if (confirmData.mode === 'class') {
+      } else if (genPayload.mode === 'class') {
         response = await feeVoucherService.generateClass(
-          confirmData.classId, 
-          month, 
+          genPayload.classId,
+          month,
           year,
-          { 
-            academicYearId: confirmData.academicYearId, 
+          {
+            academicYearId: genPayload.academicYearId,
             dueDate,
-            feeType: confirmData.feeType,
-            feeTemplateId: confirmData.feeTemplateId || undefined
+            feeType: genPayload.feeType,
+            feeTemplateId: genPayload.feeTemplateId || undefined
           }
         );
-      } else if (confirmData.mode === 'institute') {
+      } else if (genPayload.mode === 'institute') {
         response = await feeVoucherService.generateInstitute(
-          month, 
+          month,
           year,
-          { 
-            academicYearId: confirmData.academicYearId, 
+          {
+            academicYearId: genPayload.academicYearId,
             dueDate,
-            feeType: confirmData.feeType,
-            feeTemplateId: confirmData.feeTemplateId || undefined
+            feeType: genPayload.feeType,
+            feeTemplateId: genPayload.feeTemplateId || undefined
           }
         );
       }
 
       const resData = response?.data || response;
-      const count = resData?.generated ?? resData?.total ?? resData?.count ?? (confirmData.mode === 'single' ? 1 : 0);
+      const count = resData?.generated ?? resData?.total ?? resData?.count ?? (genPayload.mode === 'single' ? 1 : 0);
 
       setProgressResult({
         total: count,
@@ -339,7 +341,7 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
       });
       setProgressStatus('success');
       setResult(response);
-      toast.success(response?.message || `Vouchers generated successfully!`);
+      toast.success(response?.message || 'Vouchers generated successfully!');
 
       qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
       qc.invalidateQueries({ queryKey: ['fees'] });
@@ -366,348 +368,277 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Bulk Fee Voucher Generator</CardTitle>
-        <CardDescription>Generate fee vouchers for students with automatic concession calculation</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {/* Result Display */}
-        {result && !submitting && (
-          <div className={`mb-6 p-4 rounded-lg border-2 ${result.error ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
-            <div className="flex items-start gap-3">
-              {result.error ? (
-                <AlertTriangle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
-              ) : (
-                <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
+    <div className="space-y-4">
+      {/* Result Card if any */}
+      {result && !submitting && !showProgressModal && (
+        <div className={`p-4 rounded-xl border ${result.error ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+          <div className="flex items-start gap-3">
+            {result.error ? (
+              <AlertTriangle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+            ) : (
+              <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
+            )}
+            <div className="flex-1">
+              <h3 className={`font-bold text-sm ${result.error ? 'text-red-800' : 'text-green-800'}`}>
+                {result.error ? 'Generation Failed' : 'Vouchers Generated Successfully!'}
+              </h3>
+              {result.error && <p className="text-xs text-red-700 mt-1">{result.error}</p>}
+              {!result.error && (
+                <p className="text-xs text-green-700 mt-1">
+                  Vouchers are ready. You can print them or collect payments in the Fee Management table.
+                </p>
               )}
-              <div className="flex-1">
-                <h3 className={`font-semibold ${result.error ? 'text-red-800' : 'text-green-800'}`}>
-                  {result.error ? 'Generation Failed' : 'Vouchers Generated Successfully!'}
-                </h3>
-                {result.error && <p className="text-sm text-red-700 mt-1">{result.error}</p>}
-                {!result.error && (
-                  <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
-                    <div className="bg-white/50 p-2 rounded">
-                      <p className="text-gray-600">Total</p>
-                      <p className="font-bold text-lg text-gray-800">{result.total || 0}</p>
-                    </div>
-                    <div className="bg-white/50 p-2 rounded">
-                      <p className="text-gray-600">Generated</p>
-                      <p className="font-bold text-lg text-green-700">{result.generated || 0}</p>
-                    </div>
-                    {result.failed > 0 && (
-                      <>
-                        <div className="bg-white/50 p-2 rounded">
-                          <p className="text-gray-600">Failed</p>
-                          <p className="font-bold text-lg text-red-700">{result.failed}</p>
-                        </div>
-                        <div className="bg-white/50 p-2 rounded">
-                          <p className="text-gray-600">Success Rate</p>
-                          <p className="font-bold text-lg text-blue-700">{((result.generated / result.total) * 100).toFixed(1)}%</p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-                <button 
-                  onClick={() => setResult(null)}
-                  className="mt-3 text-sm font-medium px-3 py-1 rounded bg-white/50 hover:bg-white transition"
-                >
-                  Close
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setResult(null)}
+                className="mt-2 text-xs font-semibold px-2.5 py-1 rounded bg-white/80 hover:bg-white text-slate-700 border"
+              >
+                Dismiss
+              </button>
             </div>
           </div>
-        )}
-        <form onSubmit={handleSubmit(handleGenerateClick)}>
-          <Tabs value={selectedMode} onValueChange={setSelectedMode} className="mb-6">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="single">Single Student</TabsTrigger>
-              <TabsTrigger value="class">By Class</TabsTrigger>
-              <TabsTrigger value="institute">Entire Institute</TabsTrigger>
-            </TabsList>
+        </div>
+      )}
 
-            {/* Single Student Mode */}
-            <TabsContent value="single" className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <Controller
-                  name="classId"
-                  control={control}
-                  render={({ field }) => (
-                    <SelectField
-                      label="Select Class"
-                      options={classOptions}
-                      value={field.value}
-                      onChange={field.onChange}
-                      error={errors.classId}
-                      placeholder="Choose a class..."
-                    />
-                  )}
-                />
-                <Controller
-                  name="studentId"
-                  control={control}
-                  render={({ field }) => (
-                    <SelectField
-                      label={isLoadingStudents ? "Loading Students..." : "Select Student"}
-                      options={studentOptions}
-                      value={field.value}
-                      onChange={field.onChange}
-                      error={errors.studentId}
-                      placeholder={!selectedClassId ? "Select a class first..." : "Choose a student..."}
-                      disabled={!selectedClassId || isLoadingStudents}
-                    />
-                  )}
-                />
-                <Controller
-                  name="feeTemplateId"
-                  control={control}
-                  render={({ field }) => (
-                    <SelectField
-                      label="Fee Template (Optional)"
-                      options={feeTemplates}
-                      value={field.value}
-                      onChange={field.onChange}
-                      placeholder="Choose a fee template..."
-                    />
-                  )}
-                />
+      <form onSubmit={handleSubmit(handleGenerateClick)} className="space-y-5">
+        {/* Mode Selector Tabs */}
+        <Tabs value={selectedMode} onValueChange={setSelectedMode} className="w-full">
+          <TabsList className="grid w-full grid-cols-3 p-1 bg-slate-100 rounded-xl">
+            <TabsTrigger
+              value="class"
+              className="flex items-center gap-2 py-2.5 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm font-semibold text-xs sm:text-sm"
+            >
+              <Users className="h-4 w-4 text-blue-600" />
+              <span>By Class</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="single"
+              className="flex items-center gap-2 py-2.5 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm font-semibold text-xs sm:text-sm"
+            >
+              <User className="h-4 w-4 text-emerald-600" />
+              <span>Single Student</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="institute"
+              className="flex items-center gap-2 py-2.5 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm font-semibold text-xs sm:text-sm"
+            >
+              <Building className="h-4 w-4 text-purple-600" />
+              <span>All Students</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Mode 1: By Class */}
+          <TabsContent value="class" className="space-y-4 pt-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Controller
+                name="classId"
+                control={control}
+                render={({ field }) => (
+                  <SelectField
+                    label="Select Class *"
+                    options={classOptions}
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.classId}
+                    placeholder="Choose class (e.g. Class 1, Class 9)..."
+                  />
+                )}
+              />
+
+              <Controller
+                name="feeTemplateId"
+                control={control}
+                render={({ field }) => (
+                  <SelectField
+                    label="Fee Template (Optional)"
+                    options={feeTemplates}
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Apply a Fee Template (or use monthly fee)..."
+                  />
+                )}
+              />
+            </div>
+          </TabsContent>
+
+          {/* Mode 2: Single Student */}
+          <TabsContent value="single" className="space-y-4 pt-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Controller
+                name="classId"
+                control={control}
+                render={({ field }) => (
+                  <SelectField
+                    label="Select Class *"
+                    options={classOptions}
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.classId}
+                    placeholder="Choose a class..."
+                  />
+                )}
+              />
+
+              <Controller
+                name="studentId"
+                control={control}
+                render={({ field }) => (
+                  <SelectField
+                    label={isLoadingStudents ? 'Loading Students...' : 'Select Student *'}
+                    options={studentOptions}
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.studentId}
+                    placeholder={!selectedClassId ? 'Select a class first...' : 'Choose student...'}
+                    disabled={!selectedClassId || isLoadingStudents}
+                  />
+                )}
+              />
+
+              <Controller
+                name="feeTemplateId"
+                control={control}
+                render={({ field }) => (
+                  <SelectField
+                    label="Fee Template (Optional)"
+                    options={feeTemplates}
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Choose fee template..."
+                  />
+                )}
+              />
+            </div>
+          </TabsContent>
+
+          {/* Mode 3: Entire Institute */}
+          <TabsContent value="institute" className="space-y-4 pt-3">
+            <div className="grid grid-cols-1 gap-4">
+              <Controller
+                name="feeTemplateId"
+                control={control}
+                render={({ field }) => (
+                  <SelectField
+                    label="Fee Template (Optional)"
+                    options={feeTemplates}
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Apply a Fee Template to all students..."
+                  />
+                )}
+              />
+            </div>
+
+            <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center gap-2 text-xs text-purple-900 font-medium">
+              <Info size={16} className="text-purple-600 flex-shrink-0" />
+              <span>This will generate fee vouchers for all active students across the entire institution.</span>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Selected Fee Template Preview Badge */}
+        {selectedTemplate && (
+          <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-blue-600" />
+                <h4 className="font-bold text-sm text-blue-950">Applied Template: {selectedTemplate.label}</h4>
               </div>
-
-              {/* Fee Template Breakdown Preview */}
-              {selectedTemplate && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
-                  <div className="flex items-center gap-2">
-                    <DollarSign size={16} className="text-blue-600" />
-                    <h4 className="font-semibold text-blue-900">Fee Template: {selectedTemplate.label}</h4>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="bg-white p-3 rounded border border-blue-100">
-                      <p className="text-muted-foreground text-xs font-semibold">Total Amount</p>
-                      <p className="font-bold text-lg text-blue-600">PKR {selectedTemplate.total_amount?.toLocaleString('en-PK') || 0}</p>
-                    </div>
-                    <div className="bg-white p-3 rounded border border-blue-100">
-                      <p className="text-muted-foreground text-xs font-semibold">Fee Basis</p>
-                      <p className="font-semibold capitalize text-gray-700">{selectedTemplate.fee_basis || 'N/A'}</p>
-                    </div>
-                    {selectedTemplate.is_default && (
-                      <div className="bg-green-100 p-3 rounded text-green-700 text-xs font-semibold col-span-2 flex items-center gap-2">
-                        <CheckCircle size={14} /> Default Template
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {!selectedClassId && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700 flex items-center gap-2">
-                  <Info size={16} /> Please select a class first to see available students.
-                </div>
-              )}
-            </TabsContent>
-
-            {/* Class Mode */}
-            <TabsContent value="class" className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <Controller
-                  name="classId"
-                  control={control}
-                  render={({ field }) => (
-                    <SelectField
-                      label="Select Class"
-                      options={classOptions}
-                      value={field.value}
-                      onChange={field.onChange}
-                      error={errors.classId}
-                      placeholder="Choose a class..."
-                    />
-                  )}
-                />
-                <Controller
-                  name="feeTemplateId"
-                  control={control}
-                  render={({ field }) => (
-                    <SelectField
-                      label="Fee Template (Optional)"
-                      options={feeTemplates}
-                      value={field.value}
-                      onChange={field.onChange}
-                      placeholder="Choose a fee template..."
-                    />
-                  )}
-                />
-              </div>
-
-              {/* Fee Template Breakdown Preview */}
-              {selectedTemplate && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
-                  <div className="flex items-center gap-2">
-                    <DollarSign size={16} className="text-blue-600" />
-                    <h4 className="font-semibold text-blue-900">Fee Template: {selectedTemplate.label}</h4>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="bg-white p-3 rounded border border-blue-100">
-                      <p className="text-muted-foreground text-xs font-semibold">Total Amount</p>
-                      <p className="font-bold text-lg text-blue-600">PKR {selectedTemplate.total_amount?.toLocaleString('en-PK') || 0}</p>
-                    </div>
-                    <div className="bg-white p-3 rounded border border-blue-100">
-                      <p className="text-muted-foreground text-xs font-semibold">Fee Basis</p>
-                      <p className="font-semibold capitalize text-gray-700">{selectedTemplate.fee_basis || 'N/A'}</p>
-                    </div>
-                    {selectedTemplate.is_default && (
-                      <div className="bg-green-100 p-3 rounded text-green-700 text-xs font-semibold col-span-2 flex items-center gap-2">
-                        <CheckCircle size={14} /> Default Template
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-
-            {/* Institute Mode */}
-            <TabsContent value="institute" className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-1">
-                <Controller
-                  name="feeTemplateId"
-                  control={control}
-                  render={({ field }) => (
-                    <SelectField
-                      label="Fee Template (Optional)"
-                      options={feeTemplates}
-                      value={field.value}
-                      onChange={field.onChange}
-                      placeholder="Choose a fee template..."
-                    />
-                  )}
-                />
-              </div>
-
-              {/* Fee Template Breakdown Preview */}
-              {selectedTemplate && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
-                  <div className="flex items-center gap-2">
-                    <DollarSign size={16} className="text-blue-600" />
-                    <h4 className="font-semibold text-blue-900">Fee Template: {selectedTemplate.label}</h4>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="bg-white p-3 rounded border border-blue-100">
-                      <p className="text-muted-foreground text-xs font-semibold">Total Amount</p>
-                      <p className="font-bold text-lg text-blue-600">PKR {selectedTemplate.total_amount?.toLocaleString('en-PK') || 0}</p>
-                    </div>
-                    <div className="bg-white p-3 rounded border border-blue-100">
-                      <p className="text-muted-foreground text-xs font-semibold">Fee Basis</p>
-                      <p className="font-semibold capitalize text-gray-700">{selectedTemplate.fee_basis || 'N/A'}</p>
-                    </div>
-                    {selectedTemplate.is_default && (
-                      <div className="bg-green-100 p-3 rounded text-green-700 text-xs font-semibold col-span-2 flex items-center gap-2">
-                        <CheckCircle size={14} /> Default Template
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
-                <Info size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-amber-800 font-medium">
-                  ℹ️ This will generate vouchers for ALL active students in your institute.
-                </p>
-              </div>
-            </TabsContent>
-          </Tabs>
-
-          {/* Academic Year, Month, Fee Type and Due Date Selection */}
-          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-            <Controller
-              name="academicYearId"
-              control={control}
-              render={({ field }) => (
-                <SelectField
-                  label="Academic Year"
-                  options={academicYearOptions}
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={errors.academicYearId}
-                  placeholder="Select academic year..."
-                />
-              )}
-            />
-            <Controller
-              name="feeType"
-              control={control}
-              render={({ field }) => (
-                <SelectField
-                  label="Fee Type"
-                  options={FEE_TYPE_OPTIONS}
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={errors.feeType}
-                  placeholder="Select fee type..."
-                  disabled={!!selectedTemplateId}
-                />
-              )}
-            />
-            <Controller
-              name="month"
-              control={control}
-              render={({ field }) => (
-                <SelectField
-                  label="Month"
-                  options={MONTH_OPTIONS}
-                  value={String(field.value)}
-                  onChange={field.onChange}
-                  error={errors.month}
-                  placeholder="Select month..."
-                />
-              )}
-            />
-            <Controller
-              name="dueDate"
-              control={control}
-              render={({ field }) => (
-                <DatePickerField
-                  label="Due Date"
-                  name="dueDate"
-                  value={field.value}
-                  onChange={field.onChange}
-                  placeholder="Select due date"
-                  error={errors.dueDate}
-                  disablePastDates={true}
-                  required={true}
-                />
-              )}
-            />
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-600 text-white">
+                PKR {Number(selectedTemplate.total_amount || 0).toLocaleString()}
+              </span>
+            </div>
+            <p className="text-xs text-blue-700">
+              Vouchers will be created using this template&apos;s components (Total: PKR {Number(selectedTemplate.total_amount || 0).toLocaleString()}). Student concessions and prior balances will also be calculated automatically.
+            </p>
           </div>
+        )}
 
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={submitting}
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              'Generate Vouchers'
+        {/* Scheduling Details */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+          <Controller
+            name="academicYearId"
+            control={control}
+            render={({ field }) => (
+              <SelectField
+                label="Academic Year *"
+                options={academicYearOptions}
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.academicYearId}
+                placeholder="Select year..."
+              />
             )}
-          </Button>
-        </form>
-      </CardContent>
+          />
 
-      {/* Confirmation Dialog */}
-      <ConfirmDialog
-        open={showConfirm && !!confirmData}
-        onClose={() => setShowConfirm(false)}
-        onConfirm={handleConfirmGenerate}
-        loading={submitting}
-        title="Confirm Voucher Generation"
-        description={`Generate vouchers for ${confirmData?.mode === 'single' ? 'single student' : confirmData?.mode === 'class' ? 'all students in class' : 'entire institute'} in ${MONTH_OPTIONS.find(m => m.value === parseInt(confirmData?.month))?.label || 'selected month'}?`}
-        confirmLabel="Generate"
-      />
+          <Controller
+            name="feeType"
+            control={control}
+            render={({ field }) => (
+              <SelectField
+                label="Fee Type *"
+                options={FEE_TYPE_OPTIONS}
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.feeType}
+                placeholder="Select type..."
+                disabled={!!selectedTemplateId}
+              />
+            )}
+          />
+
+          <Controller
+            name="month"
+            control={control}
+            render={({ field }) => (
+              <SelectField
+                label="Billing Month *"
+                options={MONTH_OPTIONS}
+                value={String(field.value)}
+                onChange={field.onChange}
+                error={errors.month}
+                placeholder="Select month..."
+              />
+            )}
+          />
+
+          <Controller
+            name="dueDate"
+            control={control}
+            render={({ field }) => (
+              <DatePickerField
+                label="Due Date *"
+                name="dueDate"
+                value={field.value}
+                onChange={field.onChange}
+                placeholder="Select due date"
+                error={errors.dueDate}
+                disablePastDates={false}
+                required={true}
+              />
+            )}
+          />
+        </div>
+
+        {/* Generate Button */}
+        <Button
+          type="submit"
+          disabled={submitting}
+          className="w-full py-6 text-base font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+        >
+          {submitting ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Generating Vouchers...
+            </>
+          ) : (
+            <>
+              <CheckCircle className="h-5 w-5" />
+              Generate Fee Vouchers Now
+            </>
+          )}
+        </Button>
+      </form>
 
       {/* Operation Progress Modal */}
       <OperationProgressModal
@@ -720,10 +651,10 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
         }}
         type="voucher"
         title="Generating Fee Vouchers"
-        subtitle={`Generating vouchers for ${confirmData?.mode === 'single' ? 'single student' : confirmData?.mode === 'class' ? 'selected class' : 'entire institute'} (${MONTH_OPTIONS.find(m => m.value === parseInt(confirmData?.month))?.label || ''})`}
-        estimatedSeconds={confirmData?.mode === 'single' ? 3 : confirmData?.mode === 'class' ? 6 : 12}
+        subtitle={`Generating vouchers for ${activeGenerationMeta?.mode === 'single' ? 'single student' : activeGenerationMeta?.mode === 'class' ? 'selected class' : 'all students'} (${MONTH_OPTIONS.find(m => m.value === parseInt(activeGenerationMeta?.month))?.label || ''})`}
+        estimatedSeconds={activeGenerationMeta?.mode === 'single' ? 3 : activeGenerationMeta?.mode === 'class' ? 5 : 10}
         status={progressStatus}
-        statusMessage="Fee vouchers have been generated successfully and recorded in ledger."
+        statusMessage="Fee vouchers have been generated successfully and recorded in the fee ledger."
         errorMessage={progressError}
         result={progressResult}
         onDone={() => {
@@ -732,6 +663,6 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
         }}
         doneText="View Generated Vouchers"
       />
-    </Card>
+    </div>
   );
 }
