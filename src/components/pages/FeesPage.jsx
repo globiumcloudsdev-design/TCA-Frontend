@@ -660,6 +660,11 @@ const { data: bulkClasses = [] } = useQuery({
       qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
       qc.invalidateQueries({ queryKey: ['fees'] });
       qc.invalidateQueries({ queryKey: ['fee-stats'] });
+      qc.invalidateQueries({ queryKey: ['student-vouchers'] });
+      qc.invalidateQueries({ queryKey: ['student-unpaid-vouchers'] });
+      qc.invalidateQueries({ queryKey: ['student-unpaid-vouchers-gen'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['student'] });
     },
     onError: (error) => {
       setDeletingVoucher(null);
@@ -684,6 +689,11 @@ const { data: bulkClasses = [] } = useQuery({
       qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
       qc.invalidateQueries({ queryKey: ['fees'] });
       qc.invalidateQueries({ queryKey: ['fee-stats'] });
+      qc.invalidateQueries({ queryKey: ['student-vouchers'] });
+      qc.invalidateQueries({ queryKey: ['student-unpaid-vouchers'] });
+      qc.invalidateQueries({ queryKey: ['student-unpaid-vouchers-gen'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['student'] });
     },
     onError: (err) => {
       const message = err?.message || err?.response?.data?.message || err?.error?.response?.data?.message || 'Failed to delete selected vouchers';

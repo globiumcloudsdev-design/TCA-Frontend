@@ -28,6 +28,7 @@ import ResultCard from '@/components/cards/ResultCard';
 import { DataTable, StatsCard, AppModal, ConfirmDialog, InputField, SelectField, TextareaField, FormSubmitButton } from '@/components/common';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 
 // ─── Helpers ─────────────────────────────────────────────
 function initials(s) {
@@ -317,6 +318,31 @@ function AttendanceTab({ student }) {
 
 // ========== FEES TAB ==========
 function FeesTab({ student, currentInstitute, onGenerateVoucher }) {
+  const qc = useQueryClient();
+  const canDo = useAuthStore((s) => s.canDo);
+  const canDeleteVoucher = canDo('fees.delete') || canDo('fees.voucher.delete') || canDo('fees.manage');
+  const [deletingVoucher, setDeletingVoucher] = useState(null);
+
+  const deleteVoucherMutation = useMutation({
+    mutationFn: (id) => feeVoucherService.delete(id),
+    onSuccess: () => {
+      toast.success('Voucher deleted successfully');
+      setDeletingVoucher(null);
+      qc.invalidateQueries({ queryKey: ['student-vouchers', student?.id] });
+      qc.invalidateQueries({ queryKey: ['student-unpaid-vouchers', student?.id] });
+      qc.invalidateQueries({ queryKey: ['student-unpaid-vouchers-gen', student?.id] });
+      qc.invalidateQueries({ queryKey: ['student', student?.id] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
+      qc.invalidateQueries({ queryKey: ['fees'] });
+      qc.invalidateQueries({ queryKey: ['fee-stats'] });
+    },
+    onError: (err) => {
+      setDeletingVoucher(null);
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to delete voucher');
+    }
+  });
+
   const { data: voucherData, isLoading: loadingVouchers } = useQuery({
     queryKey: ['student-vouchers', student?.id],
     queryFn: async () => {
@@ -327,6 +353,7 @@ function FeesTab({ student, currentInstitute, onGenerateVoucher }) {
         if (!Array.isArray(list)) return;
         for (const item of list) {
           if (!item) continue;
+          if (item.archived === true || item.status === 'cancelled') continue;
           const id = item.id || item.voucher_id || item.voucherId;
           const key = id ? String(id) : `${item.year || ''}-${item.month || ''}-${item.voucher_number || item.voucherNumber || ''}`;
           if (!vouchersMap.has(key)) {
@@ -343,7 +370,7 @@ function FeesTab({ student, currentInstitute, onGenerateVoucher }) {
       // 2. Fetch from feeVoucherService
       try {
         const res = await feeVoucherService.getAll(
-          { student_id: student.id, studentId: student.id, include_all: true, limit: 1000 },
+          { student_id: student.id, studentId: student.id, limit: 1000 },
           { page: 1, limit: 1000 }
         );
         if (Array.isArray(res?.vouchers)) addVouchers(res.vouchers);
@@ -355,7 +382,7 @@ function FeesTab({ student, currentInstitute, onGenerateVoucher }) {
         if (Array.isArray(unpaid)) addVouchers(unpaid);
       } catch (err) {}
 
-      const rawList = Array.from(vouchersMap.values());
+      const rawList = Array.from(vouchersMap.values()).filter(v => v && !v.archived && v.status !== 'cancelled');
       const decomposed = decomposeVouchersForPayment(rawList);
       return feePaymentService.sortChronologically(decomposed);
     },
@@ -378,15 +405,31 @@ function FeesTab({ student, currentInstitute, onGenerateVoucher }) {
     enabled: !!student?.id,
   });
 
-  const vouchers = Array.isArray(voucherData) && voucherData.length > 0
+  const vouchers = (Array.isArray(voucherData) && voucherData.length > 0
     ? voucherData
-    : (student.feeVouchers || []);
+    : (student.feeVouchers || [])
+  ).filter(v => v && !v.archived && v.status !== 'cancelled');
 
   const totalPaid = vouchers.reduce(
     (acc, v) => acc + Number(v.paid_amount || v.paidAmount || (v.status === 'paid' ? (v.net_amount || v.amount || 0) : 0)),
     0
   );
   const totalPending = feePaymentService.calculateTotalPendingDues(vouchers);
+
+  // Student Base Fee Details Extraction
+  const sDetails = student?.details?.studentDetails || {};
+  const monthlyFee = Number(sDetails.monthly_fee || student?.monthly_fee || sDetails.monthlyFee || student?.monthlyFee || 0);
+  const admissionFee = Number(sDetails.admission_fee || sDetails.admission_charges || student?.admission_fee || student?.admission_charges || 0);
+  const annualCharges = Number(sDetails.annual_charges || student?.annual_charges || 0);
+  const labCharges = Number(sDetails.lab_charges || student?.lab_charges || 0);
+  const concessionType = sDetails.concession_type || sDetails.discount_type || student?.concession_type || student?.discount_type || 'none';
+  const discountType = sDetails.discount_type || student?.discount_type || 'fixed';
+  const concessionPercentage = Number(sDetails.concession_percentage || student?.concession_percentage || 0);
+  const concessionReason = sDetails.concession_reason || student?.concession_reason || '';
+  const concessionAmount = discountType === 'percentage' && concessionPercentage > 0
+    ? (monthlyFee * concessionPercentage / 100)
+    : Number(sDetails.concession_amount || student?.concession_amount || 0);
+  const netBaseMonthly = Math.max(0, monthlyFee - concessionAmount);
 
   const feeColumns = [
     {
@@ -476,24 +519,38 @@ function FeesTab({ student, currentInstitute, onGenerateVoucher }) {
     },
     {
       id: 'actions',
-      header: '',
+      header: 'Actions',
       cell: ({ row }) => (
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1.5 text-xs"
-          onClick={() => {
-            generateAndDownloadFeeVoucherPdf({
-              voucher: row.original,
-              student,
-              instituteName: currentInstitute?.name || 'Academy',
-              logoUrl: currentInstitute?.logo_url,
-              institute: currentInstitute,
-            });
-          }}
-        >
-          <Download size={13} /> PDF
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => {
+              generateAndDownloadFeeVoucherPdf({
+                voucher: row.original,
+                student,
+                instituteName: currentInstitute?.name || 'Academy',
+                logoUrl: currentInstitute?.logo_url,
+                institute: currentInstitute,
+              });
+            }}
+          >
+            <Download size={13} /> PDF
+          </Button>
+
+          {row.original.status !== 'paid' && canDeleteVoucher && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md"
+              onClick={() => setDeletingVoucher(row.original)}
+              title="Delete Voucher"
+            >
+              <Trash2 size={14} />
+            </Button>
+          )}
+        </div>
       ),
     },
   ];
@@ -540,6 +597,88 @@ function FeesTab({ student, currentInstitute, onGenerateVoucher }) {
 
   return (
     <div className="space-y-6">
+      {/* Student Fee Structure / Base Fee Overview Card */}
+      <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-slate-50/80 to-blue-50/30 overflow-hidden">
+        <CardContent className="p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-lg bg-blue-100 text-blue-700">
+                <DollarSign className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-slate-800">Student Base Fee & Charges Profile</h3>
+                <p className="text-xs text-slate-500">Configured monthly fees, admission charges, and approved concessions</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500">Net Monthly Base:</span>
+              <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
+                PKR {netBaseMonthly.toLocaleString('en-PK')} / month
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+            {/* Monthly Fee */}
+            <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs space-y-1">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Monthly Fee</p>
+              <p className="text-lg font-black text-slate-900">
+                PKR {monthlyFee.toLocaleString('en-PK')}
+              </p>
+              <p className="text-[10px] text-slate-500">Regular Tuition Fee</p>
+            </div>
+
+            {/* Admission Charges */}
+            <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs space-y-1">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Admission Charges</p>
+              <p className="text-lg font-bold text-slate-800">
+                {admissionFee > 0 ? `PKR ${admissionFee.toLocaleString('en-PK')}` : '—'}
+              </p>
+              <p className="text-[10px] text-slate-500">One-time Fee</p>
+            </div>
+
+            {/* Annual Charges */}
+            <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs space-y-1">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Annual Charges</p>
+              <p className="text-lg font-bold text-slate-800">
+                {annualCharges > 0 ? `PKR ${annualCharges.toLocaleString('en-PK')}` : '—'}
+              </p>
+              <p className="text-[10px] text-slate-500">Yearly / Session Fee</p>
+            </div>
+
+            {/* Lab Charges */}
+            <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs space-y-1">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Lab / Computer Fee</p>
+              <p className="text-lg font-bold text-slate-800">
+                {labCharges > 0 ? `PKR ${labCharges.toLocaleString('en-PK')}` : '—'}
+              </p>
+              <p className="text-[10px] text-slate-500">Facility Charges</p>
+            </div>
+          </div>
+
+          {/* Concession / Discount Bar (if any exists) */}
+          {concessionAmount > 0 && (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900">
+              <div className="flex items-center gap-2">
+                <span className="font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-emerald-200/80 text-emerald-800 text-[10px]">
+                  {concessionType !== 'none' ? concessionType : 'Concession'}
+                </span>
+                <span>
+                  {discountType === 'percentage'
+                    ? `${concessionPercentage}% concession applied`
+                    : `PKR ${concessionAmount.toLocaleString('en-PK')} discount applied`
+                  }
+                  {concessionReason ? ` (${concessionReason})` : ''}
+                </span>
+              </div>
+              <span className="font-bold text-emerald-700 self-end sm:self-auto">
+                - PKR {concessionAmount.toLocaleString('en-PK')}
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700">Fee Vouchers History (All Months)</h3>
@@ -578,6 +717,18 @@ function FeesTab({ student, currentInstitute, onGenerateVoucher }) {
           />
         </div>
       )}
+
+      {/* Delete Voucher Confirm Dialog */}
+      <ConfirmDialog
+        open={!!deletingVoucher}
+        onClose={() => setDeletingVoucher(null)}
+        onConfirm={() => deletingVoucher?.id && deleteVoucherMutation.mutate(deletingVoucher.id)}
+        loading={deleteVoucherMutation.isPending}
+        title="Delete Fee Voucher"
+        description={`Are you sure you want to delete voucher #${deletingVoucher?.voucher_number || deletingVoucher?.voucherNumber || deletingVoucher?.id}? This action cannot be undone.`}
+        confirmLabel="Delete Voucher"
+        variant="destructive"
+      />
     </div>
   );
 }
