@@ -38,13 +38,13 @@ import { cn, getActiveAcademicYear } from '@/lib/utils';
 import useInstituteStore from '@/store/instituteStore';
 import { toast } from 'sonner';
 
-// Fee basis options in simple terms
+// Fee basis options in clear English
 const FEE_BASIS_OPTIONS = [
-  { value: 'monthly', label: 'Monthly (Har Mahine)' },
-  { value: 'quarterly', label: 'Quarterly (3 Months)' },
-  { value: 'half_yearly', label: 'Half Yearly (6 Months)' },
-  { value: 'annually', label: 'Annually (Saalana / Yearly)' },
-  { value: 'one_time', label: 'One Time (Aik Baar)' }
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly (Every 3 Months)' },
+  { value: 'half_yearly', label: 'Half Yearly (Every 6 Months)' },
+  { value: 'annually', label: 'Annually (Yearly)' },
+  { value: 'one_time', label: 'One Time' }
 ];
 
 // Component schema - simplified for non-tech users with sensible defaults
