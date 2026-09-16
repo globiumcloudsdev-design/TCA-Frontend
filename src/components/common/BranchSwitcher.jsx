@@ -212,6 +212,11 @@ export default function BranchSwitcher({ className = '' }) {
                   <div className="flex items-center gap-2 min-w-0 pr-2">
                     <Building2 className="h-3.5 w-3.5 shrink-0 opacity-70" />
                     <span className="truncate">{resolveBranchName(branch, branch.name || 'Branch')}</span>
+                    {(branch.is_main === true || branches.length === 1) && (
+                      <span className="text-[10px] bg-primary/15 text-primary font-bold px-1.5 py-0.5 rounded shrink-0">
+                        Main
+                      </span>
+                    )}
                   </div>
                   {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
                 </DropdownMenuItem>
