@@ -424,18 +424,17 @@ export default function BranchForm({
                 )}
               />
 
-              {/* ✅ SwitchField already uses Controller internally */}
-              {/* <div className="flex items-center justify-between pt-4 border-t">
+              <div className="flex items-center justify-between pt-4 border-t">
                 <div className="space-y-0.5">
                   <Label htmlFor="is_main">Main Branch</Label>
-                  <p className="text-xs text-muted-foreground">Set as primary branch</p>
+                  <p className="text-xs text-muted-foreground">Set as primary / main campus for this institute</p>
                 </div>
                 <SwitchField
                   label=""
                   name="is_main"
                   control={control}
                 />
-              </div> */}
+              </div>
 
               {is_main && (
                 <div className="p-3 bg-blue-50 rounded-md">
