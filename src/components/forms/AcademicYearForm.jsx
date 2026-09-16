@@ -75,6 +75,7 @@ export default function AcademicYearForm({
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(academicYearSchema),
@@ -85,6 +86,17 @@ export default function AcademicYearForm({
       institute_id: instituteId,
     },
   });
+
+  useEffect(() => {
+    reset({
+      name: defaultValues.name || '',
+      start_date: defaultValues.start_date ? String(defaultValues.start_date).split('T')[0] : '',
+      end_date: defaultValues.end_date ? String(defaultValues.end_date).split('T')[0] : '',
+      is_current: Boolean(defaultValues.is_current),
+      description: defaultValues.description || '',
+      institute_id: instituteId,
+    });
+  }, [defaultValues, instituteId, reset]);
 
   const startDate = watch('start_date');
   const endDate = watch('end_date');
