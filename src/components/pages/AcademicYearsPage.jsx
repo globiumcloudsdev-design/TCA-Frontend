@@ -262,11 +262,19 @@ export default function AcademicYearsPage({ type }) {
         }) : '—';
       },
     },
-    // {
-    //   accessorKey: 'description',
-    //   header: 'Description',
-    //   cell: ({ getValue }) => getValue() || '—',
-    // },
+    {
+      accessorKey: 'description',
+      header: 'Description',
+      cell: ({ getValue }) => {
+        const desc = getValue();
+        if (!desc) return <span className="text-muted-foreground">—</span>;
+        return (
+          <span className="text-sm text-muted-foreground line-clamp-1 max-w-[220px]" title={desc}>
+            {desc}
+          </span>
+        );
+      },
+    },
     {
       accessorKey: 'is_active',
       header: 'Status',
