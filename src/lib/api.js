@@ -120,7 +120,8 @@ api.interceptors.request.use(
       urlLower.includes('voucher') ||
       urlLower.includes('fee') ||
       urlLower.includes('defaulter') ||
-      urlLower.includes('attendance');
+      urlLower.includes('attendance') ||
+      urlLower.includes('teacher');
 
     if (isHeavyOperation) {
       config.timeout = Math.max(config.timeout || 0, 300000); // 5 minutes for heavy operations
