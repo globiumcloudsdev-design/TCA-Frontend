@@ -143,10 +143,18 @@ export default function TeachersPage({ type }) {
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data) => teacherService.create({
-      ...data,
-      ...(activeBranchId ? { branch_id: data.branch_id || activeBranchId } : {})
-    }),
+    mutationFn: (data) => {
+      if (data instanceof FormData) {
+        if (activeBranchId && activeBranchId !== 'all' && !data.has('branch_id')) {
+          data.append('branch_id', activeBranchId);
+        }
+        return teacherService.create(data);
+      }
+      return teacherService.create({
+        ...data,
+        ...(activeBranchId && activeBranchId !== 'all' ? { branch_id: data.branch_id || activeBranchId } : {})
+      });
+    },
     onSuccess: (response) => {
       toast.success(`${teacherLabel} created successfully`);
       queryClient.invalidateQueries({ queryKey: ['teachers'] });
@@ -159,7 +167,15 @@ export default function TeachersPage({ type }) {
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => teacherService.update(id, data),
+    mutationFn: ({ id, data }) => {
+      if (data instanceof FormData) {
+        if (activeBranchId && activeBranchId !== 'all' && !data.has('branch_id')) {
+          data.append('branch_id', activeBranchId);
+        }
+        return teacherService.update(id, data);
+      }
+      return teacherService.update(id, data);
+    },
     onSuccess: () => {
       toast.success(`${teacherLabel} updated successfully`);
       queryClient.invalidateQueries({ queryKey: ['teachers'] });

@@ -22,6 +22,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import useAuthStore from '@/store/authStore';
+import useUIStore from '@/store/uiStore';
 import { X,  PlusCircle, Upload, ChevronLeft, ChevronRight, Plus, Trash2, Eye, EyeOff } from 'lucide-react';
 import { 
   GENDER_OPTIONS, 
@@ -96,9 +98,11 @@ const teacherSchema = z.object({
     .refine(val => !val || (val.length <= 7 && /^\d+$/.test(val)), 'Max 7 digits allowed'),
   bank_name: z.string()
     .optional()
+    .nullable()
+    .or(z.literal(''))
     .refine(val => !val || /^[A-Za-z\s]+$/.test(val), 'Only alphabets allowed'),
-  bank_account_no: z.string().optional(),
-  bank_branch: z.string().optional(),
+  bank_account_no: z.string().optional().nullable().or(z.literal('')),
+  bank_branch: z.string().optional().nullable().or(z.literal('')),
   emergency_contact_name: z.string().optional(),
   emergency_contact_relation: z.string().optional(),
   emergency_contact_phone: z.string().optional(),
@@ -191,6 +195,10 @@ export default function TeacherForm({
 
   // Transform API data to form structure
   const transformDefaultValues = (data) => {
+    const activeUser = useAuthStore.getState().user;
+    const activeBranchId = useUIStore.getState().activeBranchId;
+    const fallbackBranchId = activeUser?.branch_id || activeUser?.branch?.id || (activeBranchId && activeBranchId !== 'all' ? activeBranchId : '');
+
     if (!data || Object.keys(data).length === 0) {
       return {
         nationality: 'Pakistani',
@@ -198,6 +206,10 @@ export default function TeacherForm({
         send_email: true,
         documents: [],
         contract_type: 'permanent',
+        bank_name: '',
+        bank_account_no: '',
+        bank_branch: '',
+        branch_id: defaultValues?.branch_id || fallbackBranchId || '',
       };
     }
     const teacherDetails = data.details?.teacherDetails || {};
@@ -208,6 +220,7 @@ export default function TeacherForm({
       phone: data.phone || '',
       alternate_phone: data.alternate_phone || '',
       employee_id: teacherDetails.employee_id || data.employee_id || '',
+      branch_id: teacherDetails.branch_id || data.branch_id || defaultValues?.branch_id || fallbackBranchId || '',
       cnic: teacherDetails.cnic || '',
       dob: teacherDetails.date_of_birth || data.dob || '',
       gender: teacherDetails.gender || '',
@@ -433,8 +446,13 @@ export default function TeacherForm({
   const onSubmitForm = (data) => {
     console.log('📤 Full form data:', data);
 
+    const activeUser = useAuthStore.getState().user;
+    const activeBranchId = useUIStore.getState().activeBranchId;
+    const fallbackBranchId = activeUser?.branch_id || activeUser?.branch?.id || (activeBranchId && activeBranchId !== 'all' ? activeBranchId : null);
+
     let formattedData = {
       ...data,
+      branch_id: data.branch_id || fallbackBranchId || undefined,
       salary: data.salary ? Number(data.salary) : null,
       experience_years: data.experience_years ? Number(data.experience_years) : null,
       contract_start_date: data.employment_type === 'contract' ? (data.joining_date || data.contract_start_date) : null,
@@ -479,6 +497,10 @@ export default function TeacherForm({
     
     if (avatarFileRef.current) {
       formData.append('photo', avatarFileRef.current);
+    }
+
+    if (!formData.has('branch_id') && (formattedData.branch_id || fallbackBranchId)) {
+      formData.append('branch_id', formattedData.branch_id || fallbackBranchId);
     }
 
     console.log('📦 FormData entries:');
@@ -614,7 +636,7 @@ export default function TeacherForm({
                 <h3 className="text-lg font-semibold">Contact Information</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <InputField label="Email" name="email" register={register} error={errors.email} required type="email" placeholder="teacher@school.com" />
-                  <PhoneInputField label="Phone Number" value={watch('phone') || ''} onChange={val => setValue('phone', val)} error={errors.phone} />
+                  <PhoneInputField label="Phone Number" value={watch('phone') || ''} onChange={val => setValue('phone', val)} error={errors.phone} required />
                   <PhoneInputField label="Alternate Phone" value={watch('alternate_phone') || ''} onChange={val => setValue('alternate_phone', val)} error={errors.alternate_phone} />
                   <InputField label="City" name="city" register={register} error={errors.city} placeholder="Karachi" />
                 </div>
@@ -666,7 +688,7 @@ export default function TeacherForm({
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Employment Details</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <BranchSelectField control={control} error={errors.branch_id} setValue={setValue} watch={watch} required />
+                  <BranchSelectField control={control} register={register} error={errors.branch_id} setValue={setValue} watch={watch} required />
                   <SelectField label="Designation" name="designation" control={control} error={errors.designation} options={TEACHER_DESIGNATION_OPTIONS} placeholder="Select" />
                   <SelectField label="Employment Type" name="employment_type" control={control} error={errors.employment_type} options={EMPLOYMENT_TYPE_OPTIONS} placeholder="Select" />
                   <DatePickerField label="Joining Date" name="joining_date" control={control} error={errors.joining_date} />
@@ -690,29 +712,41 @@ export default function TeacherForm({
                 </div>
 
                 <Separator />
-                <h3 className="text-lg font-semibold">Bank Details</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Bank Details</h3>
+                  <Badge variant="outline" className="text-xs text-muted-foreground font-normal">Optional</Badge>
+                </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <InputField 
-                    label="Bank Name" 
+                    label="Bank Name (Optional)" 
                     name="bank_name" 
                     register={register} 
                     error={errors.bank_name} 
-                    placeholder="e.g. HBL" 
+                    placeholder="e.g. HBL (Optional)" 
+                    required={false}
                     onInput={(e) => {
                       e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '');
                     }}
                   />
                   <InputField 
-                    label="Account Number" 
+                    label="Account Number (Optional)" 
                     name="bank_account_no" 
                     register={register} 
                     error={errors.bank_account_no} 
-                    placeholder="1234567890" 
+                    placeholder="1234567890 (Optional)" 
+                    required={false}
                     onInput={(e) => {
                       e.target.value = e.target.value.replace(/[^0-9]/g, '');
                     }}
                   />
-                  <InputField label="Branch" name="bank_branch" register={register} error={errors.bank_branch} placeholder="Main Branch" />
+                  <InputField 
+                    label="Branch (Optional)" 
+                    name="bank_branch" 
+                    register={register} 
+                    error={errors.bank_branch} 
+                    placeholder="Main Branch (Optional)" 
+                    required={false}
+                  />
                 </div>
 
                 {!isEdit && (

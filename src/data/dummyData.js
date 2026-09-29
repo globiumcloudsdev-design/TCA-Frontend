@@ -1,26 +1,7 @@
-// /**
-//  * ╔══════════════════════════════════════════════════════════════╗
-//  * ║   The Clouds Academy — Complete Dummy / Seed Data           ║
-//  * ║                                                              ║
-//  * ║  Used as fallback when backend API is unreachable.          ║
-//  * ║  Import DUMMY_USERS to show demo login credentials.          ║
-//  * ╚══════════════════════════════════════════════════════════════╝
-//  *
-//  * Demo Credentials
-//  * ──────────────────────────────────────────────────────────────────────────────────────
-//  *  Role / Type          │ Inst. Code │ Email                    │ Password
-//  * ─────────────────────┼────────────┼──────────────────────────┼───────────────
-//  *  Master Admin         │ MASTER     │ master@cloudsacademy.com │ master@123
-//  *  Academy Admin (TCA)  │ TCA-LHR    │ admin@tca.edu.pk         │ admin@123
-//  *  Fee Manager          │ TCA-LHR    │ fees@tca.edu.pk          │ fees@123
-//  *  Class Teacher        │ TCA-LHR    │ teacher@tca.edu.pk       │ teacher@123
-//  *  Receptionist         │ TCA-LHR    │ reception@tca.edu.pk     │ reception@123
-//  *  Branch Admin         │ TCA-LHR    │ branch@tca.edu.pk        │ branch@123
-//  *  Coaching Admin (SCC) │ SCC-LHR    │ admin@scc.edu.pk         │ coaching@123
-//  *  Academy Admin (HIA)  │ HIA-ISL    │ admin@hia.edu.pk         │ academy@123
-//  *  College Admin (PCC)  │ PCC-LHR    │ admin@pcc.edu.pk         │ college@123
-//  * ──────────────────────────────────────────────────────────────────────────────────────
-//  */
+/**
+ * The Clouds Academy — Dummy / Seed Data
+ * Used as fallback data structures for the frontend.
+ */
 
 // // ──────────────────────────────────────────────────────────────────────────────
 // // 0 ▸ INSTITUTE TYPES
@@ -260,7 +241,6 @@
 //     first_name: 'Zahid',
 //     last_name: 'Ali Khan',
 //     email: 'master@cloudsacademy.com',
-//     password: 'master@123',
 //     phone: '+92-300-1234567',
 //     role_code: 'MASTER_ADMIN',
 //     is_active: true,
@@ -278,7 +258,6 @@
 //     first_name: 'Muhammad',
 //     last_name: 'Usman',
 //     email: 'admin@tca.edu.pk',
-//     password: 'admin@123',
 //     phone: '+92-321-9876543',
 //     role_code: 'SCHOOL_ADMIN',
 //     is_active: true,
@@ -296,7 +275,6 @@
 //     first_name: 'Ayesha',
 //     last_name: 'Siddiqui',
 //     email: 'fees@tca.edu.pk',
-//     password: 'fees@123',
 //     phone: '+92-333-5556677',
 //     role_code: 'FEE_MANAGER',
 //     is_active: true,
@@ -314,7 +292,6 @@
 //     first_name: 'Hassan',
 //     last_name: 'Mahmood',
 //     email: 'teacher@tca.edu.pk',
-//     password: 'teacher@123',
 //     phone: '+92-315-4443322',
 //     role_code: 'CLASS_TEACHER',
 //     is_active: true,
@@ -332,7 +309,6 @@
 //     first_name: 'Sarah',
 //     last_name: 'Noor',
 //     email: 'reception@tca.edu.pk',
-//     password: 'reception@123',
 //     phone: '+92-311-7778899',
 //     role_code: 'RECEPTIONIST',
 //     is_active: true,
@@ -350,7 +326,6 @@
 //     first_name: 'Tariq',
 //     last_name: 'Jamil',
 //     email: 'branch@tca.edu.pk',
-//     password: 'branch@123',
 //     phone: '+92-333-4445566',
 //     role_code: 'BRANCH_ADMIN',
 //     is_active: true,
@@ -388,7 +363,6 @@
 //     first_name: 'Khalid',
 //     last_name: 'Mehmood',
 //     email: 'admin@scc.edu.pk',
-//     password: 'coaching@123',
 //     phone: '+92-321-1230009',
 //     role_code: 'SCHOOL_ADMIN',
 //     is_active: true,
@@ -404,7 +378,6 @@
 //     first_name: 'Zara',
 //     last_name: 'Hashmi',
 //     email: 'admin@hia.edu.pk',
-//     password: 'academy@123',
 //     phone: '+92-333-1230010',
 //     role_code: 'SCHOOL_ADMIN',
 //     is_active: true,
@@ -420,7 +393,6 @@
 //     first_name: 'Naveed',
 //     last_name: 'Chaudhry',
 //     email: 'admin@pcc.edu.pk',
-//     password: 'college@123',
 //     phone: '+92-302-1230011',
 //     role_code: 'SCHOOL_ADMIN',
 //     is_active: true,
@@ -1165,15 +1137,12 @@
 // // 12 ▸ DUMMY LOGIN — called by login page when API is not reachable
 // // ──────────────────────────────────────────────────────────────────────────────
 // /**
-//  * dummyLogin({ school_code, email, password })
 //  * Returns { user, access_token: 'dummy-token' }  or throws Error.
 //  */
-// export function dummyLogin({ school_code, email, password }) {
 //   const user = DUMMY_USERS.find(
 //     (u) =>
 //       u.school_code.toLowerCase() === school_code.trim().toLowerCase() &&
 //       u.email.toLowerCase()       === email.trim().toLowerCase() &&
-//       u.password                  === password,
 //   );
 //   if (!user) throw new Error('Invalid credentials');
 //   // Return a shape identical to what the real API returns
@@ -2051,13 +2020,12 @@ export const DUMMY_ROLES = [
 // 8 ▸ USERS (Demo accounts for all institute types)
 // ──────────────────────────────────────────────────────────────────────────────
 export const DUMMY_USERS = [
-  // Master Admin — credentials match backend DB (.env SUPER_ADMIN_*)
+  // Master Admin
   {
     id: 'user-master-001',
     first_name: 'Master',
     last_name: 'Admin',
     email: 'admin@thecloudsacademy.com',
-    password: 'Admin@TCA2026!',
     role_code: 'MASTER_ADMIN',
     role: DUMMY_ROLES[0],
     institute_id: null,
@@ -2072,7 +2040,6 @@ export const DUMMY_USERS = [
     first_name: 'Muhammad',
     last_name: 'Usman',
     email: 'admin@tcaschool.edu.pk',
-    password: 'school@123',
     role_code: 'INSTITUTE_ADMIN',
     role: DUMMY_ROLES[1],
     institute_id: 'inst-001',
@@ -2085,7 +2052,6 @@ export const DUMMY_USERS = [
     first_name: 'Ayesha',
     last_name: 'Siddiqui',
     email: 'fees@tcaschool.edu.pk',
-    password: 'fees@123',
     role_code: 'FEE_MANAGER',
     role: DUMMY_ROLES.find(r => r.code === 'FEE_MANAGER'),
     institute_id: 'inst-001',
@@ -2097,7 +2063,6 @@ export const DUMMY_USERS = [
     first_name: 'Hassan',
     last_name: 'Mahmood',
     email: 'teacher.sch@tcaschool.edu.pk',
-    password: 'teacher@123',
     role_code: 'CLASS_TEACHER',
     role: DUMMY_ROLES.find(r => r.code === 'CLASS_TEACHER'),
     institute_id: 'inst-001',
@@ -2111,7 +2076,6 @@ export const DUMMY_USERS = [
     first_name: 'Khalid',
     last_name: 'Mehmood',
     email: 'admin@starcoaching.pk',
-    password: 'coaching@123',
     role_code: 'INSTITUTE_ADMIN',
     role: DUMMY_ROLES[1],
     institute_id: 'inst-002',
@@ -2123,7 +2087,6 @@ export const DUMMY_USERS = [
     first_name: 'Naila',
     last_name: 'Rashid',
     email: 'faculty@starcoaching.pk',
-    password: 'faculty@123',
     role_code: 'SENIOR_FACULTY',
     role: DUMMY_ROLES.find(r => r.code === 'SENIOR_FACULTY'),
     institute_id: 'inst-002',
@@ -2137,7 +2100,6 @@ export const DUMMY_USERS = [
     first_name: 'Zara',
     last_name: 'Hashmi',
     email: 'admin@horizonit.edu.pk',
-    password: 'academy@123',
     role_code: 'INSTITUTE_ADMIN',
     role: DUMMY_ROLES[1],
     institute_id: 'inst-003',
@@ -2151,7 +2113,6 @@ export const DUMMY_USERS = [
     first_name: 'Naveed',
     last_name: 'Chaudhry',
     email: 'admin@pcc.edu.pk',
-    password: 'college@123',
     role_code: 'INSTITUTE_ADMIN',
     role: DUMMY_ROLES[1],
     institute_id: 'inst-004',
@@ -2163,7 +2124,6 @@ export const DUMMY_USERS = [
     first_name: 'Imran',
     last_name: 'Khan',
     email: 'hod.cs@pcc.edu.pk',
-    password: 'hod@123',
     role_code: 'HOD',
     role: DUMMY_ROLES.find(r => r.code === 'HOD'),
     institute_id: 'inst-004',
@@ -2177,7 +2137,6 @@ export const DUMMY_USERS = [
     first_name: 'Ahmed',
     last_name: 'Saeed',
     email: 'admin@cust.edu.pk',
-    password: 'university@123',
     role_code: 'INSTITUTE_ADMIN',
     role: DUMMY_ROLES[1],
     institute_id: 'inst-005',
@@ -2738,43 +2697,7 @@ export const DUMMY_MA_USERS = [
 
 // ──────────────────────────────────────────────────────────────────────────────
 // 9 ▸ DEMO LOGIN FUNCTION (Updated)
-// ──────────────────────────────────────────────────────────────────────────────
-export function dummyLogin({ school_code, institute_code, email, password }) {
-  // Accept both field names (form sends school_code, old code used institute_code)
-  const code = (school_code || institute_code || '').trim().toLowerCase();
-  const emailLower = (email || '').trim().toLowerCase();
-
-  const user = DUMMY_USERS.find((u) => {
-    const emailMatch    = u.email.toLowerCase() === emailLower;
-    const passwordMatch = u.password === password;
-    // Master Admin has no institute code — match by email+password only
-    if (u.role_code === 'MASTER_ADMIN') return emailMatch && passwordMatch;
-    // All other users must also match institute code
-    return u.institute_code?.toLowerCase() === code && emailMatch && passwordMatch;
-  });
-
-  if (!user) throw new Error('Invalid credentials. Check institute code, email and password.');
-
-  const institute = DUMMY_INSTITUTES.find((i) => i.id === user.institute_id);
-
-  return {
-    user: {
-      id:             user.id,
-      first_name:     user.first_name,
-      last_name:      user.last_name,
-      email:          user.email,
-      role_code:      user.role_code,
-      role:           user.role,
-      institute_id:   user.institute_id,
-      institute:      institute,
-      institute_type: institute?.institute_type,
-      permissions:    user.permissions || user.role?.permissions || [],
-    },
-    access_token: `dummy-token-${user.id}-${Date.now()}`,
-  };
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
+ ──────────────────────────────────────────────────────────────────────────────
 // 10 ▸ HELPER — paginate array (for service fallback)
 // ──────────────────────────────────────────────────────────────────────────────
 export function paginate(arr, page = 1, limit = 20) {
@@ -2913,6 +2836,5 @@ export default {
   DUMMY_RESEARCH,
   DUMMY_INVOICES,
   DUMMY_SUBSCRIPTION_HISTORY,
-  dummyLogin,
-  paginate
+paginate
 };
