@@ -243,12 +243,44 @@ export function hasAnyPermission(userPermissions = [], permCodes = [], isMasterA
 export function isMainBranchUser(user) {
   if (!user) return false;
 
-  // 1. Explicit main branch flags
-  if (user.is_main_branch === true || user.is_main === true) return true;
-  if (user.branch?.is_main === true || user.assigned_branch?.is_main === true) return true;
+  const userType = String(user.user_type || '').toUpperCase();
+  const roleCode = String(
+    user.role_code ||
+    user.role?.code ||
+    (typeof user.role === 'string' ? user.role : user.role?.name) ||
+    user.role_name ||
+    ''
+  ).toUpperCase();
+
+  // Branch Admins and regular staff are NEVER main branch super users
+  if (
+    user.is_branch_admin === true ||
+    user.staff_type === 'Branch Head' ||
+    userType === 'BRANCH_ADMIN' ||
+    userType === 'CAMPUS_ADMIN' ||
+    userType === 'BRANCH ADMIN' ||
+    userType === 'CAMPUS ADMIN' ||
+    userType === 'BRANCH_STAFF' ||
+    userType === 'STAFF' ||
+    userType === 'TEACHER' ||
+    userType === 'STUDENT' ||
+    userType === 'PARENT' ||
+    roleCode === 'BRANCH_ADMIN' ||
+    roleCode === 'CAMPUS_ADMIN' ||
+    roleCode === 'BRANCH ADMIN' ||
+    roleCode === 'CAMPUS ADMIN' ||
+    roleCode === 'BRANCH_STAFF' ||
+    roleCode === 'TEACHER' ||
+    roleCode === 'STUDENT' ||
+    roleCode === 'PARENT'
+  ) {
+    return false;
+  }
+
+  // 1. Explicit bypass
+  if (user.is_super_admin === true) return true;
 
   // 2. Global platform / institute admin types are always super admin
-  const userType = String(user.user_type || '').toUpperCase();
   if (
     userType === 'INSTITUTE_ADMIN' ||
     userType === 'SUPER_ADMIN' ||
@@ -259,7 +291,20 @@ export function isMainBranchUser(user) {
     return true;
   }
 
-  // 3. Main branch naming / code conventions
+  if (
+    roleCode === 'INSTITUTE_ADMIN' ||
+    roleCode === 'SUPER_ADMIN' ||
+    roleCode === 'SUPER ADMIN' ||
+    roleCode === 'MASTER_ADMIN'
+  ) {
+    return true;
+  }
+
+  // 3. Explicit main branch flags
+  if (user.is_main_branch === true || user.is_main === true) return true;
+  if (user.branch?.is_main === true || user.assigned_branch?.is_main === true) return true;
+
+  // 4. Main branch naming / code conventions
   const branchName = String(user.branch?.name || user.assigned_branch?.name || user.branch_name || '').toLowerCase();
   const branchCode = String(user.branch?.code || user.assigned_branch?.code || user.branch_code || '').toUpperCase();
 
@@ -272,7 +317,7 @@ export function isMainBranchUser(user) {
     return true;
   }
 
-  // 4. Cross-reference user.institute.branches if present
+  // 5. Cross-reference user.institute.branches if present
   const branchId = user.branch?.id || user.assigned_branch?.id || user.branch_id;
   if (branchId && Array.isArray(user.institute?.branches)) {
     const matched = user.institute.branches.find((b) => String(b.id) === String(branchId));
@@ -297,35 +342,19 @@ export function isMainBranchUser(user) {
 export function isBranchAdmin(user) {
   if (!user) return false;
 
-  // Explicit bypass
+  // Explicit bypass for global super admins
   if (user.is_super_admin === true) return false;
 
-  // 1. MAIN BRANCH USER = SUPER ADMIN (Must NEVER be restricted as Branch Admin)
-  if (isMainBranchUser(user)) {
-    return false;
-  }
-
-  // 2. Explicit branch admin flag on non-main branch
-  if (user.is_branch_admin === true) return true;
-
-  // 3. Explicit non-main branch indicator
-  if (user.branch && user.branch.is_main === false) {
-    return true;
-  }
-  if (user.assigned_branch && user.assigned_branch.is_main === false) {
-    return true;
-  }
-
-  // 4. Role / User Type for Branch Admin
   const userType = String(user.user_type || '').toUpperCase();
   if (
-    userType === 'BRANCH_ADMIN' ||
-    userType === 'CAMPUS_ADMIN' ||
-    userType === 'BRANCH_STAFF' ||
-    userType === 'BRANCH ADMIN' ||
-    userType === 'CAMPUS ADMIN'
+    userType === 'INSTITUTE_ADMIN' ||
+    userType === 'SUPER_ADMIN' ||
+    userType === 'SUPER ADMIN' ||
+    userType === 'MASTER_ADMIN' ||
+    userType === 'MASTER ADMIN' ||
+    userType === 'SYSTEM_ADMIN'
   ) {
-    return true;
+    return false;
   }
 
   const roleCode = String(
@@ -337,6 +366,29 @@ export function isBranchAdmin(user) {
   ).toUpperCase();
 
   if (
+    roleCode === 'INSTITUTE_ADMIN' ||
+    roleCode === 'SUPER_ADMIN' ||
+    roleCode === 'SUPER ADMIN' ||
+    roleCode === 'MASTER_ADMIN'
+  ) {
+    return false;
+  }
+
+  // Explicit branch admin flags and roles
+  if (user.is_branch_admin === true) return true;
+
+  if (
+    userType === 'BRANCH_ADMIN' ||
+    userType === 'CAMPUS_ADMIN' ||
+    userType === 'BRANCH_STAFF' ||
+    userType === 'BRANCH ADMIN' ||
+    userType === 'CAMPUS ADMIN' ||
+    user.staff_type === 'Branch Head'
+  ) {
+    return true;
+  }
+
+  if (
     roleCode === 'BRANCH_ADMIN' ||
     roleCode === 'BRANCH_STAFF' ||
     roleCode === 'CAMPUS_ADMIN' ||
@@ -346,8 +398,21 @@ export function isBranchAdmin(user) {
     return true;
   }
 
-  // 5. If user has a branch_id assigned and is not main branch
-  if (user.branch_id) {
+  // Explicit non-main branch indicator
+  if (user.branch && user.branch.is_main === false) {
+    return true;
+  }
+  if (user.assigned_branch && user.assigned_branch.is_main === false) {
+    return true;
+  }
+
+  // Check if main branch user
+  if (isMainBranchUser(user)) {
+    return false;
+  }
+
+  // If user has a branch_id assigned and is not main branch
+  if (user.branch_id || user.branch?.id || user.assigned_branch?.id) {
     return true;
   }
 

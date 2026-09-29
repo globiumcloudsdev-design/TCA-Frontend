@@ -143,22 +143,29 @@ export default function BranchSelectField({
     }
   }, [isBranchAdmin, setValue, branchList, currentValue, name]);
 
-  // 3. Pre-select Main Branch for Super Admin when multiple branches exist and field is empty
+  // 3. Pre-select Main Branch for Super Admin when branches exist and field is empty
   useEffect(() => {
-    if (!isBranchAdmin && setValue && branchList.length > 1 && defaultBranchId && required) {
+    if (!isBranchAdmin && setValue && defaultBranchId) {
       if (!currentValue || currentValue === '') {
         setValue(name, defaultBranchId, { shouldValidate: true, shouldDirty: false });
       }
     }
-  }, [isBranchAdmin, setValue, branchList.length, defaultBranchId, currentValue, name, required]);
+  }, [isBranchAdmin, setValue, defaultBranchId, currentValue, name]);
 
-  // Case 1: Branch Admin -> completely hidden
+  // Case 1: Branch Admin -> completely hidden from UI
   if (isBranchAdmin) {
     const branchId = assignedBranch?.id || user?.branch_id || user?.branch?.id || '';
-    return register ? <input type="hidden" {...register(name)} value={branchId} /> : null;
+    return (
+      <input
+        type="hidden"
+        name={name}
+        value={branchId}
+        {...(register ? register(name) : {})}
+      />
+    );
   }
 
-  // Case 2: Loading state when no branches loaded yet
+  // Case 2: Loading state when branches are still loading
   if (isLoading && branchList.length === 0) {
     return (
       <div className={className}>
@@ -176,14 +183,19 @@ export default function BranchSelectField({
     );
   }
 
-  // Case 3: Only 1 branch (or 0 branches) -> do NOT ask for branch
-  if (branchList.length <= 1) {
-    const singleBranchId = branchList[0] ? String(branchList[0].id || branchList[0].value || '') : '';
-    return register ? <input type="hidden" {...register(name)} value={singleBranchId} /> : null;
-  }
+  // Case 3: Super Admin -> Always show select dropdown with Main Branch sorted first
+  const sortedBranchList = [...branchList].sort((a, b) => {
+    const aId = String(a.id || a.value || '');
+    const bId = String(b.id || b.value || '');
+    const mainId = mainBranch ? String(mainBranch.id || mainBranch.value || '') : null;
+    if (aId === mainId) return -1;
+    if (bId === mainId) return 1;
+    const aName = a.name || a.label || a.branch_name || '';
+    const bName = b.name || b.label || b.branch_name || '';
+    return aName.localeCompare(bName);
+  });
 
-  // Case 4: Multiple branches -> show select with main branch pre-selected & rest of branches listed
-  const branchOptions = branchList.map((b) => {
+  const branchOptions = sortedBranchList.map((b) => {
     const val = String(b.id || b.value || '');
     const isMain = b.is_main === true || b.is_main === 'true' ||
       String(b.code || '').toUpperCase().endsWith('-MAIN') ||

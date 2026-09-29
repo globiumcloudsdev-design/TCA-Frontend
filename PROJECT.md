@@ -473,43 +473,12 @@ All dummy data is imported directly into page components. When API is ready, jus
 
 ---
 
-## 11. Demo Credentials
+## 11. Authentication & Credentials
 
-### School Staff (Admin Panel)
+All platform administrative credentials (such as Master Admin) are configured via environment variables in the `.env` file (`SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`).
 
-| Email | Password | Role |
-|-------|----------|------|
-| `principal@tca.edu.pk` | `admin@123` | Branch Admin |
-| `admin@tca.edu.pk` | `admin@123` | Branch Admin |
-| `accountant@tca.edu.pk` | `admin@123` | Accountant |
-| `receptionist@tca.edu.pk` | `admin@123` | Receptionist |
+Staff, teacher, parent, and student accounts are created dynamically with credentials issued or invited through the administration dashboard and email notifications. Demo and hardcoded accounts are not stored in the codebase.
 
-### Master Admin
-
-| Email | Password | Role |
-|-------|----------|------|
-| `master@tca.edu.pk` | `master@123` | Master Admin |
-
-### Parent Portal
-
-| Email | Password |
-|-------|----------|
-| `parent@tca.edu.pk` | `parent@123` |
-| `parent2@tca.edu.pk` | `parent@123` |
-
-### Student Portal
-
-| Email | Password |
-|-------|----------|
-| `ali@student.tca` | `student@123` |
-| `fatima@student.tca` | `student@123` |
-
-### Teacher Portal
-
-| Email | Password |
-|-------|----------|
-| `hassan@teacher.tca` | `teacher@123` |
-| `sana@teacher.tca` | `teacher@123` |
 
 ---
 

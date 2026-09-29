@@ -125,7 +125,7 @@ export const MOCK_USERS = {
     first_name: 'Zubair',
     last_name: 'Ahmed',
     name: 'Zubair Ahmed',
-    email: 'hafizshoaibraza140@gmail.com',
+    email: 'accountant@thecloudsacademy.com',
     user_type: 'STAFF',
     role_code: 'ACCOUNTANT',
     permissions: ['fees.manage', 'payroll.manage', 'expense.manage', 'dashboard.view'],

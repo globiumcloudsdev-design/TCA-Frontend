@@ -63,19 +63,24 @@ export const teacherService = {
    */
   create: async (data) => {
     try {
-        if (data instanceof FormData) {
-          const response = await api.post('/teachers', data, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
-          return response.data;
-        }
+      if (data instanceof FormData) {
+        const response = await api.post('/teachers', data, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return response.data;
+      }
+
+      const formData = new FormData();
 
       // Basic info
-      formData.append('first_name', data.first_name);
-      formData.append('last_name', data.last_name);
-      formData.append('email', data.email);
-      formData.append('phone', data.phone);
+      formData.append('first_name', data.first_name || '');
+      formData.append('last_name', data.last_name || '');
+      formData.append('email', data.email || '');
+      formData.append('phone', data.phone || '');
       formData.append('alternate_phone', data.alternate_phone || '');
+      if (data.branch_id) {
+        formData.append('branch_id', data.branch_id);
+      }
       
       // Identity
       formData.append('employee_id', data.employee_id || '');
@@ -161,19 +166,22 @@ export const teacherService = {
    */
   update: async (id, data) => {
     try {
-        if (data instanceof FormData) {
-          const response = await api.put(`/teachers/${id}`, data, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
-          return response.data;
-        }
+      if (data instanceof FormData) {
+        const response = await api.put(`/teachers/${id}`, data, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return response.data;
+      }
+
+      const formData = new FormData();
 
       // Same as create but without password fields
-      formData.append('first_name', data.first_name);
-      formData.append('last_name', data.last_name);
-      formData.append('email', data.email);
-      formData.append('phone', data.phone);
-      formData.append('alternate_phone', data.alternate_phone || '');
+      if (data.first_name !== undefined) formData.append('first_name', data.first_name);
+      if (data.last_name !== undefined) formData.append('last_name', data.last_name);
+      if (data.email !== undefined) formData.append('email', data.email);
+      if (data.phone !== undefined) formData.append('phone', data.phone);
+      if (data.alternate_phone !== undefined) formData.append('alternate_phone', data.alternate_phone || '');
+      if (data.branch_id) formData.append('branch_id', data.branch_id);
       formData.append('employee_id', data.employee_id || '');
       formData.append('cnic', data.cnic || '');
       formData.append('dob', data.dob || '');

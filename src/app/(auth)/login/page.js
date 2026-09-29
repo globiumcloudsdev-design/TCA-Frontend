@@ -39,12 +39,6 @@ const PORTAL_BUTTONS = [
   { type: 'PARENT', label: 'Parent Portal', icon: Users, bg: 'bg-tca-primary/10', text: 'text-tca-primary', border: 'border-tca-primary/20', description: 'Track child progress...' },
 ];
 
-const QUICK_LOGINS = [
-  { label: 'School Admin', email: 'demo@gmail.com', password: '12345678', type: 'INSTITUTE_ADMIN' },
-  { label: 'Master Admin', email: 'admin@thecloudsacademy.com', password: 'Admin@TCA2026!', type: 'MASTER_ADMIN' },
-  { label: 'Accountant', email: 'hafizshoaibraza140@gmail.com', password: '123456', type: 'STAFF' },
-];
-
 export default function LoginPage() {
   const router = useRouter();
   const setUser = useAuthStore((s) => s.setUser);
@@ -70,16 +64,6 @@ export default function LoginPage() {
 
   const navigateToPortal = (portalType) => {
     router.push(`/portal-login?type=${portalType}`);
-  };
-
-  const fillCredentials = (cred) => {
-    if (loginMode === 'single') {
-      setValueSingle('email', cred.email);
-      setValueSingle('password', cred.password);
-    } else {
-      setValueDual('email', cred.email);
-    }
-    toast.info(`Filled ${cred.label} credentials`);
   };
 
   const completeLogin = async (user, accessToken, refreshToken) => {
@@ -347,21 +331,6 @@ export default function LoginPage() {
             </div>
           </Tabs>
         </div>
-
-        {/* Demo Quick Login - Only in Development */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-6 sm:mt-8 flex flex-wrap justify-center gap-2 sm:gap-3">
-            {QUICK_LOGINS.map((cred) => (
-              <button
-                key={cred.email} type="button" onClick={() => fillCredentials(cred)}
-                className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-white/5 border border-white/10 text-[9px] sm:text-[10px] font-bold text-slate-500 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest"
-                disabled={loading}
-              >
-                Demo: {cred.label}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Account Selector Modal */}
