@@ -1,3 +1,5 @@
+'use client';
+
 const DEFAULT_STAFF_PERMISSIONS = [
     'dashboard.view',
     'students.read',
@@ -35,7 +37,6 @@ const DEFAULT_STAFF_PERMISSIONS = [
     'notices.create',
     'events.read',
 ];
-'use client';
 
 /**
  * Staff Management Page
