@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Download, Printer, X, FileText, Receipt, Compass } from 'lucide-react';
+import { Download, Printer, X, FileText, Receipt, ZoomIn, ZoomOut } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -9,19 +9,6 @@ import AppModal from '@/components/common/AppModal';
 import FeeVoucher from '@/fees-template/FeeVoucher';
 import { getFeeTheme } from '@/fees-template/styles/feeTheme';
 import { downloadVoucherFromNode } from '@/fees-template/utils/voucherPdfExport';
-
-const toNumber = (value) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const formatBreakdownAmount = (feeType, amount) => {
-  const normalizedType = String(feeType || '').toLowerCase();
-  if (normalizedType.includes('percent') || normalizedType.includes('percentage')) {
-    return `${toNumber(amount).toLocaleString()}%`;
-  }
-  return `PKR ${toNumber(amount).toLocaleString()}`;
-};
 
 export default function FeeVoucherPreviewModal({
   open,
@@ -75,18 +62,10 @@ export default function FeeVoucherPreviewModal({
   const [activePageSize, setActivePageSize] = useState(detectedPageSize);
   const [activeOrientation, setActiveOrientation] = useState(detectedOrientation);
   const [copyMode, setCopyMode] = useState(initialCopyMode);
+  const [zoomLevel, setZoomLevel] = useState(0.85);
   const [isDownloading, setIsDownloading] = useState(false);
   const voucherRef = useRef(null);
   const theme = useMemo(() => getFeeTheme(resolvedTheme), [resolvedTheme]);
-
-  const breakdownRows = useMemo(
-    () =>
-      (feeStructure || []).map((row) => ({
-        feeType: row?.feeType || row?.label || 'Fee Item',
-        amount: row?.amount,
-      })),
-    [feeStructure]
-  );
 
   useEffect(() => {
     setActiveFormat(detectedFormat);
@@ -98,6 +77,11 @@ export default function FeeVoucherPreviewModal({
 
   useEffect(() => {
     setActiveOrientation(detectedOrientation);
+    if (detectedOrientation === 'landscape') {
+      setZoomLevel(0.8);
+    } else {
+      setZoomLevel(0.88);
+    }
   }, [detectedOrientation, open]);
 
   useEffect(() => {
@@ -125,7 +109,7 @@ export default function FeeVoucherPreviewModal({
   };
 
   const modalFooter = (
-    <div className="fee-voucher-modal-actions flex w-full flex-wrap items-center justify-between gap-2">
+    <div className="fee-voucher-modal-actions flex w-full flex-wrap items-center justify-between gap-2 border-t pt-3">
       <div className="flex flex-wrap items-center gap-2">
         {/* Layout Format Selector Toggle */}
         <div className="flex items-center gap-1 rounded-lg border bg-slate-50 p-1">
@@ -177,7 +161,10 @@ export default function FeeVoucherPreviewModal({
         <div className="flex items-center gap-1 rounded-lg border bg-slate-50 p-1">
           <button
             type="button"
-            onClick={() => setActiveOrientation('portrait')}
+            onClick={() => {
+              setActiveOrientation('portrait');
+              setZoomLevel(0.88);
+            }}
             className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-all ${
               activeOrientation === 'portrait'
                 ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
@@ -188,7 +175,10 @@ export default function FeeVoucherPreviewModal({
           </button>
           <button
             type="button"
-            onClick={() => setActiveOrientation('landscape')}
+            onClick={() => {
+              setActiveOrientation('landscape');
+              setZoomLevel(0.8);
+            }}
             className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-all ${
               activeOrientation === 'landscape'
                 ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
@@ -198,11 +188,41 @@ export default function FeeVoucherPreviewModal({
             Landscape
           </button>
         </div>
+
+        {/* Zoom Controls */}
+        <div className="flex items-center gap-1 rounded-lg border bg-slate-50 p-1 text-xs">
+          <button
+            type="button"
+            onClick={() => setZoomLevel((z) => Math.max(0.5, Number((z - 0.1).toFixed(2))))}
+            className="rounded p-1 text-slate-600 hover:bg-white hover:text-slate-900"
+            title="Zoom Out"
+          >
+            <ZoomOut className="h-3.5 w-3.5" />
+          </button>
+          <span className="w-10 text-center font-mono font-semibold text-slate-700">
+            {Math.round(zoomLevel * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={() => setZoomLevel((z) => Math.min(1.4, Number((z + 0.1).toFixed(2))))}
+            className="rounded p-1 text-slate-600 hover:bg-white hover:text-slate-900"
+            title="Zoom In"
+          >
+            <ZoomIn className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setZoomLevel(1)}
+            className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 hover:bg-white hover:text-slate-900"
+          >
+            100%
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
         {allowCopyToggle && !isCompact && !isLandscape ? (
-          <label className="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs">
+          <label className="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs bg-slate-50">
             <span>{copyToggleLabel}</span>
             <Switch
               checked={copyMode === 'triple'}
@@ -211,12 +231,12 @@ export default function FeeVoucherPreviewModal({
           </label>
         ) : null}
 
-        <Button variant="outline" size="sm" onClick={handlePrint}>
+        <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5 font-semibold">
           <Printer className="h-4 w-4" />
           Print
         </Button>
 
-        <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={isDownloading}>
+        <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={isDownloading} className="gap-1.5 font-semibold">
           <Download className="h-4 w-4" />
           {isDownloading ? 'Downloading...' : 'Download PDF'}
         </Button>
@@ -238,29 +258,14 @@ export default function FeeVoucherPreviewModal({
       className="fee-voucher-modal-shell !max-w-[96vw] sm:!max-w-[96vw]"
       footer={modalFooter}
     >
-      <div className="bg-slate-100 p-4 -mx-5 -my-4 h-full min-h-[50vh]">
-        {!isCompact && (
-          <div className="print:hidden mx-auto mb-4 w-full max-w-[210mm] rounded-lg border bg-white p-0 shadow-sm">
-            <div className="border-b bg-emerald-700 px-4 py-2 text-sm font-semibold text-white">
-              Fee Breakdown
-            </div>
-            {breakdownRows.length ? (
-              <div className="divide-y">
-                {breakdownRows.map((row, index) => (
-                  <div key={`${row.feeType}-${index}`} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2 text-xs">
-                    <span className="font-medium text-slate-700">{row.feeType}</span>
-                    <span className="font-semibold text-slate-900">{formatBreakdownAmount(row.feeType, row.amount)}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="px-4 py-3 text-xs text-slate-500">No fee breakdown available for this voucher.</p>
-            )}
-          </div>
-        )}
-
-        <div className="mx-auto w-fit pb-8 print:pb-0 overflow-x-auto max-w-full">
-          <div ref={voucherRef} className="fee-voucher-print-target">
+      <div className="bg-slate-200/80 p-3 sm:p-5 -mx-5 -my-4 h-full min-h-[55vh] max-h-[82vh] overflow-auto flex justify-center items-start">
+        <div
+          className="mx-auto w-fit pb-6 print:pb-0 transition-transform origin-top"
+          style={{
+            transform: zoomLevel !== 1 ? `scale(${zoomLevel})` : undefined,
+          }}
+        >
+          <div ref={voucherRef} className="fee-voucher-print-target shadow-lg rounded-sm overflow-hidden">
             <FeeVoucher
               studentData={studentData}
               feeStructure={feeStructure}
@@ -306,6 +311,7 @@ export default function FeeVoucherPreviewModal({
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
+            transform: none !important;
             width: ${
               isCompact
                 ? (isLandscape ? '148mm' : '105mm')
@@ -315,16 +321,10 @@ export default function FeeVoucherPreviewModal({
             margin: 0 !important;
             padding: 0 !important;
             box-shadow: none !important;
+            border: none !important;
             background: #fff !important;
             z-index: 9999 !important;
           }
-
-          ${!isCompact && !isLandscape ? `
-            .fee-voucher-print-target th:first-child,
-            .fee-voucher-print-target .month-row {
-              display: none !important;
-            }
-          ` : ''}
 
           .fee-voucher-modal-actions,
           [data-radix-dialog-overlay] {

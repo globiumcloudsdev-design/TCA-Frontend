@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import VoucherHeader from './VoucherHeader';
 import StudentInfoSection from './StudentInfoSection';
 import FeeTable from './FeeTable';
@@ -75,33 +76,75 @@ export default function FeeVoucher({
 
   return (
     <div
-      className={`fee-voucher-print-target fee-voucher-sheet mx-auto bg-white ${className}`.trim()}
+      className={`fee-voucher-print-target fee-voucher-sheet mx-auto bg-white border border-slate-300 shadow-sm print:border-none print:shadow-none ${className}`.trim()}
       style={{
         width: containerWidth,
         minHeight: containerHeight,
-        color: theme?.colors?.text || '#0f172a',
+        color: '#0f172a',
         backgroundColor: '#ffffff',
         padding: isLandscape ? '4mm 3mm' : '4mm',
+        boxSizing: 'border-box',
       }}
     >
-      <div className={`flex h-full ${isLandscape ? 'flex-row gap-2' : 'flex-col gap-1'}`}>
+      <div className={`flex h-full ${isLandscape ? 'flex-row gap-2' : 'flex-col gap-2'}`}>
         {copyLabels.map((label, index) => (
-          <section
-            key={label}
-            className="flex flex-1 flex-col border p-2 text-xs"
-            style={{
-              borderColor: '#8a8a8a',
-              borderBottom: !isLandscape && index !== copyLabels.length - 1 ? `1px dashed ${theme?.colors?.border || '#cbd5e1'}` : undefined,
-              borderRight: isLandscape && index !== copyLabels.length - 1 ? `1px dashed ${theme?.colors?.border || '#cbd5e1'}` : undefined,
-              paddingBottom: !isLandscape && index === copyLabels.length - 1 ? '8px' : '10px',
-              paddingRight: isLandscape && index !== copyLabels.length - 1 ? '8px' : '6px',
-            }}
-          >
-            <VoucherHeader instituteData={instituteData} voucherMeta={voucherMeta} theme={theme} copyLabel={label} isLandscape={isLandscape} />
-            <StudentInfoSection studentData={studentData} voucherMeta={voucherMeta} theme={theme} isLandscape={isLandscape} />
-            <FeeTable feeStructure={feeStructure} theme={theme} isLandscape={isLandscape} />
-            <VoucherFooter voucherMeta={voucherMeta} theme={theme} isLandscape={isLandscape} />
-          </section>
+          <React.Fragment key={label}>
+            {/* Cut Line Indicator between copies */}
+            {index > 0 && (
+              isLandscape ? (
+                <div className="flex flex-col items-center justify-center text-[10px] text-slate-400 select-none px-0.5 print:text-slate-400">
+                  <div className="h-full border-r border-dashed border-slate-400 flex flex-col justify-between py-2 items-center">
+                    <span className="text-[11px] transform -rotate-90">✂</span>
+                    <span className="text-[8px] font-mono transform -rotate-90 tracking-widest text-slate-400">CUT HERE</span>
+                    <span className="text-[11px] transform -rotate-90">✂</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center text-[10px] text-slate-400 select-none py-0.5 print:text-slate-400">
+                  <div className="w-full border-t border-dashed border-slate-400 flex justify-between px-4 items-center">
+                    <span className="text-[11px] bg-white px-1">✂</span>
+                    <span className="text-[8px] font-mono tracking-widest text-slate-400 bg-white px-2">CUT HERE</span>
+                    <span className="text-[11px] bg-white px-1">✂</span>
+                  </div>
+                </div>
+              )
+            )}
+
+            {/* Individual Voucher Copy Section */}
+            <section
+              className="flex flex-1 flex-col rounded border p-2 text-xs bg-white"
+              style={{
+                borderColor: '#cbd5e1',
+                minWidth: 0,
+              }}
+            >
+              <VoucherHeader
+                instituteData={instituteData}
+                voucherMeta={voucherMeta}
+                theme={theme}
+                copyLabel={label}
+                isLandscape={isLandscape}
+              />
+              <StudentInfoSection
+                studentData={studentData}
+                voucherMeta={voucherMeta}
+                theme={theme}
+                isLandscape={isLandscape}
+              />
+              <FeeTable
+                feeStructure={feeStructure}
+                voucherMeta={voucherMeta}
+                theme={theme}
+                isLandscape={isLandscape}
+              />
+              <VoucherFooter
+                instituteData={instituteData}
+                voucherMeta={voucherMeta}
+                theme={theme}
+                isLandscape={isLandscape}
+              />
+            </section>
+          </React.Fragment>
         ))}
       </div>
     </div>

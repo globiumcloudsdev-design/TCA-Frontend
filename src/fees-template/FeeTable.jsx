@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { fmtAmount } from '@/lib/formatters';
 
 const toNumber = (value) => {
@@ -7,109 +8,175 @@ const toNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const normalizeLabel = (label = '') => label.toLowerCase().trim();
+const normalizeLabel = (label = '') => String(label || '').toLowerCase().trim();
 
-const isDiscount = (label) => normalizeLabel(label).includes('discount');
-const isPaid = (label) => normalizeLabel(label).includes('paid amount');
-const isRemaining = (label) => normalizeLabel(label).includes('remaining amount');
-const isTotal = (label) => normalizeLabel(label).includes('total amount');
+const isDiscount = (label) => normalizeLabel(label).includes('discount') || normalizeLabel(label).includes('concession');
+const isPaid = (label) => normalizeLabel(label).includes('paid amount') || normalizeLabel(label) === 'paid';
+const isRemaining = (label) => normalizeLabel(label).includes('remaining amount') || normalizeLabel(label).includes('balance');
+const isTotal = (label) => normalizeLabel(label).includes('total amount') || normalizeLabel(label) === 'total';
+const isArrears = (label) => normalizeLabel(label).includes('arrear') || normalizeLabel(label).includes('previous');
 const isPercent = (label) => /percent|percentage/.test(normalizeLabel(label));
 
-const hasNonZeroValue = (label, value) => {
-  if (value === null || value === undefined || value === '') return false;
-  if (isPercent(label) && typeof value === 'string' && value.includes('%')) {
-    const parsed = Number(String(value).replace('%', '').trim());
-    return Number.isFinite(parsed) && parsed !== 0;
-  }
-  return toNumber(value) !== 0;
-};
-
-const formatValue = (label, amount) => {
-  if (amount === '-') return '-';
-  if (isPercent(label)) return `${fmtAmount(amount)}%`;
-  return `PKR ${fmtAmount(amount)}`;
-};
-
-export default function FeeTable({ feeStructure = [], theme }) {
-  const normalizedRows = (feeStructure || []).map((row) => ({
-    feeType: row.feeType || row.label || 'Unknown Fee',
+export default function FeeTable({
+  feeStructure = [],
+  voucherMeta = {},
+  isLandscape = false,
+  theme,
+}) {
+  const normalizedRows = (Array.isArray(feeStructure) ? feeStructure : []).map((row) => ({
+    feeType: row.feeType || row.label || row.name || 'Fee Item',
     amount: row.amount,
   }));
 
+  // Filter out standalone summary rows so we calculate cleanly
   const baseRows = normalizedRows.filter(
-    (row) => !isPaid(row.feeType) && !isRemaining(row.feeType) && !isTotal(row.feeType) && hasNonZeroValue(row.feeType, row.amount)
+    (row) =>
+      !isPaid(row.feeType) &&
+      !isRemaining(row.feeType) &&
+      !isTotal(row.feeType) &&
+      row.amount !== null &&
+      row.amount !== undefined &&
+      row.amount !== '' &&
+      toNumber(row.amount) !== 0
   );
 
+  // Calculate base total
   const chargeTotal = baseRows
     .filter((row) => !isDiscount(row.feeType) && !isPercent(row.feeType))
     .reduce((sum, row) => sum + toNumber(row.amount), 0);
 
-  const discount = baseRows
+  const discountTotal = baseRows
     .filter((row) => isDiscount(row.feeType))
-    .reduce((sum, row) => sum + toNumber(row.amount), 0);
+    .reduce((sum, row) => sum + Math.abs(toNumber(row.amount)), 0);
 
-  const paidAmount = normalizedRows
-    .filter((row) => isPaid(row.feeType) && hasNonZeroValue(row.feeType, row.amount))
-    .reduce((sum, row) => sum + toNumber(row.amount), 0);
+  const calculatedNet = Math.max(0, chargeTotal - discountTotal);
 
-  const totalAmount = chargeTotal - discount;
-  const remainingAmount = Math.max(totalAmount - paidAmount, 0);
+  // Voucher meta overrides if available
+  const netAmount =
+    voucherMeta.netAmount !== undefined && voucherMeta.netAmount !== null
+      ? toNumber(voucherMeta.netAmount)
+      : voucherMeta.net_amount !== undefined && voucherMeta.net_amount !== null
+        ? toNumber(voucherMeta.net_amount)
+        : voucherMeta.amount !== undefined && voucherMeta.amount !== null
+          ? toNumber(voucherMeta.amount)
+          : calculatedNet;
 
-  const summaryRows = [];
-  if (totalAmount !== 0) summaryRows.push({ feeType: 'Total Amount', amount: totalAmount });
-  if (paidAmount !== 0) summaryRows.push({ feeType: 'Paid Amount', amount: paidAmount });
-  if (remainingAmount !== 0) summaryRows.push({ feeType: 'Remaining Amount', amount: remainingAmount });
+  const lateFee =
+    voucherMeta.lateFee !== undefined && voucherMeta.lateFee !== null
+      ? toNumber(voucherMeta.lateFee)
+      : voucherMeta.late_fee !== undefined && voucherMeta.late_fee !== null
+        ? toNumber(voucherMeta.late_fee)
+        : 100;
 
-  const displayRows = [...baseRows, ...summaryRows];
+  const totalAfterDue = netAmount + lateFee;
 
-  const rowsToRender = displayRows.length
-    ? displayRows
-    : [{ feeType: 'No fee lines', amount: '-' }];
+  const paidAmount =
+    voucherMeta.paidAmount !== undefined && voucherMeta.paidAmount !== null
+      ? toNumber(voucherMeta.paidAmount)
+      : voucherMeta.paid_amount !== undefined && voucherMeta.paid_amount !== null
+        ? toNumber(voucherMeta.paid_amount)
+        : voucherMeta.amount_paid !== undefined && voucherMeta.amount_paid !== null
+          ? toNumber(voucherMeta.amount_paid)
+          : String(voucherMeta.status || '').toLowerCase() === 'paid'
+            ? netAmount
+            : 0;
+
+  const remainingBalance = Math.max(0, netAmount - paidAmount);
+
+  // Rows to display
+  const displayItems = baseRows.length > 0 ? baseRows : [{ feeType: 'Tuition / Monthly Fee', amount: netAmount }];
+
+  const headerBg = theme?.colors?.primary || '#0f4c81';
 
   return (
-    <section className="mt-1 border" style={{ borderColor: '#bcbcbc' }}>
-      <table className="w-full border-collapse text-[10px]">
+    <section className="mb-1.5 overflow-hidden rounded border" style={{ borderColor: '#cbd5e1' }}>
+      <table className="w-full border-collapse text-[9.5px]">
         <thead>
-          <tr>
-            <th className="border px-2 py-[2px] text-left font-semibold text-white" style={{ borderColor: '#bcbcbc', backgroundColor: '#0f7138' }}>
-              Fee Type
+          <tr style={{ backgroundColor: headerBg, color: '#ffffff' }}>
+            <th className="px-2 py-1 text-left font-bold uppercase tracking-wider text-[8.5px]">
+              Particulars
             </th>
-            <th className="border px-2 py-[2px] text-center font-semibold text-white" style={{ borderColor: '#bcbcbc', backgroundColor: '#0f7138' }}>
-              Amount
+            <th className="px-2 py-1 text-right font-bold uppercase tracking-wider text-[8.5px]">
+              Amount (PKR)
             </th>
           </tr>
         </thead>
 
         <tbody>
-          {rowsToRender.map((row, index) => {
-            const lower = normalizeLabel(row.feeType);
-            const isSummary = lower.includes('total amount') || lower.includes('remaining amount') || lower.includes('paid amount');
+          {displayItems.map((row, index) => {
+            const isDisc = isDiscount(row.feeType);
+            const isArr = isArrears(row.feeType);
+            const val = toNumber(row.amount);
 
             return (
-              <tr key={`${row.feeType}-${index}`}>
-                <td
-                  className="border px-2 py-[2px]"
-                  style={{
-                    borderColor: '#bcbcbc',
-                    fontWeight: isSummary ? 600 : 400,
-                    backgroundColor: '#ffffff',
-                  }}
-                >
+              <tr
+                key={`${row.feeType}-${index}`}
+                className="border-b"
+                style={{ borderColor: '#e2e8f0', backgroundColor: index % 2 === 1 ? '#f8fafc' : '#ffffff' }}
+              >
+                <td className="px-2 py-[2.5px] font-medium text-slate-700 truncate max-w-[140px]">
                   {row.feeType}
                 </td>
                 <td
-                  className="border px-2 py-[2px] text-right"
-                  style={{
-                    borderColor: '#bcbcbc',
-                    fontWeight: isSummary ? 600 : 400,
-                    backgroundColor: '#ffffff',
-                  }}
+                  className={`px-2 py-[2.5px] text-right font-mono font-medium ${
+                    isDisc ? 'text-emerald-700' : isArr ? 'text-amber-800' : 'text-slate-900'
+                  }`}
                 >
-                  {formatValue(row.feeType, row.amount)}
+                  {isDisc ? `-${fmtAmount(Math.abs(val))}` : fmtAmount(val)}
                 </td>
               </tr>
             );
           })}
+
+          {/* ── Summary Rows ── */}
+          <tr className="border-t-2 bg-slate-100 font-bold" style={{ borderColor: '#cbd5e1' }}>
+            <td className="px-2 py-1 text-slate-900 uppercase text-[9px] tracking-tight">
+              Payable Within Due Date:
+            </td>
+            <td className="px-2 py-1 text-right font-mono text-slate-950 font-black">
+              PKR {fmtAmount(netAmount)}
+            </td>
+          </tr>
+
+          {lateFee > 0 && (
+            <tr className="border-b bg-rose-50/50 text-[8.5px]" style={{ borderColor: '#e2e8f0' }}>
+              <td className="px-2 py-[2px] text-rose-700">Late Fee Fine (After Due Date):</td>
+              <td className="px-2 py-[2px] text-right font-mono font-semibold text-rose-700">
+                +{fmtAmount(lateFee)}
+              </td>
+            </tr>
+          )}
+
+          {lateFee > 0 && (
+            <tr className="border-b bg-slate-50 font-semibold text-[9px]" style={{ borderColor: '#e2e8f0' }}>
+              <td className="px-2 py-[2px] text-slate-800">Payable After Due Date:</td>
+              <td className="px-2 py-[2px] text-right font-mono font-bold text-slate-900">
+                PKR {fmtAmount(totalAfterDue)}
+              </td>
+            </tr>
+          )}
+
+          {paidAmount > 0 && (
+            <tr className="border-b bg-emerald-50/60 text-[9px]" style={{ borderColor: '#e2e8f0' }}>
+              <td className="px-2 py-[2px] font-semibold text-emerald-800">Paid Amount:</td>
+              <td className="px-2 py-[2px] text-right font-mono font-bold text-emerald-700">
+                PKR {fmtAmount(paidAmount)}
+              </td>
+            </tr>
+          )}
+
+          {paidAmount > 0 && (
+            <tr className="bg-slate-100 text-[9px]" style={{ borderColor: '#e2e8f0' }}>
+              <td className="px-2 py-[2px] font-bold text-slate-800">Remaining Balance:</td>
+              <td
+                className={`px-2 py-[2px] text-right font-mono font-black ${
+                  remainingBalance > 0 ? 'text-rose-600' : 'text-emerald-700'
+                }`}
+              >
+                PKR {fmtAmount(remainingBalance)}
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </section>

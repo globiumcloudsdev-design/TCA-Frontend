@@ -20,14 +20,45 @@ export default function CompactFeeVoucher({
   orientation = null,
   className = '',
 }) {
-  const schoolName = instituteData.name || instituteData.institute_name || voucherMeta.instituteName || 'School Management System';
-  const schoolAddress = instituteData.address || instituteData.campus_address || instituteData.city || '';
+  const schoolName =
+    instituteData.name ||
+    instituteData.institute_name ||
+    voucherMeta.instituteName ||
+    'School Management System';
+
+  const logoUrl =
+    instituteData.logo ||
+    instituteData.logo_url ||
+    instituteData.logoUrl ||
+    voucherMeta.instituteLogo ||
+    voucherMeta.logo;
+
+  const schoolAddress =
+    instituteData.address ||
+    instituteData.campus_address ||
+    instituteData.city ||
+    '';
   const schoolPhone = instituteData.phone || instituteData.contact || '';
   
-  const voucherNo = voucherMeta.voucherNumber || voucherMeta.voucher_number || voucherMeta.voucherNo || voucherMeta.id || 'N/A';
-  const paymentDate = voucherMeta.paymentDate || voucherMeta.payment_date || voucherMeta.issueDate || voucherMeta.issuedDate || voucherMeta.generatedDate || new Date();
+  const voucherNo =
+    voucherMeta.voucherNumber ||
+    voucherMeta.voucher_number ||
+    voucherMeta.voucherNo ||
+    voucherMeta.id ||
+    'N/A';
+
+  const paymentDate =
+    voucherMeta.paymentDate ||
+    voucherMeta.payment_date ||
+    voucherMeta.issueDate ||
+    voucherMeta.issuedDate ||
+    voucherMeta.generatedDate ||
+    new Date();
+
+  const dueDate = voucherMeta.dueDate || voucherMeta.due_date;
   
-  const studentName = studentData.studentName || studentData.name || 'Student';
+  const studentName = studentData.studentName || studentData.name || studentData.full_name || 'Student';
+  const fatherName = studentData.fatherName || studentData.father_name || studentData.parent_name || studentData.guardian_name || null;
   const regNo = studentData.registrationNo || studentData.registration_no || studentData.studentId || studentData.rollNumber || null;
   const classNameVal = studentData.className || studentData.class_name || studentData.class || '';
   const sectionNameVal = studentData.sectionName || studentData.section_name || studentData.section || '';
@@ -117,10 +148,10 @@ export default function CompactFeeVoucher({
     >
       {/* ── 1. HEADER ── */}
       <div className="text-center pb-2 border-b border-dashed border-slate-400">
-        {instituteData.logo ? (
+        {logoUrl ? (
           <div className="flex justify-center mb-1">
             <img
-              src={instituteData.logo}
+              src={logoUrl}
               alt="Logo"
               className="h-8 w-8 object-contain"
               crossOrigin="anonymous"
@@ -144,9 +175,15 @@ export default function CompactFeeVoucher({
       {/* ── 2. TRANSACTION DETAILS ── */}
       <div className="py-2 border-b border-dashed border-slate-400 text-[10.5px]">
         <div className="flex justify-between items-center py-0.5">
-          <span className="font-semibold text-slate-600">Date:</span>
+          <span className="font-semibold text-slate-600">Issue Date:</span>
           <span className="font-bold text-slate-900">{fmtDate(paymentDate)}</span>
         </div>
+        {dueDate && (
+          <div className="flex justify-between items-center py-0.5">
+            <span className="font-semibold text-rose-600">Due Date:</span>
+            <span className="font-bold text-rose-700">{fmtDate(dueDate)}</span>
+          </div>
+        )}
         <div className="flex justify-between items-center py-0.5">
           <span className="font-semibold text-slate-600">Voucher No:</span>
           <span className="font-mono font-black text-slate-950">{voucherNo}</span>
@@ -159,6 +196,12 @@ export default function CompactFeeVoucher({
           <span className="font-semibold text-slate-600 shrink-0">Student:</span>
           <span className="font-bold text-slate-900 text-right">{studentName}</span>
         </div>
+        {fatherName && (
+          <div className="flex justify-between items-start py-0.5">
+            <span className="font-semibold text-slate-600 shrink-0">Father Name:</span>
+            <span className="font-medium text-slate-800 text-right">{fatherName}</span>
+          </div>
+        )}
         <div className="flex justify-between items-center py-0.5">
           <span className="font-semibold text-slate-600">Class &amp; Section:</span>
           <span className="font-medium text-slate-900">{classAndSection}</span>
@@ -249,7 +292,7 @@ export default function CompactFeeVoucher({
       {/* ── 6. FOOTER ── */}
       <div className="pt-2 text-center text-[9.5px] font-medium text-slate-600 border-t border-dashed border-slate-400">
         <p className="tracking-tight text-slate-700 font-semibold">
-          Powered by TCA The Clouds Academy | 03352778488
+          Powered by The Clouds Academy
         </p>
       </div>
 
