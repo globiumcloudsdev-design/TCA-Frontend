@@ -278,6 +278,7 @@ export default function StudentsPage({ type }) {
   }, [academicYearsData, academicYearId]);
 
   // Fetch all available classes
+  const canViewClasses = canDo('classes.read') || canDo('students.read') || canDo('fees.read');
   const { data: classesData, isLoading: isClassesLoading } = useQuery({
     queryKey: ['classes-all', academicYearId, type, currentInstitute?.id, activeBranchId],
     queryFn: () => classService.getAll({
@@ -289,6 +290,7 @@ export default function StudentsPage({ type }) {
       limit: 500,
       fetchAll: true,
     }),
+    enabled: canViewClasses,
   });
 
   // Extract raw classes list safely across all potential data formats
@@ -530,6 +532,7 @@ export default function StudentsPage({ type }) {
   });
 
   // Fetch Stats using Report Service
+  const canViewStudentStats = canDo('reports.student') || canDo('reports.read') || canDo('students.read');
   const { data: statsData, isLoading: isLoadingStats } = useQuery({
     queryKey: ['student-stats', type, academicYearId, classId, sectionId],
     queryFn: () => reportService.getStudentReport({
@@ -539,10 +542,18 @@ export default function StudentsPage({ type }) {
       institute_type: type,
       limit: 1 // We only need summary
     }),
-    enabled: !!academicYearId,
+    enabled: !!academicYearId && canViewStudentStats,
   });
 
-  const stats = statsData?.data?.summary || { total_records: 0, active_students: 0, inactive_students: 0 };
+  const students = Array.isArray(data?.data) ? data.data : [];
+  const total = data?.pagination?.total ?? (Array.isArray(data?.data) ? data.data.length : 0);
+  const totalPages = data?.pagination?.totalPages ?? 1;
+
+  const stats = statsData?.data?.summary || {
+    total_records: total || 0,
+    active_students: total || 0,
+    inactive_students: 0
+  };
 
   const { data: studentToEditData, isLoading: isLoadingEdit } = useQuery({
     queryKey: ['student', editingId],
@@ -553,10 +564,6 @@ export default function StudentsPage({ type }) {
   const studentToEdit = useMemo(() => {
     return flattenStudent(studentToEditData?.data || studentToEditData);
   }, [studentToEditData]);
-
-  const students = Array.isArray(data?.data) ? data.data : [];
-  const total = data?.pagination?.total ?? (Array.isArray(data?.data) ? data.data.length : 0);
-  const totalPages = data?.pagination?.totalPages ?? 1;
 
   const handleGenerateIdCard = async (student) => {
     try {
