@@ -90,9 +90,11 @@ export default function TimetablePage() {
     enabled:  !!classId,
   });
 
+  const canReadTeachers = useAuthStore((s) => s.canDo('teachers.read') || s.canDo('teachers.view'));
   const { data: teachersData } = useQuery({
     queryKey: ['teachers-all'],
     queryFn:  () => teacherService.getAll({ limit: 200 }),
+    enabled:  canReadTeachers,
   });
 
   const { data: ttData, isLoading } = useQuery({

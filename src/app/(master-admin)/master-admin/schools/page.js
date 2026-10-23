@@ -727,7 +727,7 @@ function InstituteFormModal({ open, onClose, institute, onSubmit, loading, typeO
             control={control}
             options={[
               { value: 'three_part', label: 'Classic Three-Part Slip (Bank, School & Parent Copies - A4)' },
-              { value: 'compact', label: 'Compact Receipt (Small Shop Receipt - Thermal / A5)' }
+              { value: 'compact', label: 'Compact Receipt (Small Shop Receipt - Thermal / A5 / A6)' }
             ]}
             placeholder="Select voucher print format"
             hint="Choose default voucher print format for this school"

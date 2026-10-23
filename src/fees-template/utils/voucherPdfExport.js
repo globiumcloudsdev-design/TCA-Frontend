@@ -3,7 +3,7 @@
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
-export const captureVoucherCanvas = async (sourceNode, isCompact = false) => {
+export const captureVoucherCanvas = async (sourceNode, isCompact = false, pageSize = null, orientation = 'portrait') => {
   const exportHost = document.createElement('div');
   exportHost.style.position = 'fixed';
   exportHost.style.left = '-100000px';
@@ -14,12 +14,24 @@ export const captureVoucherCanvas = async (sourceNode, isCompact = false) => {
 
   const exportNode = sourceNode.cloneNode(true);
   exportNode.style.transform = 'none';
+
+  const rawSize = String(pageSize || '').toUpperCase();
+  const isLandscape = String(orientation || '').toLowerCase() === 'landscape' || String(orientation || '').toLowerCase() === 'l';
+
   if (isCompact) {
-    exportNode.style.width = '105mm';
-    exportNode.style.minHeight = 'auto';
+    if (rawSize === 'A6') {
+      exportNode.style.width = isLandscape ? '148mm' : '105mm';
+      exportNode.style.minHeight = isLandscape ? '105mm' : '148mm';
+    } else if (rawSize === 'A5') {
+      exportNode.style.width = isLandscape ? '210mm' : '148mm';
+      exportNode.style.minHeight = isLandscape ? '148mm' : '210mm';
+    } else {
+      exportNode.style.width = isLandscape ? '148mm' : '105mm';
+      exportNode.style.minHeight = 'auto';
+    }
   } else {
-    exportNode.style.width = '210mm';
-    exportNode.style.minHeight = '297mm';
+    exportNode.style.width = isLandscape ? '297mm' : '210mm';
+    exportNode.style.minHeight = isLandscape ? '210mm' : '297mm';
   }
   exportNode.style.margin = '0';
 
@@ -39,29 +51,29 @@ export const captureVoucherCanvas = async (sourceNode, isCompact = false) => {
   }
 };
 
-export const saveCanvasAsPdf = (canvas, fileName, isCompact = false) => {
+export const saveCanvasAsPdf = (canvas, fileName, isCompact = false, pageSize = null, orientation = 'portrait') => {
   const imageData = canvas.toDataURL('image/png');
-  
+  const rawSize = String(pageSize || '').toUpperCase();
+  const isLandscape = String(orientation || '').toLowerCase() === 'landscape' || String(orientation || '').toLowerCase() === 'l';
+  const pdfOrientation = isLandscape ? 'landscape' : 'portrait';
+
+  const pdfFormat = rawSize === 'A6' ? 'a6' : (rawSize === 'A5' || isCompact ? 'a5' : 'a4');
+  const pdf = new jsPDF({ orientation: pdfOrientation, unit: 'mm', format: pdfFormat });
+
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+
   if (isCompact) {
-    // Standard A5 portrait (148mm x 210mm) or custom compact receipt dimensions
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    
-    // Center receipt horizontally if smaller than page width
-    const targetWidth = Math.min(pageWidth - 20, 105);
+    const targetWidth = Math.min(pageWidth - 10, isLandscape ? 140 : 105);
     const targetHeight = (canvas.height * targetWidth) / canvas.width;
-    const xOffset = (pageWidth - targetWidth) / 2;
-    const yOffset = 10;
+    const xOffset = Math.max(0, (pageWidth - targetWidth) / 2);
+    const yOffset = Math.max(4, (pageHeight - targetHeight) / 2);
 
     pdf.addImage(imageData, 'PNG', xOffset, yOffset, targetWidth, targetHeight, undefined, 'FAST');
     pdf.save(fileName);
     return;
   }
 
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
   const imageWidth = pageWidth;
   const imageHeight = (canvas.height * imageWidth) / canvas.width;
 
@@ -81,11 +93,11 @@ export const saveCanvasAsPdf = (canvas, fileName, isCompact = false) => {
   pdf.save(fileName);
 };
 
-export const saveCanvasAsA4Pdf = (canvas, fileName) => saveCanvasAsPdf(canvas, fileName, false);
+export const saveCanvasAsA4Pdf = (canvas, fileName) => saveCanvasAsPdf(canvas, fileName, false, 'A4', 'portrait');
 
-export const downloadVoucherFromNode = async (node, fileName, isCompact = false) => {
+export const downloadVoucherFromNode = async (node, fileName, isCompact = false, pageSize = null, orientation = 'portrait') => {
   if (!node) return;
   const compactCheck = isCompact || node.querySelector?.('.compact-fee-receipt') !== null || node.classList?.contains('compact-fee-receipt');
-  const canvas = await captureVoucherCanvas(node, compactCheck);
-  saveCanvasAsPdf(canvas, fileName, compactCheck);
+  const canvas = await captureVoucherCanvas(node, compactCheck, pageSize, orientation);
+  saveCanvasAsPdf(canvas, fileName, compactCheck, pageSize, orientation);
 };

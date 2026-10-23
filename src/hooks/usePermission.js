@@ -7,15 +7,19 @@
 import useAuthStore from '@/store/authStore';
 
 export function usePermission(permissionCode) {
+  const canDo = useAuthStore((s) => s.canDo);
+  const isMaster = useAuthStore((s) => s.isMasterAdmin());
   return {
-    can: true,
-    isMasterAdmin: true,
+    can: typeof canDo === 'function' ? canDo(permissionCode) : true,
+    isMasterAdmin: isMaster,
   };
 }
 
 export function usePermissions(permissionCodes = []) {
+  const canDoAny = useAuthStore((s) => s.canDoAny);
+  const isMaster = useAuthStore((s) => s.isMasterAdmin());
   return {
-    canAny: true,
-    isMasterAdmin: true,
+    canAny: typeof canDoAny === 'function' ? canDoAny(permissionCodes) : true,
+    isMasterAdmin: isMaster,
   };
 }

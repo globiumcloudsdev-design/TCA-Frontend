@@ -20,6 +20,7 @@ import {
   getAssignedBranch as checkGetAssignedBranch,
   getMainBranch as checkGetMainBranch,
   schoolHasBranches as checkSchoolHasBranches,
+  hasPermission as checkHasPermission,
 } from "@/lib/auth";
 import { settingService } from "@/services/settingService";
 import { getDashboardPath } from "@/utils/authUtils";
@@ -269,27 +270,55 @@ export const useAuthStore = create(
       // =========================================================
       
       isMasterAdmin: () => {
-        return true;
+        const u = get().user;
+        if (!u) return false;
+        const role = (u?.role_code || u?.user_type || u?.role?.code || u?.role?.name || '').toUpperCase();
+        const MASTER_ROLES = ['MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPPORT_STAFF', 'MASTER_STAFF', 'MASTER_SUPPORT'];
+        return MASTER_ROLES.includes(role);
       },
 
       permissions: () => {
         const user = get().user;
-        return user?.permissions && user.permissions.length > 0 ? user.permissions : ['*'];
+        return Array.isArray(user?.permissions) ? user.permissions : [];
       },
 
       canDo: (permissionCode) => {
-        // Bypass all permissions — return true for all permission checks
-        return true;
+        const u = get().user;
+        if (!u) return false;
+        if (get().isMasterAdmin()) return true;
+
+        // Dashboard is accessible to all authenticated users
+        if (!permissionCode || permissionCode === 'dashboard.view' || permissionCode === 'dashboard.read') {
+          return true;
+        }
+
+        const role = (u?.role_code || u?.user_type || u?.role?.code || u?.role?.name || '').toUpperCase();
+        // Super admin / Institute admin have full permissions in their institute
+        if (role === 'INSTITUTE_ADMIN' || role === 'SUPER_ADMIN' || role === 'SUPER ADMIN') {
+          return true;
+        }
+
+        // Branch Admin has administrative permissions for their branch (except multi-branch management)
+        if (checkIsBranchAdmin(u) && !permissionCode.startsWith('branch.') && !permissionCode.startsWith('branches.')) {
+          const customPerms = u.permissions;
+          if (Array.isArray(customPerms) && customPerms.length > 0) {
+            return checkHasPermission(customPerms, permissionCode, false);
+          }
+          return true;
+        }
+
+        // For Staff, Teachers, and custom-permission users: check their resolved permissions
+        const rawPerms = u.permissions || u.role?.permissions || [];
+        return checkHasPermission(rawPerms, permissionCode, false);
       },
 
       hasPermission: (permissionCode) => {
-        // Bypass all permissions — return true for all permission checks
-        return true;
+        return get().canDo(permissionCode);
       },
 
       canDoAny: (codes = []) => {
-        // Bypass all permissions — return true for all permission checks
-        return true;
+        if (!Array.isArray(codes) || codes.length === 0) return true;
+        return codes.some((code) => get().canDo(code));
       },
 
       schoolHasBranches: () => {

@@ -1047,6 +1047,7 @@ function InstituteFormModal({ open, onClose, institute, onSubmit, loading, typeO
                   options={[
                     { value: 'A4', label: 'A4 (210 x 297 mm)' },
                     { value: 'A5', label: 'A5 (148 x 210 mm)' },
+                    { value: 'A6', label: 'A6 (105 x 148 mm)' },
                     { value: 'Letter', label: 'Letter (8.5 x 11 in)' }
                   ]}
                 />

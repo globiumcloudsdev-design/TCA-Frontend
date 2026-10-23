@@ -48,6 +48,11 @@ export default function Sidebar() {
     if (isBranchAdmin && (item.href?.includes('/branches') || item.hideForRoles?.includes('BRANCH_ADMIN'))) {
       return false;
     }
+    if (item.permission && typeof canDo === 'function') {
+      if (!canDo(item.permission)) {
+        return false;
+      }
+    }
     return true;
   });
 

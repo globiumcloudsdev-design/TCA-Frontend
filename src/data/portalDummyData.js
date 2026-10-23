@@ -235,7 +235,6 @@ export const DUMMY_PARENTS = [
     id: 'parent-001',
     name: 'Muhammad Raza',
     email: 'parent@tca.edu.pk',
-    password: 'parent@123',
     phone: '+92-300-9876543',
     occupation: 'Software Engineer',
     address: '12 Main Boulevard, Gulberg, Lahore',
@@ -269,7 +268,6 @@ export const DUMMY_PARENTS = [
     id: 'parent-002',
     name: 'Rabia Khan',
     email: 'parent2@tca.edu.pk',
-    password: 'parent@123',
     phone: '+92-321-5544332',
     occupation: 'Doctor',
     address: '45 DHA Phase 5, Lahore',
@@ -310,7 +308,6 @@ export const DUMMY_STUDENT_PORTAL_USERS = [
     first_name: 'Ali',
     last_name: 'Raza',
     email: 'ali@student.tca',
-    password: 'student@123',
     roll_number: 'TCA-001',
     class_name: 'Class 1 – Section A',
     class_id: 'class-001',
@@ -332,7 +329,6 @@ export const DUMMY_STUDENT_PORTAL_USERS = [
     first_name: 'Fatima',
     last_name: 'Malik',
     email: 'fatima@student.tca',
-    password: 'student@123',
     roll_number: 'TCA-002',
     class_name: 'Class 1 – Section B',
     class_id: 'class-001',
@@ -408,7 +404,6 @@ export const DUMMY_TEACHER_PORTAL_USERS = [
     first_name: 'Hassan',
     last_name: 'Mahmood',
     email: 'hassan@teacher.tca',
-    password: 'teacher@123',
     phone: '+92-333-1234567',
     branch: 'Main Campus',
     designation: 'Senior Teacher',
@@ -431,7 +426,6 @@ export const DUMMY_TEACHER_PORTAL_USERS = [
     first_name: 'Sana',
     last_name: 'Tariq',
     email: 'sana@teacher.tca',
-    password: 'teacher@123',
     phone: '+92-321-9876543',
     branch: 'Main Campus',
     designation: 'Teacher',
@@ -524,9 +518,9 @@ const _SCHOOL = (() => {
     { id:'syl-sch-6',name:'Islamiat',   code:'ISL-9',  class_id:'sch-c1',description:'Islamic studies and Quran.',syllabus_type:'text',syllabus_content:'Quran: Al-Hujurat (49), Al-Jumuah (62)\nHadith: Truthfulness, Knowledge, Brotherhood\nFiqh: Wudu, Salah, Sawm, Zakat, Hajj\nSeerah: Battle of Badr, Conquest of Makkah\nIslamic Ethics & Values',is_active:true },
   ];
   return {
-    parent: { id:'parent-sch',name:'Ahmed Khan',email:'parent@school.edu',password:'parent@123',phone:'+92-311-2233445',occupation:'Engineer',address:'House 14, Johar Town, Lahore',relation:'Father',portal_type:'PARENT',institute_type:'school',children:[child1,child2] },
-    student: { id:'sch-s1',first_name:'Usman',last_name:'Ali',email:'student@school.edu',password:'student@123',roll_number:'SCH-001',roll_no:'SCH-001',class_name:'Class 9 – Section A',class_id:'sch-c1',branch:'Main Campus',gender:'male',date_of_birth:'2011-05-12',guardian_name:'Ahmed Khan',guardian_phone:'+92-311-2233445',portal_type:'STUDENT',institute_type:'school',attendance:att1,fees:fees1,results:res1,timetable:tt,syllabus:schSyl },
-    teacher: { id:'sch-t1',first_name:'Rabia',last_name:'Naz',email:'teacher@school.edu',password:'teacher@123',phone:'+92-322-5544332',branch:'Main Campus',designation:'Senior Teacher',department:'Mathematics',joining_date:'2018-04-01',portal_type:'TEACHER',institute_type:'school',assigned_classes:[{ class_id:'sch-c1',class_name:'Class 9 – Section A',subjects:['Mathematics','Computer'],total_students:42 },{ class_id:'sch-c2',class_name:'Class 9 – Section B',subjects:['Mathematics'],total_students:40 }],notes:[{ id:'sn1',class_id:'sch-c1',class_name:'Class 9 – Section A',subject:'Mathematics',title:'Chapter 2: Linear Equations',description:'Complete notes on solving linear equations with examples.',file_type:'PDF',file_size:'1.1 MB',uploaded_on:'2026-02-22',teacher_id:'sch-t1',downloads:38 },{ id:'sn2',class_id:'sch-c1',class_name:'Class 9 – Section A',subject:'Mathematics',title:'Chapter 3: Geometry Basics',description:'Lines, angles and triangles with worked problems.',file_type:'PDF',file_size:'900 KB',uploaded_on:'2026-02-15',teacher_id:'sch-t1',downloads:30 }],assignments:[{ id:'sa1',class_id:'sch-c1',class_name:'Class 9 – Section A',subject:'Mathematics',title:'Linear Equations Practice',description:'Solve 15 problems from the worksheet.',due_date:'2026-03-06',assigned_on:'2026-02-27',total_marks:20,status:'active',submissions:35,total_students:42,teacher_id:'sch-t1' }],homework:[{ id:'sh1',class_id:'sch-c1',class_name:'Class 9 – Section A',subject:'Mathematics',date:'2026-02-27',title:'Revision: Chapters 1–2',description:'Revise chapters 1 and 2 for the upcoming test.',due_date:'2026-02-28',teacher_id:'sch-t1' },{ id:'sh2',class_id:'sch-c1',class_name:'Class 9 – Section A',subject:'Mathematics',date:'2026-02-26',title:'Practice Exercise 5',description:'Complete exercise 5 from textbook page 48.',due_date:'2026-02-27',teacher_id:'sch-t1' }],attendance_marked_today:false,stats:{ total_students:82,notes_uploaded:2,assignments_active:1,classes:2 } },
+    parent: { id:'parent-sch',name:'Ahmed Khan',email:'parent@school.edu',phone:'+92-311-2233445',occupation:'Engineer',address:'House 14, Johar Town, Lahore',relation:'Father',portal_type:'PARENT',institute_type:'school',children:[child1,child2] },
+    student: { id:'sch-s1',first_name:'Usman',last_name:'Ali',email:'student@school.edu',roll_number:'SCH-001',roll_no:'SCH-001',class_name:'Class 9 – Section A',class_id:'sch-c1',branch:'Main Campus',gender:'male',date_of_birth:'2011-05-12',guardian_name:'Ahmed Khan',guardian_phone:'+92-311-2233445',portal_type:'STUDENT',institute_type:'school',attendance:att1,fees:fees1,results:res1,timetable:tt,syllabus:schSyl },
+    teacher: { id:'sch-t1',first_name:'Rabia',last_name:'Naz',email:'teacher@school.edu',phone:'+92-322-5544332',branch:'Main Campus',designation:'Senior Teacher',department:'Mathematics',joining_date:'2018-04-01',portal_type:'TEACHER',institute_type:'school',assigned_classes:[{ class_id:'sch-c1',class_name:'Class 9 – Section A',subjects:['Mathematics','Computer'],total_students:42 },{ class_id:'sch-c2',class_name:'Class 9 – Section B',subjects:['Mathematics'],total_students:40 }],notes:[{ id:'sn1',class_id:'sch-c1',class_name:'Class 9 – Section A',subject:'Mathematics',title:'Chapter 2: Linear Equations',description:'Complete notes on solving linear equations with examples.',file_type:'PDF',file_size:'1.1 MB',uploaded_on:'2026-02-22',teacher_id:'sch-t1',downloads:38 },{ id:'sn2',class_id:'sch-c1',class_name:'Class 9 – Section A',subject:'Mathematics',title:'Chapter 3: Geometry Basics',description:'Lines, angles and triangles with worked problems.',file_type:'PDF',file_size:'900 KB',uploaded_on:'2026-02-15',teacher_id:'sch-t1',downloads:30 }],assignments:[{ id:'sa1',class_id:'sch-c1',class_name:'Class 9 – Section A',subject:'Mathematics',title:'Linear Equations Practice',description:'Solve 15 problems from the worksheet.',due_date:'2026-03-06',assigned_on:'2026-02-27',total_marks:20,status:'active',submissions:35,total_students:42,teacher_id:'sch-t1' }],homework:[{ id:'sh1',class_id:'sch-c1',class_name:'Class 9 – Section A',subject:'Mathematics',date:'2026-02-27',title:'Revision: Chapters 1–2',description:'Revise chapters 1 and 2 for the upcoming test.',due_date:'2026-02-28',teacher_id:'sch-t1' },{ id:'sh2',class_id:'sch-c1',class_name:'Class 9 – Section A',subject:'Mathematics',date:'2026-02-26',title:'Practice Exercise 5',description:'Complete exercise 5 from textbook page 48.',due_date:'2026-02-27',teacher_id:'sch-t1' }],attendance_marked_today:false,stats:{ total_students:82,notes_uploaded:2,assignments_active:1,classes:2 } },
   };
 })();
 
@@ -550,9 +544,9 @@ const _COACHING = (() => {
     { id:'syl-cch-3',name:'Mathematics',code:'MATH-ENT', class_id:'cch-c1',description:'Entry test mathematics for ECAT/NTS.',syllabus_type:'text',syllabus_content:'Module 1: Number Systems & Sets\nModule 2: Algebra & Functions\nModule 3: Trigonometry\nModule 4: Coordinate Geometry\nModule 5: Differentiation & Integration\nModule 6: Vectors & Matrices\nModule 7: Statistics & Probability\nModule 8: Practice MCQs',is_active:true },
   ];
   return {
-    parent: { id:'parent-cch',name:'Sara Ahmed',email:'parent@coaching.edu',password:'parent@123',phone:'+92-333-9988776',occupation:'Homemaker',address:'22 Model Town, Lahore',relation:'Mother',portal_type:'PARENT',institute_type:'coaching',children:[child1] },
-    student: { id:'cch-s1',first_name:'Bilal',last_name:'Hassan',email:'student@coaching.edu',password:'student@123',roll_number:'CCH-001',roll_no:'CCH-001',class_name:'Physics Batch A – Morning',class_id:'cch-c1',branch:'Main Center',gender:'male',date_of_birth:'2008-08-14',guardian_name:'Sara Ahmed',guardian_phone:'+92-333-9988776',portal_type:'STUDENT',institute_type:'coaching',attendance:att1,fees:fees1,results:res1,timetable:tt,syllabus:cchSyl },
-    teacher: { id:'cch-t1',first_name:'Imran',last_name:'Butt',email:'instructor@coaching.edu',password:'teacher@123',phone:'+92-300-7766554',branch:'Main Center',designation:'Senior Instructor',department:'Physics',joining_date:'2019-09-01',portal_type:'TEACHER',institute_type:'coaching',assigned_classes:[{ class_id:'cch-c1',class_name:'Physics Batch A – Morning',subjects:['Physics'],total_students:28 },{ class_id:'cch-c2',class_name:'Physics Batch B – Evening',subjects:['Physics'],total_students:32 }],notes:[{ id:'cn1',class_id:'cch-c1',class_name:'Physics Batch A',subject:'Physics',title:'Mechanics – Chapter 4 Notes',description:"Complete coverage of Newton's laws with solved problems.",file_type:'PDF',file_size:'1.5 MB',uploaded_on:'2026-02-21',teacher_id:'cch-t1',downloads:25 }],assignments:[{ id:'ca1',class_id:'cch-c1',class_name:'Physics Batch A',subject:'Physics',title:'Mechanics Practice Set 3',description:"Solve all problems from today's worksheet.",due_date:'2026-03-07',assigned_on:'2026-02-28',total_marks:25,status:'active',submissions:20,total_students:28,teacher_id:'cch-t1' }],homework:[{ id:'ch1',class_id:'cch-c1',class_name:'Physics Batch A',subject:'Physics',date:'2026-02-27',title:'Read Section 4.3',description:'Read section 4.3 and summarize key formulas.',due_date:'2026-02-28',teacher_id:'cch-t1' }],attendance_marked_today:false,stats:{ total_students:60,notes_uploaded:1,assignments_active:1,classes:2 } },
+    parent: { id:'parent-cch',name:'Sara Ahmed',email:'parent@coaching.edu',phone:'+92-333-9988776',occupation:'Homemaker',address:'22 Model Town, Lahore',relation:'Mother',portal_type:'PARENT',institute_type:'coaching',children:[child1] },
+    student: { id:'cch-s1',first_name:'Bilal',last_name:'Hassan',email:'student@coaching.edu',roll_number:'CCH-001',roll_no:'CCH-001',class_name:'Physics Batch A – Morning',class_id:'cch-c1',branch:'Main Center',gender:'male',date_of_birth:'2008-08-14',guardian_name:'Sara Ahmed',guardian_phone:'+92-333-9988776',portal_type:'STUDENT',institute_type:'coaching',attendance:att1,fees:fees1,results:res1,timetable:tt,syllabus:cchSyl },
+    teacher: { id:'cch-t1',first_name:'Imran',last_name:'Butt',email:'instructor@coaching.edu',phone:'+92-300-7766554',branch:'Main Center',designation:'Senior Instructor',department:'Physics',joining_date:'2019-09-01',portal_type:'TEACHER',institute_type:'coaching',assigned_classes:[{ class_id:'cch-c1',class_name:'Physics Batch A – Morning',subjects:['Physics'],total_students:28 },{ class_id:'cch-c2',class_name:'Physics Batch B – Evening',subjects:['Physics'],total_students:32 }],notes:[{ id:'cn1',class_id:'cch-c1',class_name:'Physics Batch A',subject:'Physics',title:'Mechanics – Chapter 4 Notes',description:"Complete coverage of Newton's laws with solved problems.",file_type:'PDF',file_size:'1.5 MB',uploaded_on:'2026-02-21',teacher_id:'cch-t1',downloads:25 }],assignments:[{ id:'ca1',class_id:'cch-c1',class_name:'Physics Batch A',subject:'Physics',title:'Mechanics Practice Set 3',description:"Solve all problems from today's worksheet.",due_date:'2026-03-07',assigned_on:'2026-02-28',total_marks:25,status:'active',submissions:20,total_students:28,teacher_id:'cch-t1' }],homework:[{ id:'ch1',class_id:'cch-c1',class_name:'Physics Batch A',subject:'Physics',date:'2026-02-27',title:'Read Section 4.3',description:'Read section 4.3 and summarize key formulas.',due_date:'2026-02-28',teacher_id:'cch-t1' }],attendance_marked_today:false,stats:{ total_students:60,notes_uploaded:1,assignments_active:1,classes:2 } },
   };
 })();
 
@@ -579,9 +573,9 @@ const _COLLEGE = (() => {
     { id:'syl-clg-6',name:'Urdu',       code:'URDU-11', class_id:'clg-c1',description:'FSc Part 1 Urdu language and literature.',syllabus_type:'text',syllabus_content:'نثر: افسانے اور مضامین\nنظم: غزلیں اور نظمیں\nسرگزشت: خودنوشت\nقواعد: جملہ سازی، محاورے\nمضمون نویسی\nخط نویسی',is_active:true },
   ];
   return {
-    parent: { id:'parent-clg',name:'Dr. Khalid Siddiqui',email:'parent@college.edu',password:'parent@123',phone:'+92-321-6677889',occupation:'Doctor',address:'8 Cantt View, Rawalpindi',relation:'Father',portal_type:'PARENT',institute_type:'college',children:[child1] },
-    student: { id:'clg-s1',first_name:'Zara',last_name:'Malik',email:'student@college.edu',password:'student@123',roll_number:'CLG-001',roll_no:'CLG-001',class_name:'FSc Year 1 – Section A',class_id:'clg-c1',branch:'Main Campus',gender:'female',date_of_birth:'2009-02-28',guardian_name:'Dr. Khalid Siddiqui',guardian_phone:'+92-321-6677889',portal_type:'STUDENT',institute_type:'college',attendance:att1,fees:fees1,results:res1,timetable:tt,syllabus:clgSyl },
-    teacher: { id:'clg-t1',first_name:'Tariq',last_name:'Mehmood',email:'lecturer@college.edu',password:'teacher@123',phone:'+92-315-4433221',branch:'Main Campus',designation:'Senior Lecturer',department:'Physics',joining_date:'2017-07-01',portal_type:'TEACHER',institute_type:'college',assigned_classes:[{ class_id:'clg-c1',class_name:'FSc Year 1 – Section A',subjects:['Physics'],total_students:55 },{ class_id:'clg-c2',class_name:'FSc Year 1 – Section B',subjects:['Physics'],total_students:52 }],notes:[{ id:'cln1',class_id:'clg-c1',class_name:'FSc Year 1 – Section A',subject:'Physics',title:'Chapter 3: Forces & Motion',description:'Lecture notes with diagrams and derivations.',file_type:'PDF',file_size:'1.8 MB',uploaded_on:'2026-02-23',teacher_id:'clg-t1',downloads:50 },{ id:'cln2',class_id:'clg-c1',class_name:'FSc Year 1 – Section A',subject:'Physics',title:'Chapter 4: Work, Power & Energy',description:'Key formulas, examples and exercise solutions.',file_type:'PDF',file_size:'1.3 MB',uploaded_on:'2026-02-18',teacher_id:'clg-t1',downloads:44 }],assignments:[{ id:'cla1',class_id:'clg-c1',class_name:'FSc Year 1 – Section A',subject:'Physics',title:'Forces & Motion Problems',description:'Solve the 10 assigned numericals from the textbook.',due_date:'2026-03-05',assigned_on:'2026-02-26',total_marks:30,status:'active',submissions:40,total_students:55,teacher_id:'clg-t1' }],homework:[{ id:'clh1',class_id:'clg-c1',class_name:'FSc Year 1 – Section A',subject:'Physics',date:'2026-02-27',title:'Derivation Practice',description:'Write derivations of all formulas from Chapter 3.',due_date:'2026-02-28',teacher_id:'clg-t1' }],attendance_marked_today:true,stats:{ total_students:107,notes_uploaded:2,assignments_active:1,classes:2 } },
+    parent: { id:'parent-clg',name:'Dr. Khalid Siddiqui',email:'parent@college.edu',phone:'+92-321-6677889',occupation:'Doctor',address:'8 Cantt View, Rawalpindi',relation:'Father',portal_type:'PARENT',institute_type:'college',children:[child1] },
+    student: { id:'clg-s1',first_name:'Zara',last_name:'Malik',email:'student@college.edu',roll_number:'CLG-001',roll_no:'CLG-001',class_name:'FSc Year 1 – Section A',class_id:'clg-c1',branch:'Main Campus',gender:'female',date_of_birth:'2009-02-28',guardian_name:'Dr. Khalid Siddiqui',guardian_phone:'+92-321-6677889',portal_type:'STUDENT',institute_type:'college',attendance:att1,fees:fees1,results:res1,timetable:tt,syllabus:clgSyl },
+    teacher: { id:'clg-t1',first_name:'Tariq',last_name:'Mehmood',email:'lecturer@college.edu',phone:'+92-315-4433221',branch:'Main Campus',designation:'Senior Lecturer',department:'Physics',joining_date:'2017-07-01',portal_type:'TEACHER',institute_type:'college',assigned_classes:[{ class_id:'clg-c1',class_name:'FSc Year 1 – Section A',subjects:['Physics'],total_students:55 },{ class_id:'clg-c2',class_name:'FSc Year 1 – Section B',subjects:['Physics'],total_students:52 }],notes:[{ id:'cln1',class_id:'clg-c1',class_name:'FSc Year 1 – Section A',subject:'Physics',title:'Chapter 3: Forces & Motion',description:'Lecture notes with diagrams and derivations.',file_type:'PDF',file_size:'1.8 MB',uploaded_on:'2026-02-23',teacher_id:'clg-t1',downloads:50 },{ id:'cln2',class_id:'clg-c1',class_name:'FSc Year 1 – Section A',subject:'Physics',title:'Chapter 4: Work, Power & Energy',description:'Key formulas, examples and exercise solutions.',file_type:'PDF',file_size:'1.3 MB',uploaded_on:'2026-02-18',teacher_id:'clg-t1',downloads:44 }],assignments:[{ id:'cla1',class_id:'clg-c1',class_name:'FSc Year 1 – Section A',subject:'Physics',title:'Forces & Motion Problems',description:'Solve the 10 assigned numericals from the textbook.',due_date:'2026-03-05',assigned_on:'2026-02-26',total_marks:30,status:'active',submissions:40,total_students:55,teacher_id:'clg-t1' }],homework:[{ id:'clh1',class_id:'clg-c1',class_name:'FSc Year 1 – Section A',subject:'Physics',date:'2026-02-27',title:'Derivation Practice',description:'Write derivations of all formulas from Chapter 3.',due_date:'2026-02-28',teacher_id:'clg-t1' }],attendance_marked_today:true,stats:{ total_students:107,notes_uploaded:2,assignments_active:1,classes:2 } },
   };
 })();
 
@@ -607,9 +601,9 @@ const _UNIVERSITY = (() => {
     { id:'syl-uni-5',name:'Discrete Mathematics',code:'CS-305',class_id:'uni-c1',description:'Mathematical foundations of computer science.',syllabus_type:'text',syllabus_content:'Week 1-2: Logic & Propositional Calculus\nWeek 3-4: Predicate Logic & Quantifiers\nWeek 5-6: Set Theory\nWeek 7-8: Relations & Functions\nWeek 9-10: Graph Theory\nWeek 11-12: Trees & Matrices\nWeek 13-14: Counting & Combinatorics\nWeek 15-16: Probability & Boolean Algebra',is_active:true },
   ];
   return {
-    parent: { id:'parent-uni',name:'Mrs. Farida Nawaz',email:'parent@uni.edu',password:'parent@123',phone:'+92-346-8899001',occupation:'Retired Teacher',address:'33 Shahrah-e-Faisal, Karachi',relation:'Mother',portal_type:'PARENT',institute_type:'university',children:[child1] },
-    student: { id:'uni-s1',first_name:'Hamza',last_name:'Nawaz',email:'student@uni.edu',password:'student@123',roll_number:'UNI-CS4-001',roll_no:'UNI-CS4-001',class_name:'BS-CS Semester 4',class_id:'uni-c1',branch:'Main Campus',gender:'male',date_of_birth:'2004-11-03',guardian_name:'Mrs. Farida Nawaz',guardian_phone:'+92-346-8899001',portal_type:'STUDENT',institute_type:'university',attendance:att1,fees:fees1,results:res1,timetable:tt,syllabus:uniSyl },
-    teacher: { id:'uni-t1',first_name:'Hassan',last_name:'Ali',email:'professor@uni.edu',password:'teacher@123',phone:'+92-301-2233444',branch:'Main Campus',designation:'Associate Professor',department:'Computer Science',joining_date:'2015-02-01',portal_type:'TEACHER',institute_type:'university',assigned_classes:[{ class_id:'uni-c1',class_name:'BS-CS Semester 4',subjects:['Data Structures'],total_students:65 },{ class_id:'uni-c2',class_name:'BS-SE Semester 4',subjects:['Data Structures','Algorithms'],total_students:55 }],notes:[{ id:'un1',class_id:'uni-c1',class_name:'BS-CS Semester 4',subject:'Data Structures',title:'Topic 5: Trees and Graphs',description:'Lecture slides covering BST, AVL trees and graph traversal.',file_type:'PDF',file_size:'2.5 MB',uploaded_on:'2026-02-24',teacher_id:'uni-t1',downloads:60 },{ id:'un2',class_id:'uni-c1',class_name:'BS-CS Semester 4',subject:'Data Structures',title:'Topic 6: Hashing',description:'Hash tables, collision resolution and complexity analysis.',file_type:'PDF',file_size:'1.6 MB',uploaded_on:'2026-02-17',teacher_id:'uni-t1',downloads:55 }],assignments:[{ id:'ua1',class_id:'uni-c1',class_name:'BS-CS Semester 4',subject:'Data Structures',title:'Assignment 3: BST Implementation',description:'Implement a Binary Search Tree in C++ with insert, delete, search and traversal.',due_date:'2026-03-10',assigned_on:'2026-02-25',total_marks:50,status:'active',submissions:38,total_students:65,teacher_id:'uni-t1' }],homework:[{ id:'uh1',class_id:'uni-c1',class_name:'BS-CS Semester 4',subject:'Data Structures',date:'2026-02-27',title:'Practice: Graph Traversal',description:'Trace BFS and DFS on the 5 graphs from the handout.',due_date:'2026-02-28',teacher_id:'uni-t1' }],attendance_marked_today:false,stats:{ total_students:120,notes_uploaded:2,assignments_active:1,classes:2 } },
+    parent: { id:'parent-uni',name:'Mrs. Farida Nawaz',email:'parent@uni.edu',phone:'+92-346-8899001',occupation:'Retired Teacher',address:'33 Shahrah-e-Faisal, Karachi',relation:'Mother',portal_type:'PARENT',institute_type:'university',children:[child1] },
+    student: { id:'uni-s1',first_name:'Hamza',last_name:'Nawaz',email:'student@uni.edu',roll_number:'UNI-CS4-001',roll_no:'UNI-CS4-001',class_name:'BS-CS Semester 4',class_id:'uni-c1',branch:'Main Campus',gender:'male',date_of_birth:'2004-11-03',guardian_name:'Mrs. Farida Nawaz',guardian_phone:'+92-346-8899001',portal_type:'STUDENT',institute_type:'university',attendance:att1,fees:fees1,results:res1,timetable:tt,syllabus:uniSyl },
+    teacher: { id:'uni-t1',first_name:'Hassan',last_name:'Ali',email:'professor@uni.edu',phone:'+92-301-2233444',branch:'Main Campus',designation:'Associate Professor',department:'Computer Science',joining_date:'2015-02-01',portal_type:'TEACHER',institute_type:'university',assigned_classes:[{ class_id:'uni-c1',class_name:'BS-CS Semester 4',subjects:['Data Structures'],total_students:65 },{ class_id:'uni-c2',class_name:'BS-SE Semester 4',subjects:['Data Structures','Algorithms'],total_students:55 }],notes:[{ id:'un1',class_id:'uni-c1',class_name:'BS-CS Semester 4',subject:'Data Structures',title:'Topic 5: Trees and Graphs',description:'Lecture slides covering BST, AVL trees and graph traversal.',file_type:'PDF',file_size:'2.5 MB',uploaded_on:'2026-02-24',teacher_id:'uni-t1',downloads:60 },{ id:'un2',class_id:'uni-c1',class_name:'BS-CS Semester 4',subject:'Data Structures',title:'Topic 6: Hashing',description:'Hash tables, collision resolution and complexity analysis.',file_type:'PDF',file_size:'1.6 MB',uploaded_on:'2026-02-17',teacher_id:'uni-t1',downloads:55 }],assignments:[{ id:'ua1',class_id:'uni-c1',class_name:'BS-CS Semester 4',subject:'Data Structures',title:'Assignment 3: BST Implementation',description:'Implement a Binary Search Tree in C++ with insert, delete, search and traversal.',due_date:'2026-03-10',assigned_on:'2026-02-25',total_marks:50,status:'active',submissions:38,total_students:65,teacher_id:'uni-t1' }],homework:[{ id:'uh1',class_id:'uni-c1',class_name:'BS-CS Semester 4',subject:'Data Structures',date:'2026-02-27',title:'Practice: Graph Traversal',description:'Trace BFS and DFS on the 5 graphs from the handout.',due_date:'2026-02-28',teacher_id:'uni-t1' }],attendance_marked_today:false,stats:{ total_students:120,notes_uploaded:2,assignments_active:1,classes:2 } },
   };
 })();
 
@@ -638,64 +632,3 @@ export const PORTAL_ALL_TEACHER_ASSIGNMENTS = [
 ];
 
 // ──────────────────────────────────────────────────────────────────────────────
-// 9 ▸ QUICK DEMO ACCOUNTS  (one per institute_type × portal_role)
-// ──────────────────────────────────────────────────────────────────────────────
-export const PORTAL_DEMO_ACCOUNTS = [
-  // ── School
-  { institute_type: 'school',     role: 'PARENT',  name: 'Ahmed Khan',          sub: 'Parent of Usman',           email: 'parent@school.edu',       password: 'parent@123'  },
-  { institute_type: 'school',     role: 'STUDENT', name: 'Usman Ali',           sub: 'Class 9 – Section A',       email: 'student@school.edu',      password: 'student@123' },
-  { institute_type: 'school',     role: 'TEACHER', name: 'Rabia Naz',           sub: 'Mathematics Teacher',        email: 'teacher@school.edu',      password: 'teacher@123' },
-  // ── Coaching
-  { institute_type: 'coaching',   role: 'PARENT',  name: 'Sara Ahmed',          sub: 'Parent of Bilal',           email: 'parent@coaching.edu',     password: 'parent@123'  },
-  { institute_type: 'coaching',   role: 'STUDENT', name: 'Bilal Hassan',        sub: 'Batch A – Morning',         email: 'student@coaching.edu',    password: 'student@123' },
-  { institute_type: 'coaching',   role: 'TEACHER', name: 'Imran Butt',          sub: 'Physics Instructor',        email: 'instructor@coaching.edu', password: 'teacher@123' },
-  // ── Academy  (maps to real full-data accounts)
-  { institute_type: 'academy',    role: 'PARENT',  name: 'Muhammad Raza',       sub: 'Parent of Ali & Fatima',    email: 'parent@tca.edu.pk',       password: 'parent@123'  },
-  { institute_type: 'academy',    role: 'STUDENT', name: 'Ali Raza',            sub: 'Class 1 – Section A',       email: 'ali@student.tca',         password: 'student@123' },
-  { institute_type: 'academy',    role: 'TEACHER', name: 'Hassan Mahmood',      sub: 'Maths & Science Teacher',   email: 'hassan@teacher.tca',      password: 'teacher@123' },
-  // ── College
-  { institute_type: 'college',    role: 'PARENT',  name: 'Dr. Khalid Siddiqui', sub: 'Parent of Zara',           email: 'parent@college.edu',      password: 'parent@123'  },
-  { institute_type: 'college',    role: 'STUDENT', name: 'Zara Malik',          sub: 'FSc Year 1',                email: 'student@college.edu',     password: 'student@123' },
-  { institute_type: 'college',    role: 'TEACHER', name: 'Tariq Mehmood',       sub: 'Physics Lecturer',          email: 'lecturer@college.edu',    password: 'teacher@123' },
-  // ── University
-  { institute_type: 'university', role: 'PARENT',  name: 'Mrs. Farida Nawaz',   sub: 'Parent of Hamza',          email: 'parent@uni.edu',          password: 'parent@123'  },
-  { institute_type: 'university', role: 'STUDENT', name: 'Hamza Nawaz',         sub: 'BS-CS Semester 4',          email: 'student@uni.edu',         password: 'student@123' },
-  { institute_type: 'university', role: 'TEACHER', name: 'Prof. Hassan Ali',    sub: 'Data Structures Professor', email: 'professor@uni.edu',       password: 'teacher@123' },
-];
-
-// ──────────────────────────────────────────────────────────────────────────────
-// 9 ▸ PORTAL LOGIN HELPER
-// ──────────────────────────────────────────────────────────────────────────────
-export function dummyPortalLogin({ email, password, type }) {
-  const em = email.trim().toLowerCase();
-
-  if (type === 'PARENT') {
-    const parent = DUMMY_PARENTS.find((p) => p.email.toLowerCase() === em && p.password === password);
-    if (parent) return { user: parent, portal_type: 'PARENT', institute_type: parent.institute_type || 'school', token: `portal-parent-${parent.id}` };
-  }
-  if (type === 'STUDENT') {
-    const student = DUMMY_STUDENT_PORTAL_USERS.find((s) => s.email.toLowerCase() === em && s.password === password);
-    if (student) return { user: student, portal_type: 'STUDENT', institute_type: student.institute_type || 'school', token: `portal-student-${student.id}` };
-  }
-  if (type === 'TEACHER') {
-    const teacher = DUMMY_TEACHER_PORTAL_USERS.find((t) => t.email.toLowerCase() === em && t.password === password);
-    if (teacher) return { user: teacher, portal_type: 'TEACHER', institute_type: teacher.institute_type || 'school', token: `portal-teacher-${teacher.id}` };
-  }
-
-  // Fallback — per-institute-type full demo data
-  const demo = PORTAL_DEMO_ACCOUNTS.find((a) => a.email.toLowerCase() === em && a.password === password && a.role === type);
-  if (demo) {
-    const instData = DEMO_INSTITUTE_DATA[demo.institute_type];
-    if (instData) {
-      const roleKey = demo.role === 'PARENT' ? 'parent' : demo.role === 'STUDENT' ? 'student' : 'teacher';
-      return {
-        user:           instData[roleKey],
-        portal_type:    demo.role,
-        institute_type: demo.institute_type,
-        token: `portal-${demo.role.toLowerCase()}-${demo.institute_type}`,
-      };
-    }
-  }
-
-  throw new Error('Invalid credentials. Check your email and password.');
-}

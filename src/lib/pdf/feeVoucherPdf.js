@@ -159,7 +159,182 @@ const buildFeeRows = (voucher) => {
 /**
  * Render 3 copies (Bank, School, Parent) on a single A4 page
  */
+/**
+ * Render 3 copies (Bank, School, Parent) side-by-side on an A4 Landscape page
+ */
+const renderVoucherLandscapePage = (doc, { voucher, student, instituteName, logoImg }) => {
+  const pageWidth = doc.internal.pageSize.getWidth();   // 297mm
+  const pageHeight = doc.internal.pageSize.getHeight(); // 210mm
+
+  const sectionWidth = 89;
+  const sectionHeight = 194;
+  const sectionGap = 6;
+  const startX = (pageWidth - (3 * sectionWidth + 2 * sectionGap)) / 2; // ~9mm
+  const sectionY = 8;
+
+  const { className, sectionName } = extractStudentMeta(voucher, student);
+  const studentName = voucher?.studentName || student?.name || 'Student';
+  const registrationNo = voucher?.registrationNo || voucher?.registration_no || student?.registrationNo || 'N/A';
+  const voucherNo = voucher?.voucherNumber || voucher?.voucher_number || voucher?.voucher_no || voucher?.id || 'N/A';
+  const dueDate = formatDate(voucher?.dueDate || voucher?.due_date);
+  const monthName = formatMonth(voucher);
+  const netAmount = Number(voucher?.net_amount || voucher?.netAmount || voucher?.amount || 0);
+  const safeAmount = isNaN(netAmount) ? 0 : netAmount;
+
+  const copies = ['BANK COPY', 'SCHOOL COPY', 'PARENT COPY'];
+
+  copies.forEach((copyTitle, index) => {
+    const colX = startX + index * (sectionWidth + sectionGap);
+
+    // 1. Border
+    doc.setDrawColor(200);
+    doc.setLineWidth(0.1);
+    doc.rect(colX, sectionY, sectionWidth, sectionHeight);
+
+    // 2. Header
+    let y = sectionY + 4;
+    if (logoImg) {
+      try {
+        doc.addImage(logoImg, 'PNG', colX + 4, y, 9, 9);
+      } catch (e) {}
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(30, 41, 59);
+    doc.text(instituteName.toUpperCase(), colX + (logoImg ? 16 : 4), y + 6);
+
+    y += 11;
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text('FEE VOUCHER', colX + 4, y);
+
+    // Copy Badge
+    doc.setFillColor(241, 245, 249);
+    doc.rect(colX + sectionWidth - 34, y - 4, 30, 5, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(copyTitle, colX + sectionWidth - 19, y - 0.5, { align: 'center' });
+
+    y += 4;
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.2);
+    doc.line(colX + 3, y, colX + sectionWidth - 3, y);
+    y += 4;
+
+    // 3. Info Block
+    doc.setFontSize(7);
+    doc.setTextColor(71, 85, 105);
+
+    // Line 1: Voucher No & Date
+    doc.setFont('helvetica', 'bold');
+    doc.text('Voucher #:', colX + 4, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(15, 23, 42);
+    doc.text(String(voucherNo), colX + 22, y);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(71, 85, 105);
+    doc.text('Due Date:', colX + 48, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(15, 23, 42);
+    doc.text(String(dueDate), colX + 64, y);
+    y += 4.5;
+
+    // Line 2: Student & Reg #
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(71, 85, 105);
+    doc.text('Student:', colX + 4, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(15, 23, 42);
+    doc.text(String(studentName).slice(0, 14), colX + 22, y);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(71, 85, 105);
+    doc.text('Reg #:', colX + 48, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(15, 23, 42);
+    doc.text(String(registrationNo), colX + 64, y);
+    y += 4.5;
+
+    // Line 3: Class & Month
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(71, 85, 105);
+    doc.text('Class:', colX + 4, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${className} - ${sectionName}`.slice(0, 13), colX + 22, y);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(71, 85, 105);
+    doc.text('Month:', colX + 48, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(15, 23, 42);
+    doc.text(String(monthName), colX + 64, y);
+    y += 5.5;
+
+    // 4. Breakdown Table
+    const feeRows = buildFeeRows(voucher);
+    autoTable(doc, {
+      startY: y,
+      margin: { left: colX + 3, right: pageWidth - (colX + sectionWidth - 3) },
+      tableWidth: sectionWidth - 6,
+      head: [['Description', 'Amount']],
+      body: feeRows,
+      theme: 'grid',
+      styles: { fontSize: 6.5, cellPadding: 1.5 },
+      headStyles: { fillColor: [51, 65, 85], textColor: 255, fontSize: 6.5 },
+      columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } }
+    });
+
+    const tableEnd = doc.lastAutoTable?.finalY || (y + 35);
+
+    // 5. Payable Box
+    const boxY = Math.max(tableEnd + 3, sectionY + sectionHeight - 34);
+    doc.setFillColor(248, 250, 252);
+    doc.rect(colX + 3, boxY, sectionWidth - 6, 12, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(colX + 3, boxY, sectionWidth - 6, 12, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(71, 85, 105);
+    doc.text('TOTAL PAYABLE:', colX + 6, boxY + 5);
+
+    doc.setFontSize(9.5);
+    doc.setTextColor(220, 38, 38);
+    doc.text(`PKR ${safeAmount.toFixed(2)}`, colX + sectionWidth - 6, boxY + 8, { align: 'right' });
+
+    // 6. Signatures
+    const sigY = sectionY + sectionHeight - 10;
+    doc.setDrawColor(200);
+    doc.line(colX + 6, sigY, colX + 36, sigY);
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139);
+    doc.text('Bank / Cashier Stamp', colX + 21, sigY + 3.5, { align: 'center' });
+
+    doc.line(colX + sectionWidth - 36, sigY, colX + sectionWidth - 6, sigY);
+    doc.text('Authorized Sign', colX + sectionWidth - 21, sigY + 3.5, { align: 'center' });
+
+    // 7. Dashed Cut Line between columns
+    if (index < 2) {
+      const cutX = colX + sectionWidth + (sectionGap / 2);
+      doc.setLineDash([2, 2]);
+      doc.setDrawColor(180);
+      doc.line(cutX, 4, cutX, pageHeight - 4);
+      doc.setLineDash([]);
+    }
+  });
+};
+
 const renderVoucherPage = (doc, { voucher, student, instituteName, logoImg }) => {
+  const isLandscape = doc.internal.pageSize.getWidth() > doc.internal.pageSize.getHeight();
+  if (isLandscape) {
+    return renderVoucherLandscapePage(doc, { voucher, student, instituteName, logoImg });
+  }
+
   const sectionWidth = 190;
   const sectionX = 10;
   const sectionHeight = 90; 
@@ -297,9 +472,10 @@ const renderVoucherPage = (doc, { voucher, student, instituteName, logoImg }) =>
 const renderCompactReceiptPage = (doc, { voucher, student, instituteName, logoImg }) => {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 12;
+  const isA6 = pageWidth <= 110;
+  const margin = isA6 ? 6 : 12;
   const contentWidth = pageWidth - (margin * 2);
-  let y = 14;
+  let y = isA6 ? 8 : 14;
 
   const { className, sectionName } = extractStudentMeta(voucher, student);
   const studentName = voucher?.studentName || student?.name || (student?.first_name ? `${student.first_name} ${student.last_name || ''}`.trim() : 'Student');
@@ -325,15 +501,16 @@ const renderCompactReceiptPage = (doc, { voucher, student, instituteName, logoIm
   // 1. Header: School's actual name at the top
   if (logoImg) {
     try {
-      doc.addImage(logoImg, 'PNG', (pageWidth / 2) - 6, y, 12, 12);
-      y += 15;
+      const logoSize = isA6 ? 8 : 12;
+      doc.addImage(logoImg, 'PNG', (pageWidth / 2) - (logoSize / 2), y, logoSize, logoSize);
+      y += isA6 ? 10 : 15;
     } catch (e) {
       y += 2;
     }
   }
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
+  doc.setFontSize(isA6 ? 10 : 13);
   doc.setTextColor(15, 23, 42);
   doc.text(instituteName.toUpperCase(), pageWidth / 2, y, { align: 'center' });
   y += 5;
@@ -498,17 +675,36 @@ const renderCompactReceiptPage = (doc, { voucher, student, instituteName, logoIm
 // EXPORTS
 // --------------------------------------------------------------------------------
 
-export const generateFeeVoucherPdfBlob = async ({ voucher, student, instituteName, logoUrl, voucherFormat, institute }) => {
+export const generateFeeVoucherPdfBlob = async ({ voucher, student, instituteName, logoUrl, voucherFormat, institute, pageSize, orientation }) => {
   const formatType = voucherFormat || getInstituteVoucherFormat(institute || { name: instituteName }, voucher);
   const logoImg = await loadLogo(logoUrl);
+  const rawSize = String(pageSize || voucher?.pageSize || voucher?.page_size || institute?.settings?.print_settings?.page_size || '').toUpperCase();
+  const isA6 = rawSize === 'A6' || formatType === 'a6';
+  const isA5 = rawSize === 'A5' || formatType === 'a5';
 
-  if (formatType === 'compact' || formatType === 'compact_receipt') {
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
+  const rawOrientation = String(
+    orientation ||
+    voucher?.orientation ||
+    institute?.settings?.print_settings?.orientation ||
+    institute?.print_settings?.orientation ||
+    'portrait'
+  ).toLowerCase();
+  const isLandscape = rawOrientation === 'landscape' || rawOrientation === 'l';
+  const pdfOrientation = isLandscape ? 'landscape' : 'portrait';
+
+  if (isA6) {
+    const doc = new jsPDF({ orientation: pdfOrientation, unit: 'mm', format: 'a6' });
     renderCompactReceiptPage(doc, { voucher, student, instituteName, logoImg });
     return doc.output('blob');
   }
 
-  const doc = new jsPDF();
+  if (formatType === 'compact' || formatType === 'compact_receipt' || isA5) {
+    const doc = new jsPDF({ orientation: pdfOrientation, unit: 'mm', format: 'a5' });
+    renderCompactReceiptPage(doc, { voucher, student, instituteName, logoImg });
+    return doc.output('blob');
+  }
+
+  const doc = new jsPDF({ orientation: pdfOrientation, unit: 'mm', format: rawSize === 'LETTER' ? 'letter' : 'a4' });
   renderVoucherPage(doc, { voucher, student, instituteName, logoImg });
   return doc.output('blob');
 };
@@ -531,14 +727,29 @@ export const generateAndDownloadFeeVoucherPdf = async ({ voucher, student, insti
   }
 };
 
-export const generateBulkFeeVouchersPdfBlob = async ({ vouchers, instituteName, logoUrl, voucherFormat, institute }) => {
+export const generateBulkFeeVouchersPdfBlob = async ({ vouchers, instituteName, logoUrl, voucherFormat, institute, pageSize, orientation }) => {
   const formatType = voucherFormat || (vouchers?.length > 0 ? getInstituteVoucherFormat(institute || { name: instituteName }, vouchers[0]) : 'three_part');
   const logoImg = await loadLogo(logoUrl);
 
-  const isCompact = formatType === 'compact' || formatType === 'compact_receipt';
-  const doc = isCompact
-    ? new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' })
-    : new jsPDF();
+  const rawSize = String(pageSize || institute?.settings?.print_settings?.page_size || '').toUpperCase();
+  const isA6 = rawSize === 'A6' || formatType === 'a6';
+  const isCompact = formatType === 'compact' || formatType === 'compact_receipt' || isA6;
+
+  const rawOrientation = String(
+    orientation ||
+    vouchers?.[0]?.orientation ||
+    institute?.settings?.print_settings?.orientation ||
+    institute?.print_settings?.orientation ||
+    'portrait'
+  ).toLowerCase();
+  const isLandscape = rawOrientation === 'landscape' || rawOrientation === 'l';
+  const pdfOrientation = isLandscape ? 'landscape' : 'portrait';
+
+  const doc = isA6
+    ? new jsPDF({ orientation: pdfOrientation, unit: 'mm', format: 'a6' })
+    : (isCompact 
+        ? new jsPDF({ orientation: pdfOrientation, unit: 'mm', format: 'a5' }) 
+        : new jsPDF({ orientation: pdfOrientation, unit: 'mm', format: rawSize === 'LETTER' ? 'letter' : 'a4' }));
 
   for (let i = 0; i < vouchers.length; i++) {
     if (i > 0) doc.addPage();
