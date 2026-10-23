@@ -1127,6 +1127,7 @@ const handleDownloadVoucher = async (voucher) => {
     
     let className = '';
     let sectionName = '';
+    let student = voucher.Student || voucher.student || null;
     
     // METHOD 1: Try to get from student record with full details
     const targetStudentId = voucher.studentId || voucher.student_id || voucher.Student?.id;
@@ -1136,7 +1137,8 @@ const handleDownloadVoucher = async (voucher) => {
         const studentResponse = await studentService.getById(targetStudentId, { 
           params: { institute_type: currentInstitute?.type, include: 'class,section' } 
         });
-        const student = studentResponse?.data || studentResponse;
+        const fetchedStudent = studentResponse?.data || studentResponse;
+        if (fetchedStudent) student = fetchedStudent;
         
         console.log('📚 Student data received for PDF:', student);
         
@@ -1250,6 +1252,7 @@ const handlePrintVoucher = async (voucher) => {
     
     let className = '';
     let sectionName = '';
+    let student = voucher.Student || voucher.student || null;
     
     // Try to get from student record with full details
     const targetStudentId = voucher.studentId || voucher.student_id || voucher.Student?.id;
@@ -1258,7 +1261,8 @@ const handlePrintVoucher = async (voucher) => {
         const studentResponse = await studentService.getById(targetStudentId, { 
           params: { institute_type: currentInstitute?.type, include: 'class,section' } 
         });
-        const student = studentResponse?.data || studentResponse;
+        const fetchedStudent = studentResponse?.data || studentResponse;
+        if (fetchedStudent) student = fetchedStudent;
         
         className = 
           student.class_name ||
