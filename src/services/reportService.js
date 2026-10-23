@@ -115,10 +115,12 @@ export const reportService = {
         data: reportData,
       };
     } catch (error) {
-      console.error("❌ Error fetching student report:", error);
+      if (error?.response?.status !== 403) {
+        console.error("❌ Error fetching student report:", error);
+      }
       return {
-        status: 500,
-        message: "Failed to fetch student report",
+        status: error?.response?.status || 500,
+        message: error?.response?.data?.message || "Failed to fetch student report",
         data: { records: [], summary: { total_records: 0, active_students: 0, inactive_students: 0 } },
       };
     }

@@ -532,7 +532,7 @@ export default function StudentsPage({ type }) {
   });
 
   // Fetch Stats using Report Service
-  const canViewStudentStats = canDo('reports.student') || canDo('reports.read') || canDo('students.read');
+  const canViewStudentStats = canDo('reports.student') || canDo('reports.read') || canDo('students.report');
   const { data: statsData, isLoading: isLoadingStats } = useQuery({
     queryKey: ['student-stats', type, academicYearId, classId, sectionId],
     queryFn: () => reportService.getStudentReport({
