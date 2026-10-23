@@ -16,6 +16,8 @@ export default function CompactFeeVoucher({
   feeStructure = [],
   instituteData = {},
   voucherMeta = {},
+  pageSize = null,
+  orientation = null,
   className = '',
 }) {
   const schoolName = instituteData.name || instituteData.institute_name || voucherMeta.instituteName || 'School Management System';
@@ -46,6 +48,9 @@ export default function CompactFeeVoucher({
   const monthLabel = voucherMeta.month || voucherMeta.monthLabel || voucherMeta.fee_month || 'N/A';
   const yearLabel = voucherMeta.year || (new Date().getFullYear());
   const monthPeriod = `${monthLabel} ${yearLabel}`.trim();
+  const resolvedPageSize = String(pageSize || voucherMeta?.pageSize || voucherMeta?.page_size || instituteData?.settings?.print_settings?.page_size || '').toUpperCase();
+  const resolvedOrientation = String(orientation || voucherMeta?.orientation || instituteData?.settings?.print_settings?.orientation || instituteData?.print_settings?.orientation || 'portrait').toLowerCase();
+  const isLandscape = resolvedOrientation === 'landscape' || resolvedOrientation === 'l';
 
   // Normalize fee items
   const feeRows = useMemo(() => {
@@ -101,8 +106,8 @@ export default function CompactFeeVoucher({
       className={`compact-fee-receipt fee-voucher-print-target bg-white text-slate-900 border border-slate-300 shadow-sm mx-auto p-4 ${className}`.trim()}
       style={{
         width: '100%',
-        maxWidth: '105mm',
-        minHeight: '140mm',
+        maxWidth: isLandscape ? (resolvedPageSize === 'A5' ? '210mm' : '148mm') : (resolvedPageSize === 'A5' ? '148mm' : '105mm'),
+        minHeight: isLandscape ? (resolvedPageSize === 'A5' ? '140mm' : '100mm') : '140mm',
         fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace, sans-serif',
         fontSize: '11px',
         lineHeight: '1.35',
@@ -251,7 +256,7 @@ export default function CompactFeeVoucher({
       <style jsx global>{`
         @media print {
           @page {
-            size: 80mm auto;
+            size: ${resolvedPageSize === 'A6' ? (isLandscape ? '148mm 105mm' : '105mm 148mm') : resolvedPageSize === 'A5' ? (isLandscape ? '210mm 148mm' : '148mm 210mm') : (isLandscape ? '148mm 105mm' : '80mm auto')};
             margin: 0mm;
           }
 

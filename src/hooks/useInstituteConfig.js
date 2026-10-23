@@ -16,6 +16,7 @@ import { useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import useAuthStore from '@/store/authStore';
 import { getInstituteConfig, getTypeFromPath } from '@/config/instituteConfig';
+import { isBranchAdmin as checkIsBranchAdmin, schoolHasBranches as checkSchoolHasBranches } from '@/lib/auth';
 
 export default function useInstituteConfig() {
   const user = useAuthStore((s) => s.user);
@@ -52,11 +53,10 @@ export function useTerm(key) {
  * Usage:
  *   const navItems = useInstituteNav();
  */
-import { isBranchAdmin as checkIsBranchAdmin, schoolHasBranches as checkSchoolHasBranches } from '@/lib/auth';
-
 export function useInstituteNav() {
   const { nav } = useInstituteConfig();
   const user = useAuthStore((s) => s.user);
+  const canDo = useAuthStore((s) => s.canDo);
 
   const filteredNav = useMemo(() => {
     if (!Array.isArray(nav)) return [];
@@ -76,9 +76,14 @@ export function useInstituteNav() {
         return false;
       }
 
+      // 3. Check permission for staff / limited users
+      if (item.permission && typeof canDo === 'function') {
+        if (!canDo(item.permission)) return false;
+      }
+
       return true;
     });
-  }, [nav, user]);
+  }, [nav, user, canDo]);
 
   return filteredNav;
 }

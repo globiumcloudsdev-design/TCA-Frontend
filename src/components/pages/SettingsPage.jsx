@@ -98,7 +98,10 @@ export default function SettingsPage() {
       twitter_url: currentSettings.twitter_url || '',
       linkedin_url: currentSettings.linkedin_url || '',
       youtube_url: currentSettings.youtube_url || '',
-      voucher_format: currentSettings.voucher_format || user?.institute?.settings?.print_settings?.voucher_format || user?.institute?.voucher_format || 'three_part'
+      voucher_format: currentSettings.voucher_format || user?.institute?.settings?.print_settings?.voucher_format || user?.institute?.voucher_format || 'three_part',
+      page_size: currentSettings.page_size || user?.institute?.settings?.print_settings?.page_size || 'A4',
+      orientation: currentSettings.orientation || user?.institute?.settings?.print_settings?.orientation || 'portrait',
+      printer_type: currentSettings.printer_type || user?.institute?.settings?.print_settings?.printer_type || 'regular'
     }
   });
 
@@ -121,7 +124,10 @@ export default function SettingsPage() {
       twitter_url: currentSettings.twitter_url || '',
       linkedin_url: currentSettings.linkedin_url || '',
       youtube_url: currentSettings.youtube_url || '',
-      voucher_format: currentSettings.voucher_format || user?.institute?.settings?.print_settings?.voucher_format || user?.institute?.voucher_format || 'three_part'
+      voucher_format: currentSettings.voucher_format || user?.institute?.settings?.print_settings?.voucher_format || user?.institute?.voucher_format || 'three_part',
+      page_size: currentSettings.page_size || user?.institute?.settings?.print_settings?.page_size || 'A4',
+      orientation: currentSettings.orientation || user?.institute?.settings?.print_settings?.orientation || 'portrait',
+      printer_type: currentSettings.printer_type || user?.institute?.settings?.print_settings?.printer_type || 'regular'
     });
   }, [currentInstituteName, currentSettings, user?.institute, generalReset]);
 
@@ -502,10 +508,48 @@ export default function SettingsPage() {
                         control={generalControl}
                         options={[
                           { value: 'three_part', label: 'Classic Three-Part Slip (Bank, School & Parent Copies - Full A4)' },
-                          { value: 'compact', label: 'Compact Receipt (Small Shop Receipt - Thermal / A5 Slip)' }
+                          { value: 'compact', label: 'Compact Receipt (Small Shop Receipt - Thermal / A5 / A6 Slip)' }
                         ]}
                         placeholder="Select layout"
                         hint="Choose whether fee vouchers default to a three-part slip or a compact shop receipt"
+                      />
+
+                      <SelectField
+                        label="Print Orientation"
+                        name="orientation"
+                        control={generalControl}
+                        options={[
+                          { value: 'portrait', label: 'Portrait (Vertical Layout)' },
+                          { value: 'landscape', label: 'Landscape (Horizontal Layout - Side by Side Copies)' }
+                        ]}
+                        placeholder="Select orientation"
+                        hint="Select page orientation for fee vouchers and receipts"
+                      />
+
+                      <SelectField
+                        label="Standard Page Size"
+                        name="page_size"
+                        control={generalControl}
+                        options={[
+                          { value: 'A4', label: 'A4 (210 x 297 mm)' },
+                          { value: 'A5', label: 'A5 (148 x 210 mm)' },
+                          { value: 'A6', label: 'A6 (105 x 148 mm)' },
+                          { value: 'Letter', label: 'Letter (8.5 x 11 in)' }
+                        ]}
+                        placeholder="Select page size"
+                        hint="Choose default paper size for vouchers"
+                      />
+
+                      <SelectField
+                        label="Printer Type"
+                        name="printer_type"
+                        control={generalControl}
+                        options={[
+                          { value: 'regular', label: 'Regular Laser / Inkjet Printer' },
+                          { value: 'thermal', label: 'Thermal POS Printer (80mm Roll)' }
+                        ]}
+                        placeholder="Select printer"
+                        hint="Thermal mode scales output for POS receipt printers"
                       />
                     </div>
                   </div>

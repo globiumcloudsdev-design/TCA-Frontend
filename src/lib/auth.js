@@ -200,30 +200,86 @@ export async function logoutUser({ redirectTo = '/login' } = {}) {
 
 // ── Permission check ──────────────────────────────────────────────────────
 /**
+ * Generate semantic variants for a permission check.
+ * Handles singular/plural module names, action aliases, and report inversions.
+ */
+export function getPermissionVariants(perm) {
+  if (!perm || typeof perm !== 'string') return [];
+  const variants = new Set([perm]);
+  const parts = perm.split('.');
+  if (parts.length === 2) {
+    const [mod, action] = parts;
+    const altMod = mod.endsWith('s') ? mod.slice(0, -1) : `${mod}s`;
+    variants.add(`${altMod}.${action}`);
+
+    const actionAliases = {
+      read: ['view', 'read', 'list'],
+      view: ['read', 'view', 'list'],
+      mark: ['create', 'mark'],
+      enter: ['create', 'enter'],
+      list: ['read', 'view', 'list'],
+      delete: ['delete', 'remove', 'destroy', 'bulk_actions'],
+    };
+
+    const actionsToCheck = [action, ...(actionAliases[action] || [])];
+    const modsToCheck = [mod, altMod];
+
+    for (const m of modsToCheck) {
+      for (const a of actionsToCheck) {
+        variants.add(`${m}.${a}`);
+      }
+      variants.add(`${m}.*`);
+      variants.add(`${m}.ALL`);
+      variants.add(`${m}.manage`);
+    }
+
+    if (mod === 'reports' || mod === 'report') {
+      variants.add(`${action}.report`);
+      variants.add(`${action}.reports`);
+      const altAction = action.endsWith('s') ? action.slice(0, -1) : `${action}s`;
+      variants.add(`${altAction}.report`);
+      variants.add(`${altAction}.reports`);
+    } else if (action === 'report' || action === 'reports') {
+      variants.add(`reports.${mod}`);
+      variants.add(`reports.${altMod}`);
+    }
+  }
+  return Array.from(variants);
+}
+
+/**
  * Check if the logged-in user has a given permission code.
  * @param {string[]} userPermissions  — array of permission codes from auth store
- * @param {string}   permissionCode   — e.g. 'student.create'
+ * @param {string}   permissionCode   — e.g. 'student.create' or 'students.read'
  * @param {boolean}  isMasterAdmin    — Master Admin bypasses all checks
  */
 export function hasPermission(userPermissions = [], permissionCode, isMasterAdmin = false) {
-  // Bypass all permissions
-  return true;
+  if (isMasterAdmin) return true;
+  if (!permissionCode) return true;
+  if (!Array.isArray(userPermissions)) return false;
+  if (userPermissions.includes('ALL') || userPermissions.includes('*')) return true;
+  if (userPermissions.includes(permissionCode)) return true;
+
+  const variants = getPermissionVariants(permissionCode);
+  return variants.some((v) => userPermissions.includes(v));
 }
 
 /**
  * Check multiple permissions (user must have ALL of them).
  */
 export function hasAllPermissions(userPermissions = [], permCodes = [], isMasterAdmin = false) {
-  // Bypass all permissions
-  return true;
+  if (isMasterAdmin) return true;
+  if (!Array.isArray(permCodes) || permCodes.length === 0) return true;
+  return permCodes.every((code) => hasPermission(userPermissions, code, isMasterAdmin));
 }
 
 /**
  * Check multiple permissions (user must have AT LEAST ONE).
  */
 export function hasAnyPermission(userPermissions = [], permCodes = [], isMasterAdmin = false) {
-  // Bypass all permissions
-  return true;
+  if (isMasterAdmin) return true;
+  if (!Array.isArray(permCodes) || permCodes.length === 0) return true;
+  return permCodes.some((code) => hasPermission(userPermissions, code, isMasterAdmin));
 }
 
 // ── Branch & Multi-Branch Access Control helpers ───────────────────────────
@@ -346,6 +402,12 @@ export function isBranchAdmin(user) {
   if (user.is_super_admin === true) return false;
 
   const userType = String(user.user_type || '').toUpperCase();
+
+  // Regular staff, teachers, students, parents are NEVER branch admins
+  if (['STAFF', 'TEACHER', 'STUDENT', 'PARENT'].includes(userType) && user.staff_type !== 'Branch Head') {
+    return false;
+  }
+
   if (
     userType === 'INSTITUTE_ADMIN' ||
     userType === 'SUPER_ADMIN' ||

@@ -93,24 +93,27 @@ export default function DashboardPage({ type }) {
   });
 
   // Fallback count queries — only run if primary dashboard is loaded and cached for 5 mins
+  const canViewStudentsFallback = canDo('students.read') || canDo('students.view');
   const { data: studentsFallbackData } = useQuery({
     queryKey: ['dashboard-fallback-students', type, branchFilter, userId, instituteId],
     queryFn: () => studentService.getAll({ limit: 1, branch_id: branchFilter }, type),
-    enabled: !!user?.id && !isLoading,
+    enabled: !!user?.id && !isLoading && canViewStudentsFallback,
     staleTime: 5 * 60 * 1000,
   });
 
+  const canViewTeachersFallback = canDo('teachers.read') || canDo('teachers.view');
   const { data: teachersFallbackData } = useQuery({
     queryKey: ['dashboard-fallback-teachers', type, branchFilter, userId, instituteId],
     queryFn: () => teacherService.getAll({ limit: 1, branch_id: branchFilter }),
-    enabled: !!user?.id && !isLoading,
+    enabled: !!user?.id && !isLoading && canViewTeachersFallback,
     staleTime: 5 * 60 * 1000,
   });
 
+  const canViewClassesFallback = canDo('classes.read') || canDo('classes.view');
   const { data: classesFallbackData } = useQuery({
     queryKey: ['dashboard-fallback-classes', type, branchFilter, userId, instituteId],
     queryFn: () => classService.getAll({ limit: 1, branch_id: branchFilter, institute_type: type }),
-    enabled: !!user?.id && !isLoading,
+    enabled: !!user?.id && !isLoading && canViewClassesFallback,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -410,6 +413,10 @@ export default function DashboardPage({ type }) {
     canViewFees,
   ]);
 
+  // Permission checks for stat card visibility
+  const canViewTeachers = canDo('teachers.read') || canDo('teachers.view');
+  const canViewClasses  = canDo('classes.read')  || canDo('classes.view');
+
   // Filter Stats based on permissions
   const stats = useMemo(() => {
     return rawStats.filter((stat) => {
@@ -419,9 +426,11 @@ export default function DashboardPage({ type }) {
       if (label.includes('student') || label.includes('enrollment') || label.includes((terms.student || '').toLowerCase())) return canViewStudents;
       if (label.includes('attendance')) return canViewAttendance;
       if (label.includes('leave')) return canDo('leaves.view');
-      return true; // Show others
+      if (label.includes('teacher') || label.includes((terms.teachers || 'teachers').toLowerCase())) return canViewTeachers;
+      if (label.includes('class') || label.includes((terms.primaryUnitPlural || 'classes').toLowerCase())) return canViewClasses;
+      return true;
     });
-  }, [rawStats, canViewFees, canViewExpenses, canViewStudents, canViewAttendance, canDo, terms.student]);
+  }, [rawStats, canViewFees, canViewExpenses, canViewStudents, canViewAttendance, canViewTeachers, canViewClasses, canDo, terms.student, terms.teachers, terms.primaryUnitPlural]);
 
   const quickActions = useMemo(() => {
     const actions = [];

@@ -1,3 +1,40 @@
+const DEFAULT_STAFF_PERMISSIONS = [
+    'dashboard.view',
+    'students.read',
+    'students.create',
+    'students.update',
+    'students.delete',
+    'students.export',
+    'admissions.read',
+    'admissions.create',
+    'admissions.update',
+    'parents.read',
+    'teachers.read',
+    'staff.read',
+    'classes.read',
+    'sections.read',
+    'subjects.read',
+    'timetable.read',
+    'attendance.view',
+    'attendance.mark',
+    'attendance.export',
+    'staff_attendance.view',
+    'fees.read',
+    'fees.create',
+    'fees.collect',
+    'fees.export',
+    'fee_templates.read',
+    'exams.read',
+    'exams.create',
+    'exams.update',
+    'exam_results.read',
+    'expenses.read',
+    'expenses.create',
+    'reports.read',
+    'notices.read',
+    'notices.create',
+    'events.read',
+];
 'use client';
 
 /**
@@ -277,7 +314,14 @@ export default function StaffManagementPage({ instituteType }) {
             : (Array.isArray(data?.rows) ? data.rows : []));
     const total = data?.pagination?.total ?? data?.total ?? data?.data?.total ?? (Array.isArray(staffMembers) ? staffMembers.length : 0);
     const totalPages = data?.pagination?.totalPages ?? data?.totalPages ?? 1;
-    const availableRoles = user?.permissions ?? [];
+        // Fetch available staff roles/permissions from API
+    const { data: availableRolesData } = useQuery({
+        queryKey: ['staff-available-roles'],
+        queryFn: () => staffService.getAvailableRoles().catch(() => []),
+    });
+    const availableRoles = (Array.isArray(user?.permissions) && user.permissions.length > 0 && !user.permissions.includes('ALL') && !user.permissions.includes('*'))
+        ? user.permissions
+        : DEFAULT_STAFF_PERMISSIONS;
 
     // Get default permissions
     const getDefaultPermissions = (staffType) => {
@@ -799,7 +843,13 @@ export default function StaffManagementPage({ instituteType }) {
     const activeCount = staffMembers.filter(s => s.is_active).length;
 
     // Get available permissions
-    const availablePermissions = availableRoles || [];
+    const staffTypeRole = Array.isArray(availableRolesData)
+        ? availableRolesData.find(r => r.type?.toLowerCase() === selectedStaffType?.toLowerCase() || r.name?.toLowerCase() === selectedStaffType?.toLowerCase())
+        : null;
+    const rolePermissions = staffTypeRole?.permissions;
+    const availablePermissions = (Array.isArray(rolePermissions) && rolePermissions.length > 0)
+        ? rolePermissions
+        : availableRoles;
 
     if (!mounted) return null;
 
