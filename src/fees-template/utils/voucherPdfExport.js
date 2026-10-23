@@ -64,10 +64,18 @@ export const saveCanvasAsPdf = (canvas, fileName, isCompact = false, pageSize = 
   const pageHeight = pdf.internal.pageSize.getHeight();
 
   if (isCompact) {
-    const targetWidth = Math.min(pageWidth - 10, isLandscape ? 140 : 105);
-    const targetHeight = (canvas.height * targetWidth) / canvas.width;
+    const maxWidth = pageWidth - 6;
+    const maxHeight = pageHeight - 6;
+    let targetWidth = maxWidth;
+    let targetHeight = (canvas.height * targetWidth) / canvas.width;
+
+    if (targetHeight > maxHeight) {
+      targetHeight = maxHeight;
+      targetWidth = (canvas.width * targetHeight) / canvas.height;
+    }
+
     const xOffset = Math.max(0, (pageWidth - targetWidth) / 2);
-    const yOffset = Math.max(4, (pageHeight - targetHeight) / 2);
+    const yOffset = Math.max(0, (pageHeight - targetHeight) / 2);
 
     pdf.addImage(imageData, 'PNG', xOffset, yOffset, targetWidth, targetHeight, undefined, 'FAST');
     pdf.save(fileName);

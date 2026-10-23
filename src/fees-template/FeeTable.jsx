@@ -70,6 +70,11 @@ export default function FeeTable({
 
   const totalAfterDue = netAmount + lateFee;
 
+  const payments = voucherMeta.payments || voucherMeta.FeePayments;
+  const paymentSum = Array.isArray(payments) && payments.length > 0
+    ? payments.reduce((sum, p) => sum + toNumber(p.amount_paid || p.amount), 0)
+    : 0;
+
   const paidAmount =
     voucherMeta.paidAmount !== undefined && voucherMeta.paidAmount !== null
       ? toNumber(voucherMeta.paidAmount)
@@ -77,9 +82,11 @@ export default function FeeTable({
         ? toNumber(voucherMeta.paid_amount)
         : voucherMeta.amount_paid !== undefined && voucherMeta.amount_paid !== null
           ? toNumber(voucherMeta.amount_paid)
-          : String(voucherMeta.status || '').toLowerCase() === 'paid'
-            ? netAmount
-            : 0;
+          : paymentSum > 0
+            ? paymentSum
+            : String(voucherMeta.status || voucherMeta.feeStatus || '').toLowerCase() === 'paid'
+              ? netAmount
+              : 0;
 
   const remainingBalance = Math.max(0, netAmount - paidAmount);
 
@@ -161,6 +168,15 @@ export default function FeeTable({
               <td className="px-2 py-[2px] font-semibold text-emerald-800">Paid Amount:</td>
               <td className="px-2 py-[2px] text-right font-mono font-bold text-emerald-700">
                 PKR {fmtAmount(paidAmount)}
+              </td>
+            </tr>
+          )}
+
+          {paidAmount === 0 && (
+            <tr className="border-b bg-rose-50/50 text-[9px]" style={{ borderColor: '#e2e8f0' }}>
+              <td className="px-2 py-[2px] font-semibold text-rose-700">Payment Status:</td>
+              <td className="px-2 py-[2px] text-right font-mono font-bold text-rose-700 uppercase">
+                UNPAID (Pending)
               </td>
             </tr>
           )}

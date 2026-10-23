@@ -1173,14 +1173,14 @@ const handleDownloadVoucher = async (voucher) => {
     const { classNameById, sectionNameById } = buildClassSectionMaps();
     
     // Final check for class
-    const cid = voucher.classId || voucher.class_id;
-    if (cid && (!className || className === '')) {
+    const cid = voucher.classId || voucher.class_id || student?.details?.studentDetails?.class_id || student?.details?.active_session?.class_id || student?.class_id;
+    if (cid && (!className || className === '' || className === 'N/A')) {
       className = classNameById.get(String(cid)) || normalizeDisplayValue(voucher.className || voucher.class_name);
     }
     
     // Final check for section
-    const sid = voucher.sectionId || voucher.section_id;
-    if (sid && (!sectionName || sectionName === '')) {
+    const sid = voucher.sectionId || voucher.section_id || student?.details?.studentDetails?.section_id || student?.details?.active_session?.section_id || student?.section_id;
+    if (sid && (!sectionName || sectionName === '' || sectionName === 'N/A')) {
       sectionName = sectionNameById.get(String(sid)) || normalizeDisplayValue(voucher.sectionName || voucher.section_name);
     }
     
@@ -1286,13 +1286,13 @@ const handlePrintVoucher = async (voucher) => {
     
     const { classNameById, sectionNameById } = buildClassSectionMaps();
     
-    const cid = voucher.classId || voucher.class_id;
-    if (cid && (!className || className === '')) {
+    const cid = voucher.classId || voucher.class_id || student?.details?.studentDetails?.class_id || student?.details?.active_session?.class_id || student?.class_id;
+    if (cid && (!className || className === '' || className === 'N/A')) {
       className = classNameById.get(String(cid)) || normalizeDisplayValue(voucher.className || voucher.class_name);
     }
     
-    const sid = voucher.sectionId || voucher.section_id;
-    if (sid && (!sectionName || sectionName === '')) {
+    const sid = voucher.sectionId || voucher.section_id || student?.details?.studentDetails?.section_id || student?.details?.active_session?.section_id || student?.section_id;
+    if (sid && (!sectionName || sectionName === '' || sectionName === 'N/A')) {
       sectionName = sectionNameById.get(String(sid)) || normalizeDisplayValue(voucher.sectionName || voucher.section_name);
     }
     

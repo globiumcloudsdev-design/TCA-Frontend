@@ -65,19 +65,51 @@ const formatFeeType = (type) => {
  * Robust extraction of class and section names
  */
 const extractStudentMeta = (voucher, student) => {
-  let className = voucher?.className || voucher?.class_name || student?.className || student?.class_name || 'N/A';
-  let sectionName = voucher?.sectionName || voucher?.section_name || student?.sectionName || student?.section_name || 'N/A';
-
   const clean = (val) => {
-    if (!val) return 'N/A';
+    if (!val) return '';
     const s = String(val).trim();
-    if (s.toLowerCase() === 'n/a' || s.toLowerCase() === 'undefined' || s === '') return 'N/A';
+    if (/^n\/?a$/i.test(s) || /^undefined$/i.test(s) || /^null$/i.test(s) || s === '—') return '';
     return s;
   };
 
+  const activeStudent = student || voucher?.student || voucher?.Student || {};
+  const studentDetails = activeStudent?.details?.studentDetails || activeStudent?.details || {};
+  const activeSession = activeStudent?.details?.active_session || studentDetails?.active_session || (Array.isArray(activeStudent?.details?.academic_history) && activeStudent?.details?.academic_history[0]) || {};
+
+  const rawClass =
+    voucher?.className ||
+    voucher?.class_name ||
+    voucher?.class ||
+    voucher?.fee_breakdown?.class_name ||
+    activeStudent?.className ||
+    activeStudent?.class_name ||
+    activeStudent?.class ||
+    activeStudent?.Class?.name ||
+    studentDetails?.class_name ||
+    activeSession?.class_name ||
+    '';
+
+  const rawSection =
+    voucher?.sectionName ||
+    voucher?.section_name ||
+    voucher?.section ||
+    voucher?.fee_breakdown?.section_name ||
+    activeStudent?.sectionName ||
+    activeStudent?.section_name ||
+    activeStudent?.section ||
+    activeStudent?.Section?.name ||
+    studentDetails?.section_name ||
+    activeSession?.section_name ||
+    '';
+
+  const cClass = clean(rawClass);
+  const cSection = clean(rawSection);
+  const display = cClass && cSection ? `${cClass} - ${cSection}` : cClass || cSection || 'General';
+
   return {
-    className: clean(className),
-    sectionName: clean(sectionName)
+    className: cClass || 'General',
+    sectionName: cSection || 'General',
+    classAndSection: display
   };
 };
 
@@ -172,7 +204,7 @@ const renderVoucherLandscapePage = (doc, { voucher, student, instituteName, logo
   const startX = (pageWidth - (3 * sectionWidth + 2 * sectionGap)) / 2; // ~9mm
   const sectionY = 8;
 
-  const { className, sectionName } = extractStudentMeta(voucher, student);
+  const { className, sectionName, classAndSection } = extractStudentMeta(voucher, student);
   const studentName = voucher?.studentName || student?.name || 'Student';
   const registrationNo = voucher?.registrationNo || voucher?.registration_no || student?.registrationNo || 'N/A';
   const voucherNo = voucher?.voucherNumber || voucher?.voucher_number || voucher?.voucher_no || voucher?.id || 'N/A';
@@ -490,8 +522,14 @@ const renderCompactReceiptPage = (doc, { voucher, student, instituteName, logoIm
   const netAmount = Number(voucher?.net_amount ?? voucher?.netAmount ?? voucher?.amount ?? 0);
   const safeTotal = netAmount > 0 ? netAmount : Math.max(0, baseAmount - discount + arrears);
   
-  const paidAmount = Number(voucher?.paid_amount ?? voucher?.paidAmount ?? voucher?.amount_paid ?? (String(voucher?.status).toLowerCase() === 'paid' ? safeTotal : 0));
+  const payments = voucher?.payments || voucher?.FeePayments || [];
+  const paymentSum = Array.isArray(payments) && payments.length > 0
+    ? payments.reduce((sum, p) => sum + Number(p.amount_paid || p.amount || 0), 0)
+    : 0;
+  const rawPaid = voucher?.paid_amount ?? voucher?.paidAmount ?? voucher?.amount_paid ?? (paymentSum > 0 ? paymentSum : (String(voucher?.status).toLowerCase() === 'paid' ? safeTotal : 0));
+  const paidAmount = Number(rawPaid);
   const remainingBalance = Number(voucher?.pending_amount ?? voucher?.remaining_amount ?? Math.max(0, safeTotal - paidAmount));
+  const isUnpaid = paidAmount === 0;
 
   // Outer border / frame for receipt
   doc.setDrawColor(203, 213, 225);
@@ -565,7 +603,7 @@ const renderCompactReceiptPage = (doc, { voucher, student, instituteName, logoIm
   doc.text('Class & Section:', margin, y);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(15, 23, 42);
-  doc.text(`${className} - ${sectionName}`, margin + 28, y);
+  doc.text(String(classAndSection), margin + 28, y);
 
   if (registrationNo && registrationNo !== 'N/A') {
     doc.setFont('helvetica', 'bold');
@@ -630,13 +668,22 @@ const renderCompactReceiptPage = (doc, { voucher, student, instituteName, logoIm
   doc.text(`PKR ${safeTotal.toFixed(2)}`, pageWidth - margin, y, { align: 'right' });
   y += 5.5;
 
-  // Amount Paid Today
-  doc.setFillColor(240, 253, 244);
-  doc.rect(margin, y - 4, contentWidth, 6, 'F');
-  doc.setTextColor(21, 128, 61);
-  doc.text('Amount Paid:', margin + 2, y);
-  doc.text(`PKR ${paidAmount.toFixed(2)}`, pageWidth - margin - 2, y, { align: 'right' });
-  y += 8;
+  // Amount Paid or Unpaid Status
+  if (paidAmount > 0) {
+    doc.setFillColor(240, 253, 244);
+    doc.rect(margin, y - 4, contentWidth, 6, 'F');
+    doc.setTextColor(21, 128, 61);
+    doc.text('Amount Paid:', margin + 2, y);
+    doc.text(`PKR ${paidAmount.toFixed(2)}`, pageWidth - margin - 2, y, { align: 'right' });
+    y += 7.5;
+  } else {
+    doc.setFillColor(255, 241, 242);
+    doc.rect(margin, y - 4, contentWidth, 6, 'F');
+    doc.setTextColor(225, 29, 72);
+    doc.text('Payment Status:', margin + 2, y);
+    doc.text('UNPAID (Pending)', pageWidth - margin - 2, y, { align: 'right' });
+    y += 7.5;
+  }
 
   // 5. Unpaid Balance Section (Small, separate area showing remaining unpaid balance)
   doc.setFillColor(248, 250, 252);
@@ -658,11 +705,12 @@ const renderCompactReceiptPage = (doc, { voucher, student, instituteName, logoIm
   }
   y += 18;
 
-  // 6. Footer (Exact text: Powered by TCA The Clouds Academy | 03352778488)
-  const footerY = pageHeight - 12;
+  // 6. Footer (Guaranteed no overlap: dynamic placement below y)
+  const minFooterY = y + 7;
+  const footerY = Math.max(minFooterY, pageHeight - 10);
   doc.setLineDash([1, 1]);
   doc.setDrawColor(148, 163, 184);
-  doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
+  doc.line(margin, footerY - 3, pageWidth - margin, footerY - 3);
   doc.setLineDash([]);
 
   doc.setFontSize(7.5);
