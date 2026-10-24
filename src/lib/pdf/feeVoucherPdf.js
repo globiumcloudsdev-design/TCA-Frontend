@@ -296,7 +296,7 @@ const renderVoucherLandscapePage = (doc, { voucher, student, instituteName, logo
     doc.text('Class:', colX + 4, y);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(15, 23, 42);
-    doc.text(`${className} - ${sectionName}`.slice(0, 13), colX + 22, y);
+    doc.text(String(classAndSection || `${className} - ${sectionName}`).slice(0, 15), colX + 22, y);
 
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(71, 85, 105);
@@ -372,7 +372,7 @@ const renderVoucherPage = (doc, { voucher, student, instituteName, logoImg }) =>
   const sectionHeight = 90; 
   const sectionGap = 4;
   
-  const { className, sectionName } = extractStudentMeta(voucher, student);
+  const { className, sectionName, classAndSection } = extractStudentMeta(voucher, student);
   const studentName = voucher?.studentName || student?.name || 'Student';
   const registrationNo = voucher?.registrationNo || voucher?.registration_no || student?.registrationNo || 'N/A';
   const voucherNo = voucher?.voucherNumber || voucher?.voucher_number || voucher?.voucher_no || voucher?.id || 'N/A';
@@ -433,7 +433,7 @@ const renderVoucherPage = (doc, { voucher, student, instituteName, logoImg }) =>
     doc.setFont('helvetica', 'bold');
     doc.text('Class:', sectionX + 135, sectionY + 22);
     doc.setFont('helvetica', 'normal');
-    doc.text(String(className), sectionX + 148, sectionY + 22);
+    doc.text(String(classAndSection || className), sectionX + 148, sectionY + 22);
 
     // Row 2
     doc.setFont('helvetica', 'bold');
@@ -509,7 +509,7 @@ const renderCompactReceiptPage = (doc, { voucher, student, instituteName, logoIm
   const contentWidth = pageWidth - (margin * 2);
   let y = isA6 ? 8 : 14;
 
-  const { className, sectionName } = extractStudentMeta(voucher, student);
+  const { className, sectionName, classAndSection } = extractStudentMeta(voucher, student);
   const studentName = voucher?.studentName || student?.name || (student?.first_name ? `${student.first_name} ${student.last_name || ''}`.trim() : 'Student');
   const registrationNo = voucher?.registrationNo || voucher?.registration_no || student?.registrationNo || student?.registration_no || null;
   const voucherNo = voucher?.voucherNumber || voucher?.voucher_number || voucher?.voucher_no || voucher?.id || 'N/A';
@@ -817,7 +817,7 @@ export const generateFeeReceiptPdfBlob = async ({ payment, voucher, instituteNam
   const doc = new jsPDF();
   const logoImg = await loadLogo(logoUrl);
 
-  const { className, sectionName } = extractStudentMeta(voucher, null);
+  const { className, sectionName, classAndSection } = extractStudentMeta(voucher, null);
   const studentName = voucher?.studentName || 'N/A';
   const registrationNo = voucher?.registrationNo || 'N/A';
 
@@ -872,7 +872,7 @@ export const generateFeeReceiptPdfBlob = async ({ payment, voucher, instituteNam
   doc.setFont('helvetica', 'bold');
   doc.text('Class:', 20, currentY);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${className} - ${sectionName}`, 45, currentY);
+  doc.text(String(classAndSection || `${className} - ${sectionName}`), 45, currentY);
 
   currentY += 15;
 
