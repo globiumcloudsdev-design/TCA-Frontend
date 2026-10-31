@@ -22,7 +22,7 @@ import {
   setAccessToken
 } from './auth';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api/v1';
 
 const api = axios.create({
   baseURL: BASE_URL,

@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
 import { isBranchAdmin as checkIsBranchAdmin, getAssignedBranch } from '@/lib/auth';
-import { branchService } from '@/services';
+import { branchService, classService } from '@/services';
 import { resolveBranchName, registerBranches } from '@/lib/branchUtils';
 import { DUMMY_FLAT_STUDENTS } from '@/data/dummyData';
 
@@ -77,7 +77,7 @@ function SectionCard({ icon: Icon, title, children }) {
 }
 
 // ─── type-specific academic fields ──────────────────────────────────────────
-function AcademicFields({ type, form, onChange, terms, isSuperAdmin, branchOptions, branchError }) {
+function AcademicFields({ type, form, onChange, terms, isSuperAdmin, branchOptions, branchError, classOptions = [], sectionOptions = [] }) {
   const baseSelect = (name, label, options, required, error) => (
     <FormField key={name} label={label} required={required} hint={error}>
       <Select name={name} value={form[name] ?? ''} onChange={onChange} className={error ? 'border-red-500' : ''}>
@@ -96,15 +96,8 @@ function AcademicFields({ type, form, onChange, terms, isSuperAdmin, branchOptio
   if (type === 'school') return (
     <>
       {branchField}
-      {baseSelect('class_id', terms?.class ?? 'Class', [
-        { value: 'cls-1', label: 'Class 1' }, { value: 'cls-2', label: 'Class 2' },
-        { value: 'cls-3', label: 'Class 3' }, { value: 'cls-4', label: 'Class 4' },
-        { value: 'cls-5', label: 'Class 5' }, { value: 'cls-6', label: 'Class 6' },
-        { value: 'cls-7', label: 'Class 7' }, { value: 'cls-8', label: 'Class 8' },
-      ], true)}
-      {baseSelect('section_id', terms?.section ?? 'Section', [
-        { value: 'sec-a', label: 'Section A' }, { value: 'sec-b', label: 'Section B' }, { value: 'sec-c', label: 'Section C' },
-      ], false)}
+      {baseSelect('class_id', terms?.class ?? 'Class', classOptions, true)}
+      {baseSelect('section_id', terms?.section ?? 'Section', sectionOptions, false)}
       <FormField label="Roll Number">
         <Input name="roll_number" value={form.roll_number ?? ''} onChange={onChange} placeholder="e.g. TCA-001" />
       </FormField>
@@ -302,6 +295,34 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
   const isEdit = mode === 'edit';
   const studentLabel = terms?.student ?? (type === 'coaching' ? 'Candidate' : type === 'academy' ? 'Trainee' : 'Student');
 
+  // ── Fetch Classes & Sections ───────────────────────────────────────────────
+  const effectiveBranchId = form.branch_id || (isBranchAdmin ? (assignedBranch?.id || user?.branch_id) : undefined);
+  const { data: classesData } = useQuery({
+    queryKey: ['classes-add-edit', effectiveBranchId, type],
+    queryFn: () => classService.getAll({ branch_id: effectiveBranchId || undefined, institute_type: type, limit: 500, fetchAll: true }),
+  });
+
+  const rawClasses = useMemo(() => {
+    const data = classesData?.data || classesData;
+    const list = data?.rows || (Array.isArray(data) ? data : []);
+    return Array.isArray(list) ? list : [];
+  }, [classesData]);
+
+  const classOptions = useMemo(() => {
+    return rawClasses.map(c => ({ value: String(c.id), label: c.name }));
+  }, [rawClasses]);
+
+  const selectedClass = useMemo(() => {
+    return rawClasses.find(c => String(c.id) === String(form.class_id));
+  }, [rawClasses, form.class_id]);
+
+  const sectionOptions = useMemo(() => {
+    if (!selectedClass || !Array.isArray(selectedClass.sections)) return [];
+    return selectedClass.sections
+      .filter(s => s && s.is_active !== false)
+      .map(s => ({ value: String(s.id), label: s.name || s.section_name }));
+  }, [selectedClass]);
+
   // ── Fetch existing student if editing ──────────────────────────────────────
   const { isLoading: fetching } = useQuery({
     queryKey: ['student-edit', type, id],
@@ -360,7 +381,14 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    mutation.mutate(form);
+
+    const selectedSec = selectedClass?.sections?.find(s => String(s.id) === String(form.section_id));
+    const submitPayload = {
+      ...form,
+      class_name: selectedClass?.name || form.class_name || '',
+      section_name: selectedSec?.name || selectedSec?.section_name || form.section_name || '',
+    };
+    mutation.mutate(submitPayload);
   };
 
   if (isEdit && fetching) {
@@ -458,6 +486,8 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
           isSuperAdmin={isSuperAdmin}
           branchOptions={branchOptions}
           branchError={errors.branch_id}
+          classOptions={classOptions}
+          sectionOptions={sectionOptions}
         />
       </SectionCard>
 
