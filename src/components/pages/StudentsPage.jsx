@@ -307,6 +307,108 @@ export default function StudentsPage({ type }) {
     return selectedClass?.sections || [];
   }, [classId, rawClassesList]);
 
+  // Lookup maps to accurately resolve class and section names
+  const { classMap, sectionMap, classSectionsMap } = useMemo(() => {
+    const cMap = new Map();
+    const sMap = new Map();
+    const csMap = new Map();
+
+    rawClassesList.forEach((cls) => {
+      if (!cls) return;
+      const cid = String(cls.id);
+      if (cls.name) cMap.set(cid, cls.name);
+
+      const secs = Array.isArray(cls.sections) ? cls.sections : [];
+      csMap.set(cid, secs);
+
+      secs.forEach((sec) => {
+        const sid = String(sec?.id || sec?.section_id || '');
+        const sName = sec?.name || sec?.section_name;
+        if (sid && sName) {
+          sMap.set(sid, sName);
+          sMap.set(`${cid}_${sid}`, sName);
+        }
+      });
+    });
+
+    return { classMap: cMap, sectionMap: sMap, classSectionsMap: csMap };
+  }, [rawClassesList]);
+
+  // Dynamic resolver for section name (ensures custom names like Lotus, Sunflower are never overridden with defaults)
+  const resolveStudentSectionName = useMemo(() => {
+    return (s) => {
+      if (!s) return '—';
+      const classId = String(s.class_id || s.details?.studentDetails?.class_id || s.active_session?.class_id || '');
+      const sectionId = String(s.section_id || s.details?.studentDetails?.section_id || s.active_session?.section_id || '');
+
+      // 1. Direct match by section_id in sectionMap
+      if (sectionId && sectionMap.has(sectionId)) {
+        return sectionMap.get(sectionId);
+      }
+      // 2. Direct match by classId + sectionId
+      if (classId && sectionId && sectionMap.has(`${classId}_${sectionId}`)) {
+        return sectionMap.get(`${classId}_${sectionId}`);
+      }
+
+      // 3. Match within class's sections list
+      if (classId && classSectionsMap.has(classId)) {
+        const classSecs = classSectionsMap.get(classId) || [];
+        if (classSecs.length > 0) {
+          // Match by section id
+          const matchedById = classSecs.find(sec => String(sec.id || sec.section_id) === sectionId);
+          if (matchedById) {
+            return matchedById.name || matchedById.section_name;
+          }
+
+          // Match by raw section name/string (e.g. Lotus, Sunflower, or legacy A/B)
+          const rawSec = s.section_name || s.section?.name || s.details?.studentDetails?.section_name || (typeof s.section === 'string' ? s.section : '');
+          if (rawSec) {
+            const matchedByName = classSecs.find(sec => (sec.name || '').trim().toLowerCase() === String(rawSec).trim().toLowerCase());
+            if (matchedByName) {
+              return matchedByName.name;
+            }
+
+            // If the class has custom sections (none named 'A' or 'B') and student has default 'A' or 'B':
+            const hasAorB = classSecs.some(sec => ['a', 'b'].includes(String(sec.name || '').trim().toLowerCase()));
+            if (!hasAorB) {
+              if (String(rawSec).trim().toUpperCase() === 'A' && classSecs[0]) {
+                return classSecs[0].name || classSecs[0].section_name;
+              }
+              if (String(rawSec).trim().toUpperCase() === 'B' && classSecs[1]) {
+                return classSecs[1].name || classSecs[1].section_name;
+              }
+            }
+          }
+        }
+      }
+
+      // 4. Fallback to student properties
+      if (s.section?.name) return s.section.name;
+      if (s.Section?.name) return s.Section.name;
+      if (s.section_name) return s.section_name;
+      if (s.details?.studentDetails?.section_name) return s.details.studentDetails.section_name;
+      if (typeof s.section === 'string' && s.section && s.section.length < 50) return s.section;
+
+      return '—';
+    };
+  }, [sectionMap, classSectionsMap]);
+
+  // Dynamic resolver for class name
+  const resolveStudentClassName = useMemo(() => {
+    return (s) => {
+      if (!s) return '—';
+      const classId = String(s.class_id || s.details?.studentDetails?.class_id || s.active_session?.class_id || '');
+      if (classId && classMap.has(classId)) {
+        return classMap.get(classId);
+      }
+      if (s.class?.name) return s.class.name;
+      if (s.Class?.name) return s.Class.name;
+      if (s.class_name) return s.class_name;
+      if (s.details?.studentDetails?.class_name) return s.details.studentDetails.class_name;
+      return '—';
+    };
+  }, [classMap]);
+
   // Reset filters
   useEffect(() => {
     setClassId('');
@@ -583,11 +685,58 @@ export default function StudentsPage({ type }) {
 
   // Build columns dynamically
   const columns = useMemo(() => {
-    const cols = (studentColumns || []).map((col) => ({
-      accessorKey: col.key,
-      header: col.label,
-      cell: ({ row }) => <StudentCell student={row.original} columnKey={col.key} type={type} terms={terms} />,
-    }));
+    const cols = (studentColumns || []).map((col) => {
+      if (['section_name', 'section', 'batch_name', 'semester_name'].includes(col.key)) {
+        return {
+          id: col.key,
+          accessorFn: (row) => resolveStudentSectionName(row),
+          header: col.label,
+          cell: ({ row }) => (
+            <StudentCell
+              student={row.original}
+              columnKey={col.key}
+              type={type}
+              terms={terms}
+              resolveSectionName={resolveStudentSectionName}
+              resolveClassName={resolveStudentClassName}
+            />
+          ),
+        };
+      }
+
+      if (['class_name', 'class', 'course_name', 'program_name', 'department_name'].includes(col.key)) {
+        return {
+          id: col.key,
+          accessorFn: (row) => resolveStudentClassName(row),
+          header: col.label,
+          cell: ({ row }) => (
+            <StudentCell
+              student={row.original}
+              columnKey={col.key}
+              type={type}
+              terms={terms}
+              resolveSectionName={resolveStudentSectionName}
+              resolveClassName={resolveStudentClassName}
+            />
+          ),
+        };
+      }
+
+      return {
+        accessorKey: col.key,
+        header: col.label,
+        cell: ({ row }) => (
+          <StudentCell
+            student={row.original}
+            columnKey={col.key}
+            type={type}
+            terms={terms}
+            resolveSectionName={resolveStudentSectionName}
+            resolveClassName={resolveStudentClassName}
+          />
+        ),
+      };
+    });
 
     // Status column
     cols.push({
@@ -636,7 +785,7 @@ export default function StudentsPage({ type }) {
     });
 
     return cols;
-  }, [studentColumns, type, terms, canDo, router]);
+  }, [studentColumns, type, terms, canDo, router, resolveStudentSectionName, resolveStudentClassName]);
 
   // Options for SelectField
   const statusOptions = [
@@ -767,13 +916,13 @@ export default function StudentsPage({ type }) {
         phone: s.phone || '',
         status: s.is_active ? 'Active' : 'Inactive',
         roll_number: val('roll_no') || val('roll_number') || '',
-        class_name: val('class_name') || s.class?.name || '',
-        section_name: val('section_name') || s.section?.name || '',
+        class_name: resolveStudentClassName(s) || val('class_name') || '',
+        section_name: resolveStudentSectionName(s) || val('section_name') || '',
         date_of_birth: formatDate(val('date_of_birth') || val('dob')),
         branch_name: resolveBranchName(s.branch || s.branch_name || val('branch_id'), ''),
       };
     });
-  }, [students]);
+  }, [students, resolveStudentClassName, resolveStudentSectionName]);
   
   // All possible columns from StudentForm
   // All possible columns from StudentForm
@@ -1230,7 +1379,7 @@ export default function StudentsPage({ type }) {
 }
 
 // StudentCell Component
-function StudentCell({ student: s, columnKey, type, terms }) {
+function StudentCell({ student: s, columnKey, type, terms, resolveSectionName, resolveClassName }) {
   const val = (k) => {
     // Try primary key, then details structure
     const baseVal = s[k] ?? s.details?.studentDetails?.[k];
@@ -1248,6 +1397,22 @@ function StudentCell({ student: s, columnKey, type, terms }) {
   };
 
   switch (columnKey) {
+    case 'class_name':
+    case 'class':
+    case 'course_name':
+    case 'program_name':
+    case 'department_name': {
+      const cName = resolveClassName ? resolveClassName(s) : (s.class_name || s.class?.name || val(columnKey));
+      return <span className="text-sm font-medium">{cName || '—'}</span>;
+    }
+
+    case 'section_name':
+    case 'section':
+    case 'batch_name':
+    case 'semester_name': {
+      const sName = resolveSectionName ? resolveSectionName(s) : (s.section_name || s.section?.name || val(columnKey));
+      return <span className="text-sm font-medium">{sName || '—'}</span>;
+    }
     case 'name':
       return (
         <div className="flex items-center gap-3">

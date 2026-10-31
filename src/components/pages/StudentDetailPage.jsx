@@ -58,13 +58,14 @@ import { generateAndDownloadSLC } from '@/lib/pdf/slcPdf';
 import { generateAcademicProfile } from '@/lib/pdf/academicProfilePdf';
 import { generateAndDownloadFeeVoucherPdf } from '@/lib/pdf/feeVoucherPdf';
 import { studentService } from '@/services/studentService';
+import { classService } from '@/services/classService';
 import { feeVoucherService, decomposeVouchersForPayment, computeVoucherMonthLabel } from '@/services/feeVoucherService';
 import { feePaymentService } from '@/services/feePaymentService';
 
 const TABS = ['Overview', 'Attendance', 'Fees', 'Exams', 'Documents', 'Behavioral'];
 
 // ========== OVERVIEW TAB (with Start & End Dates) ==========
-function OverviewTab({ student, terms, currentInstitute }) {
+function OverviewTab({ student, terms, currentInstitute, resolvedClassName, resolvedSectionName }) {
   const sDetails = student.details?.studentDetails || {};
   const sessions = sDetails.academicSessions || [];
   const rawGuardians = Array.isArray(sDetails.guardians) && sDetails.guardians.length > 0
@@ -155,8 +156,8 @@ function OverviewTab({ student, terms, currentInstitute }) {
   };
 
   const rollNo = student.registration_no || sDetails.roll_no || student.roll_number || student.candidate_id;
-  const className = sDetails.class_name || student.class?.name || '—';
-  const section = sDetails.section_name || student.section?.name || '—';
+  const className = resolvedClassName || sDetails.class_name || student.class?.name || '—';
+  const section = resolvedSectionName || sDetails.section_name || student.section?.name || '—';
   const branchName = resolveBranchName(
     student.branch ||
     student.branch_name ||
@@ -1059,6 +1060,21 @@ export default function StudentDetailPage({ type, id }) {
   });
 
   const student = data?.data ?? DUMMY_FLAT_STUDENTS[0];
+  const sDetails = student?.details?.studentDetails || {};
+  const currentClassId = student?.class_id || sDetails.class_id;
+  const currentSectionId = student?.section_id || sDetails.section_id;
+
+  const { data: classData } = useQuery({
+    queryKey: ['class-detail-for-student', currentClassId],
+    queryFn: () => classService.getById(currentClassId),
+    enabled: !!currentClassId,
+  });
+
+  const resolvedClass = classData?.data || classData;
+  const resolvedClassSections = Array.isArray(resolvedClass?.sections) ? resolvedClass.sections : [];
+  const matchedSection = resolvedClassSections.find(s => String(s.id || s.section_id) === String(currentSectionId));
+  const resolvedSectionName = matchedSection?.name || matchedSection?.section_name || sDetails.section_name || student?.section?.name || (typeof student?.section === 'string' ? student.section : '') || '';
+  const resolvedClassName = resolvedClass?.name || sDetails.class_name || student?.class?.name || student?.class_name || '';
 
   const studentLabel = terms?.student ?? (type === 'coaching' ? 'Candidate' : type === 'academy' ? 'Trainee' : 'Student');
 
@@ -1236,10 +1252,10 @@ export default function StudentDetailPage({ type, id }) {
           </div>
           {rollNo && <p className="font-mono text-sm text-muted-foreground">#{rollNo}</p>}
           <div className="flex flex-wrap gap-3 pt-1">
-            {(student.class_name || student.class?.name) && (
+            {(resolvedClassName || student.class_name || student.class?.name) && (
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <BookOpen size={11} /> {student.class?.name || student.class_name}
-                {(student.section || student.section?.name) && ` · ${student.section?.name || student.section}`}
+                <BookOpen size={11} /> {resolvedClassName || student.class?.name || student.class_name}
+                {(resolvedSectionName || student.section || student.section?.name) && ` · ${resolvedSectionName || student.section?.name || student.section}`}
               </span>
             )}
             {student.gender && (
@@ -1327,7 +1343,7 @@ export default function StudentDetailPage({ type, id }) {
 
       {/* Tab Content */}
       <div className="min-h-[300px]">
-        {activeTab === 'Overview'    && <OverviewTab    student={student} terms={{ ...terms, type }} currentInstitute={currentInstitute} />}
+        {activeTab === 'Overview'    && <OverviewTab    student={student} terms={{ ...terms, type }} currentInstitute={currentInstitute} resolvedClassName={resolvedClassName} resolvedSectionName={resolvedSectionName} />}
         {activeTab === 'Attendance'  && <AttendanceTab  student={student} />}
         {activeTab === 'Fees'        && <FeesTab        student={student} currentInstitute={currentInstitute} onGenerateVoucher={() => setVoucherOpen(true)} />}
         {activeTab === 'Exams'       && <ExamsTab       student={student} />}

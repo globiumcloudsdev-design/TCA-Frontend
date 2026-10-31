@@ -309,8 +309,33 @@ export default function StudentForm({
       const currentClassId = watchClass;
       const originalClassId = defaultValues.class_id || defaultValues.details?.studentDetails?.class_id;
       
-      if (targetSectionId && !watchSection && currentClassId === originalClassId) {
-        setValue('section_id', targetSectionId);
+      if (!watchSection && (!currentClassId || String(currentClassId) === String(originalClassId))) {
+        let matched = null;
+        if (targetSectionId) {
+          matched = sections.find(s => String(s.id) === String(targetSectionId));
+        }
+        if (!matched) {
+          const rawSecName = String(
+            defaultValues.section_name ||
+            defaultValues.details?.studentDetails?.section_name ||
+            defaultValues.section?.name ||
+            defaultValues.section ||
+            ''
+          ).trim().toLowerCase();
+
+          if (rawSecName) {
+            matched = sections.find(s => (s.name || '').trim().toLowerCase() === rawSecName);
+            if (!matched) {
+              if (rawSecName === 'a' && sections[0]) matched = sections[0];
+              else if (rawSecName === 'b' && sections[1]) matched = sections[1];
+            }
+          }
+        }
+        if (matched) {
+          setValue('section_id', String(matched.id));
+        } else if (targetSectionId) {
+          setValue('section_id', String(targetSectionId));
+        }
       }
     }
   }, [isEdit, sections, watchSection, watchClass, setValue, defaultValues]);
@@ -501,15 +526,44 @@ export default function StudentForm({
 
   const onSubmitForm = (data) => {
     const formData = new FormData();
-    const editableKeys = ['first_name', 'last_name', 'email', 'phone', 'registration_no', 'dob', 'gender', 'blood_group', 'religion', 'nationality', 'cnic', 'branch_id', 'academic_year_id', 'class_id', 'section_id', 'roll_no', 'admission_date', 'present_address', 'permanent_address', 'city', 'monthly_fee', 'admission_fee', 'discount_type', 'lab_charges', 'annual_charges', 'concession_type', 'concession_percentage', 'concession_reason', 'medical_conditions', 'allergies', 'previous_school', 'previous_class', 'is_active'];
-    
-    editableKeys.forEach(key => { if (data[key] !== undefined && data[key] !== null) formData.append(key, data[key]); });
+    const editableKeys = [
+      'first_name', 'last_name', 'email', 'phone', 'registration_no', 'dob', 'gender',
+      'blood_group', 'religion', 'nationality', 'cnic', 'branch_id', 'academic_year_id',
+      'class_id', 'section_id', 'class_name', 'section_name', 'roll_no', 'admission_date',
+      'present_address', 'permanent_address', 'city', 'monthly_fee', 'admission_fee',
+      'discount_type', 'lab_charges', 'annual_charges', 'concession_type',
+      'concession_percentage', 'concession_reason', 'medical_conditions', 'allergies',
+      'previous_school', 'previous_class', 'is_active'
+    ];
+
+    const currentClassId = watchClass || data.class_id;
+    const currentSectionId = watchSection || data.section_id;
+    const currentClassName = selectedClassData?.name || data.class_name || '';
+    const currentSectionName = selectedSectionData?.name || data.section_name || '';
+
+    editableKeys.forEach(key => {
+      let val = data[key];
+      if (key === 'class_id') val = currentClassId;
+      if (key === 'section_id') val = currentSectionId;
+      if (key === 'class_name') val = currentClassName;
+      if (key === 'section_name') val = currentSectionName;
+      if (val !== undefined && val !== null) formData.append(key, val);
+    });
+
     if (data.avatar_file instanceof File) formData.append('photo', data.avatar_file);
     
     const normalizedGuardians = (data.guardians || []).map(g => ({ ...g, type: g.type || 'father', relation: g.relation || g.type || 'father' }));
     formData.append('guardians', JSON.stringify(normalizedGuardians));
     
-    const details = { studentDetails: { ...data.details?.studentDetails, class_id: watchClass, section_id: watchSection } };
+    const details = {
+      studentDetails: {
+        ...data.details?.studentDetails,
+        class_id: currentClassId,
+        section_id: currentSectionId,
+        ...(currentClassName ? { class_name: currentClassName } : {}),
+        ...(currentSectionName ? { section_name: currentSectionName } : {}),
+      }
+    };
     formData.append('details', JSON.stringify(details));
 
     const documentMetadata = (data.documents || []).map(doc => {

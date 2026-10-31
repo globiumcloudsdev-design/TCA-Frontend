@@ -140,7 +140,7 @@ export function useSocket() {
     const token = getAccessToken();
     if (!token) return;
 
-    socketInstance = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000', {
+    socketInstance = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5001', {
       auth: { token },
       transports: ['websocket'],
       reconnectionAttempts: 10,
