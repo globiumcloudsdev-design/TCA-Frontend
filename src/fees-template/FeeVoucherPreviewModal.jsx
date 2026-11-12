@@ -265,7 +265,7 @@ export default function FeeVoucherPreviewModal({
             transform: zoomLevel !== 1 ? `scale(${zoomLevel})` : undefined,
           }}
         >
-          <div ref={voucherRef} className="fee-voucher-print-target shadow-lg rounded-sm overflow-hidden">
+          <div ref={voucherRef} className="fee-voucher-print-target shadow-lg rounded-2xl overflow-visible">
             <FeeVoucher
               studentData={studentData}
               feeStructure={feeStructure}
@@ -299,6 +299,8 @@ export default function FeeVoucherPreviewModal({
             position: static !important;
             max-height: none !important;
             height: auto !important;
+            min-height: auto !important;
+            max-height: none !important;
             overflow: visible !important;
             width: auto !important;
             max-width: none !important;

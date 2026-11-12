@@ -96,7 +96,7 @@ export default function FeeTable({
   const headerBg = theme?.colors?.primary || '#0f4c81';
 
   return (
-    <section className="mb-1.5 overflow-hidden rounded border" style={{ borderColor: '#cbd5e1' }}>
+    <section className="mb-2 overflow-hidden rounded-lg border" style={{ borderColor: '#cbd5e1' }}>
       <table className="w-full border-collapse text-[9.5px]">
         <thead>
           <tr style={{ backgroundColor: headerBg, color: '#ffffff' }}>
@@ -138,7 +138,7 @@ export default function FeeTable({
           {/* ── Summary Rows ── */}
           <tr className="border-t-2 bg-slate-100 font-bold" style={{ borderColor: '#cbd5e1' }}>
             <td className="px-2 py-1 text-slate-900 uppercase text-[9px] tracking-tight">
-              Payable Within Due Date:
+              Total Fee Amount:
             </td>
             <td className="px-2 py-1 text-right font-mono text-slate-950 font-black">
               PKR {fmtAmount(netAmount)}

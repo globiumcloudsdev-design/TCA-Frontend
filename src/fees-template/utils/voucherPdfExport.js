@@ -33,6 +33,8 @@ export const captureVoucherCanvas = async (sourceNode, isCompact = false, pageSi
     exportNode.style.width = isLandscape ? '297mm' : '210mm';
     exportNode.style.minHeight = isLandscape ? '210mm' : '297mm';
   }
+  exportNode.style.height = 'auto';
+  exportNode.style.maxHeight = 'none';
   exportNode.style.margin = '0';
 
   exportHost.appendChild(exportNode);

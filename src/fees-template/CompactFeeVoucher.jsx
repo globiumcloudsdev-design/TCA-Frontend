@@ -207,7 +207,7 @@ export default function CompactFeeVoucher({
 
   return (
     <div
-      className={`compact-fee-receipt fee-voucher-print-target flex flex-col justify-between bg-white text-slate-900 border border-slate-300 shadow-sm mx-auto ${className}`.trim()}
+      className={`compact-fee-receipt fee-voucher-print-target flex flex-col justify-between bg-white text-slate-900 border border-slate-300 rounded-2xl shadow-sm mx-auto ${className}`.trim()}
       style={{
         width: '100%',
         maxWidth: isLandscape ? '148mm' : (resolvedPageSize === 'A5' ? '148mm' : '105mm'),
@@ -215,14 +215,17 @@ export default function CompactFeeVoucher({
         fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         fontSize: '10px',
         lineHeight: '1.3',
-        padding: '3mm 3.5mm',
+        height: 'auto',
+        maxHeight: 'none',
+        padding: '3.5mm 4mm 24px 4mm',
+        paddingBottom: '24px',
         backgroundColor: '#ffffff',
         color: '#0f172a',
         boxSizing: 'border-box',
       }}
     >
       {/* ── MAIN CONTENT (Header, Student Info, Fee Items, Totals) ── */}
-      <div className="flex-1 flex flex-col justify-start min-w-0">
+      <div className="flex-1 flex flex-col justify-start min-w-0 gap-1.5">
         {/* ── 1. HEADER ── */}
         <div className="text-center pb-1.5 border-b border-dashed border-slate-400">
           {logoUrl ? (
@@ -343,7 +346,7 @@ export default function CompactFeeVoucher({
           )}
 
           {/* ── 5. TOTALS & PAYMENT SUMMARY BOX ── */}
-          <div className="rounded border border-slate-300 bg-slate-50 p-1.5 space-y-1 text-[9.5px]">
+          <div className="mt-2 rounded-xl border border-slate-300 bg-slate-50 p-2.5 space-y-2 text-[9.5px]">
             <div className="flex justify-between items-center font-bold">
               <span className="text-slate-800">Total Fee Amount:</span>
               <span className="font-mono text-slate-950 font-black">PKR {fmtAmount(totalAmount)}</span>

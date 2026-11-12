@@ -11,7 +11,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,31 +42,31 @@ import { getActiveAcademicYearId } from '@/lib/utils';
 const subjectScheduleSchema = z.object({
   subject_id: z.string().min(1, 'Subject required'),
   subject_name: z.string().min(1, 'Subject name required'),
-  subject_code: z.string().optional().default(''),
+  subject_code: z.string().nullish().default(''),
   date: z.string().min(1, 'Date required'),
   start_time: z.string().min(1, 'Start time required'),
   end_time: z.string().min(1, 'End time required'),
   duration_minutes: z.coerce.number().min(1, 'Duration required'),
   total_marks: z.coerce.number().min(1, 'Total marks required'),
   pass_marks: z.coerce.number().min(0, 'Pass marks required'),
-  venue: z.string().optional().default(''),
-  room_no: z.string().optional().default(''),
-  invigilator_ids: z.array(z.string()).optional().default([]),
-  instructions: z.string().optional().default('')
+  venue: z.string().nullish().default(''),
+  room_no: z.string().nullish().default(''),
+  invigilator_ids: z.array(z.string()).nullish().default([]),
+  instructions: z.string().nullish().default('')
 });
 
 // STEP 1 SCHEMA: Basic Info
 const step1Schema = z.object({
   name: z.string().min(3, 'Exam name required (min 3 chars)'),
-  code: z.string().optional(),
-  description: z.string().optional(),
-  branch_id: z.string().optional(),
+  code: z.string().nullish(),
+  description: z.string().nullish(),
+  branch_id: z.string().nullish(),
   type: z.string().min(1, 'Exam type required'),
   category: z.string().min(1, 'Category required'),
-  entity_type: z.string().min(1, 'Entity type required'),
+  entity_type: z.string().nullish().default('school'),
   academic_year_id: z.string().min(1, 'Academic year required'),
   class_id: z.string().min(1, 'Class required'),
-  section_id: z.string().optional(),
+  section_id: z.string().nullish(),
 });
 
 // STEP 2 SCHEMA: Subjects
@@ -76,7 +76,7 @@ const step2Schema = z.object({
 
 // STEP 3 SCHEMA: Settings
 const step3Schema = z.object({
-  pass_percentage: z.coerce.number().min(0).max(100).default(40),
+  pass_percentage: z.coerce.number().min(0).max(100).optional().default(40),
 });
 
 // FULL SCHEMA
@@ -97,6 +97,7 @@ export default function ExamForm({
     : (rawInstituteType?.toLowerCase() || 'school');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingSubjects, setIsLoadingSubjects] = useState(false);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -105,8 +106,8 @@ export default function ExamForm({
   const [stepErrors, setStepErrors] = useState({});
   
   // Add ref to track if subjects have been auto-populated
-  const hasAutoPopulated = useRef(false);
-  const previousClassId = useRef(null);
+  const hasAutoPopulated = useRef(!!initialData);
+  const previousClassId = useRef(initialData?.class_id || null);
 
   const {
     control,
@@ -122,7 +123,21 @@ export default function ExamForm({
     mode: 'onBlur',
     defaultValues: initialData ? {
       ...initialData,
-      has_section: !!initialData.section_id
+      code: initialData.code || '',
+      description: initialData.description || '',
+      has_section: !!initialData.section_id,
+      section_id: initialData.section_id || '',
+      pass_percentage: initialData.pass_percentage ? Number(initialData.pass_percentage) : 40,
+      subject_schedules: (initialData.subject_schedules || []).map(s => ({
+        ...s,
+        date: s.date ? (typeof s.date === 'string' ? s.date.split('T')[0] : s.date) : '',
+        total_marks: Number(s.total_marks) || 100,
+        pass_marks: Number(s.pass_marks) || 40,
+        duration_minutes: Number(s.duration_minutes) || 180,
+        venue: s.venue || '',
+        room_no: s.room_no || '',
+        instructions: s.instructions || ''
+      }))
     } : {
       type: 'mid_term',
       category: 'theory',
@@ -133,6 +148,35 @@ export default function ExamForm({
       has_section: false
     }
   });
+
+  // Sync form when initialData changes (e.g. when opening modal for edit)
+  useEffect(() => {
+    if (initialData) {
+      previousClassId.current = initialData.class_id;
+      hasAutoPopulated.current = true;
+      const formattedSchedules = (initialData.subject_schedules || []).map(s => ({
+        ...s,
+        date: s.date ? (typeof s.date === 'string' ? s.date.split('T')[0] : s.date) : '',
+        total_marks: Number(s.total_marks) || 100,
+        pass_marks: Number(s.pass_marks) || 40,
+        duration_minutes: Number(s.duration_minutes) || 180,
+        venue: s.venue || '',
+        room_no: s.room_no || '',
+        instructions: s.instructions || ''
+      }));
+
+      reset({
+        ...initialData,
+        code: initialData.code || '',
+        description: initialData.description || '',
+        branch_id: initialData.branch_id || activeBranchId || '',
+        has_section: !!initialData.section_id,
+        section_id: initialData.section_id || '',
+        pass_percentage: initialData.pass_percentage ? Number(initialData.pass_percentage) : 40,
+        subject_schedules: formattedSchedules,
+      });
+    }
+  }, [initialData, reset, activeBranchId]);
 
   const {
     fields: scheduleFields,
@@ -179,6 +223,24 @@ export default function ExamForm({
     fetchData();
   }, [instituteId]);
 
+  // If editing and initialData has class_id not yet in classes list, fetch it directly
+  useEffect(() => {
+    if (initialData?.class_id && classes.length > 0) {
+      const exists = classes.some(c => c.id === initialData.class_id);
+      if (!exists) {
+        classService.getById(initialData.class_id).then(res => {
+          const cls = res?.data || res;
+          if (cls && (cls.id || cls.name)) {
+            setClasses(prev => [...prev, cls]);
+            if (cls.sections && cls.sections.length > 0) {
+              setSections(cls.sections);
+            }
+          }
+        }).catch(err => console.warn('Could not load initial class:', err));
+      }
+    }
+  }, [initialData?.class_id, classes]);
+
   // Auto-select active academic year if not yet selected
   const watchedAcademicYearId = watch('academic_year_id');
   useEffect(() => {
@@ -197,14 +259,6 @@ export default function ExamForm({
     }
   }, [instituteType, setValue, initialData]);
 
-  // Reset auto-populate flag when class changes
-  useEffect(() => {
-    if (previousClassId.current !== watchedClassId) {
-      hasAutoPopulated.current = false;
-      previousClassId.current = watchedClassId;
-    }
-  }, [watchedClassId]);
-
   // Fetch subjects when class changes
   useEffect(() => {
     if (!watchedClassId) {
@@ -214,12 +268,16 @@ export default function ExamForm({
       return;
     }
 
-    // Reset section if class changed
-    if (previousClassId.current !== watchedClassId) {
+    // Only reset section if the user genuinely changed the class
+    if (previousClassId.current && previousClassId.current !== watchedClassId) {
+      hasAutoPopulated.current = false;
       setValue('section_id', '');
+      setValue('has_section', false);
     }
+    previousClassId.current = watchedClassId;
 
     const fetchClassData = async () => {
+      setIsLoadingSubjects(true);
       try {
         const response = await classService.getById(watchedClassId);
         const classData = response?.data;
@@ -247,7 +305,7 @@ export default function ExamForm({
             end_time: '12:00',
             duration_minutes: 180,
             total_marks: 100,
-            pass_marks: Math.round((100 * passPercentage) / 100),
+            pass_marks: 40,
             venue: '',
             room_no: '',
             instructions: '',
@@ -259,27 +317,33 @@ export default function ExamForm({
       } catch (error) {
         console.error('Error fetching class data:', error);
         toast.error('Failed to fetch class subjects');
+      } finally {
+        setIsLoadingSubjects(false);
       }
     };
 
     fetchClassData();
-  }, [watchedClassId, initialData, replaceSchedules, passPercentage]);
-
-  // Auto-update pass marks when pass percentage changes
-  useEffect(() => {
-    if (watchedSchedules && watchedSchedules.length > 0) {
-      watchedSchedules.forEach((schedule, idx) => {
-        const passMarks = Math.round((schedule.total_marks * passPercentage) / 100);
-        setValue(`subject_schedules.${idx}.pass_marks`, passMarks);
-      });
-    }
-  }, [passPercentage, setValue, watchedSchedules]);
+  }, [watchedClassId, initialData, replaceSchedules, setValue]);
 
   const calculateDuration = (startTime, endTime) => {
     if (!startTime || !endTime) return 0;
     const [startH, startM] = startTime.split(':').map(Number);
     const [endH, endM] = endTime.split(':').map(Number);
     return (endH - startH) * 60 + (endM - startM);
+  };
+
+  const formatDuration = (totalMinutes) => {
+    const mins = Number(totalMinutes) || 0;
+    if (mins <= 0) return '0 min';
+    const hours = Math.floor(mins / 60);
+    const remainingMins = mins % 60;
+    if (hours === 0) {
+      return `${remainingMins} minute${remainingMins !== 1 ? 's' : ''}`;
+    }
+    if (remainingMins === 0) {
+      return `${hours} hour${hours !== 1 ? 's' : ''}`;
+    }
+    return `${hours} hour${hours !== 1 ? 's' : ''} ${remainingMins} minute${remainingMins !== 1 ? 's' : ''}`;
   };
 
   // Validate current step
@@ -290,7 +354,7 @@ export default function ExamForm({
     } else if (stepNum === 2) {
       fieldsToValidate = ['subject_schedules'];
     } else if (stepNum === 3) {
-      fieldsToValidate = ['pass_percentage'];
+      return true;
     }
 
     const isValid = await trigger(fieldsToValidate);
@@ -311,13 +375,29 @@ export default function ExamForm({
     setStep(step - 1);
   };
 
+  const totalMarks = watchedSchedules?.reduce((sum, s) => sum + (parseInt(s.total_marks) || 0), 0) || 0;
+  const totalPassMarks = watchedSchedules?.reduce((sum, s) => sum + (parseInt(s.pass_marks) || 0), 0) || 0;
+  const computedPassPercentage = totalMarks > 0 ? Math.round((totalPassMarks / totalMarks) * 100) : 40;
+
+  const onInvalid = (validationErrors) => {
+    console.error('Validation errors on submit:', validationErrors);
+    const firstKey = Object.keys(validationErrors)[0];
+    const firstMsg = validationErrors[firstKey]?.message;
+    toast.error(typeof firstMsg === 'string' ? firstMsg : 'Please check the form for errors');
+  };
+
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     try {
+      const totalMarksSum = (data.subject_schedules || []).reduce((sum, s) => sum + (parseInt(s.total_marks) || 0), 0);
+      const totalPassMarksSum = (data.subject_schedules || []).reduce((sum, s) => sum + (parseInt(s.pass_marks) || 0), 0);
+      const computedPct = totalMarksSum > 0 ? Math.round((totalPassMarksSum / totalMarksSum) * 100) : 40;
+
       // Clean payload: convert empty strings to null for optional UUID fields
       const payload = {
         ...data,
-        section_id: data.section_id?.trim() ? data.section_id : null,
+        pass_percentage: computedPct || data.pass_percentage || 40,
+        section_id: hasSection && data.section_id?.trim() ? data.section_id : null,
         school_id: instituteId,
         status: isEdit ? initialData.status : 'draft'
       };
@@ -360,12 +440,10 @@ export default function ExamForm({
     ...sections.map(section => ({ value: section.id, label: section.name }))
   ];
 
-  const totalMarks = watchedSchedules?.reduce((sum, s) => sum + (parseInt(s.total_marks) || 0), 0) || 0;
-
   const progressValue = (step / 3) * 100;
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 w-full">
+    <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6 w-full">
       {/* PROGRESS BAR */}
       <div className="space-y-2">
         <div className="flex justify-between items-center">
@@ -460,24 +538,32 @@ export default function ExamForm({
               <div className="flex flex-col gap-2 pt-2">
                 <SwitchField
                   label="Target Specific Section?"
-                  description="Enable to apply this exam to a single section only."
+                  description="Enable to apply this exam to a single section only. If turned off, this exam will be created for all sections."
                   name="has_section"
                   control={control}
                 />
               </div>
             </div>
 
-            {hasSection && (
+            {hasSection ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-start-2">
                   <SelectField
                     label="Section"
                     name="section_id"
                     control={control}
-                    options={sectionOptions}
+                    options={sections.map(section => ({ value: section.id, label: section.name }))}
+                    placeholder="Select Section"
                   />
                 </div>
               </div>
+            ) : (
+              watchedClassId && (
+                <div className="rounded-md border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300 flex items-center gap-2">
+                  <span className="font-semibold">All Sections Selected:</span>
+                  This exam will be created for all sections ({sections.length > 0 ? sections.map(s => s.name).join(', ') : 'all existing sections'}) of the selected class.
+                </div>
+              )
             )}
 
             <div className="space-y-2">
@@ -502,7 +588,12 @@ export default function ExamForm({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {scheduleFields.length === 0 ? (
+            {isLoadingSubjects ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm font-medium text-muted-foreground">Loading subjects and schedules...</p>
+              </div>
+            ) : scheduleFields.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <p>No subjects available. Please go back and select a class.</p>
               </div>
@@ -543,7 +634,6 @@ export default function ExamForm({
                           control={control}
                           error={errors.subject_schedules?.[idx]?.date}
                           required
-                          disablePastDates
                         />
 
                         <div className="space-y-1">
@@ -573,8 +663,8 @@ export default function ExamForm({
 
                         <div className="space-y-1">
                           <Label className="text-xs font-medium">Duration</Label>
-                          <div className="px-3 py-2 bg-muted rounded-md border border-input text-sm">
-                            {watch(`subject_schedules.${idx}.duration_minutes`)} min
+                          <div className="px-3 py-2 bg-muted rounded-md border border-input text-sm font-medium">
+                            {formatDuration(watch(`subject_schedules.${idx}.duration_minutes`))}
                           </div>
                         </div>
                       </div>
@@ -590,12 +680,14 @@ export default function ExamForm({
                           min="1"
                         />
 
-                        <div className="space-y-1">
-                          <Label className="text-xs font-medium">Pass Marks (Auto)</Label>
-                          <div className="px-3 py-2 bg-muted rounded-md border border-input text-sm font-medium">
-                            {watch(`subject_schedules.${idx}.pass_marks`)}
-                          </div>
-                        </div>
+                        <InputField
+                          label="Pass Marks"
+                          type="number"
+                          {...register(`subject_schedules.${idx}.pass_marks`)}
+                          error={errors.subject_schedules?.[idx]?.pass_marks?.message}
+                          required
+                          min="0"
+                        />
                       </div>
 
                       {/* Venue & Room */}
@@ -631,30 +723,76 @@ export default function ExamForm({
         </Card>
       )}
 
-      {/* STEP 3: SETTINGS */}
+      {/* STEP 3: SETTINGS / REVIEW */}
       {step === 3 && (
         <div className="space-y-4">
+          <Card className="border bg-muted/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Exam Configuration Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className="text-xs text-muted-foreground block">Exam Name</span>
+                  <span className="font-semibold">{watch('name') || '—'}</span>
+                  {watch('code') && <span className="text-xs text-muted-foreground block">({watch('code')})</span>}
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground block">Class</span>
+                  <span className="font-semibold text-primary">
+                    {classes.find(c => c.id === watchedClassId)?.name || '—'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground block">Target Section</span>
+                  <span>
+                    {hasSection && watch('section_id') ? (
+                      <Badge variant="outline" className="font-medium">
+                        {sections.find(s => s.id === watch('section_id'))?.name ? `Section ${sections.find(s => s.id === watch('section_id'))?.name}` : 'Specific Section'}
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="font-medium text-blue-700 dark:text-blue-300">
+                        All Sections
+                      </Badge>
+                    )}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground block">Type & Category</span>
+                  <span className="capitalize font-medium">
+                    {watch('type')?.replace('_', ' ')} • {watch('category')}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
-              <CardTitle>Pass Percentage</CardTitle>
+              <CardTitle>Exam Passing Criteria</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField
-                  label="Pass Percentage (%)"
-                  type="number"
-                  {...register('pass_percentage')}
-                  error={errors.pass_percentage?.message}
-                  min="0"
-                  max="100"
-                  required
-                />
-
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground">Total Marks</Label>
-                  <div className="text-3xl font-bold text-primary pt-1">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-muted-foreground text-xs">Total Marks</Label>
+                  <div className="text-2xl font-bold text-primary pt-1">
                     {totalMarks}
                   </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-muted-foreground text-xs">Total Pass Marks</Label>
+                  <div className="text-2xl font-bold text-foreground pt-1">
+                    {totalPassMarks}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-muted-foreground text-xs">Overall Pass Percentage (Auto)</Label>
+                  <div className="text-2xl font-bold text-emerald-600 pt-1">
+                    {computedPassPercentage}%
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Auto-calculated from subject pass marks</p>
                 </div>
               </div>
             </CardContent>
@@ -676,7 +814,7 @@ export default function ExamForm({
                     </div>
                     <div className="text-right">
                       <p className="font-semibold">{schedule.total_marks} marks</p>
-                      <p className="text-xs text-muted-foreground">Pass: {schedule.pass_marks}</p>
+                      <p className="text-xs text-muted-foreground">Pass: {schedule.pass_marks} ({schedule.total_marks > 0 ? Math.round(((schedule.pass_marks || 0) / schedule.total_marks) * 100) : 0}%)</p>
                     </div>
                   </div>
                 ))}

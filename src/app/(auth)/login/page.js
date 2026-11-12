@@ -228,7 +228,7 @@ export default function LoginPage() {
         </div> */}
 
         {/* Portal Shortcuts */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6">
           {PORTAL_BUTTONS.map((portal) => {
             const Icon = portal.icon;
             return (
@@ -240,7 +240,7 @@ export default function LoginPage() {
                 <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl ${portal.bg} flex items-center justify-center group-hover:scale-110 transition-transform`}>
                   <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${portal.text}`} />
                 </div>
-                <span className={`text-[10px] font-black uppercase tracking-wider ${portal.text}`}>{portal.label.split(' ')[0]}</span>
+                <span className={`text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-center leading-tight ${portal.text}`}>{portal.label}</span>
               </button>
             );
           })}

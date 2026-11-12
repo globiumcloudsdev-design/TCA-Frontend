@@ -76,17 +76,20 @@ export default function FeeVoucher({
 
   return (
     <div
-      className={`fee-voucher-print-target fee-voucher-sheet mx-auto bg-white border border-slate-300 shadow-sm print:border-none print:shadow-none ${className}`.trim()}
+      className={`fee-voucher-print-target fee-voucher-sheet mx-auto bg-white border border-slate-300 rounded-xl shadow-sm print:border-none print:shadow-none ${className}`.trim()}
       style={{
         width: containerWidth,
         minHeight: containerHeight,
         color: '#0f172a',
         backgroundColor: '#ffffff',
-        padding: isLandscape ? '4mm 3mm' : '4mm',
+        height: 'auto',
+        maxHeight: 'none',
+        padding: isLandscape ? '4mm 3mm 24px 3mm' : '4mm 4mm 24px 4mm',
+        paddingBottom: '24px',
         boxSizing: 'border-box',
       }}
     >
-      <div className={`flex h-full ${isLandscape ? 'flex-row gap-2' : 'flex-col gap-2'}`}>
+      <div className={`flex ${isLandscape ? 'flex-row gap-3' : 'flex-col gap-3'} min-h-full h-auto`}>
         {copyLabels.map((label, index) => (
           <React.Fragment key={label}>
             {/* Cut Line Indicator between copies */}
@@ -112,10 +115,15 @@ export default function FeeVoucher({
 
             {/* Individual Voucher Copy Section */}
             <section
-              className="flex flex-1 flex-col rounded border p-2 text-xs bg-white"
+              className="flex flex-1 flex-col justify-between rounded-2xl border p-3.5 pb-6 text-xs bg-white shadow-xs"
               style={{
                 borderColor: '#cbd5e1',
                 minWidth: 0,
+                height: 'auto',
+                minHeight: 'auto',
+                maxHeight: 'none',
+                paddingBottom: '24px',
+                boxSizing: 'border-box',
               }}
             >
               <VoucherHeader

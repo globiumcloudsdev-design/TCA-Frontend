@@ -15,11 +15,20 @@ import { ArrowLeft, Check, Download } from 'lucide-react';
 import PageHeader from '@/components/common/PageHeader';
 import PageLoader from '@/components/common/PageLoader';
 import DataTable from '@/components/common/DataTable';
+import AppPagination from '@/components/common/AppPagination';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useAuthStore } from '@/store/authStore';
 
 import { examService } from '@/services/examService';
+import { classService } from '@/services/classService';
 import { generateReportCard } from '@/lib/pdf/reportCardPdf';
 import { generateMarkSheet } from '@/lib/pdf/markSheetPdf';
 
@@ -30,6 +39,9 @@ export default function ExamResultsPage({ examId, type }) {
 
   const [markEntries, setMarkEntries] = useState({}); // student_id -> { subject_id: marks, ... }
   const [absentStudents, setAbsentStudents] = useState(new Set()); // student_ids
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [sectionFilter, setSectionFilter] = useState('all');
 
   // Fetch exam details
   const { data: exam, isLoading: examLoading } = useQuery({
@@ -38,10 +50,22 @@ export default function ExamResultsPage({ examId, type }) {
     enabled: !!examId
   });
 
-  // Fetch exam results which automatically loads students from exam's class/section
+  // Fetch class to get available sections for filtering
+  const { data: classData } = useQuery({
+    queryKey: ['class', exam?.class_id],
+    queryFn: () => classService.getById(exam.class_id),
+    enabled: !!exam?.class_id
+  });
+  const availableSections = classData?.data?.sections || [];
+
+  // Fetch exam results with pagination and optional section filter
   const { data: resultsData, isLoading: resultsLoading } = useQuery({
-    queryKey: ['exam-results', examId],
-    queryFn: () => examService.getResults(examId),
+    queryKey: ['exam-results', examId, page, pageSize, sectionFilter],
+    queryFn: () => examService.getResults(examId, {
+      page,
+      limit: pageSize,
+      section_id: sectionFilter !== 'all' ? sectionFilter : undefined
+    }),
     enabled: !!examId
   });
 
@@ -62,25 +86,31 @@ export default function ExamResultsPage({ examId, type }) {
   // Initialize with existing results
   useEffect(() => {
     if (resultsData?.data) {
-      const entries = {};
-      const absent = new Set();
-      
-      resultsData.data.forEach(result => {
-        if (result.subject_marks && Array.isArray(result.subject_marks)) {
-          const subjectMarks = {};
-          result.subject_marks.forEach(sm => {
-            subjectMarks[sm.subject_id] = sm.marks_obtained || 0;
-          });
-          entries[result.student_id] = subjectMarks;
-        }
-        
-        if (!result.is_present) {
-          absent.add(result.student_id);
-        }
+      setMarkEntries(prev => {
+        const next = { ...prev };
+        resultsData.data.forEach(result => {
+          const sId = result.student_id || result.id;
+          if (!next[sId] && result.subject_marks && Array.isArray(result.subject_marks)) {
+            const subjectMarks = {};
+            result.subject_marks.forEach(sm => {
+              subjectMarks[sm.subject_id] = sm.marks_obtained || 0;
+            });
+            next[sId] = subjectMarks;
+          }
+        });
+        return next;
       });
-      
-      setMarkEntries(entries);
-      setAbsentStudents(absent);
+
+      setAbsentStudents(prev => {
+        const next = new Set(prev);
+        resultsData.data.forEach(result => {
+          const sId = result.student_id || result.id;
+          if (result.is_present === false) {
+            next.add(sId);
+          }
+        });
+        return next;
+      });
     }
   }, [resultsData]);
 
@@ -101,6 +131,9 @@ export default function ExamResultsPage({ examId, type }) {
   }
 
   const students = resultsData?.data || [];
+  const pagination = resultsData?.pagination || {};
+  const total = pagination.total ?? students.length;
+  const totalPages = pagination.totalPages ?? 1;
   const subjectSchedules = exam.subject_schedules || [];
 
   const handleMarkChange = (studentId, subjectId, marks) => {
@@ -182,11 +215,16 @@ export default function ExamResultsPage({ examId, type }) {
     return marks && Object.values(marks).some(m => m > 0);
   }).length;
 
+  const className = classData?.data?.name || classData?.name || '';
+  const targetSection = exam.section_id 
+    ? (availableSections.find(s => s.id === exam.section_id)?.name ? `Section ${availableSections.find(s => s.id === exam.section_id)?.name}` : 'Specific Section')
+    : 'All Sections';
+
   return (
     <div className="space-y-6">
       <PageHeader
         title={`Enter Results - ${exam.name}`}
-        description={`Enter marks for ${students.length} students across ${subjectSchedules.length} subjects`}
+        description={`${className ? `Class: ${className}` : ''}${targetSection ? ` (${targetSection})` : ''} • ${total} students • ${subjectSchedules.length} subjects`}
         action={
           <Button onClick={() => router.back()} variant="outline">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -202,7 +240,7 @@ export default function ExamResultsPage({ examId, type }) {
             <CardTitle className="text-sm font-medium">Total Students</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{students.length}</div>
+            <div className="text-2xl font-bold">{total}</div>
           </CardContent>
         </Card>
 
@@ -221,7 +259,7 @@ export default function ExamResultsPage({ examId, type }) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {filledCount} <span className="text-sm text-muted-foreground">/ {students.length}</span>
+              {filledCount} <span className="text-sm text-muted-foreground">/ {total}</span>
             </div>
           </CardContent>
         </Card>
@@ -239,8 +277,32 @@ export default function ExamResultsPage({ examId, type }) {
       {/* Results Table */}
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Student Results</CardTitle>
+          <div className="flex flex-wrap justify-between items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <CardTitle>Student Results</CardTitle>
+              {!exam.section_id && availableSections.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">Section:</span>
+                  <Select
+                    value={sectionFilter}
+                    onValueChange={(val) => {
+                      setSectionFilter(val);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[130px] text-xs">
+                      <SelectValue placeholder="All Sections" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" className="text-xs">All Sections</SelectItem>
+                      {availableSections.map(sec => (
+                        <SelectItem key={sec.id} value={sec.id} className="text-xs">{sec.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <Button 
                 variant="outline"
@@ -273,7 +335,10 @@ export default function ExamResultsPage({ examId, type }) {
                 <thead className="border-b bg-muted">
                   <tr>
                     <th className="px-4 py-2 text-left font-medium">Student</th>
-                    <th className="px-4 py-2 text-left font-medium">Roll No</th>
+                    <th className="px-4 py-2 text-center font-medium">Roll No</th>
+                    {!exam.section_id && (
+                      <th className="px-4 py-2 text-center font-medium">Section</th>
+                    )}
                     {subjectSchedules.map(subject => (
                       <th key={subject.subject_id} className="px-4 py-2 text-center font-medium">
                         <div className="text-xs">{subject.subject_name}</div>
@@ -304,6 +369,13 @@ export default function ExamResultsPage({ examId, type }) {
                           <div className="text-xs text-muted-foreground">{studentEmail}</div>
                         </td>
                         <td className="px-4 py-2 text-center font-medium">{rollNumber || '—'}</td>
+                        {!exam.section_id && (
+                          <td className="px-4 py-2 text-center text-xs">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200">
+                              {studentInfo?.section_name || studentInfo?.section?.name || '—'}
+                            </span>
+                          </td>
+                        )}
                         {subjectSchedules.map(subject => {
                           const studentMarks = markEntries[studentId]?.[subject.subject_id] || 0;
                           const isExceeding = studentMarks > subject.total_marks;
@@ -353,6 +425,43 @@ export default function ExamResultsPage({ examId, type }) {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Pagination Bar */}
+          {students.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t mt-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <p className="text-xs text-muted-foreground">
+                  Showing {students.length} of {total} records
+                </p>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">Rows per page</span>
+                  <Select
+                    value={String(pageSize)}
+                    onValueChange={(v) => {
+                      setPageSize(Number(v));
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-7 w-[65px] text-xs px-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[5, 10, 25, 50, 100].map((n) => (
+                        <SelectItem key={n} value={String(n)} className="text-xs">{n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <AppPagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+              />
             </div>
           )}
         </CardContent>

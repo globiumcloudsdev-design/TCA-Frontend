@@ -300,6 +300,10 @@ export const useAuthStore = create(
 
         // Branch Admin has administrative permissions for their branch (except multi-branch management)
         if (checkIsBranchAdmin(u) && !permissionCode.startsWith('branch.') && !permissionCode.startsWith('branches.')) {
+          // Exam management and marks entry are fully accessible to branch administrators
+          if (permissionCode.startsWith('exam') || permissionCode.startsWith('exams.')) {
+            return true;
+          }
           const customPerms = u.permissions;
           if (Array.isArray(customPerms) && customPerms.length > 0) {
             return checkHasPermission(customPerms, permissionCode, false);

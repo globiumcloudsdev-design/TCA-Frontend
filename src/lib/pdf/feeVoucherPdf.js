@@ -534,7 +534,7 @@ const renderCompactReceiptPage = (doc, { voucher, student, instituteName, logoIm
   // Outer border / frame for receipt
   doc.setDrawColor(203, 213, 225);
   doc.setLineWidth(0.3);
-  doc.roundedRect(margin - 4, 8, contentWidth + 8, pageHeight - 16, 2, 2);
+  // Outer border will be drawn at end of renderCompactReceiptPage to enclose all content cleanly
 
   // 1. Header: School's actual name at the top
   if (logoImg) {
@@ -717,6 +717,13 @@ const renderCompactReceiptPage = (doc, { voucher, student, instituteName, logoIm
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(71, 85, 105);
   doc.text('Powered by TCA The Clouds Academy | 03352778488', pageWidth / 2, footerY, { align: 'center' });
+
+  // Draw clean outer rounded border enclosing all receipt content and footer inside
+  const cardBottomPadding = 6;
+  const receiptCardHeight = Math.max(footerY + cardBottomPadding - 6, pageHeight - 12);
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(margin - 4, 6, contentWidth + 8, receiptCardHeight, 3, 3);
 };
 
 // --------------------------------------------------------------------------------

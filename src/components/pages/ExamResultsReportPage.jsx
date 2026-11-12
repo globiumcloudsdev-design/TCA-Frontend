@@ -1,302 +1,12 @@
-// 'use client';
-
-// /**
-//  * ExamResultsReportPage — View and analyze published exam results
-//  * Shows rankings, pass/fail stats, performance analytics
-//  */
-
-// import { useEffect, useState } from 'react';
-// import { useRouter } from 'next/navigation';
-// import { useQuery } from '@tanstack/react-query';
-// import { Download, ArrowLeft, TrendingUp, Users, Award, PrinterIcon } from 'lucide-react';
-
-// import PageHeader from '@/components/common/PageHeader';
-// import PageLoader from '@/components/common/PageLoader';
-// import AppModal from '@/components/common/AppModal';
-// import DataTable from '@/components/common/DataTable';
-// import StatsCard from '@/components/common/StatsCard';
-// import ResultCard from '@/components/cards/ResultCard';
-// import { Button } from '@/components/ui/button';
-// import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-// import { Badge } from '@/components/ui/badge';
-// import { useAuthStore } from '@/store/authStore';
-
-// import { examService } from '@/services/examService';
-
-// export default function ExamResultsReportPage({ examId, type }) {
-//   const router = useRouter();
-//   const { user, getInstitute } = useAuthStore();
-//   const institute = getInstitute();
-//   const [selectedStudent, setSelectedStudent] = useState(null);
-//   const [selectedResult, setSelectedResult] = useState(null);
-
-//   // Fetch exam details
-//   const { data: exam, isLoading: examLoading } = useQuery({
-//     queryKey: ['exam', examId],
-//     queryFn: () => examService.getById(examId),
-//     enabled: !!examId
-//   });
-
-//   // Fetch results
-//   const { data: resultsResponse, isLoading: resultsLoading } = useQuery({
-//     queryKey: ['exam-results', examId],
-//     queryFn: () => examService.getResults(examId),
-//     enabled: !!examId
-//   });
-
-//   const results = resultsResponse?.data || [];
-
-//   // Calculate statistics
-//   const stats = {
-//     total: results.length,
-//     passed: results.filter(r => r.status === 'pass').length,
-//     failed: results.filter(r => r.status === 'fail').length,
-//     absent: results.filter(r => r.status === 'absent').length,
-//     avgPercentage: results.length > 0 
-//       ? (results.reduce((sum, r) => sum + (Number(r.percentage) || 0), 0) / results.length).toFixed(2)
-//       : 0,
-//     topScore: results.length > 0 
-//       ? Math.max(...results.map(r => r.total_marks_obtained || 0))
-//       : 0,
-//     passPercentage: results.length > 0
-//       ? ((results.filter(r => r.status === 'pass').length / results.length) * 100).toFixed(2)
-//       : 0
-//   };
-
-//   const columns = [
-//     {
-//       accessorKey: 'student.roll_number',
-//       header: 'Roll No',
-//       cell: ({ row }) => row.original.student?.roll_number || '—'
-//     },
-//     {
-//       accessorKey: 'student.name',
-//       header: 'Student Name',
-//       cell: ({ row }) => (
-//         <div>
-//           <p className="font-medium">{row.original.student?.first_name} {row.original.student?.last_name}</p>
-//           <p className="text-xs text-muted-foreground">{row.original.student?.email}</p>
-//         </div>
-//       )
-//     },
-//     {
-//       accessorKey: 'total_marks_obtained',
-//       header: 'Marks Obtained',
-//       cell: ({ getValue }) => (
-//         <div className="font-semibold">{getValue()} / {exam?.total_marks}</div>
-//       )
-//     },
-//     {
-//       accessorKey: 'percentage',
-//       header: 'Percentage',
-//       cell: ({ getValue }) => {
-//         const percentage = Number(getValue()) || 0;
-//         const color = percentage >= 70 ? 'text-green-600' : percentage >= 50 ? 'text-amber-600' : 'text-red-600';
-//         return <span className={`font-semibold ${color}`}>{percentage.toFixed(2)}%</span>;
-//       }
-//     },
-//     {
-//       accessorKey: 'grade',
-//       header: 'Grade',
-//       cell: ({ getValue }) => (
-//         <Badge variant="outline" className="text-sm font-semibold">
-//           {getValue()}
-//         </Badge>
-//       )
-//     },
-//     {
-//       accessorKey: 'status',
-//       header: 'Status',
-//       cell: ({ getValue }) => {
-//         const status = getValue();
-//         const variant = status === 'pass' ? 'default' : status === 'absent' ? 'secondary' : 'destructive';
-//         return (
-//           <Badge variant={variant} className="capitalize">
-//             {status}
-//           </Badge>
-//         );
-//       }
-//     },
-//     {
-//       accessorKey: 'rank',
-//       header: 'Rank',
-//       cell: ({ getValue }) => {
-//         const rank = getValue();
-//         return rank ? (
-//           <div className="flex items-center font-semibold">
-//             <Award className="h-4 w-4 mr-1 text-amber-600" />
-//             #{rank}
-//           </div>
-//         ) : '—';
-//       }
-//     },
-//     {
-//       id: 'actions',
-//       header: 'Actions',
-//       cell: ({ row }) => (
-//         <Button
-//           size="sm"
-//           variant="outline"
-//           onClick={() => {
-//             setSelectedStudent(row.original.student);
-//             setSelectedResult(row.original);
-//           }}
-//           className="gap-2"
-//         >
-//           <PrinterIcon className="h-4 w-4" />
-//           Print Card
-//         </Button>
-//       )
-//     }
-//   ];
-
-//   if (examLoading || resultsLoading) {
-//     return <PageLoader message="Loading results..." />;
-//   }
-
-//   if (!exam) {
-//     return (
-//       <div className="space-y-4">
-//         <PageHeader title="Exam Not Found" description="The exam you're looking for doesn't exist." />
-//         <Button onClick={() => router.back()}>
-//           <ArrowLeft className="mr-2 h-4 w-4" />
-//           Go Back
-//         </Button>
-//       </div>
-//     );
-//   }
-
-//   const sortedResults = [...results].sort((a, b) => (b.percentage || 0) - (a.percentage || 0));
-
-//   return (
-//     <>
-//       <AppModal
-//         open={!!(selectedStudent && selectedResult)}
-//         onClose={() => {
-//           setSelectedStudent(null);
-//           setSelectedResult(null);
-//         }}
-//         title="Student Result Card"
-//         description={selectedStudent ? `${selectedStudent.first_name} ${selectedStudent.last_name}` : ''}
-//         size="xl"
-//       >
-//         {selectedStudent && selectedResult && (
-//           <ResultCard
-//             student={selectedStudent}
-//             exam={exam}
-//             result={selectedResult}
-//             institute={institute}
-//           />
-//         )}
-//       </AppModal>
-
-//       <div className="space-y-6" role="main">
-//         <PageHeader
-//           title={`Results - ${exam.name}`}
-//           description={`${exam.name} | ${results.length} students | ${exam.total_marks} marks`}
-//           action={
-//             <div className="flex gap-2">
-//               <Button onClick={() => router.back()} variant="outline">
-//                 <ArrowLeft className="mr-2 h-4 w-4" />
-//                 Back
-//               </Button>
-//               <Button>
-//                 <Download className="mr-2 h-4 w-4" />
-//                 Export
-//               </Button>
-//             </div>
-//           }
-//         />
-
-//         {/* Statistics */}
-//         <div className="grid gap-4 sm:grid-cols-4">
-//           <StatsCard
-//             label="Total Students"
-//             value={stats.total}
-//             icon={<Users size={18} />}
-//             variant="info"
-//           />
-//           <StatsCard
-//             label="Passed"
-//             value={stats.passed}
-//             icon={<TrendingUp size={18} />}
-//             variant="success"
-//             subtitle={`${stats.passPercentage}%`}
-//           />
-//           <StatsCard
-//             label="Failed"
-//             value={stats.failed}
-//             icon={<TrendingUp size={18} />}
-//             variant="destructive"
-//           />
-//           <StatsCard
-//             label="Avg Percentage"
-//             value={`${stats.avgPercentage}%`}
-//             icon={<TrendingUp size={18} />}
-//             variant="warning"
-//           />
-//         </div>
-
-//         {/* Subject-wise Analysis */}
-//         {exam.subject_schedules && exam.subject_schedules.length > 0 && (
-//           <Card>
-//             <CardHeader>
-//               <CardTitle>Subject-wise Analysis</CardTitle>
-//             </CardHeader>
-//             <CardContent>
-//               <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-//                 {exam.subject_schedules.map(subject => {
-//                   const subjectResults = results
-//                     .flatMap(r => r.subject_marks || [])
-//                     .filter(sm => sm.subject_id === subject.subject_id);
-                  
-//                   const avgMarks = subjectResults.length > 0
-//                     ? (subjectResults.reduce((sum, sm) => sum + (sm.marks_obtained || 0), 0) / subjectResults.length).toFixed(2)
-//                     : 0;
-
-//                   return (
-//                     <Card key={subject.subject_id} className="border">
-//                       <CardContent className="pt-6">
-//                         <div className="text-sm font-medium mb-2">{subject.subject_name}</div>
-//                         <div className="text-2xl font-bold text-primary">{avgMarks}</div>
-//                         <div className="text-xs text-muted-foreground">Average out of {subject.total_marks}</div>
-//                       </CardContent>
-//                     </Card>
-//                   );
-//                 })}
-//               </div>
-//             </CardContent>
-//           </Card>
-//         )}
-
-//         {/* Results Table */}
-//         <Card>
-//           <CardHeader>
-//             <CardTitle>Student Results</CardTitle>
-//           </CardHeader>
-//           <CardContent>
-//             <DataTable
-//               columns={columns}
-//               data={sortedResults}
-//               emptyMessage="No results found"
-//               pagination={false}
-//             />
-//           </CardContent>
-//         </Card>
-//       </div>
-//     </>
-//   );
-// }
-
 'use client';
 
 /**
  * ExamResultsReportPage — View and analyze published exam results
  * Shows rankings, pass/fail stats, performance analytics
- * Fixed: Subject-level pass/fail based on 40% threshold
+ * Fixed: Subject-level pass/fail based on threshold and robust stats calculation
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Download, ArrowLeft, TrendingUp, Users, Award, PrinterIcon } from 'lucide-react';
@@ -313,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/store/authStore';
 
 import { examService } from '@/services/examService';
+import { classService } from '@/services/classService';
 
 // ======================= HELPER FUNCTIONS =======================
 /**
@@ -332,21 +43,25 @@ const getGradeFromPercentage = (percentage) => {
 /**
  * Check if a subject is passed (marks >= 40% of total)
  */
-const isSubjectPass = (marksObtained, totalMarks) => {
+const isSubjectPass = (marksObtained, totalMarks, subjectPassMarks) => {
+  if (subjectPassMarks != null && Number(subjectPassMarks) >= 0) {
+    return marksObtained >= Number(subjectPassMarks);
+  }
   if (!totalMarks || totalMarks === 0) return true;
-  const passingMarks = totalMarks * 0.4; // 40% threshold
+  const passingMarks = totalMarks * 0.4; // default 40% threshold
   return marksObtained >= passingMarks;
 };
 
 /**
  * Process a single result to compute correct subject passes, overall status, and grade
  */
-const processResult = (result, examTotalMarks) => {
+const processResult = (result, examTotalMarks, subjectMap = {}) => {
   // Process each subject
   const processedSubjects = (result.subject_marks || []).map(sub => {
     const marksObtained = Number(sub.marks_obtained) || 0;
     const totalMarks = Number(sub.total_marks) || 0;
-    const passed = isSubjectPass(marksObtained, totalMarks);
+    const passThreshold = subjectMap[sub.subject_id]?.pass_marks;
+    const passed = isSubjectPass(marksObtained, totalMarks, passThreshold);
     const percentage = totalMarks > 0 ? (marksObtained / totalMarks) * 100 : 0;
     const grade = sub.grade || getGradeFromPercentage(percentage);
     
@@ -396,6 +111,8 @@ export default function ExamResultsReportPage({ examId, type }) {
   const institute = getInstitute();
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [selectedResult, setSelectedResult] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Fetch exam details
   const { data: exam, isLoading: examLoading } = useQuery({
@@ -404,20 +121,37 @@ export default function ExamResultsReportPage({ examId, type }) {
     enabled: !!examId
   });
 
-  // Fetch results
+  // Fetch class to get class & section names
+  const { data: classData } = useQuery({
+    queryKey: ['class', exam?.class_id],
+    queryFn: () => classService.getById(exam?.class_id),
+    enabled: !!exam?.class_id
+  });
+
+  // Fetch results with pagination
   const { data: resultsResponse, isLoading: resultsLoading } = useQuery({
-    queryKey: ['exam-results', examId],
-    queryFn: () => examService.getResults(examId),
+    queryKey: ['exam-results', examId, page, pageSize],
+    queryFn: () => examService.getResults(examId, { page, limit: pageSize }),
     enabled: !!examId
   });
 
   const rawResults = resultsResponse?.data || [];
+  const pagination = resultsResponse?.pagination || {};
+  const total = pagination.total ?? rawResults.length;
+  const totalPages = pagination.totalPages ?? 1;
+  const summary = resultsResponse?.summary || exam?.results_summary;
+
+  // Build subject lookup map for pass marks
+  const subjectMap = {};
+  (exam?.subject_schedules || []).forEach(s => {
+    subjectMap[s.subject_id] = s;
+  });
   
   // Process results with correct pass/fail logic
   const examTotalMarks = exam?.total_marks || 
     exam?.subject_schedules?.reduce((sum, s) => sum + (s.total_marks || 0), 0) || 0;
   
-  const processedResults = rawResults.map(result => processResult(result, examTotalMarks));
+  const processedResults = rawResults.map(result => processResult(result, examTotalMarks, subjectMap));
   
   // Sort by rank or percentage
   const sortedResults = [...processedResults].sort((a, b) => {
@@ -425,22 +159,59 @@ export default function ExamResultsReportPage({ examId, type }) {
     return (b.overallPercentage || 0) - (a.overallPercentage || 0);
   });
 
-  // Calculate statistics based on processed status
+  // Robust statistics calculation (handles 0/null summary cache gracefully)
+  const effectiveTotal = (summary && Number(summary.total_students) > 0)
+    ? Number(summary.total_students)
+    : (Number(total) > 0 ? Number(total) : processedResults.length);
+
+  const hasSummaryStats = summary && Number(summary.total_students) > 0;
+
+  const passedCount = hasSummaryStats && summary.passed != null
+    ? Number(summary.passed)
+    : processedResults.filter(r => r.overallStatus === 'pass').length;
+
+  const failedCount = hasSummaryStats && summary.failed != null
+    ? Number(summary.failed)
+    : processedResults.filter(r => r.overallStatus === 'fail').length;
+
+  const absentCount = hasSummaryStats && summary.absent != null
+    ? Number(summary.absent)
+    : processedResults.filter(r => r.overallStatus === 'absent').length;
+
+  const avgPct = hasSummaryStats && summary.avg_percentage != null
+    ? Number(summary.avg_percentage).toFixed(2)
+    : (processedResults.length > 0 
+        ? (processedResults.reduce((sum, r) => sum + (r.overallPercentage || 0), 0) / processedResults.length).toFixed(2)
+        : '0.00');
+
+  const topScoreValue = hasSummaryStats && summary.top_score != null
+    ? Number(summary.top_score)
+    : (processedResults.length > 0 
+        ? Math.max(...processedResults.map(r => r.total_marks_obtained || 0))
+        : 0);
+
+  const passPct = hasSummaryStats && summary.pass_percentage != null
+    ? Number(summary.pass_percentage).toFixed(2)
+    : (processedResults.length > 0
+        ? ((passedCount / (processedResults.length || 1)) * 100).toFixed(2)
+        : '0.00');
+
   const stats = {
-    total: processedResults.length,
-    passed: processedResults.filter(r => r.overallStatus === 'pass').length,
-    failed: processedResults.filter(r => r.overallStatus === 'fail').length,
-    absent: processedResults.filter(r => r.overallStatus === 'absent').length,
-    avgPercentage: processedResults.length > 0 
-      ? (processedResults.reduce((sum, r) => sum + (r.overallPercentage || 0), 0) / processedResults.length).toFixed(2)
-      : 0,
-    topScore: processedResults.length > 0 
-      ? Math.max(...processedResults.map(r => r.total_marks_obtained || 0))
-      : 0,
-    passPercentage: processedResults.length > 0
-      ? ((processedResults.filter(r => r.overallStatus === 'pass').length / processedResults.length) * 100).toFixed(2)
-      : 0
+    total: effectiveTotal,
+    passed: passedCount,
+    failed: failedCount,
+    absent: absentCount,
+    avgPercentage: avgPct,
+    topScore: topScoreValue,
+    passPercentage: passPct
   };
+
+  // Class and Section labels
+  const className = classData?.data?.name || classData?.name || '';
+  const sectionsList = classData?.data?.sections || classData?.sections || [];
+  const sectionName = exam?.section_id
+    ? (sectionsList.find(s => s.id === exam.section_id)?.name ? `Section ${sectionsList.find(s => s.id === exam.section_id)?.name}` : 'Specific Section')
+    : 'All Sections';
 
   // Table columns with processed data
   const columns = [
@@ -455,17 +226,28 @@ export default function ExamResultsReportPage({ examId, type }) {
       cell: ({ row }) => (
         <div>
           <p className="font-medium">{row.original.student?.first_name} {row.original.student?.last_name}</p>
-          <p className="text-xs text-muted-foreground">{row.original.student?.email}</p>
+          {row.original.student?.email && (
+            <p className="text-xs text-muted-foreground">{row.original.student?.email}</p>
+          )}
         </div>
       )
     },
+    ...(!exam?.section_id ? [{
+      id: 'section_name',
+      header: 'Section',
+      cell: ({ row }) => (
+        <Badge variant="outline" className="text-xs font-normal">
+          {row.original.student?.section_name || '—'}
+        </Badge>
+      )
+    }] : []),
     {
       accessorKey: 'total_marks_obtained',
       header: 'Marks Obtained',
       cell: ({ row }) => {
         const obtained = row.original.total_marks_obtained;
-        const total = examTotalMarks;
-        return <div className="font-semibold">{obtained} / {total}</div>;
+        const totalMarksVal = examTotalMarks;
+        return <div className="font-semibold">{obtained} / {totalMarksVal}</div>;
       }
     },
     {
@@ -608,7 +390,7 @@ export default function ExamResultsReportPage({ examId, type }) {
       <div className="space-y-6" role="main">
         <PageHeader
           title={`Results - ${exam.name}`}
-          description={`${exam.name} | ${stats.total} students | ${examTotalMarks} marks`}
+          description={`${className ? `Class: ${className}` : ''}${sectionName ? ` (${sectionName})` : ''} • ${stats.total} students • ${examTotalMarks} marks`}
           action={
             <div className="flex gap-2">
               <Button onClick={() => router.back()} variant="outline">
@@ -706,7 +488,17 @@ export default function ExamResultsReportPage({ examId, type }) {
               columns={columns}
               data={sortedResults}
               emptyMessage="No results found"
-              pagination={false}
+              pagination={{
+                page,
+                totalPages,
+                onPageChange: setPage,
+                total,
+                pageSize,
+                onPageSizeChange: (s) => {
+                  setPageSize(s);
+                  setPage(1);
+                }
+              }}
             />
           </CardContent>
         </Card>
