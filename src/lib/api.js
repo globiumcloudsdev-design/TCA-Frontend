@@ -10,6 +10,7 @@
  * On 401 → tries to refresh token once, then logs out.
  */
 
+import { humanizeAxiosError } from '@/lib/errorMessages';
 import axios from 'axios';
 import Cookies from 'js-cookie';
 import {
@@ -150,6 +151,8 @@ const processQueue = (error, token = null) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Log technical details to the console and replace user-visible messages with plain language
+    humanizeAxiosError(error);
     const originalRequest = error.config;
 
     if (
@@ -175,16 +178,11 @@ api.interceptors.response.use(
         getRefreshToken() ||
         Cookies.get('refreshToken') ||
         Cookies.get('refresh_token') ||
-        (typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null);
+        null;
 
-      // If no refresh token exists at all, do not attempt network refresh
-      if (!storedRefreshToken) {
-        clearAuthData();
-        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-          window.location.replace('/login');
-        }
-        return Promise.reject(error);
-      }
+      // No client-readable refresh token is fine: the backend also sets an httpOnly
+      // refresh cookie (sent via withCredentials). If neither works the refresh fails
+      // below and the user is logged out.
 
       originalRequest._retry = true;
       isRefreshing = true;
@@ -192,10 +190,9 @@ api.interceptors.response.use(
       try {
         const { data } = await axios.post(
           `${BASE_URL}/auth/refresh-token`,
-          {
-            refreshToken: storedRefreshToken,
-            refresh_token: storedRefreshToken
-          },
+          storedRefreshToken
+            ? { refreshToken: storedRefreshToken, refresh_token: storedRefreshToken }
+            : {},
           { withCredentials: true }
         );
         const newToken = data?.data?.access_token || data?.data?.accessToken;
@@ -213,6 +210,7 @@ api.interceptors.response.use(
           throw new Error('No access token received from refresh-token');
         }
       } catch (refreshError) {
+        humanizeAxiosError(refreshError);
         processQueue(refreshError, null);
         // Token refresh failed — clean wipe everything and redirect to login
         clearAuthData();
