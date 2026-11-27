@@ -17,90 +17,31 @@ import { withFallback } from '@/lib/withFallback';
 import { DUMMY_NOTIFICATIONS, paginate } from '@/data/dummyData';
 
 /**
- * Get all notifications for current user with optional filters
+ * Inbox (real backend only: no demo/dummy fallback, so the bell never shows fake items)
  * @param {Object} filters - { is_read, type, page, limit, sort }
  */
-export const getAll = (filters = {}) =>
-  withFallback(
-    () => api.get('/notifications', { params: filters }).then((r) => r.data),
-    () => {
-      let data = [...DUMMY_NOTIFICATIONS];
-      
-      // Filter by read status
-      if (filters.is_read !== undefined) {
-        const isRead = filters.is_read === 'true' || filters.is_read === true;
-        data = data.filter((n) => n.is_read === isRead);
-      }
-      
-      // Filter by type
-      if (filters.type) {
-        data = data.filter((n) => n.type === filters.type);
-      }
-      
-      // Sort
-      const sort = filters.sort === 'ASC' ? 'ASC' : 'DESC';
-      data.sort((a, b) => {
-        const timeA = new Date(a.createdAt || a.created_at).getTime();
-        const timeB = new Date(b.createdAt || b.created_at).getTime();
-        return sort === 'DESC' ? timeB - timeA : timeA - timeB;
-      });
-      
-      return paginate(data, filters.page, filters.limit);
-    }
-  );
+export const getAll = (filters = {}) => api.get('/notifications', { params: filters }).then((r) => r.data);
+
+/** Count of unread notifications -> { data: { count } } */
+export const getUnreadCount = () => api.get('/notifications/unread-count').then((r) => r.data);
+
+/** Notification statistics */
+export const getStats = () => api.get('/notifications/stats').then((r) => r.data);
+
+/** Mark a single notification as read */
+export const markRead = (id) => api.patch(`/notifications/${id}/read`).then((r) => r.data);
+
+/** Mark all notifications as read */
+export const markAllRead = () => api.patch('/notifications/mark-all-read').then((r) => r.data);
 
 /**
- * Get count of unread notifications
+ * Admin composer: POST /notifications/send
+ * @param {{ title: string, body: string, audience: object, data?: object }} payload  (see lib/notificationAudience.js)
  */
-export const getUnreadCount = () =>
-  withFallback(
-    () => api.get('/notifications/unread-count').then((r) => r.data),
-    () => ({
-      data: {
-        count: DUMMY_NOTIFICATIONS.filter((n) => !n.is_read).length,
-      },
-    })
-  );
+export const sendToAudience = (payload) => api.post('/notifications/send', payload).then((r) => r.data);
 
-/**
- * Get notification statistics
- */
-export const getStats = () =>
-  withFallback(
-    () => api.get('/notifications/stats').then((r) => r.data),
-    () => {
-      const unreadCount = DUMMY_NOTIFICATIONS.filter((n) => !n.is_read).length;
-      const byType = {};
-      DUMMY_NOTIFICATIONS.forEach((n) => {
-        byType[n.type] = (byType[n.type] || 0) + 1;
-      });
-      return {
-        data: {
-          unreadCount,
-          totalCount: DUMMY_NOTIFICATIONS.length,
-          byType,
-        },
-      };
-    }
-  );
-
-/**
- * Mark single notification as read
- */
-export const markRead = (id) =>
-  withFallback(
-    () => api.patch(`/notifications/${id}/read`).then((r) => r.data),
-    () => ({ data: { id, is_read: true } })
-  );
-
-/**
- * Mark all notifications as read
- */
-export const markAllRead = () =>
-  withFallback(
-    () => api.patch('/notifications/mark-all-read').then((r) => r.data),
-    () => ({ data: { updated: DUMMY_NOTIFICATIONS.length } })
-  );
+/** Recipient count before sending -> { data: { count, by_role } } */
+export const previewAudience = (audience) => api.post('/notifications/audience/preview', { audience }).then((r) => r.data);
 
 /**
  * Delete a notification
@@ -162,8 +103,11 @@ export const notificationService = {
   markRead,
   markAllRead,
   delete: deleteNotification,
+  deleteNotification,
   cleanupOld: cleanupOldNotifications,
   send: sendNotification,
+  sendToAudience,
+  previewAudience,
   broadcast: broadcastNotification,
   getGlobalAnnouncements,
 };

@@ -183,7 +183,8 @@ export const NAV = {
     { group: 'Finance', label: 'Fee Templates', href: '/school/fee-templates', icon: 'Receipt', permission: 'fee_templates.create' },
     { group: 'Finance', label: 'Payroll', href: '/school/payroll', icon: 'DollarSign', permission: 'payroll.read' },
     { group: 'Finance', label: 'Reports', href: '/school/reports', icon: 'BarChart2', permission: 'reports.student' },
-    { group: 'Comms', label: 'Notifications', href: '/school/notices', icon: 'Bell', permission: 'notices.read' },
+    // (The old /school/notices page has no backend endpoint yet and stays hidden.)
+    { group: 'Comms', label: 'Send Notification', href: '/school/notifications', icon: 'Bell', permission: 'notices.create' },
     { group: 'Operations', label: 'Events', href: '/school/events', icon: 'Calendar', permission: 'notices.read' },
     { group: 'Admin', label: 'Branches', href: '/school/branches', icon: 'Building2', permission: 'branches.read', requiresBranches: true },
     // { group: 'Admin', label: 'Roles', href: '/school/roles', icon: 'Shield', permission: 'roles.read' },
