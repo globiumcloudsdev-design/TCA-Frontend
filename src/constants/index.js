@@ -164,7 +164,8 @@ export const SCHOOL_NAV = [
   // ── Academics ─────────────────────────────────────────────────────────
   { label: 'Classes', href: '/classes', icon: 'BookOpen', permission: PERMISSIONS.CLASS_READ, group: 'Academics' },
   { label: 'Sections', href: '/sections', icon: 'Layers', permission: PERMISSIONS.SECTION_READ, group: 'Academics' },
-  { label: 'Subjects', href: '/subjects', icon: 'BookMarked', permission: PERMISSIONS.SUBJECT_READ, group: 'Academics' },
+  // Hidden: backend route does not exist yet
+  // { label: 'Subjects', href: '/subjects', icon: 'BookMarked', permission: PERMISSIONS.SUBJECT_READ, group: 'Academics' },
   { label: 'Timetable', href: '/timetable', icon: 'CalendarDays', permission: PERMISSIONS.TIMETABLE_READ, group: 'Academics' },
   { label: 'Attendance', href: '/attendance', icon: 'CalendarCheck', permission: PERMISSIONS.ATTENDANCE_READ, group: 'Academics' },
   { label: 'Exams', href: '/exams', icon: 'FileText', permission: PERMISSIONS.EXAM_READ, group: 'Academics' },

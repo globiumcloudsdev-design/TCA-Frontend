@@ -271,6 +271,34 @@
 // src/lib/idCardGenerator.js
 
 // Default policy config (fallback)
+import QRCode from 'qrcode';
+
+/** Escape a value for safe interpolation into HTML text or a quoted attribute. */
+export const escapeHtml = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+/** Only allow http(s)/relative/blob/data-image URLs; anything else (javascript: etc.) becomes empty. */
+const safeUrl = (value) => {
+  const v = String(value ?? '').trim();
+  if (!v) return '';
+  if (/^(https?:|blob:|\/(?!\/))/i.test(v) || /^data:image\/(png|jpe?g|gif|webp);/i.test(v)) return escapeHtml(v);
+  return '';
+};
+
+/** Lengths (e.g. 16px, 50%) from admin policy settings. */
+const safeLength = (value, fallback) => (/^[0-9.]{1,6}(px|%|rem|em)?$/.test(String(value ?? '').trim()) ? String(value).trim() : fallback);
+
+/** Colours come from admin policy settings: only allow plain CSS colour tokens. */
+const safeColor = (value, fallback) => {
+  const v = String(value ?? '').trim();
+  return /^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,20}|rgba?\([\d\s.,%]+\)|hsla?\([\d\s.,%]+\))$/.test(v) ? v : fallback;
+};
+
 const DEFAULT_POLICY_CONFIG = {
   layout: 'vertical',
   card_type: 'student',
@@ -347,35 +375,25 @@ const flattenStudentData = (student) => {
   };
 };
 
-// Generate QR Code SVG from value
+// Generate a REAL, scannable QR code SVG from a value
 const generateQRCodeSVG = (value) => {
   if (!value) return '';
-  
-  // Create a simple QR-like SVG based on the value
-  // This creates a deterministic pattern based on the input string
-  const hash = value.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const seed = hash % 100;
-  
-  return `
-    <svg width="55" height="55" viewBox="0 0 25 25" style="background:white; padding:4px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-      <rect width="25" height="25" fill="white"/>
-      ${[0,1,2,3,4,5,6,7].map(r => [0,1,2,3,4,5,6,7].map(c => {
-        const inTL = r < 7 && c < 7;
-        const inTR = r < 7 && c > 17;
-        const inBL = r > 17 && c < 7;
-        const border = (r === 0 || r === 6 || c === 0 || c === 6) && inTL ||
-                       (r === 0 || r === 6 || c === 18 || c === 24) && inTR ||
-                       (r === 18 || r === 24 || c === 0 || c === 6) && inBL;
-        const center = (r >= 2 && r <= 4 && c >= 2 && c <= 4) ||
-                       (r >= 2 && r <= 4 && c >= 20 && c <= 22) ||
-                       (r >= 20 && r <= 22 && c >= 2 && c <= 4);
-        const data = ((r * c + seed) % 3 === 0) && !inTL && !inTR && !inBL;
-        const fill = border || center || data ? '#000' : '#fff';
-        return `<rect x="${c}" y="${r}" width="1" height="1" fill="${fill}"/>`;
-      }).join('')).join('')}
-      <text x="12" y="24" font-size="3" fill="#000" font-family="monospace">${value.slice(0, 8)}</text>
-    </svg>
-  `;
+  try {
+    const qr = QRCode.create(String(value), { errorCorrectionLevel: 'M' });
+    const size = qr.modules.size;
+    const data = qr.modules.data;
+    const margin = 2;
+    const total = size + margin * 2;
+    let rects = '';
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        if (data[r * size + c]) rects += `<rect x="${c + margin}" y="${r + margin}" width="1" height="1"/>`;
+      }
+    }
+    return `<svg width="55" height="55" viewBox="0 0 ${total} ${total}" shape-rendering="crispEdges" style="background:#ffffff;border-radius:6px;"><rect width="${total}" height="${total}" fill="#ffffff"/><g fill="#000000">${rects}</g></svg>`;
+  } catch (e) {
+    return '';
+  }
 };
 
 // Create complete HTML with Front and Back on ONE PAGE
@@ -385,33 +403,33 @@ const createCompleteCardHTML = (student, institute, policyConfig) => {
   const watermark = policyConfig?.show_watermark !== false;
   const showQr = policyConfig?.qr_enabled || false;
   const termsList = policyConfig?.terms_list || DEFAULT_POLICY_CONFIG.terms_list;
-  const bgColor = design.background_color || '#0f172a';
-  const accentColor = design.accent_color || '#f97316';
-  const textColor = design.text_color || '#ffffff';
-  const logoUrl = institute?.logo_url || '';
-  const instituteName = institute?.name || 'ABC School';
-  const tagline = institute?.settings?.academic?.school_tagline || 'Excellence in Education';
-  const address = institute?.address || '123 Street, City';
-  const phone = institute?.phone || '(123) 456-7890';
-  const email = institute?.email || 'info@school.com';
-  const validUpto = student.valid_upto || '31 Dec 2025';
-  const studentName = student.full_name || 'Student Name';
-  const parentName = student.parent_name || 'Parent Name';
-  const rollNumber = student.roll_number || 'ROLL-001';
-  const className = student.class || 'Class';
-  const section = student.section || 'A';
-  const bloodGroup = student.blood_group || 'O+';
-  const photoUrl = student.photo_url || '';
-  const qrValue = student.qr_code_url || rollNumber;
-  
-  // Generate QR code based on student's actual data
-  // const qrCodeSVG = showQr ? generateQRCodeSVG(qrValue) : '';
+  const bgColor = safeColor(design.background_color, '#0f172a');
+  const accentColor = safeColor(design.accent_color, '#f97316');
+  const textColor = safeColor(design.text_color, '#ffffff');
+  // Every value that is interpolated into the card HTML is escaped; URLs are validated.
+  const logoUrl = safeUrl(institute?.logo_url);
+  const instituteName = escapeHtml(institute?.name || 'ABC School');
+  const tagline = escapeHtml(institute?.settings?.academic?.school_tagline || 'Excellence in Education');
+  const address = escapeHtml(institute?.address || '123 Street, City');
+  const phone = escapeHtml(institute?.phone || '(123) 456-7890');
+  const email = escapeHtml(institute?.email || 'info@school.com');
+  const validUpto = escapeHtml(student.valid_upto || '31 Dec 2025');
+  const studentName = escapeHtml(student.full_name || 'Student Name');
+  const parentName = escapeHtml(student.parent_name || 'Parent Name');
+  const rollNumberRaw = student.roll_number || 'ROLL-001';
+  const rollNumber = escapeHtml(rollNumberRaw);
+  const className = escapeHtml(student.class || 'Class');
+  const section = escapeHtml(student.section || 'A');
+  const bloodGroup = escapeHtml(student.blood_group || 'O+');
+  const photoUrl = safeUrl(student.photo_url);
+  const safeQrUrl = safeUrl(student.qr_code_url);
+
+  // QR: use the server-provided image only if it is a safe URL, otherwise render a real QR locally.
+  // The raw value is only encoded into the QR, never injected as HTML.
   const qrCodeSVG = showQr
-  ? student.qr_code_url
-    ? `<img src="${student.qr_code_url}" 
-         style="width:60px;height:60px;border-radius:8px;
-         background:#fff;padding:4px;" />`
-    : generateQRCodeSVG(student.qr_value || rollNumber)
+  ? safeQrUrl
+    ? `<img src="${safeQrUrl}" style="width:60px;height:60px;border-radius:8px;background:#fff;padding:4px;" />`
+    : generateQRCodeSVG(student.qr_value || rollNumberRaw)
   : "";
 
   if (layout === 'horizontal') {
@@ -448,11 +466,11 @@ const createCompleteCardHTML = (student, institute, policyConfig) => {
           .card {
             width: 340px;
             height: 215px;
-            border-radius: ${design.border_radius || '16px'};
+            border-radius: ${safeLength(design.border_radius, '16px')};
             overflow: hidden;
             position: relative;
             box-shadow: ${design.card_shadow ? '0 10px 30px rgba(0,0,0,0.3)' : 'none'};
-            border: ${design.show_border ? `1px solid ${design.border_color || '#e2e8f0'}` : 'none'};
+            border: ${design.show_border ? `1px solid ${safeColor(design.border_color, '#e2e8f0')}` : 'none'};
           }
           .label {
             text-align: center;
@@ -498,7 +516,7 @@ const createCompleteCardHTML = (student, institute, policyConfig) => {
                   <div style="font-size: 7px; color: #fff; background: ${accentColor}; padding: 2px 8px; border-radius: 20px;">BACK SIDE</div>
                 </div>
                 <div style="flex: 1; padding: 8px 16px; display: flex; gap: 16px;">
-                  <div style="flex: 1;"><div style="font-size: 10px; font-weight: 800; color: ${bgColor}; margin-bottom: 6px;">📜 Terms & Conditions</div><div style="max-height: 85px; overflow-y: auto;">${termsList.slice(0,3).map(term => `<div style="display:flex; gap:4px; margin-bottom:3px;"><div style="width:3px; height:3px; border-radius:50%; background:${accentColor}; margin-top:4px;"></div><span style="font-size:6.5px; color:#374151;">${term}</span></div>`).join('')}</div><div style="margin-top: 6px;"><div style="font-size: 8px; font-weight: 700; color: ${bgColor};">Signature Authority</div><svg width="60" height="14" viewBox="0 0 60 14"><path d="M5 10 Q15 3 25 8 Q35 15 45 6 Q55 0 65 7" stroke="${bgColor}" stroke-width="1" fill="none" /></svg></div></div>
+                  <div style="flex: 1;"><div style="font-size: 10px; font-weight: 800; color: ${bgColor}; margin-bottom: 6px;">📜 Terms & Conditions</div><div style="max-height: 85px; overflow-y: auto;">${termsList.slice(0,3).map(term => `<div style="display:flex; gap:4px; margin-bottom:3px;"><div style="width:3px; height:3px; border-radius:50%; background:${accentColor}; margin-top:4px;"></div><span style="font-size:6.5px; color:#374151;">${escapeHtml(term)}</span></div>`).join('')}</div><div style="margin-top: 6px;"><div style="font-size: 8px; font-weight: 700; color: ${bgColor};">Signature Authority</div><svg width="60" height="14" viewBox="0 0 60 14"><path d="M5 10 Q15 3 25 8 Q35 15 45 6 Q55 0 65 7" stroke="${bgColor}" stroke-width="1" fill="none" /></svg></div></div>
                   <div style="width: 1px; background: #e2e8f0;"></div>
                   <div style="flex: 0.8;"><div style="font-size: 8px; font-weight: 700; color: ${bgColor}; margin-bottom: 4px;">Contact Info</div><div style="font-size: 6.5px; color: #4b5563; margin-bottom: 2px;">📍 ${address.slice(0,30)}</div><div style="font-size: 6.5px; color: #4b5563; margin-bottom: 2px;">✉️ ${email}</div><div style="font-size: 6.5px; color: #4b5563;">📞 ${phone}</div>${qrCodeSVG ? `<div style="margin-top: 4px; display: flex; justify-content: center;">${qrCodeSVG}</div>` : ''}</div>
                 </div>
@@ -540,11 +558,11 @@ const createCompleteCardHTML = (student, institute, policyConfig) => {
         .card {
           width: 280px;
           height: 400px;
-          border-radius: ${design.border_radius || '16px'};
+          border-radius: ${safeLength(design.border_radius, '16px')};
           overflow: hidden;
           position: relative;
           box-shadow: ${design.card_shadow ? '0 20px 60px rgba(0,0,0,0.4)' : 'none'};
-          border: ${design.show_border ? `1px solid ${design.border_color || '#e2e8f0'}` : 'none'};
+          border: ${design.show_border ? `1px solid ${safeColor(design.border_color, '#e2e8f0')}` : 'none'};
         }
         .label {
           text-align: center;
@@ -590,7 +608,7 @@ const createCompleteCardHTML = (student, institute, policyConfig) => {
           <div class="card" style="background: #f8fafc;">
             <div style="background: ${bgColor}; padding: 10px 16px; position: relative; overflow: hidden;"><svg style="position: absolute; right: 0; top: 0; width: 70px; height: 70px;" viewBox="0 0 70 70"><path d="M70 0 Q35 20 50 70 L70 70 Z" fill="${accentColor}" opacity="0.6" /></svg><div style="color: rgba(255,255,255,0.5); font-size: 6px; font-weight: 600; letter-spacing: 1px;">VALID UNTIL</div><div style="color: #fff; font-size: 14px; font-weight: 800; margin-top: 2px;">${validUpto}</div></div>
             <div style="position: absolute; top: 70px; right: -10px; opacity: 0.05; z-index: 0; font-size: 80px;">${logoUrl ? `<img src="${logoUrl}" style="width:120px;height:120px;object-fit:contain" />` : '🏫'}</div>
-            <div style="padding: 12px 16px; position: relative; z-index: 1;"><div style="font-size: 12px; font-weight: 800; color: ${bgColor}; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;"><span>📜</span> Terms & Conditions</div><div style="max-height: 130px; overflow-y: auto;">${termsList.map(term => `<div style="display:flex; gap:5px; margin-bottom:5px; align-items:flex-start;"><div style="width:4px; height:4px; border-radius:50%; background:${accentColor}; margin-top:3px; flex-shrink:0;"></div><span style="font-size:8px; color:#374151; line-height:1.4;">${term}</span></div>`).join('')}</div></div>
+            <div style="padding: 12px 16px; position: relative; z-index: 1;"><div style="font-size: 12px; font-weight: 800; color: ${bgColor}; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;"><span>📜</span> Terms & Conditions</div><div style="max-height: 130px; overflow-y: auto;">${termsList.map(term => `<div style="display:flex; gap:5px; margin-bottom:5px; align-items:flex-start;"><div style="width:4px; height:4px; border-radius:50%; background:${accentColor}; margin-top:3px; flex-shrink:0;"></div><span style="font-size:8px; color:#374151; line-height:1.4;">${escapeHtml(term)}</span></div>`).join('')}</div></div>
             <div style="padding: 0 16px 8px; position: relative; z-index: 1;"><div style="font-size: 10px; font-weight: 700; color: ${bgColor};">Signature Authority</div><div style="font-size: 7px; color: #6b7280; margin-bottom: 3px;">Principal</div><svg width="80" height="18" viewBox="0 0 80 18"><path d="M5 14 Q15 3 25 11 Q35 20 45 8 Q55 0 65 10 Q75 20 85 7" stroke="${bgColor}" stroke-width="1.2" fill="none" /></svg><div style="border-top: 1px solid ${bgColor}; width: 80px; margin-top: 2px;"></div></div>
             ${qrCodeSVG ? `<div style="padding: 8px 16px; display: flex; justify-content: center; position: relative; z-index: 1;">${qrCodeSVG}</div>` : ''}
             <div style="padding: 6px 16px; background: #f1f5f9; border-top: 1px solid #e2e8f0; position: relative; z-index: 1;"><div style="display:flex; gap:5px; align-items:center; margin-bottom:2px;"><span style="font-size:8px;">📍</span><span style="font-size:7px; color:#4b5563;">${address.slice(0,30)}</span></div><div style="display:flex; gap:5px; align-items:center; margin-bottom:2px;"><span style="font-size:8px;">✉️</span><span style="font-size:7px; color:#4b5563;">${email}</span></div><div style="display:flex; gap:5px; align-items:center;"><span style="font-size:8px;">📞</span><span style="font-size:7px; color:#4b5563;">${phone}</span></div></div>
@@ -708,28 +726,27 @@ const createTeacherCompleteCardHTML = (teacher, institute, policyConfig) => {
     "Loss of card must be reported immediately.",
     "Return upon termination of employment."
   ];
-  const bgColor = design.background_color || '#0f172a';
-  const accentColor = design.accent_color || '#3b82f6'; // Fallback to blue for teachers
-  const textColor = design.text_color || '#ffffff';
-  const logoUrl = institute?.logo_url || '';
-  const instituteName = institute?.name || 'ABC School';
-  const tagline = institute?.settings?.academic?.school_tagline || 'Excellence in Education';
-  const address = institute?.address || '123 Street, City';
-  const phone = institute?.phone || '(123) 456-7890';
-  const email = institute?.email || 'info@school.com';
-  const validUpto = teacher.valid_upto;
-  const teacherName = teacher.full_name;
-  const employeeId = teacher.employee_id;
-  const designation = teacher.designation;
-  const department = teacher.department;
-  const bloodGroup = teacher.blood_group;
-  const photoUrl = teacher.photo_url;
-  
+  const bgColor = safeColor(design.background_color, '#0f172a');
+  const accentColor = safeColor(design.accent_color, '#3b82f6'); // Fallback to blue for teachers
+  const textColor = safeColor(design.text_color, '#ffffff');
+  const logoUrl = safeUrl(institute?.logo_url);
+  const instituteName = escapeHtml(institute?.name || 'ABC School');
+  const tagline = escapeHtml(institute?.settings?.academic?.school_tagline || 'Excellence in Education');
+  const address = escapeHtml(institute?.address || '123 Street, City');
+  const phone = escapeHtml(institute?.phone || '(123) 456-7890');
+  const email = escapeHtml(institute?.email || 'info@school.com');
+  const validUpto = escapeHtml(teacher.valid_upto);
+  const teacherName = escapeHtml(teacher.full_name);
+  const employeeId = escapeHtml(teacher.employee_id);
+  const designation = escapeHtml(teacher.designation);
+  const department = escapeHtml(teacher.department);
+  const bloodGroup = escapeHtml(teacher.blood_group);
+  const photoUrl = safeUrl(teacher.photo_url);
+  const safeQrUrl = safeUrl(teacher.qr_code_url);
+
   const qrCodeSVG = showQr
-  ? teacher.qr_code_url
-    ? `<img src="${teacher.qr_code_url}" 
-         style="width:60px;height:60px;border-radius:8px;
-         background:#fff;padding:4px;" />`
+  ? safeQrUrl
+    ? `<img src="${safeQrUrl}" style="width:60px;height:60px;border-radius:8px;background:#fff;padding:4px;" />`
     : generateQRCodeSVG(teacher.qr_value)
   : "";
 
@@ -745,7 +762,7 @@ const createTeacherCompleteCardHTML = (teacher, institute, policyConfig) => {
           body { background: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
           .id-card-container { display: flex; flex-direction: column; gap: 20px; align-items: center; }
           .card-row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
-          .card { width: 340px; height: 215px; border-radius: ${design.border_radius || '16px'}; overflow: hidden; position: relative; box-shadow: ${design.card_shadow ? '0 10px 30px rgba(0,0,0,0.3)' : 'none'}; border: ${design.show_border ? `1px solid ${design.border_color || '#e2e8f0'}` : 'none'}; }
+          .card { width: 340px; height: 215px; border-radius: ${safeLength(design.border_radius, '16px')}; overflow: hidden; position: relative; box-shadow: ${design.card_shadow ? '0 10px 30px rgba(0,0,0,0.3)' : 'none'}; border: ${design.show_border ? `1px solid ${safeColor(design.border_color, '#e2e8f0')}` : 'none'}; }
           .label { text-align: center; font-size: 10px; font-weight: 600; margin-top: 5px; color: #64748b; }
           @media print { body { background: white; padding: 0; margin: 0; } .label { display: none; } }
         </style>
@@ -778,7 +795,7 @@ const createTeacherCompleteCardHTML = (teacher, institute, policyConfig) => {
                   <div style="font-size: 7px; color: #fff; background: ${accentColor}; padding: 2px 8px; border-radius: 20px;">BACK SIDE</div>
                 </div>
                 <div style="flex: 1; padding: 8px 16px; display: flex; gap: 16px;">
-                  <div style="flex: 1;"><div style="font-size: 10px; font-weight: 800; color: ${bgColor}; margin-bottom: 6px;">📜 Terms & Conditions</div><div style="max-height: 85px; overflow-y: auto;">${termsList.slice(0,3).map(term => `<div style="display:flex; gap:4px; margin-bottom:3px;"><div style="width:3px; height:3px; border-radius:50%; background:${accentColor}; margin-top:4px;"></div><span style="font-size:6.5px; color:#374151;">${term}</span></div>`).join('')}</div><div style="margin-top: 6px;"><div style="font-size: 8px; font-weight: 700; color: ${bgColor};">Signature Authority</div><svg width="60" height="14" viewBox="0 0 60 14"><path d="M5 10 Q15 3 25 8 Q35 15 45 6 Q55 0 65 7" stroke="${bgColor}" stroke-width="1" fill="none" /></svg></div></div>
+                  <div style="flex: 1;"><div style="font-size: 10px; font-weight: 800; color: ${bgColor}; margin-bottom: 6px;">📜 Terms & Conditions</div><div style="max-height: 85px; overflow-y: auto;">${termsList.slice(0,3).map(term => `<div style="display:flex; gap:4px; margin-bottom:3px;"><div style="width:3px; height:3px; border-radius:50%; background:${accentColor}; margin-top:4px;"></div><span style="font-size:6.5px; color:#374151;">${escapeHtml(term)}</span></div>`).join('')}</div><div style="margin-top: 6px;"><div style="font-size: 8px; font-weight: 700; color: ${bgColor};">Signature Authority</div><svg width="60" height="14" viewBox="0 0 60 14"><path d="M5 10 Q15 3 25 8 Q35 15 45 6 Q55 0 65 7" stroke="${bgColor}" stroke-width="1" fill="none" /></svg></div></div>
                   <div style="width: 1px; background: #e2e8f0;"></div>
                   <div style="flex: 0.8;"><div style="font-size: 8px; font-weight: 700; color: ${bgColor}; margin-bottom: 4px;">Contact Info</div><div style="font-size: 6.5px; color: #4b5563; margin-bottom: 2px;">📍 ${address.slice(0,30)}</div><div style="font-size: 6.5px; color: #4b5563; margin-bottom: 2px;">✉️ ${email}</div><div style="font-size: 6.5px; color: #4b5563;">📞 ${phone}</div>${qrCodeSVG ? `<div style="margin-top: 4px; display: flex; justify-content: center;">${qrCodeSVG}</div>` : ''}</div>
                 </div>
@@ -804,7 +821,7 @@ const createTeacherCompleteCardHTML = (teacher, institute, policyConfig) => {
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body { background: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
         .id-card-container { display: flex; flex-direction: column; gap: 20px; align-items: center; }
-        .card { width: 280px; height: 400px; border-radius: ${design.border_radius || '16px'}; overflow: hidden; position: relative; box-shadow: ${design.card_shadow ? '0 20px 60px rgba(0,0,0,0.4)' : 'none'}; border: ${design.show_border ? `1px solid ${design.border_color || '#e2e8f0'}` : 'none'}; }
+        .card { width: 280px; height: 400px; border-radius: ${safeLength(design.border_radius, '16px')}; overflow: hidden; position: relative; box-shadow: ${design.card_shadow ? '0 20px 60px rgba(0,0,0,0.4)' : 'none'}; border: ${design.show_border ? `1px solid ${safeColor(design.border_color, '#e2e8f0')}` : 'none'}; }
         .label { text-align: center; font-size: 10px; font-weight: 600; margin-top: 5px; color: #64748b; }
         @media print { body { background: white; padding: 0; margin: 0; } .label { display: none; } }
       </style>
@@ -838,7 +855,7 @@ const createTeacherCompleteCardHTML = (teacher, institute, policyConfig) => {
           <div class="card" style="background: #f8fafc;">
             <div style="background: ${bgColor}; padding: 10px 16px; position: relative; overflow: hidden; height: 36px;"><svg style="position: absolute; right: 0; top: 0; width: 70px; height: 70px;" viewBox="0 0 70 70"><path d="M70 0 Q35 20 50 70 L70 70 Z" fill="${accentColor}" opacity="0.6" /></svg></div>
             <div style="position: absolute; top: 70px; right: -10px; opacity: 0.05; z-index: 0; font-size: 80px;">${logoUrl ? `<img src="${logoUrl}" style="width:120px;height:120px;object-fit:contain" />` : '🏫'}</div>
-            <div style="padding: 12px 16px; position: relative; z-index: 1;"><div style="font-size: 12px; font-weight: 800; color: ${bgColor}; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;"><span>📜</span> Terms & Conditions</div><div style="max-height: 130px; overflow-y: auto;">${termsList.map(term => `<div style="display:flex; gap:5px; margin-bottom:5px; align-items:flex-start;"><div style="width:4px; height:4px; border-radius:50%; background:${accentColor}; margin-top:3px; flex-shrink:0;"></div><span style="font-size:8px; color:#374151; line-height:1.4;">${term}</span></div>`).join('')}</div></div>
+            <div style="padding: 12px 16px; position: relative; z-index: 1;"><div style="font-size: 12px; font-weight: 800; color: ${bgColor}; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;"><span>📜</span> Terms & Conditions</div><div style="max-height: 130px; overflow-y: auto;">${termsList.map(term => `<div style="display:flex; gap:5px; margin-bottom:5px; align-items:flex-start;"><div style="width:4px; height:4px; border-radius:50%; background:${accentColor}; margin-top:3px; flex-shrink:0;"></div><span style="font-size:8px; color:#374151; line-height:1.4;">${escapeHtml(term)}</span></div>`).join('')}</div></div>
             <div style="padding: 0 16px 8px; position: relative; z-index: 1;"><div style="font-size: 10px; font-weight: 700; color: ${bgColor};">Signature Authority</div><div style="font-size: 7px; color: #6b7280; margin-bottom: 3px;">Principal / Admin</div><svg width="80" height="18" viewBox="0 0 80 18"><path d="M5 14 Q15 3 25 11 Q35 20 45 8 Q55 0 65 10 Q75 20 85 7" stroke="${bgColor}" stroke-width="1.2" fill="none" /></svg><div style="border-top: 1px solid ${bgColor}; width: 80px; margin-top: 2px;"></div></div>
             ${qrCodeSVG ? `<div style="padding: 8px 16px; display: flex; justify-content: center; position: relative; z-index: 1;">${qrCodeSVG}</div>` : ''}
             <div style="padding: 6px 16px; background: #f1f5f9; border-top: 1px solid #e2e8f0; position: relative; z-index: 1;"><div style="display:flex; gap:5px; align-items:center; margin-bottom:2px;"><span style="font-size:8px;">📍</span><span style="font-size:7px; color:#4b5563;">${address.slice(0,30)}</span></div><div style="display:flex; gap:5px; align-items:center; margin-bottom:2px;"><span style="font-size:8px;">✉️</span><span style="font-size:7px; color:#4b5563;">${email}</span></div><div style="display:flex; gap:5px; align-items:center;"><span style="font-size:8px;">📞</span><span style="font-size:7px; color:#4b5563;">${phone}</span></div></div>

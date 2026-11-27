@@ -150,9 +150,6 @@ function PortalLoginContent() {
     Cookies.set('access_token', accessToken, { expires: 7, path: '/' });
     if (tokenToSave) {
       Cookies.set('refresh_token', tokenToSave, { expires: 30, path: '/' });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('refresh_token', tokenToSave);
-      }
     }
 
     // Also set institute info if available

@@ -9,6 +9,7 @@
  * PATCH  /admissions/:id/reject       (reject)
  */
 
+import { todayPK } from '@/lib/dateUtils';
 import api from '@/lib/api';
 import { buildQuery } from '@/lib/utils';
 import { withFallback } from '@/lib/withFallback';
@@ -63,7 +64,7 @@ export const admissionService = {
   approve: (id, body = {}) =>
     withFallback(
       () => api.patch(`/admissions/${id}/approve`, body).then((r) => r.data),
-      () => ({ data: { id, status: 'approved', approved_date: new Date().toISOString().split('T')[0] } }),
+      () => ({ data: { id, status: 'approved', approved_date: todayPK() } }),
     ),
 
   reject: (id, body = {}) =>

@@ -58,7 +58,7 @@
 //   markPaid: (id, body) =>
 //     withFallback(
 //       () => api.patch(`/payroll/payslips/${id}/pay`, body).then((r) => r.data),
-//       () => ({ data: { id, status: 'paid', paid_on: body.paid_on ?? new Date().toISOString().split('T')[0] } }),
+//       () => ({ data: { id, status: 'paid', paid_on: body.paid_on ?? todayPK() } }),
 //     ),
 
 //   // ── Salary Grades ────────────────────────────────────────────────────────
@@ -128,6 +128,7 @@
 
 
 
+import { todayPK } from '@/lib/dateUtils';
 import api from '@/lib/api';
 import { buildQuery } from '@/lib/utils';
 

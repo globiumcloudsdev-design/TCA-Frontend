@@ -1,5 +1,6 @@
 'use client';
 
+import { todayPK } from '@/lib/dateUtils';
 import { useEffect, useState } from 'react';
 import { UserCheck, CheckCircle2, XCircle, Clock, Save, Users } from 'lucide-react';
 import { getPortalTerms } from '@/constants/portalInstituteConfig';
@@ -25,7 +26,7 @@ const user = useAuthStore((state) => state.user);
     const { classes, loading: classesLoading } = useTeacherClasses();
   const { students, fetchStudents, clearStudents, loading: studentsLoading } = useTeacherStudents();
   const { markAttendance, getClassAttendance } = useTeacherAttendance();
-  const today      = new Date().toISOString().split('T')[0];
+  const today      = todayPK();
 
   const [filters, setFilters] = useState({
     class_id: '',
@@ -64,7 +65,7 @@ const user = useAuthStore((state) => state.user);
       fetchStudents({
         class_id: filters.class_id,
         section_id: filters.section_id,
-        page: 1
+        fetchAll: true
       });
 
       // 2. Fetch existing attendance records for this class+section+date

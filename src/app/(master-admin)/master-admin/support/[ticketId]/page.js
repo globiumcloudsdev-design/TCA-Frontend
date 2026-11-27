@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Send, CheckCircle2, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { useUIStore } from '@/store/uiStore';
 import SelectField from '@/components/common/SelectField';
 import TextareaField from '@/components/common/TextareaField';
@@ -95,7 +96,7 @@ export default function MasterAdminTicketDetailsPage() {
                 <span className="font-semibold text-sm">{ticket.creator?.first_name} {ticket.creator?.last_name} (Institute)</span>
                 <span className="text-xs text-muted-foreground">{format(new Date(ticket.created_at), 'hh:mm a, dd MMM')}</span>
               </div>
-              <div className="text-slate-700 text-sm tiptap-content whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: ticket.description }} />
+              <div className="text-slate-700 text-sm tiptap-content whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: sanitizeHtml(ticket.description) }} />
             </div>
           </div>
 
@@ -118,7 +119,7 @@ export default function MasterAdminTicketDetailsPage() {
                     <span className="font-semibold text-sm">{isMe ? 'You (Master Admin)' : `${msg.sender_name} (Institute)`}</span>
                     <span className="text-xs text-muted-foreground">{format(new Date(msg.created_at), 'hh:mm a, dd MMM')}</span>
                   </div>
-                  <div className="text-slate-700 text-sm tiptap-content whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: msg.message }} />
+                  <div className="text-slate-700 text-sm tiptap-content whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: sanitizeHtml(msg.message) }} />
                 </div>
               </div>
             );

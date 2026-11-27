@@ -1,5 +1,6 @@
 'use client';
 
+import { todayPK } from '@/lib/dateUtils';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Save } from 'lucide-react';
@@ -32,7 +33,7 @@ export default function StaffAttendancePage() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayPK();
   const [date, setDate]       = useState(today);
   const [marks, setMarks]     = useState({}); // { [teacher_id]: status }
   const [saving, setSaving]   = useState(false);

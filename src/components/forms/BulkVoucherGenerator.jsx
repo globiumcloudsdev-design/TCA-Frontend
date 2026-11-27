@@ -1,5 +1,6 @@
 'use client';
 
+import { toDateStrPK } from '@/lib/dateUtils';
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
@@ -81,7 +82,7 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
     if (d < new Date()) {
       d.setDate(new Date().getDate() + 10);
     }
-    return d.toISOString().split('T')[0];
+    return toDateStrPK(d);
   })();
 
   const { control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({

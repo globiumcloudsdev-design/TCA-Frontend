@@ -1,5 +1,6 @@
 'use client';
 
+import { todayPK } from '@/lib/dateUtils';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { attendanceService, classService } from '@/services';
@@ -21,7 +22,7 @@ export default function AttendancePage() {
   const [modalState, setModalState] = useState({ open: false, mode: 'class' });
   const [isDownloadSheetOpen, setIsDownloadSheetOpen] = useState(false);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayPK();
   const [filters, setFilters] = useState({
     academic_year_id: '',
     class_id: '',

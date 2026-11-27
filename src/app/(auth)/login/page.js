@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { authService } from '@/services';
 import useAuthStore from '@/store/authStore';
+import usePortalStore from '@/store/portalStore';
 import AccountSelectionModal from '@/components/auth/AccountSelectionModal';
 import { getDashboardPath } from '@/utils/authUtils';
 import { toast } from 'sonner';
@@ -89,12 +90,16 @@ export default function LoginPage() {
 
     const tokenToSave = refreshToken || user?.refreshToken || user?.refresh_token;
     setUser(user, accessToken, tokenToSave);
+    // Portal roles (teacher/student/parent) need a portal user, otherwise PortalShell stays blank
+    if (['STUDENT', 'TEACHER', 'PARENT'].includes(user.user_type)) {
+      try {
+        const portalInstType = user.institute?.institute_type || user.institute_type || 'school';
+        usePortalStore.getState().setPortalUser(user, user.user_type, portalInstType);
+      } catch (e) {}
+    }
     Cookies.set('access_token', accessToken, { expires: 7, path: '/' });
     if (tokenToSave) {
       Cookies.set('refresh_token', tokenToSave, { expires: 30, path: '/' });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('refresh_token', tokenToSave);
-      }
     }
     Cookies.set('role_code', user.user_type, { expires: 7, path: '/' });
     Cookies.set('user_type', user.user_type, { expires: 7, path: '/' });
@@ -141,7 +146,8 @@ export default function LoginPage() {
       if (response?.user) await completeLogin(response.user, response.accessToken, response.refreshToken);
       else toast.error('Invalid email or password');
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Login failed');
+      console.error('Login error:', err);
+      toast.error(err?.response?.data?.message || err?.message || 'Login failed. Please check credentials or network.');
     } finally {
       setLoading(false);
     }

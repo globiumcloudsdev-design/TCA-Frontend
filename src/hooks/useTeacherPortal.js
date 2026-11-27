@@ -363,7 +363,7 @@
 // //     if (timetable?.week?.start) {
 // //       const next = new Date(timetable.week.start);
 // //       next.setDate(next.getDate() + 7);
-// //       setWeek(next.toISOString().split('T')[0]);
+// //       setWeek(toDateStrPK(next));
 // //     }
 // //   };
 
@@ -371,7 +371,7 @@
 // //     if (timetable?.week?.start) {
 // //       const prev = new Date(timetable.week.start);
 // //       prev.setDate(prev.getDate() - 7);
-// //       setWeek(prev.toISOString().split('T')[0]);
+// //       setWeek(toDateStrPK(prev));
 // //     }
 // //   };
 
@@ -762,7 +762,7 @@
 //     if (timetable?.week?.start) {
 //       const next = new Date(timetable.week.start);
 //       next.setDate(next.getDate() + 7);
-//       setWeek(next.toISOString().split('T')[0]);
+//       setWeek(toDateStrPK(next));
 //     }
 //   };
 
@@ -770,7 +770,7 @@
 //     if (timetable?.week?.start) {
 //       const prev = new Date(timetable.week.start);
 //       prev.setDate(prev.getDate() - 7);
-//       setWeek(prev.toISOString().split('T')[0]);
+//       setWeek(toDateStrPK(prev));
 //     }
 //   };
 
@@ -799,6 +799,7 @@
 
 // src/hooks/useTeacherPortal.js
 
+import { toDateStrPK } from '@/lib/dateUtils';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import teacherPortalService from '@/services/teacherPortalService';
@@ -968,8 +969,8 @@ export const useTeacherStudents = () => {
   const [attendanceSummary, setAttendanceSummary] = useState(null);
 
   const fetchStudents = useCallback(async (customFilters = {}, page = 1, limit = 10) => {
-    // Use the provided filter set directly
-    const mergedFilters = { ...customFilters };
+    // Use the provided filter set directly. `fetchAll` is a hook option, not an API filter.
+    const { fetchAll, ...mergedFilters } = customFilters;
     
     // Validate - class_id is required
     if (!mergedFilters.class_id) {
@@ -986,11 +987,33 @@ export const useTeacherStudents = () => {
     setError(null);
     
     try {
-      const response = await teacherPortalService.getMyStudents(
-        mergedFilters,
-        page,
-        limit
-      );
+      let response;
+      if (fetchAll) {
+        // Load the WHOLE class (attendance must never silently cover only the first page)
+        const PAGE = 100;
+        let all = [];
+        let p = 1;
+        let totalPages = 1;
+        do {
+          const part = await teacherPortalService.getMyStudents(mergedFilters, p, PAGE);
+          const rows = Array.isArray(part)
+            ? part
+            : part?.data && Array.isArray(part.data)
+              ? part.data
+              : part?.students || part?.items || [];
+          all = all.concat(rows);
+          totalPages = Array.isArray(part) ? 1 : (part?.pagination?.totalPages || 1);
+          if (rows.length < PAGE) break;
+          p += 1;
+        } while (p <= totalPages && p <= 50);
+        response = { data: all, pagination: { page: 1, limit: all.length || PAGE, total: all.length, totalPages: 1 } };
+      } else {
+        response = await teacherPortalService.getMyStudents(
+          mergedFilters,
+          page,
+          limit
+        );
+      }
       
       // Extract students data
       let studentData = [];
@@ -1313,7 +1336,7 @@ export const useTeacherTimetable = () => {
     if (timetable?.week?.start) {
       const next = new Date(timetable.week.start);
       next.setDate(next.getDate() + 7);
-      setWeek(next.toISOString().split('T')[0]);
+      setWeek(toDateStrPK(next));
     }
   };
 
@@ -1321,7 +1344,7 @@ export const useTeacherTimetable = () => {
     if (timetable?.week?.start) {
       const prev = new Date(timetable.week.start);
       prev.setDate(prev.getDate() - 7);
-      setWeek(prev.toISOString().split('T')[0]);
+      setWeek(toDateStrPK(prev));
     }
   };
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { todayPK } from '@/lib/dateUtils';
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, RefreshCw, Download, CheckCircle, XCircle } from 'lucide-react';
@@ -49,7 +50,7 @@ const EMPTY_FORM = {
   category: '',
   vendor_id: '',
   vendor_name: '',
-  date: new Date().toISOString().split('T')[0],
+  date: todayPK(),
   description: '',
   status: 'pending',
   receipt_url: '',
@@ -321,7 +322,7 @@ export default function Expense() {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `expenses_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `expenses_${todayPK()}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();

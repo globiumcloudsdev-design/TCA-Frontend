@@ -1,5 +1,6 @@
 'use client';
 
+import { todayPK } from '@/lib/dateUtils';
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -191,7 +192,7 @@ export default function CollectPaymentModal({
     method: 'cash',
     referenceNo: '',
     remarks: '',
-    paidDate: new Date().toISOString().split('T')[0],
+    paidDate: todayPK(),
   });
 
   // Ensure target voucher is in the list and decompose merged arrears into distinct monthly vouchers
@@ -222,7 +223,7 @@ export default function CollectPaymentModal({
         method: 'cash',
         referenceNo: '',
         remarks: '',
-        paidDate: new Date().toISOString().split('T')[0],
+        paidDate: todayPK(),
       }));
       setAllocationMode('fifo');
       setCustomAllocations({});
@@ -474,7 +475,7 @@ export default function CollectPaymentModal({
       paymentMethod: paymentForm.method || 'cash',
       referenceNo: paymentForm.referenceNo || null,
       remarks: paymentForm.remarks || null,
-      paidDate: paymentForm.paidDate || new Date().toISOString().split('T')[0],
+      paidDate: paymentForm.paidDate || todayPK(),
       allocations: allocationsList,
     };
 
@@ -850,7 +851,7 @@ export default function CollectPaymentModal({
               <label className="text-sm font-semibold text-slate-800 dark:text-slate-200">Payment Date</label>
               <input
                 type="date"
-                value={paymentForm.paidDate || new Date().toISOString().split('T')[0]}
+                value={paymentForm.paidDate || todayPK()}
                 onChange={(e) => setPaymentForm({ ...paymentForm, paidDate: e.target.value })}
                 className="w-full mt-1.5 px-3 py-2 border rounded-md bg-white dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
