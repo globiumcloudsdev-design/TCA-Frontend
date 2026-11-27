@@ -4,6 +4,7 @@
  */
 'use client';
 
+import { todayPK } from '@/lib/dateUtils';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -1204,7 +1205,7 @@ export default function StudentDetailPage({ type, id }) {
     student_id: student?.id,
     month: String(new Date().getMonth() + 1),
     year: new Date().getFullYear(),
-    due_date: new Date().toISOString().slice(0, 10),
+    due_date: todayPK(),
     discount: 0,
   };
 

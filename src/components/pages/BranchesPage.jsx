@@ -31,6 +31,7 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
 import { branchService } from '@/services/branchService';
+import { hasCoordinates, googleMapsUrl } from '@/lib/coordinates';
 
 // Permission constants
 const PERMISSIONS = {
@@ -290,6 +291,11 @@ export default function BranchesPage({ type }) {
             )}
             {branch.code && (
               <Badge variant="outline">{branch.code}</Badge>
+            )}
+            {!hasCoordinates(branch.location) && (
+              <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-900" title="Set the campus location so teachers can check in from the mobile app">
+                ⚠ No location
+              </Badge>
             )}
           </div>
         );
@@ -635,12 +641,15 @@ export default function BranchesPage({ type }) {
 
               <TabsContent value="location" forceMount className={cn(activeTab === 'location' ? 'block' : 'hidden')}>
                 <div className="space-y-4 pt-4">
-                  {viewingBranch.location?.latitude && viewingBranch.location?.longitude ? (
+                  {hasCoordinates(viewingBranch.location) ? (
                     <div>
                       <p className="text-sm text-muted-foreground">Coordinates</p>
                       <p className="font-mono text-sm">
-                        {viewingBranch.location.latitude.toFixed(6)}, {viewingBranch.location.longitude.toFixed(6)}
+                        {Number(viewingBranch.location.latitude).toFixed(6)}, {Number(viewingBranch.location.longitude).toFixed(6)}
                       </p>
+                      <p className="mt-2 text-sm text-muted-foreground">Attendance radius</p>
+                      <p className="text-sm">{viewingBranch.location.attendance_radius_m ?? 50} m</p>
+                      <a className="mt-2 inline-block text-sm text-blue-600 underline" href={googleMapsUrl(viewingBranch.location.latitude, viewingBranch.location.longitude)} target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
                       {viewingBranch.location.address && (
                         <>
                           <p className="text-sm text-muted-foreground mt-2">Formatted Address</p>
@@ -649,7 +658,7 @@ export default function BranchesPage({ type }) {
                       )}
                     </div>
                   ) : (
-                    <p className="text-muted-foreground">No location data available</p>
+                    <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">⚠ No campus coordinates set. Teachers can’t check in from the mobile app until you add them (Edit → Location).</p>
                   )}
                 </div>
               </TabsContent>

@@ -58,7 +58,7 @@ const schema = z.object({
 export default function ParentsPage({ type }) {
   const qc = useQueryClient();
   const router = useRouter();
-  const { canDo } = useAuthStore();
+  const { canDo, user } = useAuthStore();
   const canCreate = canDo('parents.create');
   const canUpdate = canDo('parents.update');
   const canDelete = canDo('parents.delete');

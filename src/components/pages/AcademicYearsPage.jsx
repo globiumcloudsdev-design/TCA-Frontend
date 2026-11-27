@@ -3,6 +3,7 @@
 
 'use client';
 
+import { toDateStrPK } from '@/lib/dateUtils';
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -182,8 +183,8 @@ export default function AcademicYearsPage({ type }) {
     
     const newYear = {
       name: `${parseInt(year.name.split('-')[0]) + 1}-${parseInt(year.name.split('-')[1]) + 1}`,
-      start_date: new Date(startDate.setFullYear(startDate.getFullYear() + 1)).toISOString().split('T')[0],
-      end_date: new Date(endDate.setFullYear(endDate.getFullYear() + 1)).toISOString().split('T')[0],
+      start_date: toDateStrPK(new Date(startDate.setFullYear(startDate.getFullYear() + 1))),
+      end_date: toDateStrPK(new Date(endDate.setFullYear(endDate.getFullYear() + 1))),
       description: `Copy of ${year.name}`,
       is_current: false
     };

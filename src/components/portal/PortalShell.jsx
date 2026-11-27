@@ -398,22 +398,6 @@ export default function PortalShell({ children, type }) {
     }
   }, [portalUser, hydrated, router]);
 
-  // Mock notifications
-  useEffect(() => {
-    if (portalUser) {
-      setNotifications([
-        {
-          id: 1,
-          title: "New assignment added",
-          time: "5 min ago",
-          read: false,
-        },
-        { id: 2, title: "Attendance marked", time: "1 hour ago", read: false },
-        { id: 3, title: "Fee due tomorrow", time: "2 hours ago", read: true },
-      ]);
-    }
-  }, [portalUser]);
-
   if (!hydrated || !portalUser) {
     return null;
   }

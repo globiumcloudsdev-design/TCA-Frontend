@@ -2,6 +2,7 @@
 /**
  * StaffAttendancePage — Staff daily attendance for all types
  */
+import { todayPK } from '@/lib/dateUtils';
 import { useState, useMemo, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckSquare, X, Minus, Calendar } from 'lucide-react';
@@ -105,7 +106,7 @@ export default function StaffAttendancePage({ type }) {
 
   useEffect(() => {
     setIsMounted(true);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayPK();
     setDateFilter(today);
     setManualForm(prev => ({ ...prev, date: today }));
   }, []);
@@ -347,6 +348,16 @@ export default function StaffAttendancePage({ type }) {
     { accessorKey: 'role', header: 'Role' },
     { accessorKey: 'check_in', header: 'Check In', cell: ({ getValue }) => formatTimeDisplay(getValue()) },
     { accessorKey: 'check_out', header: 'Check Out', cell: ({ getValue }) => formatTimeDisplay(getValue()) },
+    {
+      id: 'distance',
+      header: 'Distance / GPS',
+      cell: ({ row }) => {
+        const d = row.original.distance_m;
+        const a = row.original.accuracy_m;
+        if (d == null && a == null) return <span className="text-muted-foreground">—</span>;
+        return <span className="text-xs">{d != null ? `${Math.round(d)} m from campus` : ''}{d != null && a != null ? ' · ' : ''}{a != null ? `±${Math.round(a)} m` : ''}</span>;
+      },
+    },
     { accessorKey: 'date', header: 'Date', cell: ({ getValue }) => new Date(getValue()).toLocaleDateString('en-PK') },
     {
       accessorKey: 'status', header: 'Status',

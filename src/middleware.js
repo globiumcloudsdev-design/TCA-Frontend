@@ -381,6 +381,14 @@
 // src/middleware.js
 import { NextResponse } from 'next/server';
 
+// Exact path-segment match: '/student' matches '/student' and '/student/x' but NOT '/students'.
+function matchesSegment(pathname, base) {
+  return pathname === base || pathname.startsWith(base + '/');
+}
+
+const PORTAL_BASES = ['/student', '/parent', '/teacher'];
+const MASTER_ROLE_CODES = ['MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPPORT_STAFF', 'MASTER_STAFF', 'MASTER_SUPPORT', 'SUPER_ADMIN', 'ADMIN', 'MASTER'];
+
 export function middleware(request) {
   const { pathname } = request.nextUrl;
 
@@ -401,7 +409,7 @@ export function middleware(request) {
   }
 
   // Check if it's a public path
-  const isPublicPath = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
+  const isPublicPath = PUBLIC_PATHS.some((p) => matchesSegment(pathname, p));
 
   // =============================
   // 2️⃣ REDIRECT AUTHENTICATED USERS AWAY FROM LOGIN
@@ -439,7 +447,7 @@ export function middleware(request) {
     // Allow portal sub-paths to redirect to portal-login? 
     // Actually, following user's request: redirect to dashboard if logged in.
     // For non-logged in, /login is the default.
-    if (pathname.startsWith('/student') || pathname.startsWith('/parent') || pathname.startsWith('/teacher')) {
+    if (PORTAL_BASES.some((b) => matchesSegment(pathname, b))) {
         return NextResponse.redirect(new URL('/portal-login', request.url));
     }
     return NextResponse.redirect(new URL('/login', request.url));
@@ -450,27 +458,40 @@ export function middleware(request) {
   // =============================
   // Master Admin
   const currentRole = (userType || roleCode || '').toUpperCase();
-  const MASTER_ROLES = ['MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPPORT_STAFF', 'MASTER_STAFF', 'MASTER_SUPPORT', 'SUPER_ADMIN', 'ADMIN', 'MASTER'];
-  if (MASTER_ROLES.includes(currentRole)) {
+  if (MASTER_ROLE_CODES.includes(currentRole)) {
     return NextResponse.next();
+  }
+
+  // /master-admin is only for master roles. Never rely on hidden UI for this.
+  if (matchesSegment(pathname, '/master-admin')) {
+    let home = '/login';
+    if (currentRole === 'TEACHER') home = '/teacher';
+    else if (currentRole === 'STUDENT') home = '/student';
+    else if (currentRole === 'PARENT') home = '/parent';
+    else if (currentRole) home = `/${(instituteType || 'school').toLowerCase()}/dashboard`;
+    return NextResponse.redirect(new URL(home, request.url));
   }
 
   // Staff / Institute Admin
   if (userType === 'STAFF' || userType === 'INSTITUTE_ADMIN' || userType === 'BRANCH_ADMIN') {
     const instPrefix = `/${instituteType || 'school'}`;
-    if (!pathname.startsWith(instPrefix) && !isPublicPath) {
+    if (!matchesSegment(pathname, instPrefix) && !isPublicPath) {
+      return NextResponse.redirect(new URL(`${instPrefix}/dashboard`, request.url));
+    }
+    // Branch Admin must not open the branches page (exact segment, not substring)
+    if (userType === 'BRANCH_ADMIN' && pathname.split('/')[2] === 'branches') {
       return NextResponse.redirect(new URL(`${instPrefix}/dashboard`, request.url));
     }
   }
 
   // Portal users (Teacher, Student, Parent)
-  if (userType === 'TEACHER' && !pathname.startsWith('/teacher') && !isPublicPath) {
+  if (userType === 'TEACHER' && !matchesSegment(pathname, '/teacher') && !isPublicPath) {
       return NextResponse.redirect(new URL('/teacher', request.url));
   }
-  if (userType === 'STUDENT' && !pathname.startsWith('/student') && !isPublicPath) {
+  if (userType === 'STUDENT' && !matchesSegment(pathname, '/student') && !isPublicPath) {
       return NextResponse.redirect(new URL('/student', request.url));
   }
-  if (userType === 'PARENT' && !pathname.startsWith('/parent') && !isPublicPath) {
+  if (userType === 'PARENT' && !matchesSegment(pathname, '/parent') && !isPublicPath) {
       return NextResponse.redirect(new URL('/parent', request.url));
   }
 

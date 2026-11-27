@@ -277,6 +277,8 @@ import { useStudentExamSchedule, useStudentResults, useStudentProfile } from '@/
 import ResultCard from '@/components/cards/ResultCard';
 import { useAuthStore } from '@/store/authStore';
 import usePortalStore from '@/store/portalStore';
+import ExamsTabs from '@/components/test-records/ExamsTabs';
+import PublishedTestRecords from '@/components/test-records/PublishedTestRecords';
 
 // Grade calculation based on percentage (standard scale)
 const getGradeFromPercentage = (percentage) => {
@@ -318,7 +320,7 @@ const determineOverallStatus = (result, examPassPercentage = 40) => {
   return 'fail';
 };
 
-export default function StudentExamsPage() {
+function StudentExamsPageInner() {
   const { data: scheduleRes, isLoading: scheduleLoading } = useStudentExamSchedule();
   const { data: resultsRes, isLoading: resultsLoading } = useStudentResults();
   const { data: profileRes } = useStudentProfile();
@@ -568,4 +570,8 @@ export default function StudentExamsPage() {
       )}
     </div>
   );
+}
+
+export default function StudentExamsPage() {
+  return <ExamsTabs testRecords={<PublishedTestRecords mode="student" />} exams={<StudentExamsPageInner />} />;
 }

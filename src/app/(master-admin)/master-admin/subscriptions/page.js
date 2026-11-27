@@ -9,6 +9,7 @@ import {
   Printer, Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { escapeHtml } from '@/lib/sanitize';
 
 import { masterAdminService } from '@/services';
 import { PageHeader, AppModal, StatsCard, DataTable, SelectField, ConfirmDialog, DatePickerField } from '@/components/common';
@@ -183,7 +184,7 @@ export default function MasterAdminInvoicesPage() {
     const html = `
       <html>
         <head>
-          <title>Invoice - ${inv.invoice_number || inv.id}</title>
+          <title>Invoice - ${escapeHtml(inv.invoice_number || inv.id)}</title>
           <style>
             ${isThermal ? `
               @page { size: 80mm auto; margin: 0; }
@@ -273,7 +274,7 @@ export default function MasterAdminInvoicesPage() {
         <body>
           ${isThermal ? `
             <div class="thermal-header">
-              <img class="thermal-logo" src="${logoUrl}" alt="TCA Logo" onerror="this.style.display='none'" />
+              <img class="thermal-logo" src="${escapeHtml(logoUrl)}" alt="TCA Logo" onerror="this.style.display='none'" />
               <h1 class="thermal-title">THE CLOUDS ACADEMY</h1>
               <div class="thermal-sub">ERP SUITE & PLATFORM BILLING</div>
               <div>support@thecloudsacademy.com</div>
@@ -281,10 +282,10 @@ export default function MasterAdminInvoicesPage() {
             
             <div class="divider"></div>
             
-            <div class="meta-row"><span class="meta-label">INVOICE:</span><span>${inv.invoice_number || inv.id}</span></div>
+            <div class="meta-row"><span class="meta-label">INVOICE:</span><span>${escapeHtml(inv.invoice_number || inv.id)}</span></div>
             <div class="meta-row"><span class="meta-label">DATE:</span><span>${new Date(inv.created_at || new Date()).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>
             <div class="meta-row"><span class="meta-label">DUE DATE:</span><span>${new Date(inv.due_date).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>
-            <div class="meta-row"><span class="meta-label">CLIENT:</span><span>${inv.institute?.institute_name || inv.institute_name || '—'}</span></div>
+            <div class="meta-row"><span class="meta-label">CLIENT:</span><span>${escapeHtml(inv.institute?.institute_name || inv.institute_name || '—')}</span></div>
             
             <div class="divider"></div>
             
@@ -298,7 +299,7 @@ export default function MasterAdminInvoicesPage() {
               <tbody>
                 <tr>
                   <td>
-                    ${inv.plan?.name || 'Standard Plan'} Subscription<br/>
+                    ${escapeHtml(inv.plan?.name || 'Standard Plan')} Subscription<br/>
                     <small>Period: ${new Date(inv.period_start).toLocaleDateString('en-PK', { day: '2-digit', month: 'short' })} - ${new Date(inv.period_end).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}</small>
                   </td>
                   <td class="num">${inv.currency || 'PKR'} ${Number(inv.amount || inv.total_amount).toLocaleString()}</td>
@@ -314,15 +315,15 @@ export default function MasterAdminInvoicesPage() {
             </div>
             
             <div class="status-stamp">
-              ${inv.status}
+              ${escapeHtml(inv.status)}
             </div>
 
             ${inv.status === 'PAID' ? `
               <div class="divider"></div>
               <div style="font-size: 9px; line-height: 1.3;">
                 <strong>PAYMENT RECEIPT:</strong><br/>
-                METHOD: ${inv.payment_method || 'Manual'}<br/>
-                REF ID: ${inv.payment_reference || 'N/A'}<br/>
+                METHOD: ${escapeHtml(inv.payment_method || 'Manual')}<br/>
+                REF ID: ${escapeHtml(inv.payment_reference || 'N/A')}<br/>
                 PAID AT: ${new Date(inv.paid_at || new Date()).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}
               </div>
             ` : ''}
@@ -334,7 +335,7 @@ export default function MasterAdminInvoicesPage() {
           ` : `
             <div class="header">
               <div class="logo-container">
-                <img class="logo-img" src="${logoUrl}" alt="TCA Logo" />
+                <img class="logo-img" src="${escapeHtml(logoUrl)}" alt="TCA Logo" />
                 <div>
                   <h1 class="logo-title">The Clouds Academy</h1>
                   <div class="logo-sub">Cloud-based ERP Platform</div>
@@ -342,23 +343,23 @@ export default function MasterAdminInvoicesPage() {
               </div>
               <div>
                 <div class="invoice-title">INVOICE</div>
-                <div class="invoice-num">${inv.invoice_number || inv.id}</div>
+                <div class="invoice-num">${escapeHtml(inv.invoice_number || inv.id)}</div>
               </div>
             </div>
             
             <div class="meta-grid">
               <div class="meta-block">
                 <h3>Billed To:</h3>
-                <p>${inv.institute?.institute_name || inv.institute_name || '—'}</p>
+                <p>${escapeHtml(inv.institute?.institute_name || inv.institute_name || '—')}</p>
                 <span>
-                  ${inv.institute?.city || 'Pakistan'}<br/>
-                  Support contact: ${inv.institute?.contact || '—'}
+                  ${escapeHtml(inv.institute?.city || 'Pakistan')}<br/>
+                  Support contact: ${escapeHtml(inv.institute?.contact || '—')}
                 </span>
               </div>
               <div class="meta-block" style="text-align: right;">
                 <h3>Invoice Information:</h3>
                 <div style="margin-bottom: 8px;">
-                  <span class="badge badge-${String(inv.status).toLowerCase()}">${inv.status}</span>
+                  <span class="badge badge-${escapeHtml(String(inv.status).toLowerCase())}">${escapeHtml(inv.status)}</span>
                 </div>
                 <span>Issued Date: ${new Date(inv.created_at || new Date()).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}</span><br/>
                 <span>Due Date: ${new Date(inv.due_date).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
@@ -377,9 +378,9 @@ export default function MasterAdminInvoicesPage() {
               <tbody>
                 <tr>
                   <td>
-                    <strong>${inv.plan?.name || 'Standard Plan'} Subscription</strong><br/>
+                    <strong>${escapeHtml(inv.plan?.name || 'Standard Plan')} Subscription</strong><br/>
                     <small style="color: #64748b; font-size: 12px; margin-top: 4px; display: inline-block;">
-                      Billing Cycle: ${inv.plan?.cycle || inv.billing_cycle || 'Monthly'} | Platform License Fee
+                      Billing Cycle: ${escapeHtml(inv.plan?.cycle || inv.billing_cycle || 'Monthly')} | Platform License Fee
                     </small>
                   </td>
                   <td>
@@ -410,8 +411,8 @@ export default function MasterAdminInvoicesPage() {
               <strong>Payment Status Verification Receipt</strong>
               <span>This subscription invoice has been successfully processed and verified.</span><br/>
               <span style="font-family: monospace; display: inline-block; margin-top: 8px;">
-                Method: ${inv.payment_method || 'Manual Entry'} | 
-                Reference Transaction: ${inv.payment_reference || 'N/A'} | 
+                Method: ${escapeHtml(inv.payment_method || 'Manual Entry')} | 
+                Reference Transaction: ${escapeHtml(inv.payment_reference || 'N/A')} | 
                 Paid Date: ${new Date(inv.paid_at || new Date()).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}
               </span>
             </div>
@@ -550,9 +551,9 @@ export default function MasterAdminInvoicesPage() {
       head: [['Subscription Description', 'Billing Period', 'Billing Cycle', 'Price']],
       body: [
         [
-          `${inv.plan?.name || 'Standard Plan'} Subscription Fee`,
+          `${escapeHtml(inv.plan?.name || 'Standard Plan')} Subscription Fee`,
           `${new Date(inv.period_start).toLocaleDateString('en-PK', { day: '2-digit', month: 'short' })} - ${new Date(inv.period_end).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}`,
-          `${inv.plan?.cycle || inv.billing_cycle || 'Monthly'}`,
+          `${escapeHtml(inv.plan?.cycle || inv.billing_cycle || 'Monthly')}`,
           `${inv.currency || 'PKR'} ${Number(inv.amount || inv.total_amount).toLocaleString()}`
         ]
       ],
@@ -622,7 +623,7 @@ export default function MasterAdminInvoicesPage() {
       doc.setTextColor(71, 85, 105);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
-      doc.text(`Method: ${inv.payment_method || 'Manual Entry'}  |  Reference ID: ${inv.payment_reference || 'N/A'}  |  Paid Date: ${new Date(inv.paid_at || new Date()).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}`, 20, currentY + 14);
+      doc.text(`Method: ${escapeHtml(inv.payment_method || 'Manual Entry')}  |  Reference ID: ${escapeHtml(inv.payment_reference || 'N/A')}  |  Paid Date: ${new Date(inv.paid_at || new Date()).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}`, 20, currentY + 14);
     }
     
     // --- Footer at bottom of the page ---
@@ -641,7 +642,7 @@ export default function MasterAdminInvoicesPage() {
     doc.setTextColor(148, 163, 184);
     doc.text('This is an officially processed and verified invoice. For billing support, email support@thecloudsacademy.com', 105, footerY + 5, { align: 'center' });
     
-    doc.save(`Invoice_${inv.invoice_number || inv.id}.pdf`);
+    doc.save(`Invoice_${escapeHtml(inv.invoice_number || inv.id)}.pdf`);
     toast.success("PDF Downloaded successfully!");
   };
 

@@ -809,38 +809,6 @@ export default function TeacherSelfAttendancePage() {
     }
   };
 
-  const handleCheckIn = async () => {
-    setLoading(true);
-    try {
-      await teacherPortalService.selfCheckIn({ remarks: "On time" });
-      toast.success("Checked in successfully!");
-      fetchTodayAttendance();
-    } catch (error) {
-      console.error(error);
-      if (error?.response?.status === 409) toast.error("Already checked in today");
-      else if (error?.response?.status === 403) toast.error("You have an approved leave today");
-      else toast.error(error?.response?.data?.message || "Check-in failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCheckOut = async () => {
-    setLoading(true);
-    try {
-      await teacherPortalService.selfCheckOut({ remarks: "Leaving" });
-      toast.success("Checked out successfully!");
-      fetchTodayAttendance();
-    } catch (error) {
-      console.error(error);
-      if (error?.response?.status === 409) toast.error("Already checked out today");
-      else if (error?.response?.status === 400) toast.error("Check-in not found for today. Cannot check out.");
-      else toast.error(error?.response?.data?.message || "Check-out failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const isCheckedIn = attendanceData?.is_checked_in;
   const isCheckedOut = attendanceData?.is_checked_out;
   const canCheckIn = attendanceData?.can_check_in;
@@ -987,46 +955,9 @@ export default function TeacherSelfAttendancePage() {
             </div>
 
             <div className="col-span-1 flex flex-col gap-3 justify-center items-center">
-              <AnimatePresence mode="wait">
-                {loadingInitial ? (
-                  <div className="py-4 flex justify-center">
-                    <div className="w-6 h-6 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
-                  </div>
-                ) : (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-3 w-full max-w-[200px]">
-                    <div className="relative w-full">
-                      {countdown.isEarly && (
-                         <div className="absolute -top-7 left-1/2 transform -translate-x-1/2 flex justify-center z-10 w-max">
-                           <div className="bg-slate-800 text-white text-[10px] font-mono px-3 py-1 rounded-full shadow-lg border border-slate-700 animate-pulse">
-                             ⏱️ Opens in {countdown.timeStr}
-                           </div>
-                         </div>
-                      )}
-                      {countdown.isClosed && (
-                         <div className="absolute -top-7 left-1/2 transform -translate-x-1/2 flex justify-center z-10 w-max">
-                           <div className="bg-rose-100 text-rose-700 font-bold text-[10px] uppercase tracking-wider px-3 py-1 rounded-full shadow-sm border border-rose-200">
-                             School Closed
-                           </div>
-                         </div>
-                      )}
-                      <Button 
-                        onClick={handleCheckIn}
-                        disabled={loading || !canCheckIn || countdown.isEarly || countdown.isClosed}
-                        className="w-full h-10 rounded-lg text-xs font-bold tracking-tight shadow-sm bg-emerald-600 hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-200 text-white disabled:opacity-50"
-                      >
-                        {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><LogIn className="w-4 h-4 mr-2" /> MARK CHECK IN</>}
-                      </Button>
-                    </div>
-                    <Button 
-                      onClick={handleCheckOut}
-                      disabled={loading || !canCheckOut}
-                      className="w-full h-10 rounded-lg text-xs font-bold tracking-tight shadow-sm bg-rose-600 hover:bg-rose-700 focus:ring-2 focus:ring-rose-200 text-white disabled:opacity-50"
-                    >
-                      {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><LogOut className="w-4 h-4 mr-2" /> MARK CHECK OUT</>}
-                    </Button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <div className="w-full max-w-[260px] rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs font-medium leading-relaxed text-sky-900">
+                📱 Check-in and check-out are done from the mobile app at your campus.
+              </div>
             </div>
           </div>
         </CardContent>

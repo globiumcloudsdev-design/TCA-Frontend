@@ -1,6 +1,7 @@
 /**
  * Section API Service
- * GET    /sections          (list)
+ * GET    /classes/:classId/sections (list; the only real backend route — see getAll)
+ * GET    /sections          (list, legacy/demo only)
  * POST   /sections          (create)
  * GET    /sections/:id      (single)
  * PUT    /sections/:id      (update)
@@ -14,8 +15,13 @@ import { DUMMY_SECTIONS, paginate } from '@/data/dummyData';
 
 export const sectionService = {
   // filters: { class_id, branch_id, page, limit }
+  // The backend only has the nested route GET /classes/:classId/sections (there is no global /sections).
   getAll: (filters = {}) =>
-    withFallback(
+    filters.class_id
+      ? api
+          .get(`/classes/${filters.class_id}/sections${buildQuery({ page: filters.page, limit: filters.limit, search: filters.search })}`)
+          .then((r) => r.data)
+      : withFallback(
       () => api.get(`/sections${buildQuery(filters)}`).then((r) => r.data),
       () => {
         let data = [...DUMMY_SECTIONS];

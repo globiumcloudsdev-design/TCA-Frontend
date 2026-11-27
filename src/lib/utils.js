@@ -2,6 +2,7 @@
  * The Clouds Academy — Utility helpers
  */
 
+import { friendlyMessage } from '@/lib/errorMessages';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { format, formatDistance, isValid } from 'date-fns';
@@ -91,11 +92,7 @@ export const ATTENDANCE_STATUS_COLORS = {
 
 // ── Extract error message from axios error ────────────────────────────────
 export function getErrorMessage(error) {
-  return (
-    error?.response?.data?.message ||
-    error?.message ||
-    'Something went wrong. Please try again.'
-  );
+  return friendlyMessage(error);
 }
 
 // ── Debounce ──────────────────────────────────────────────────────────────

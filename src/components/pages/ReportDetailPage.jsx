@@ -5,6 +5,7 @@
  * Includes Student, Attendance, Exam, Fee, and Payroll reports (API based)
  */
 
+import { todayPK } from '@/lib/dateUtils';
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -2077,7 +2078,7 @@ export default function ReportDetailPage() {
             fileName={
               reportType === "exam"
                 ? `${config.title}-GradeSheets`
-                : `${config.title}-${new Date().toISOString().split('T')[0]}`
+                : `${config.title}-${todayPK()}`
             }
           />
 

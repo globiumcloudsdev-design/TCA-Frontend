@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Send, CheckCircle2, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { useUIStore } from '@/store/uiStore';
 import TextareaField from '@/components/common/TextareaField';
 
@@ -90,7 +91,7 @@ export default function TicketDetailsPage() {
                 <span className="font-semibold text-sm">You (Original Request)</span>
                 <span className="text-xs text-muted-foreground">{format(new Date(ticket.created_at), 'hh:mm a, dd MMM')}</span>
               </div>
-              <div className="text-slate-700 text-sm tiptap-content whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: ticket.description }} />
+              <div className="text-slate-700 text-sm tiptap-content whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: sanitizeHtml(ticket.description) }} />
             </div>
           </div>
 
@@ -113,7 +114,7 @@ export default function TicketDetailsPage() {
                     <span className="font-semibold text-sm">{isMe ? 'You' : 'The Clouds Academy Support'}</span>
                     <span className="text-xs text-muted-foreground">{format(new Date(msg.created_at), 'hh:mm a, dd MMM')}</span>
                   </div>
-                  <div className="text-slate-700 text-sm tiptap-content whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: msg.message }} />
+                  <div className="text-slate-700 text-sm tiptap-content whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: sanitizeHtml(msg.message) }} />
                 </div>
               </div>
             );

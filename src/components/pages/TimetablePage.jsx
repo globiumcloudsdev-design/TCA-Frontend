@@ -2,6 +2,7 @@
 
 'use client';
 
+import { todayPK, toDateStrPK } from '@/lib/dateUtils';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -199,7 +200,7 @@ function TimetableConfigModal({ open, onClose, onSubmit, initialConfig = null, l
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isActive, setIsActive] = useState(true);
-  const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().split('T')[0]);
+  const [effectiveFrom, setEffectiveFrom] = useState(todayPK());
   const [effectiveTo, setEffectiveTo] = useState('');
 
   // Initialize form when modal opens
@@ -210,8 +211,8 @@ function TimetableConfigModal({ open, onClose, onSubmit, initialConfig = null, l
         setName(initialConfig.name || '');
         setDescription(initialConfig.description || '');
         setIsActive(initialConfig.is_active !== false);
-        setEffectiveFrom(initialConfig.effective_from ? new Date(initialConfig.effective_from).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
-        setEffectiveTo(initialConfig.effective_to ? new Date(initialConfig.effective_to).toISOString().split('T')[0] : '');
+        setEffectiveFrom(initialConfig.effective_from ? toDateStrPK(new Date(initialConfig.effective_from)) : todayPK());
+        setEffectiveTo(initialConfig.effective_to ? toDateStrPK(new Date(initialConfig.effective_to)) : '');
 
         const config = initialConfig.period_config || {};
         setTotalPeriods(config.total_periods || 8);
@@ -223,7 +224,7 @@ function TimetableConfigModal({ open, onClose, onSubmit, initialConfig = null, l
         setName('');
         setDescription('');
         setIsActive(true);
-        setEffectiveFrom(new Date().toISOString().split('T')[0]);
+        setEffectiveFrom(todayPK());
         setEffectiveTo('');
         
         setTotalPeriods(8);

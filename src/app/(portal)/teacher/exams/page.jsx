@@ -11,6 +11,8 @@ import { EXAM_TYPES } from '@/constants';
 import useAuthStore from '@/store/authStore';
 import InputField from '@/components/common/InputField';
 import SelectField from '@/components/common/SelectField';
+import ExamsTabs from '@/components/test-records/ExamsTabs';
+import TestRecordsPanel from '@/components/test-records/TestRecordsPanel';
 
 // Exam type display mapping with colors
 const EXAM_TYPE_DISPLAY = {
@@ -42,7 +44,7 @@ const EXAM_TYPE_OPTIONS = [
   ...EXAM_TYPES
 ];
 
-export default function TeacherExamsPage() {
+function TeacherExamsPageInner() {
   const user = useAuthStore((state) => state.user);
   const t = getPortalTerms(user?.institute_type || 'school');
 
@@ -257,4 +259,8 @@ export default function TeacherExamsPage() {
       )}
     </div>
   );
+}
+
+export default function TeacherExamsPage() {
+  return <ExamsTabs testRecords={<TestRecordsPanel mode="teacher" />} exams={<TeacherExamsPageInner />} />;
 }

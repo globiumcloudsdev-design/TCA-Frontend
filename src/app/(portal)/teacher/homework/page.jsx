@@ -43,7 +43,7 @@
 //   'Art & Craft': 'bg-pink-100 text-pink-700 border-pink-200',
 // };
 
-// const today = () => new Date().toISOString().split('T')[0];
+// const today = () => todayPK();
 
 // const asText = (value) => String(value ?? '').trim();
 
@@ -841,6 +841,7 @@
 // src/app/teacher/homework/page.jsx
 'use client';
 
+import { todayPK } from '@/lib/dateUtils';
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import {
@@ -902,7 +903,7 @@ const SUBJECT_COLORS = {
   'Art & Craft': 'bg-pink-100 text-pink-700 border-pink-200',
 };
 
-const today = () => new Date().toISOString().split('T')[0];
+const today = () => todayPK();
 
 const asText = (value) => String(value ?? '').trim();
 

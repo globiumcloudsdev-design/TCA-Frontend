@@ -207,12 +207,7 @@ export default function TeacherPayrollPage() {
                       PKR {parseFloat(latestSlip?.net_salary || 0).toLocaleString()}
                     </p>
                  </div>
-                 <Button 
-                   onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}/portal/teacher/payroll/${latestSlip?.id}/pdf`, '_blank')}
-                   className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl h-12 shadow-inner px-6 text-xs uppercase tracking-tight"
-                 >
-                    <ReceiptText className="w-4 h-4 mr-2" /> Get Payslip PDF
-                 </Button>
+{/* Payslip PDF download hidden: backend has no /portal/teacher/payroll/:id/pdf route */}
               </div>
            </CardContent>
         </Card>
@@ -287,14 +282,7 @@ export default function TeacherPayrollPage() {
                           </Badge>
                        </td>
                        <td className="px-6 py-4 text-right">
-                          <Button 
-                            onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}/portal/teacher/payroll/${slip.id}/pdf`, '_blank')}
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-7 w-7 rounded-lg text-slate-400 hover:text-emerald-600"
-                          >
-                             <Download className="w-3.5 h-3.5" />
-                          </Button>
+{/* PDF download hidden: backend route does not exist */}
                        </td>
                     </tr>
                   )) : (

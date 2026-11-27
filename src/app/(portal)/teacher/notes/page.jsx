@@ -32,7 +32,7 @@
 //     class_id: '',
 //     section_id: '',
 //     description: '',
-//     assigned_on: new Date().toISOString().slice(0, 10),
+//     assigned_on: todayPK(),
 //     due_date: ''
 // };
 
@@ -670,6 +670,7 @@
 
 'use client';
 
+import { todayPK } from '@/lib/dateUtils';
 import { useMemo, useState } from 'react';
 import {
     FileText, Upload, Download, PlusCircle, Paperclip,
@@ -706,7 +707,7 @@ const EMPTY_NOTE = {
     class_id: '',
     section_id: '',
     description: '',
-    assigned_on: new Date().toISOString().slice(0, 10),
+    assigned_on: todayPK(),
 };
 
 const asText = (value) => String(value ?? '').trim();

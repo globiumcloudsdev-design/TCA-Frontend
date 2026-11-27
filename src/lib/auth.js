@@ -29,16 +29,11 @@ export function removeAccessToken() {
 export function setRefreshToken(token) {
   if (!token) return;
   Cookies.set('refresh_token', token, { expires: 30, sameSite: 'Lax', path: '/' });
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem('refresh_token', token);
-    } catch (e) {}
-  }
+  // Deliberately NOT mirrored into localStorage (persistent + readable by any injected script).
 }
 
 export function getRefreshToken() {
-  if (typeof window === 'undefined') return Cookies.get('refresh_token') || null;
-  return Cookies.get('refresh_token') || localStorage.getItem('refresh_token') || null;
+  return Cookies.get('refresh_token') || null;
 }
 
 export function removeRefreshToken() {
@@ -123,6 +118,7 @@ export function clearAuthData() {
       'clouds-ui',
       'clouds-institute',
       'clouds-portal',
+      'portal-session',
       'accessToken',
       'refresh_token',
       'refreshToken',
@@ -171,14 +167,21 @@ export async function logoutUser({ redirectTo = '/login' } = {}) {
   try {
     const instMod = require('@/store/instituteStore');
     const instStore = instMod.useInstituteStore || instMod.default || instMod;
-    instStore?.getState?.()?.clearInstitute?.();
+    instStore?.getState?.()?.clearInstituteData?.();
   } catch (e) {}
 
   try {
     const portalMod = require('@/store/portalStore');
     const portalStore = portalMod.usePortalStore || portalMod.default || portalMod;
-    portalStore?.getState?.()?.clearPortalUser?.();
+    portalStore?.getState?.()?.clearPortal?.();
   } catch (e) {}
+
+  // Zustand persist re-writes its key when state is reset: remove the persisted copies again
+  if (typeof window !== 'undefined') {
+    ['clouds-auth', 'portal-session', 'clouds-institute', 'clouds-ui'].forEach((k) => {
+      try { localStorage.removeItem(k); } catch (e) {}
+    });
+  }
 
   // 3. Fire-and-forget backend logout with short 800ms timeout so user never waits
   try {

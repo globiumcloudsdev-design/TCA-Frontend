@@ -818,6 +818,8 @@ import { PageHeader, SelectField, AppModal } from '@/components/common';
 import { Badge } from '@/components/ui/badge';
 import PageLoader from '@/components/common/PageLoader';
 import PrintableResultCard from '@/components/cards/ResultCard';
+import ExamsTabs from '@/components/test-records/ExamsTabs';
+import ParentTestRecordsTab from '@/components/test-records/ParentTestRecordsTab';
 
 // ======================= HELPER FUNCTIONS =======================
 const getGradeFromPercentage = (percentage) => {
@@ -1405,7 +1407,7 @@ const ResultCardModal = ({ isOpen, onClose, result, child, institute }) => {
 };
 
 // Main Results Page Component
-export default function ParentResultsPage() {
+function ParentResultsPageInner() {
   const { portalUser } = usePortalStore();
   const parent = portalUser;
   const t = getPortalTerms(parent?.institute_type);
@@ -1621,4 +1623,8 @@ export default function ParentResultsPage() {
       />
     </div>
   );
+}
+
+export default function ParentResultsPage() {
+  return <ExamsTabs testRecords={<ParentTestRecordsTab />} exams={<ParentResultsPageInner />} />;
 }

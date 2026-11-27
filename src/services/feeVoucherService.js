@@ -17,6 +17,7 @@
  *   feeVoucherService.getAll(filters, pagination)
  */
 
+import { todayPK } from '@/lib/dateUtils';
 import api from '@/lib/api';
 import { buildQuery } from '@/lib/utils';
 import { sectionService, classService } from '@/services';
@@ -840,7 +841,7 @@ export const feeVoucherService = {
           data: vouchers[0] || resData,
         };
       } catch (err) {
-        if (err.response?.status && err.response.status !== 404) throw err;
+        if (err.response?.status !== 404) throw err;
         const response2 = await api.post('/fee-vouchers/generate-single', payload, { timeout: 15000 });
         return transformVoucherResponse(response2.data?.data);
       }
@@ -908,7 +909,7 @@ export const feeVoucherService = {
           message: response.data?.message || `Successfully generated vouchers`,
         };
       } catch (err) {
-        if (err.response?.status && err.response.status !== 404) throw err;
+        if (err.response?.status !== 404) throw err;
         const response2 = await api.post('/fee-vouchers/generate-class', payload, { timeout: 600000 });
         const result = response2.data?.data || response2.data || {};
         const vouchers = await Promise.all((result.vouchers || []).map((voucher) => transformVoucherResponse(voucher, classService, sectionService)));
@@ -983,7 +984,7 @@ export const feeVoucherService = {
           successRate: 100
         };
       } catch (err) {
-        if (err.response?.status && err.response.status !== 404) throw err;
+        if (err.response?.status !== 404) throw err;
         const response2 = await api.post('/fee-vouchers/generate-institute', payload, { timeout: 600000 });
         const result = response2.data?.data || response2.data || {};
         const vouchers = await Promise.all((result.vouchers || []).map((voucher) => transformVoucherResponse(voucher, classService, sectionService)));
@@ -1035,7 +1036,7 @@ export const feeVoucherService = {
         const response = await api.get(`/fee-vouchers${queryString}`, { timeout });
         rawData = response?.data;
       } catch (err1) {
-        if (err1.response?.status && err1.response.status !== 404) throw err1;
+        if (err1.response?.status !== 404) throw err1;
         const response2 = await api.get(`/fees/vouchers${queryString}`, { timeout });
         rawData = response2?.data;
       }
@@ -1397,7 +1398,7 @@ export const feeVoucherService = {
       const method = paymentData.paymentMethod || paymentData.method || paymentData.payment_method || 'cash';
       const remarks = paymentData.remarks || paymentData.notes || '';
       const referenceNo = paymentData.referenceNo || paymentData.reference_no || paymentData.transaction_id || null;
-      const paidDate = paymentData.paidDate || paymentData.paid_date || new Date().toISOString().split('T')[0];
+      const paidDate = paymentData.paidDate || paymentData.paid_date || todayPK();
 
       const payload = {
         amount,
@@ -1428,7 +1429,7 @@ export const feeVoucherService = {
           updatedStatus: resData?.status,
         };
       } catch (err1) {
-        if (err1.response?.status && err1.response.status !== 404) throw err1;
+        if (err1.response?.status !== 404) throw err1;
       }
 
       // 2. Try /fee-vouchers/:id/payment
@@ -1443,7 +1444,7 @@ export const feeVoucherService = {
           updatedStatus: resData?.status,
         };
       } catch (err2) {
-        if (err2.response?.status && err2.response.status !== 404) throw err2;
+        if (err2.response?.status !== 404) throw err2;
       }
 
       // 3. Try /fee-vouchers/:id/collect
@@ -1458,7 +1459,7 @@ export const feeVoucherService = {
           updatedStatus: resData?.status,
         };
       } catch (err3) {
-        if (err3.response?.status && err3.response.status !== 404) throw err3;
+        if (err3.response?.status !== 404) throw err3;
       }
 
       // 4. Try /fees/vouchers/:id/collect
@@ -1588,7 +1589,7 @@ export const feeVoucherService = {
         transaction_id: referenceNo || null,
         remarks: remarks || null,
         notes: remarks || null,
-        paidDate: paidDate || new Date().toISOString().split('T')[0],
+        paidDate: paidDate || todayPK(),
         allocations: activeAllocations.map((a) => ({
           voucherId: a.voucherId,
           amountApplied: parseFloat(a.amountApplied),
@@ -1604,7 +1605,7 @@ export const feeVoucherService = {
           data: response.data?.data || response.data,
         };
       } catch (err1) {
-        if (err1.response?.status && err1.response.status !== 404) throw err1;
+        if (err1.response?.status !== 404) throw err1;
       }
 
       // 2. Try /fee-vouchers/process-selective-payment
@@ -1616,7 +1617,7 @@ export const feeVoucherService = {
           data: response.data?.data || response.data,
         };
       } catch (endpointError) {
-        if (endpointError.response?.status && endpointError.response.status !== 404) {
+        if (endpointError.response?.status !== 404) {
           throw endpointError;
         }
 
@@ -1629,13 +1630,25 @@ export const feeVoucherService = {
         };
 
         for (const alloc of payload.allocations) {
-          const singleResult = await feeVoucherService.recordPayment(alloc.voucherId, {
-            amount: alloc.amountApplied,
-            paymentMethod: payload.paymentMethod,
-            referenceNo: payload.referenceNo,
-            remarks: payload.remarks ? `${payload.remarks} (Selective Allocation)` : 'Selective Allocation',
-            paidDate: payload.paidDate,
-          });
+          let singleResult;
+          try {
+            singleResult = await feeVoucherService.recordPayment(alloc.voucherId, {
+              amount: alloc.amountApplied,
+              paymentMethod: payload.paymentMethod,
+              referenceNo: payload.referenceNo,
+              remarks: payload.remarks ? `${payload.remarks} (Selective Allocation)` : 'Selective Allocation',
+              paidDate: payload.paidDate,
+            });
+          } catch (allocErr) {
+            // Stop immediately and report exactly which vouchers were already paid
+            // so a retry can skip them.
+            const partial = new Error(
+              `Payment partially applied: ${results.payments.length} of ${payload.allocations.length} vouchers were paid before an error. ${allocErr?.message || ''}`.trim()
+            );
+            partial.partial = true;
+            partial.paidVoucherIds = results.payments.map((p) => p.voucherId);
+            throw partial;
+          }
           results.payments.push({
             voucherId: alloc.voucherId,
             amountApplied: alloc.amountApplied,
@@ -1751,7 +1764,7 @@ export const feeVoucherService = {
         transaction_id: referenceNo,
         remarks,
         notes: remarks,
-        paidDate: paidDate || new Date().toISOString().split('T')[0],
+        paidDate: paidDate || todayPK(),
         allocations: activeAllocations,
       };
 
@@ -1772,7 +1785,7 @@ export const feeVoucherService = {
           data: response.data?.data || response.data,
         };
       } catch (err1) {
-        if (err1.response?.status && err1.response.status !== 404) throw err1;
+        if (err1.response?.status !== 404) throw err1;
       }
 
       // 2. Try POST /fee-vouchers/process-fifo-payment
@@ -1792,7 +1805,7 @@ export const feeVoucherService = {
           data: response.data?.data || response.data,
         };
       } catch (fifoEndpointError) {
-        if (fifoEndpointError.response?.status && fifoEndpointError.response.status !== 404) {
+        if (fifoEndpointError.response?.status !== 404) {
           throw fifoEndpointError;
         }
 
@@ -1842,7 +1855,7 @@ export const feeVoucherService = {
         const res = await api.post(`/fee-vouchers/sync-arrears/${studentId}`, {}, { timeout: 10000 });
         return res.data?.data || res.data;
       } catch (e1) {
-        if (e1.response?.status && e1.response.status !== 404) throw e1;
+        if (e1.response?.status !== 404) throw e1;
         try {
           const res2 = await api.post(`/students/${studentId}/sync-dues`, {}, { timeout: 10000 });
           return res2.data?.data || res2.data;

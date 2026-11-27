@@ -3,6 +3,7 @@
  * AttendancePage — Adaptive for all institute types
  * School → Subject-wise | Coaching → Session-wise | etc.
  */
+import { monthPK } from '@/lib/dateUtils';
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -689,7 +690,7 @@ function AttendanceReportGenerator({
     academic_year_id: currentYearId,
     class_id: "",
     section_id: "",
-    month: new Date().toISOString().slice(0, 7), // YYYY-MM
+    month: monthPK(), // YYYY-MM
     student_id: "", // Used for student search mock
   });
 

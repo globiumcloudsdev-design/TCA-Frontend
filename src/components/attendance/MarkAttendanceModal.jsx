@@ -2,6 +2,7 @@
 //src/components/attendance/MarkAttendanceModal.jsx
 'use client';
 
+import { todayPK } from '@/lib/dateUtils';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { QrCode, Users, UserSquare, CheckCircle, Search, Save, AlertCircle, Calendar, X, Trash2, UserCheck, Clock, UserX, Gift, ChevronDown, Loader2, XCircle } from 'lucide-react';
@@ -87,10 +88,10 @@ export default function MarkAttendanceModal({ open, onClose, defaultMode = 'clas
 function InstantScanTab({ instituteId, type }) {
   const [scanHistory, setScanHistory] = useState([]);
   const [scanType, setScanType] = useState('regular');
-  const [scanDate, setScanDate] = useState(new Date().toISOString().slice(0, 10));
+  const [scanDate, setScanDate] = useState(todayPK());
   const [showDetails, setShowDetails] = useState(null);
   
-  const todayDate = new Date().toISOString().slice(0, 10);
+  const todayDate = todayPK();
 
   const fetchStudentDetails = async (studentId) => {
     try {
@@ -404,7 +405,7 @@ function BulkScanTab({ terms, instituteId, type }) {
     academic_year_id: '',
     class_id: '',
     section_id: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: todayPK(),
   });
   const [showDetails, setShowDetails] = useState(null);
   const queryClient = useQueryClient();
@@ -700,7 +701,7 @@ function ClassAttendanceTab({ terms, type, instituteId }) {
     academic_year_id: '',
     class_id: '',
     section_id: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: todayPK(),
   });
   const [attendanceState, setAttendanceState] = useState({});
 
@@ -986,7 +987,7 @@ function StudentSearchTab({ terms, type, instituteId }) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayPK());
   const [status, setStatus] = useState('present');
   const [leaveType, setLeaveType] = useState('sick_leave');
   const [scanType, setScanType] = useState('regular');

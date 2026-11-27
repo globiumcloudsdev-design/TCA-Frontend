@@ -26,8 +26,16 @@ export default function NotificationBell({ onClick }) {
     }
   };
 
+  // Real unread count from the inbox: on mount, every minute, and when the tab regains focus
   useEffect(() => {
     fetchUnreadCount();
+    const timer = setInterval(fetchUnreadCount, 60_000);
+    const onFocus = () => fetchUnreadCount();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   // Listen for real-time notifications to update badge

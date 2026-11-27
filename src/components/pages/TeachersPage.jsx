@@ -3,6 +3,7 @@
 
 'use client';
 
+import { todayPK } from '@/lib/dateUtils';
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -504,7 +505,7 @@ export default function TeachersPage({ type }) {
         searchPlaceholder={`Search ${teachersLabel.toLowerCase()}...`}
         enableColumnVisibility
         exportConfig={{
-          fileName: `${type}_teachers_${new Date().toISOString().split('T')[0]}`,
+          fileName: `${type}_teachers_${todayPK()}`,
           sheetName: teachersLabel
         }}
         pagination={{

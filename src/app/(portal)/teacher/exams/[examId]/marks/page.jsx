@@ -44,41 +44,25 @@ const validateMarkValue = (value, maxMarks) => {
   return { isValid: true, error: null };
 };
 
-// Mark input component
-const MarkInput = ({ value, onChange, maxMarks, error, disabled, studentId, subjectId }) => {
-  const [localValue, setLocalValue] = useState(value);
-  const debouncedValue = useDebounce(localValue, 300);
-
-  useEffect(() => {
-    if (debouncedValue !== value && debouncedValue !== undefined) {
-      onChange(studentId, subjectId, debouncedValue);
-    }
-  }, [debouncedValue, value, onChange, studentId, subjectId]);
-
-  const handleChange = (e) => {
-    const newValue = e.target.value;
-    setLocalValue(newValue);
-  };
-
-  return (
-    <div className="flex flex-col">
-      <Input
-        type="number"
-        min="0"
-        max={maxMarks}
-        step="0.5"
-        value={localValue}
-        onChange={handleChange}
-        disabled={disabled}
-        className={`w-full text-center px-2 py-1 text-sm ${
-          error ? 'border-red-500 bg-red-50' : 'border-gray-200'
-        } disabled:opacity-50`}
-        placeholder="-"
-      />
-      {error && <span className="text-red-500 text-xs mt-1">{error}</span>}
-    </div>
-  );
-};
+// Mark input component (fully controlled by the page state so refetches can never fight the user's typing)
+const MarkInput = ({ value, onChange, maxMarks, error, disabled, studentId, subjectId }) => (
+  <div className="flex flex-col">
+    <Input
+      type="number"
+      min="0"
+      max={maxMarks}
+      step="0.5"
+      value={value}
+      onChange={(e) => onChange(studentId, subjectId, e.target.value)}
+      disabled={disabled}
+      className={`w-full text-center px-2 py-1 text-sm ${
+        error ? 'border-red-500 bg-red-50' : 'border-gray-200'
+      } disabled:opacity-50`}
+      placeholder="-"
+    />
+    {error && <span className="text-red-500 text-xs mt-1">{error}</span>}
+  </div>
+);
 
 // Loading skeleton
 const LoadingSkeleton = () => (
@@ -99,6 +83,10 @@ export default function EnterMarksPage() {
 
   // State
   const [marks, setMarks] = useState({});
+  const [absent, setAbsent] = useState({}); // { [studentId]: true }
+  // Cells/students the teacher has edited: never overwritten by a refetch
+  const dirtyRef = useRef(new Set());
+  const knownStudentsRef = useRef(new Map());
   const [errors, setErrors] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -115,43 +103,50 @@ export default function EnterMarksPage() {
     refetch 
   } = useTeacherExamEntry(examId, { search: debouncedSearch, status: statusFilter });
 
-  // CRITICAL FIX: Initialize marks from fetched students
+  // Initialise from the server, but MERGE: anything the teacher has already edited is kept
+  // (a refetch caused by search/filter/focus must not wipe unsaved marks).
   useEffect(() => {
-    if (students && students.length > 0 && exam?.subject_schedules) {
-      const initialMarks = {};
-      
+    if (!students || students.length === 0 || !exam?.subject_schedules) return;
+    students.forEach((st) => knownStudentsRef.current.set(st.student_id, st));
+
+    setMarks((prev) => {
+      const next = { ...prev };
       students.forEach((student) => {
-        initialMarks[student.student_id] = {};
-        
-        // For each subject in exam (teacher's assigned subjects)
+        const row = { ...(next[student.student_id] || {}) };
         exam.subject_schedules.forEach((subject) => {
-          // Find if this student has existing marks for this subject
-          const existingSubjectMark = student.subject_marks?.find(
-            sm => sm.subject_id === subject.subject_id
-          );
-          
-          // Set the value - if exists, use it, otherwise empty string
-          initialMarks[student.student_id][subject.subject_id] = 
-            existingSubjectMark?.marks_obtained !== undefined && 
-            existingSubjectMark?.marks_obtained !== null &&
-            existingSubjectMark?.marks_obtained !== ''
-              ? existingSubjectMark.marks_obtained
+          const key = `${student.student_id}_${subject.subject_id}`;
+          if (dirtyRef.current.has(key)) return;
+          const existing = student.subject_marks?.find((sm) => sm.subject_id === subject.subject_id);
+          row[subject.subject_id] =
+            existing?.marks_obtained !== undefined && existing?.marks_obtained !== null && existing?.marks_obtained !== ''
+              ? existing.marks_obtained
               : '';
         });
+        next[student.student_id] = row;
       });
-      
-      console.log('Initialized marks:', initialMarks);
-      setMarks(initialMarks);
-    }
+      return next;
+    });
+
+    setAbsent((prev) => {
+      const next = { ...prev };
+      students.forEach((student) => {
+        if (dirtyRef.current.has(`absent_${student.student_id}`)) return;
+        const isAbsent = student.is_present === false || student.status === 'absent';
+        if (isAbsent) next[student.student_id] = true;
+        else delete next[student.student_id];
+      });
+      return next;
+    });
   }, [students, exam?.subject_schedules]);
 
   // Handle mark change
   const handleMarkChange = useCallback((studentId, subjectId, value) => {
+    dirtyRef.current.add(`${studentId}_${subjectId}`);
     setMarks((prev) => ({
       ...prev,
       [studentId]: {
         ...(prev[studentId] || {}),
-        [subjectId]: value === '' ? '' : parseFloat(value) || 0
+        [subjectId]: value === '' ? '' : value
       }
     }));
 
@@ -163,6 +158,16 @@ export default function EnterMarksPage() {
     });
   }, []);
 
+  const toggleAbsent = (studentId) => {
+    dirtyRef.current.add(`absent_${studentId}`);
+    setAbsent((prev) => {
+      const next = { ...prev };
+      if (next[studentId]) delete next[studentId];
+      else next[studentId] = true;
+      return next;
+    });
+  };
+
   // Validate all marks before submit
   const validateAllMarks = useCallback(() => {
     const newErrors = {};
@@ -173,7 +178,7 @@ export default function EnterMarksPage() {
     students.forEach((student) => {
       exam.subject_schedules.forEach((subject) => {
         const value = marks[student.student_id]?.[subject.subject_id];
-        if (value !== '' && value !== null && value !== undefined && value !== 0) {
+        if (!absent[student.student_id] && value !== '' && value !== null && value !== undefined) {
           const validation = validateMarkValue(value, subject.total_marks);
           if (!validation.isValid) {
             isValid = false;
@@ -184,7 +189,7 @@ export default function EnterMarksPage() {
     });
 
     return { isValid, errors: newErrors };
-  }, [marks, students, exam]);
+  }, [marks, students, exam, absent]);
 
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -197,24 +202,32 @@ export default function EnterMarksPage() {
       return;
     }
 
-    // Prepare results array - ONLY for subjects teacher is assigned to
-    const resultsToSubmit = students.map((student) => {
-      const subjectMarks = (exam?.subject_schedules || []).map((subject) => {
-        const marksValue = marks[student.student_id]?.[subject.subject_id];
-        return {
-          subject_id: subject.subject_id,
-          marks_obtained: marksValue !== '' && marksValue !== null && !isNaN(parseFloat(marksValue))
-            ? parseFloat(marksValue) 
-            : 0
-        };
+    // Build the payload from every student we have seen (not only the filtered rows).
+    // Blank cells are SKIPPED (never saved as 0). Absent students are sent as not present.
+    // Students with nothing entered and not marked absent are not sent at all.
+    const allStudents = Array.from(knownStudentsRef.current.values());
+    const resultsToSubmit = [];
+    allStudents.forEach((student) => {
+      if (absent[student.student_id]) {
+        resultsToSubmit.push({ student_id: student.student_id, subject_marks: [], is_present: false });
+        return;
+      }
+      const subjectMarks = [];
+      (exam?.subject_schedules || []).forEach((subject) => {
+        const raw = marks[student.student_id]?.[subject.subject_id];
+        if (raw === '' || raw === null || raw === undefined) return;
+        const num = parseFloat(raw);
+        if (isNaN(num)) return;
+        subjectMarks.push({ subject_id: subject.subject_id, marks_obtained: num });
       });
-
-      return {
-        student_id: student.student_id,
-        subject_marks: subjectMarks,
-        is_present: true
-      };
+      if (subjectMarks.length === 0) return;
+      resultsToSubmit.push({ student_id: student.student_id, subject_marks: subjectMarks, is_present: true });
     });
+
+    if (resultsToSubmit.length === 0) {
+      toast.error('Enter marks for at least one student (or mark them absent) before saving');
+      return;
+    }
 
     addResults(resultsToSubmit, {
       onSuccess: () => {
@@ -324,6 +337,7 @@ export default function EnterMarksPage() {
                     <th className="px-4 py-3 text-left font-semibold text-gray-700 text-sm w-12">#</th>
                     <th className="px-4 py-3 text-left font-semibold text-gray-700 text-sm">Student Name</th>
                     <th className="px-4 py-3 text-left font-semibold text-gray-700 text-sm w-24">Roll No.</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700 text-sm w-20">Absent</th>
                     {subjectSchedules.map((subject) => (
                       <th key={subject.subject_id} className="px-4 py-3 text-center font-semibold text-gray-700 text-sm min-w-[100px]">
                         <div>{subject.subject_name}</div>
@@ -345,6 +359,16 @@ export default function EnterMarksPage() {
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {student.student?.roll_number || '-'}
                       </td>
+                      <td className="px-4 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={!!absent[student.student_id]}
+                          onChange={() => toggleAbsent(student.student_id)}
+                          disabled={isAddingResults}
+                          aria-label="Absent"
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </td>
                       {subjectSchedules.map((subject) => {
                         // Get the current marks from state
                         const currentMarks = marks[student.student_id]?.[subject.subject_id];
@@ -357,7 +381,7 @@ export default function EnterMarksPage() {
                               onChange={handleMarkChange}
                               maxMarks={subject.total_marks}
                               error={errors[errorKey]}
-                              disabled={isAddingResults}
+                              disabled={isAddingResults || !!absent[student.student_id]}
                               studentId={student.student_id}
                               subjectId={subject.subject_id}
                             />

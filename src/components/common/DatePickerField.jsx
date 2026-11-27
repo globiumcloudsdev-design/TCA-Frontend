@@ -12,7 +12,8 @@
  *   className         string
  *   fromYear          number    default 1990
  *   toYear            number    default current year + 10
- *   disablePastDates  boolean   default false  (disable dates before today)
+ *   disablePastDates  boolean   default false  (disable dates before today, Asia/Karachi)
+ *   minDate/maxDate   "today" | "YYYY-MM-DD" | Date   (days outside are disabled; the trigger is a button so dates cannot be typed)
  *   disableFutureDates boolean  default false  (disable dates after today)
  *
  * Usage:
@@ -22,7 +23,7 @@
 
 import { useState } from 'react';
 import { Controller } from 'react-hook-form';
-import { format, parseISO, isValid, isBefore, isAfter, startOfDay, endOfDay } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,16 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
 import { cn, sanitizeFieldLabel } from '@/lib/utils';
+import { todayPK } from '@/lib/dateUtils';
+
+// Normalise minDate/maxDate ('today' | YYYY-MM-DD | Date) to a YYYY-MM-DD string.
+// 'today' and disablePastDates/disableFutureDates use Pakistan time (Asia/Karachi), not the browser zone.
+const toYmd = (v) => {
+  if (!v) return null;
+  if (v === 'today') return todayPK();
+  if (typeof v === 'string') return /^d{4}-d{2}-d{2}/.test(v) ? v.slice(0, 10) : null;
+  return isValid(v) ? format(v, 'yyyy-MM-dd') : null;
+};
 
 export default function DatePickerField({
   label,
@@ -59,23 +70,18 @@ export default function DatePickerField({
       if (!isValid(dateValue)) dateValue = null;
     }
 
-    // Build disabled matcher based on props
+    // Compare plain calendar-day strings so time zones can never shift a day.
+    const minStr = disablePastDates ? (toYmd(minDate) && toYmd(minDate) > todayPK() ? toYmd(minDate) : todayPK()) : toYmd(minDate);
+    const maxStr = disableFutureDates ? (toYmd(maxDate) && toYmd(maxDate) < todayPK() ? toYmd(maxDate) : todayPK()) : toYmd(maxDate);
+
     const disabledMatcher = (date) => {
-      const d = startOfDay(date);
-      if (disablePastDates && isBefore(d, startOfDay(new Date()))) return true;
-      if (disableFutureDates && isAfter(d, endOfDay(new Date()))) return true;
-      
-      if (minDate) {
-        const min = typeof minDate === 'string' ? startOfDay(parseISO(minDate)) : startOfDay(minDate);
-        if (isValid(min) && isBefore(d, min)) return true;
-      }
-      if (maxDate) {
-        const max = typeof maxDate === 'string' ? endOfDay(parseISO(maxDate)) : endOfDay(maxDate);
-        if (isValid(max) && isAfter(d, max)) return true;
-      }
-      
+      const ymd = format(date, 'yyyy-MM-dd');
+      if (minStr && ymd < minStr) return true;
+      if (maxStr && ymd > maxStr) return true;
       return false;
     };
+    const startMonth = minStr ? parseISO(minStr) : new Date(fromYear, 0, 1);
+    const endMonth = maxStr ? parseISO(maxStr) : new Date(toYear, 11, 31);
 
     return (
       <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -98,11 +104,13 @@ export default function DatePickerField({
             mode="single"
             selected={dateValue}
             onSelect={(d) => {
+              if (d && disabledMatcher(d)) return;
               fieldChange(d ? format(d, 'yyyy-MM-dd') : null);
               setIsOpen(false);
             }}
-            fromYear={fromYear}
-            toYear={toYear}
+            startMonth={startMonth}
+            endMonth={endMonth}
+            defaultMonth={dateValue || (minStr ? parseISO(minStr) : undefined)}
             captionLayout="dropdown"
             initialFocus
             disabled={disabledMatcher}
