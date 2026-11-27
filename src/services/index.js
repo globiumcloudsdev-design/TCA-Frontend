@@ -23,6 +23,7 @@ export { feeVoucherService, decomposeVouchersForPayment, computeVoucherMonthLabe
 export { feePaymentService }    from './feePaymentService';
 export { studentAttendanceService } from './studentAttendanceService';
 export { examService }          from './examService';
+export { testRecordService, teacherTestRecordService, parentTestRecordService, studentTestRecordService } from './testRecordService';
 export { feeService }           from './feeService';
 export { roleService }          from './roleService';
 export { schoolService }        from './schoolService';
