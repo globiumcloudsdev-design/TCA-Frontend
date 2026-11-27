@@ -125,8 +125,6 @@ export const teacherPortalService = {
 
   // Self Attendance
   getSelfAttendanceToday: () => api.get("/portal/teacher/self-attendance/today").then(unwrap),
-  selfCheckIn: (data) => api.post("/portal/teacher/self-attendance/check-in", data).then(unwrap),
-  selfCheckOut: (data) => api.post("/portal/teacher/self-attendance/check-out", data).then(unwrap),
   getSelfAttendanceHistory: (params = {}) => api.get("/portal/teacher/self-attendance/history", { params }).then(unwrap),
   getSelfAttendanceReport: (params = {}) => api.get("/portal/teacher/self-attendance/report", { params }).then(unwrap),
 

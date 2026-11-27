@@ -26,6 +26,11 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Shield, UserCog, MapPin } from 'lucide-react';
 import useAuthStore from '@/store/authStore';
+import CampusLocationSection from '@/components/forms/CampusLocationSection';
+import { RADIUS_MIN, RADIUS_MAX, RADIUS_DEFAULT } from '@/lib/coordinates';
+
+// Blank inputs must become null (z.coerce.number() would turn '' into 0)
+const emptyToNull = (v) => (v === '' || v === undefined ? null : v);
 
 // Permission Checkbox Component
 function PermissionCheckbox({ label, code, checked, onChange, disabled }) {
@@ -59,8 +64,12 @@ const branchSchema = z.object({
 
   // Location
   location: z.object({
-    latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
-    longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
+    latitude: z.preprocess(emptyToNull, z.coerce.number().min(-90, 'Latitude must be between -90 and 90').max(90, 'Latitude must be between -90 and 90').nullable()).optional(),
+    longitude: z.preprocess(emptyToNull, z.coerce.number().min(-180, 'Longitude must be between -180 and 180').max(180, 'Longitude must be between -180 and 180').nullable()).optional(),
+    attendance_radius_m: z.preprocess(
+      (v) => (v === '' || v === null || v === undefined ? RADIUS_DEFAULT : v),
+      z.coerce.number({ invalid_type_error: 'Enter a radius in metres' }).int('Radius must be a whole number').min(RADIUS_MIN, `Radius must be at least ${RADIUS_MIN} m`).max(RADIUS_MAX, `Radius can be at most ${RADIUS_MAX} m`)
+    ),
     address: z.string().optional().nullable(),
     place_id: z.string().optional().nullable()
   }).optional().default({}),
@@ -159,6 +168,7 @@ export default function BranchForm({
       location: {
         latitude: null,
         longitude: null,
+        attendance_radius_m: RADIUS_DEFAULT,
         address: '',
         place_id: ''
       },
@@ -200,11 +210,13 @@ export default function BranchForm({
     if (defaultValues && Object.keys(defaultValues).length > 0) {
       reset({
         ...defaultValues,
-        location: defaultValues.location || {
+        location: {
           latitude: null,
           longitude: null,
           address: defaultValues.address || '',
-          place_id: ''
+          place_id: '',
+          ...(defaultValues.location || {}),
+          attendance_radius_m: defaultValues.location?.attendance_radius_m ?? RADIUS_DEFAULT,
         },
         head: defaultValues.head || {
           first_name: defaultValues.head_name?.split(' ')[0] || '',
@@ -254,7 +266,15 @@ export default function BranchForm({
       email: data.email?.trim() || null,
       address: data.address?.trim() || null,
       city: data.city?.trim() || null,
-      location: data.location,
+      // Send only the keys the backend schema accepts; the server merges them into the stored location,
+      // so address/place_id are preserved (we send the values we loaded) and extra stored keys are never echoed back.
+      location: {
+        latitude: data.location?.latitude ?? null,
+        longitude: data.location?.longitude ?? null,
+        attendance_radius_m: data.location?.attendance_radius_m,
+        address: data.location?.address ?? '',
+        place_id: data.location?.place_id ?? '',
+      },
       settings: data.settings,
       is_active: data.is_active,
       is_main: data.is_main,
@@ -464,44 +484,7 @@ export default function BranchForm({
         <TabsContent value="location" forceMount className={cn(activeTab === 'location' ? 'block' : 'hidden')}>
           <Card>
             <CardContent className="p-4 space-y-4">
-              <h3 className="font-semibold">Branch Location</h3>
-              <p className="text-sm text-muted-foreground">
-                Enter location details manually
-              </p>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Controller
-                  name="location.latitude"
-                  control={control}
-                  render={({ field, fieldState: { error } }) => (
-                    <InputField
-                      label="Latitude"
-                      {...field}
-                      value={field.value ?? ''}
-                      error={error}
-                      type="number"
-                      step="any"
-                      placeholder="e.g. 31.5204"
-                    />
-                  )}
-                />
-
-                <Controller
-                  name="location.longitude"
-                  control={control}
-                  render={({ field, fieldState: { error } }) => (
-                    <InputField
-                      label="Longitude"
-                      {...field}
-                      value={field.value ?? ''}
-                      error={error}
-                      type="number"
-                      step="any"
-                      placeholder="e.g. 74.3587"
-                    />
-                  )}
-                />
-              </div>
+              <CampusLocationSection control={control} watch={watch} setValue={setValue} />
 
               {/* ✅ Using Controller for TextareaField */}
               <Controller
@@ -519,11 +502,6 @@ export default function BranchForm({
                 )}
               />
 
-              <div className="p-3 bg-yellow-50 rounded-md">
-                <p className="text-xs text-yellow-700">
-                  💡 Tip: You can get latitude and longitude from Google Maps by right-clicking on any location.
-                </p>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>

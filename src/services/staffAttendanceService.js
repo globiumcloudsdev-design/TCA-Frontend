@@ -10,6 +10,7 @@
  * DELETE /staff-attendance/:id
  */
 
+import { toDateStrPK } from '@/lib/dateUtils';
 import api from '@/lib/api';
 import { buildQuery } from '@/lib/utils';
 import { withFallback } from '@/lib/withFallback';
@@ -48,7 +49,7 @@ const normalizeDate = (value) => {
   if (!value) return undefined;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return undefined;
-  return d.toISOString().slice(0, 10);
+  return toDateStrPK(d);
 };
 
 const normalizeRecord = (row = {}) => {
@@ -73,6 +74,9 @@ const normalizeRecord = (row = {}) => {
     status: toLowerStatus(row.status),
     check_in: row.check_in || null,
     check_out: row.check_out || null,
+    // Geofence details from mobile check-in (shown when the backend provides them)
+    distance_m: row.distance_m ?? row.geo?.distance_m ?? row.check_in_distance_m ?? null,
+    accuracy_m: row.accuracy_m ?? row.geo?.accuracy_m ?? row.check_in_accuracy_m ?? null,
   };
 };
 
